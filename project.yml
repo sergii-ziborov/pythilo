@@ -1,0 +1,102 @@
+name: Pythilo
+
+options:
+  bundleIdPrefix: com.sergiiziborov
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: XMS5ZC28UJ
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    SUPPORTS_MACCATALYST: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # The Python support package ships one simulator stdlib per architecture
+    # and the embed script copies exactly one.
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]": x86_64
+    ONLY_ACTIVE_ARCH: YES
+
+packages:
+  PythiloGitCore:
+    path: Vendor/PythiloGitCore
+
+targets:
+  Pythilo:
+    type: application
+    platform: iOS
+    sources:
+      - path: Pythilo
+        excludes:
+          - PythonRuntime
+          - Resources/Info.plist
+    dependencies:
+      - framework: Vendor/Python.xcframework
+        embed: true
+      - package: PythiloGitCore
+        product: PythiloGit
+    info:
+      path: Pythilo/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Pythilo
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        ITSAppUsesNonExemptEncryption: false
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSSupportsOpeningDocumentsInPlace: true
+        UIFileSharingEnabled: true
+        UIApplicationSupportsIndirectInputEvents: true
+        UILaunchScreen: {}
+        UIRequiresFullScreen: false
+        UIUserInterfaceStyle: Automatic
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Pythilo opens the local web servers you start from your own Python projects.
+        NSHumanReadableCopyright: "© 2026 Serhii Ziborov. All rights reserved."
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sergiiziborov.Pythilo
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_OBJC_BRIDGING_HEADER: Pythilo/Runtime/Pythilo-Bridging-Header.h
+    postBuildScripts:
+      - name: Embed Python
+        script: '"$PROJECT_DIR/scripts/embed-python.sh"'
+        basedOnDependencyAnalysis: false
+  PythiloTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: PythiloTests
+    dependencies:
+      - target: Pythilo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sergiiziborov.PythiloTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Pythilo.app/Pythilo"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  Pythilo:
+    build:
+      targets:
+        Pythilo: all
+        PythiloTests: [test]
+    test:
+      config: Debug
+      targets:
+        - PythiloTests

@@ -1,0 +1,12 @@
+# Everything Pythilo bundles. Compiled packages come from BeeWare's iOS wheel
+# channel; scripts/vendor-packages.py builds one tree per platform from this.
+pip
+pytest
+pyflakes
+jedi
+django
+flask
+requests
+uvicorn
+starlette
+numpy
