@@ -17,6 +17,8 @@ rsync -au --delete --exclude '__pycache__' "$PROJECT_DIR/Pythilo/PythonRuntime/"
 packages="$PROJECT_DIR/build/app_packages/$platform"
 if [ -d "$packages" ]; then
   rsync -au --delete --exclude '__pycache__' --exclude '*.fwork' "$packages/" "$CODESIGNING_FOLDER_PATH/app_packages/"
+  # NumPy's static libraries are for building against it. App Store Connect refuses them.
+  find "$CODESIGNING_FOLDER_PATH/app_packages" -name '*.a' -delete
 else
   echo "warning: no bundled packages at $packages; run scripts/vendor-packages.py"
 fi

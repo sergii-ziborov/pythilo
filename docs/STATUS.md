@@ -75,6 +75,21 @@ the hinge here. The hinge reader itself has not been exercised. The sideways pho
 with the camera on the right, the external keyboard pill with a real keyboard, and
 the swipe gestures have not been driven by hand.
 
+## Device and TestFlight
+
+The test suite has not run on a physical iPhone yet: Xcode lost the connection to the
+phone each time. Run it with the phone unlocked and on a cable.
+
+TestFlight is uploaded by hand with `scripts/testflight.sh` and
+`scripts/testflight-finish.mjs`, built with Xcode 27.2. App Store Connect accepted build
+0.1.0 (1), which is in beta testing for the internal group. Two things to settle before an
+App Store release:
+
+- `ITSAppUsesNonExemptEncryption` is false, but the app ships OpenSSL with Python and
+  libgit2's HTTPS. Check the export compliance answer for this.
+- Crashes inside the prebuilt Python and NumPy frameworks will not symbolicate, because
+  those frameworks come without dSYMs.
+
 ## Not started
 
 - PyTorch and the Neural Engine (section 19, P0-F, P0-G)

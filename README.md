@@ -21,7 +21,9 @@ xcodebuild -project Pythilo.xcodeproj -scheme Pythilo -destination 'platform=iOS
 
 `python3 scripts/verify-lessons.py` checks the course files on the Mac.
 
-This repository has no CI or CD. Builds, tests and releases are run by hand.
+This repository has no CI or CD. Builds, tests and releases are run by hand. For
+TestFlight, `scripts/testflight.sh` archives and uploads, then
+`scripts/testflight-finish.mjs` waits for Apple and adds the notes and the internal group.
 
 ## Layout
 
