@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum AppSection: String, CaseIterable, Identifiable {
     case projects, learn, labs, playground
@@ -84,6 +85,18 @@ struct RootView: View {
         model.drawerOpen = defaults.bool(forKey: "drawer")
         if let line = defaults.string(forKey: "terminal") { model.panel = .terminal; model.runTerminal(line) }
         workspace = model
+        if defaults.bool(forKey: "startMCP") {
+            let host = MCPHost.shared
+            host.start(project: project)
+            host.workspace = model
+            for (permission, grant) in [(MCPPermission.run, MCPGrant.allow), (.commit, .allow)] { host.grants[permission] = grant }
+            let file = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appending(path: "mcp-token")
+            try? host.token.write(to: file, atomically: true, encoding: .utf8)
+        }
+        if defaults.string(forKey: "orientation") == "landscape",
+           let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first {
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { _ in }
+        }
     }
     #endif
 }

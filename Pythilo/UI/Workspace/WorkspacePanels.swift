@@ -166,7 +166,7 @@ struct OutputPanel: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
-                .background(AppTheme.panel)
+                .background(AppTheme.panel, ignoresSafeAreaEdges: [])
                 .onAppear { inputFocused = true }
             }
         }
@@ -213,7 +213,7 @@ struct TerminalPanel: View {
                 .padding(.horizontal, 10)
             }
             .frame(height: 52)
-            .background(AppTheme.panel)
+            .background(AppTheme.panel, ignoresSafeAreaEdges: [])
             HStack(spacing: 8) {
                 Text(session.phase == .waitingForInput ? ">" : "$")
                     .font(.system(size: 14, design: .monospaced))
@@ -233,7 +233,7 @@ struct TerminalPanel: View {
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 6)
-            .background(AppTheme.panel)
+            .background(AppTheme.panel, ignoresSafeAreaEdges: [])
         }
     }
 
@@ -348,7 +348,7 @@ struct DebugPanel: View {
         }
         .font(.system(size: 13.5, design: .monospaced))
         .padding(.vertical, 5)
-        .background(AppTheme.rail)
+        .background(AppTheme.rail, ignoresSafeAreaEdges: [])
         .onTapGesture { model.open(relative, line: pause.line) }
     }
 
@@ -378,7 +378,7 @@ struct DebugPanel: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .background(AppTheme.panel)
+            .background(AppTheme.panel, ignoresSafeAreaEdges: [])
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {

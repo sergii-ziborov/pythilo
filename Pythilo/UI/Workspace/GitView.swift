@@ -33,7 +33,7 @@ struct GitView: View {
                     emptyBody
                 }
             }
-            .background(AppTheme.background)
+            .background(AppTheme.background, ignoresSafeAreaEdges: [])
             .navigationTitle("Git")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

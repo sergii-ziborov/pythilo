@@ -53,6 +53,7 @@ struct RunControl: View {
             }
         }
         .buttonStyle(.plain)
+        .fixedSize()
     }
 
     private var runLabel: some View {
@@ -221,7 +222,7 @@ struct EditorPane: View {
                 ContentUnavailableView("No file open", systemImage: "doc", description: Text("Open the files and pick one, or swipe from the edge."))
             }
         }
-        .background(AppTheme.editor)
+        .background(AppTheme.editor, ignoresSafeAreaEdges: [])
         .overlay(alignment: .bottomTrailing) { completionList }
     }
 

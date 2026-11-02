@@ -109,7 +109,7 @@ struct PackagesView: View {
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
             }
-            .background(AppTheme.background)
+            .background(AppTheme.background, ignoresSafeAreaEdges: [])
             .navigationTitle("Packages")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }

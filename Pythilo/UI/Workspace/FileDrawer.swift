@@ -165,7 +165,7 @@ struct FileDrawerOverlay<Content: View>: View {
                 content()
                     .frame(width: width)
                     .frame(maxHeight: .infinity)
-                    .background(AppTheme.panel)
+                    .background(AppTheme.panel, ignoresSafeAreaEdges: [])
                     .overlay(alignment: side == .left ? .trailing : .leading) {
                         Rectangle().fill(AppTheme.border).frame(width: 1)
                     }

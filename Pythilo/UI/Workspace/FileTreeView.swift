@@ -351,7 +351,7 @@ struct NewItemSheet: View {
                 }
                 .padding(16)
             }
-            .background(AppTheme.panel)
+            .background(AppTheme.panel, ignoresSafeAreaEdges: [])
             .navigationTitle("New in \(target.folder ?? model.project.name)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

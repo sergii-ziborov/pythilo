@@ -25,10 +25,11 @@ struct WorkspaceView: View {
     var body: some View {
         GeometryReader { geometry in
             let layout = resolvedLayout(geometry)
-            let size = layout == .cover ? CGSize(width: min(466, geometry.size.width), height: min(678, geometry.size.height)) : geometry.size
+            let size = layoutSize(layout, geometry)
             ZStack {
                 AppTheme.background.ignoresSafeArea()
                 content(layout, size: size, safeArea: geometry.safeAreaInsets)
+                    .ignoresSafeArea(.container)
                 if usesDrawer(layout) { drawer(layout, size: size) }
             }
             .frame(width: size.width, height: size.height)
@@ -58,14 +59,31 @@ struct WorkspaceView: View {
         .background { shortcuts }
     }
 
+    private func layoutSize(_ layout: WorkspaceLayout, _ geometry: GeometryProxy) -> CGSize {
+        #if DEBUG
+        if let size = Self.fakeSize { return size }
+        #endif
+        return geometry.size
+    }
+
+    #if DEBUG
+    /// Device Hub cannot always drive the hinge, so debug launch arguments stand in
+    /// for it on a larger simulator: -fakeLayout laptop -fakeSize 669x951.
+    private static var fakeSize: CGSize? {
+        let parts = (UserDefaults.standard.string(forKey: "fakeSize") ?? "").split(separator: "x").compactMap { Double($0) }
+        return parts.count == 2 ? CGSize(width: parts[0], height: parts[1]) : nil
+    }
+    #endif
+
     private func resolvedLayout(_ geometry: GeometryProxy) -> WorkspaceLayout {
         #if DEBUG
-        // Device Hub cannot always drive the hinge, so a debug launch argument can
-        // stand in for it: -fakeLayout laptop | book | cover.
+        let size = Self.fakeSize ?? geometry.size
         switch UserDefaults.standard.string(forKey: "fakeLayout") {
-        case "laptop": return .duoLaptop(top: geometry.size.height / 2 - 12, hinge: 12)
-        case "book": return .duoBook(left: geometry.size.width / 2 - 6, hinge: 12)
+        case "laptop": return .duoLaptop(top: size.height / 2 - 12, hinge: 12)
+        case "book": return .duoBook(left: size.width / 2 - 6, hinge: 12)
         case "cover": return .cover
+        case "flat": return .duoFlat
+        case "padland": return .padLandscape
         default: break
         }
         #endif
@@ -185,7 +203,7 @@ struct WorkspaceView: View {
     private func dock(_ height: CGFloat = 50) -> some View {
         PanelDockBar(model: model)
             .frame(height: height)
-            .background(.ultraThinMaterial)
+            .background(.ultraThinMaterial, ignoresSafeAreaEdges: [])
             .overlay(alignment: .top) { hairline }
     }
 
@@ -251,7 +269,7 @@ struct WorkspaceView: View {
                         menu
                     }
                     .frame(height: 36)
-                    .background(AppTheme.rail)
+                    .background(AppTheme.rail, ignoresSafeAreaEdges: [])
                     hairline
                 }
                 ZStack(alignment: .bottomTrailing) {
@@ -262,7 +280,7 @@ struct WorkspaceView: View {
                                 Rectangle().fill(AppTheme.border).frame(width: 1)
                                 OutputPanel(model: model, showsStrip: true, fontSize: 13)
                                     .frame(width: min(364, size.width * 0.44))
-                                    .background(AppTheme.panel)
+                                    .background(AppTheme.panel, ignoresSafeAreaEdges: [])
                             }
                         }
                     } else {
@@ -299,31 +317,41 @@ struct WorkspaceView: View {
                 backButton
                 filesButton
                 // The camera sits in the middle of this edge.
-                Spacer(minLength: 136)
-                let lower: [WorkspacePanel] = [.code, .output, .terminal, .debug]
-                LazyVGrid(columns: [GridItem(.fixed(30), spacing: 0), GridItem(.fixed(30), spacing: 0)], spacing: 2) {
-                    ForEach(lower) { panel in
-                        Button {
-                            model.panel = panel
-                        } label: {
-                            Image(systemName: panel.systemImage)
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(model.panel == panel ? AppTheme.blue : AppTheme.muted)
-                                .frame(width: 30, height: 50)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(panel.title)
+                Spacer(minLength: 0)
+                VStack(spacing: 2) {
+                    HStack(spacing: 0) {
+                        railPanel(.code)
+                        railPanel(.problems)
                     }
+                    HStack(spacing: 0) {
+                        railPanel(.output)
+                        railPanel(.terminal)
+                    }
+                    railPanel(.debug)
                 }
             }
         }
         .padding(.vertical, 8)
         .frame(width: 62)
-        .background(AppTheme.rail)
+        .frame(maxHeight: .infinity)
+        .background(AppTheme.rail, ignoresSafeAreaEdges: [])
         .overlay(alignment: cameraIsOnLeading() ? .trailing : .leading) {
             Rectangle().fill(AppTheme.border).frame(width: 1)
         }
+    }
+
+    private func railPanel(_ panel: WorkspacePanel) -> some View {
+        Button {
+            model.panel = panel
+        } label: {
+            Image(systemName: panel.systemImage)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(model.panel == panel ? AppTheme.blue : AppTheme.muted)
+                .frame(width: 30, height: 40)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(panel.title)
     }
 
     // MARK: iPhone Duo
@@ -394,10 +422,10 @@ struct WorkspaceView: View {
                 hairline
                 PanelDockBar(model: model, panels: [.problems, .output, .terminal, .debug]).frame(height: 48)
                 hairline
-                ActivePanel(model: model, fallback: .terminal).frame(maxHeight: .infinity).background(AppTheme.panel)
+                ActivePanel(model: model, fallback: .terminal).frame(maxHeight: .infinity).background(AppTheme.panel, ignoresSafeAreaEdges: [])
             }
             .frame(width: left)
-            .background(AppTheme.rail)
+            .background(AppTheme.rail, ignoresSafeAreaEdges: [])
             Color.black.frame(width: hinge).accessibilityHidden(true)
             VStack(spacing: 0) {
                 HStack(spacing: 6) {
@@ -430,8 +458,8 @@ struct WorkspaceView: View {
                     onPackages: { showingPackages = true }
                 )
             }
-            .frame(width: 200)
-            .background(AppTheme.rail)
+            .frame(width: 216)
+            .background(AppTheme.rail, ignoresSafeAreaEdges: [])
             Rectangle().fill(AppTheme.border).frame(width: 1)
             VStack(spacing: 0) {
                 HStack(spacing: 6) {
@@ -448,7 +476,7 @@ struct WorkspaceView: View {
                     hairline
                     PanelDockBar(model: model, panels: [.problems, .output, .terminal, .debug]).frame(height: 50)
                     hairline
-                    ActivePanel(model: model).frame(height: 240).background(AppTheme.panel)
+                    ActivePanel(model: model).frame(height: 240).background(AppTheme.panel, ignoresSafeAreaEdges: [])
                 }
             }
         }
@@ -490,7 +518,7 @@ struct WorkspaceView: View {
                     }
                     .padding(.vertical, 8)
                     .frame(width: 58)
-                    .background(AppTheme.rail)
+                    .background(AppTheme.rail, ignoresSafeAreaEdges: [])
                     Rectangle().fill(AppTheme.border).frame(width: 1)
                     VStack(spacing: 0) {
                         Color.clear.frame(height: 40)
@@ -532,7 +560,7 @@ struct WorkspaceView: View {
                     .padding(.top, 8)
                 }
                 .frame(width: showsPreviewColumn ? 272 : 240)
-                .background(AppTheme.rail)
+                .background(AppTheme.rail, ignoresSafeAreaEdges: [])
                 Rectangle().fill(AppTheme.border).frame(width: 1)
             } else {
                 VStack(spacing: 4) {
@@ -544,7 +572,7 @@ struct WorkspaceView: View {
                 }
                 .padding(.vertical, 10)
                 .frame(width: 52)
-                .background(AppTheme.rail)
+                .background(AppTheme.rail, ignoresSafeAreaEdges: [])
                 Rectangle().fill(AppTheme.border).frame(width: 1)
             }
             VStack(spacing: 0) {
@@ -554,7 +582,7 @@ struct WorkspaceView: View {
                     RunControl(model: model, height: 40).padding(.trailing, 8)
                 }
                 .frame(height: 50)
-                .background(AppTheme.rail)
+                .background(AppTheme.rail, ignoresSafeAreaEdges: [])
                 hairline
                 EditorPane(model: model, bridge: bridge)
                     .overlay(alignment: .bottomTrailing) {
@@ -572,7 +600,7 @@ struct WorkspaceView: View {
                         ActivePanel(model: model)
                     }
                     .frame(height: bottomHeight)
-                    .background(AppTheme.panel)
+                    .background(AppTheme.panel, ignoresSafeAreaEdges: [])
                 }
             }
             if showsPreviewColumn, let url = model.previewURL {

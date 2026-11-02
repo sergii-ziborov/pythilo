@@ -532,8 +532,8 @@ final class WorkspaceModel {
 
     /// The address of the server the project started, once it prints one.
     func updatePreview(from text: String) {
-        guard let match = text.firstMatch(of: /http:\/\/(?:127\.0\.0\.1|localhost|0\.0\.0\.0):\d+[^\s"']*/) else { return }
-        let address = String(match.0).replacingOccurrences(of: "0.0.0.0", with: "127.0.0.1")
+        guard let match = text.firstMatch(of: /http:\/\/(?:127\.0\.0\.1|localhost|0\.0\.0\.0|\[::\]):\d+[^\s"']*/) else { return }
+        let address = String(match.0).replacingOccurrences(of: "0.0.0.0", with: "127.0.0.1").replacingOccurrences(of: "[::]", with: "127.0.0.1")
         previewURL = URL(string: address)
     }
 

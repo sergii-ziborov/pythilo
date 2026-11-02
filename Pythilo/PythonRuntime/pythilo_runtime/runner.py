@@ -21,6 +21,8 @@ from importlib.machinery import ExtensionFileLoader
 from . import emit_json, streams
 
 _baseline_modules = set()
+# The analysis thread can be inside these during a reset, whatever a run did.
+_editor_tools = {"pythilo_runtime", "pyflakes", "jedi", "parso"}
 _stdlib_root = ""
 _baseline_path = []
 _baseline_environment = {}
@@ -30,7 +32,7 @@ _baseline_cwd = ""
 
 def capture_baseline():
     global _baseline_modules, _stdlib_root, _baseline_path, _baseline_environment, _baseline_filters, _baseline_cwd
-    from . import debugger, notebook, shell  # noqa: F401
+    from . import analysis, debugger, labs, lessons, notebook, packages, shell  # noqa: F401
 
     _stdlib_root = os.path.dirname(os.__file__)
     _baseline_modules = set(sys.modules)
@@ -58,7 +60,8 @@ def _sticky_packages():
 def _purge_modules():
     sticky = _sticky_packages()
     for name, module in list(sys.modules.items()):
-        if name in _baseline_modules or name.partition(".")[0] in sticky:
+        top = name.partition(".")[0]
+        if name in _baseline_modules or top in sticky or top in _editor_tools:
             continue
         origin = _origin(module)
         if origin in ("built-in", "frozen"):

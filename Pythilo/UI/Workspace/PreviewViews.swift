@@ -50,7 +50,7 @@ struct PreviewColumn: View {
             Rectangle().fill(AppTheme.border).frame(height: 1)
             WebPreview(url: url, reloadToken: reloads)
         }
-        .background(AppTheme.panel)
+        .background(AppTheme.panel, ignoresSafeAreaEdges: [])
     }
 }
 
@@ -67,7 +67,7 @@ struct PreviewSheet: View {
                         Rectangle().fill(AppTheme.border).frame(height: 1)
                         OutputTextView(chunks: model.session.terminalOutput, revision: model.session.terminalRevision, fontSize: 12.5)
                             .frame(height: 128)
-                            .background(AppTheme.panel)
+                            .background(AppTheme.panel, ignoresSafeAreaEdges: [])
                     }
                 } else {
                     ContentUnavailableView("The server has stopped", systemImage: "globe")
