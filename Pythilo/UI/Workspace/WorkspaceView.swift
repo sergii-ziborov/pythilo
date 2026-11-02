@@ -613,6 +613,8 @@ struct WorkspaceView: View {
 
     private var padPanelTabs: some View {
         HStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 0) {
             ForEach([WorkspacePanel.problems, .output, .terminal, .debug]) { panel in
                 let active = model.panel == panel
                 Button {
@@ -625,6 +627,8 @@ struct WorkspaceView: View {
                         }
                     }
                     .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .fixedSize()
                     .foregroundStyle(active ? AppTheme.blue : AppTheme.muted)
                     .padding(.horizontal, 14)
                     .frame(height: 42)
@@ -636,7 +640,8 @@ struct WorkspaceView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("panel-\(panel.rawValue)")
             }
-            Spacer()
+            }
+            }
             if model.previewURL != nil { previewButton.scaleEffect(0.82) }
             Button {
                 bottomPanelVisible = false

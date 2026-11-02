@@ -322,9 +322,17 @@ struct ShortcutPill: View {
     let onShowKeys: () -> Void
 
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            pill(["⌘R Run", "⌘. Stop", "⌘B Files", "⌘J Panel", "⌘P Open"])
+            pill(["⌘R Run", "⌘. Stop"])
+            pill([])
+        }
+    }
+
+    private func pill(_ items: [String]) -> some View {
         HStack(spacing: 2) {
-            ForEach(["⌘R Run", "⌘. Stop", "⌘B Files", "⌘J Panel", "⌘P Open"], id: \.self) { item in
-                Text(item).padding(.horizontal, 7)
+            ForEach(items, id: \.self) { item in
+                Text(item).lineLimit(1).fixedSize().padding(.horizontal, 7)
             }
             Button(action: onShowKeys) {
                 Image(systemName: "keyboard")

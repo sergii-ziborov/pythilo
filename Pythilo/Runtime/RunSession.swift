@@ -93,8 +93,14 @@ final class RunSession {
 
     private func flushOutput() {
         for (stream, text) in pendingLock.drain() {
-            append(stream == .stdout ? .stdout : .stderr, text)
+            append(stream == .stdout ? .stdout : .stderr, Self.withoutTerminalColors(text))
         }
+    }
+
+    /// Servers colour their logs for a terminal. This view has no such codes.
+    nonisolated static func withoutTerminalColors(_ text: String) -> String {
+        guard text.contains("\u{1B}") else { return text }
+        return text.replacing(/\x{1B}\[[0-9;]*[A-Za-z]/, with: "")
     }
 
     private func handle(_ event: PythonEvent) {

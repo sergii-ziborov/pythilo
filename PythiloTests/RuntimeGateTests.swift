@@ -61,6 +61,11 @@ final class RuntimeGateTests: XCTestCase {
         return session.lastOutcome!
     }
 
+    func testTerminalColorsAreRemovedFromOutput() {
+        XCTAssertEqual(RunSession.withoutTerminalColors("\u{1B}[31m\u{1B}[1mWARNING\u{1B}[0m plain"), "WARNING plain")
+        XCTAssertEqual(RunSession.withoutTerminalColors("plain [31m"), "plain [31m")
+    }
+
     func testPrintAndFileAndVersion() async throws {
         let outcome = try await run("""
         import sys, os
