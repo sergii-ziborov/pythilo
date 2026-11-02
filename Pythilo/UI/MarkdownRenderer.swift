@@ -125,6 +125,20 @@ enum MarkdownRenderer {
         }
     }
 
+    /// Inline markdown for a `Text` that sets its own font: code spans turn monospaced
+    /// and tinted, the rest keeps the view's font and colour.
+    static func inlineText(_ text: String) -> AttributedString {
+        var line = (try? AttributedString(
+            markdown: text,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(text)
+        for run in line.runs where run.inlinePresentationIntent?.contains(.code) == true {
+            line[run.range].font = .system(size: 14.5, weight: .medium, design: .monospaced)
+            line[run.range].foregroundColor = AppTheme.selectionInk
+        }
+        return line
+    }
+
     /// Inline markdown only — bold, code spans, links — which AttributedString
     /// already handles correctly once the block structure is out of the way.
     private static func inline(_ text: String) -> AttributedString {

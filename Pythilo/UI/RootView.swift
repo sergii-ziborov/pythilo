@@ -74,6 +74,7 @@ struct RootView: View {
     /// For screenshots: -openTemplate django -panel terminal -drawer YES.
     private func openFromLaunchArguments() {
         let defaults = UserDefaults.standard
+        if let tab = defaults.string(forKey: "tab").flatMap(AppSection.init(rawValue:)) { section = tab }
         guard let id = defaults.string(forKey: "openTemplate"),
               let template = ProjectTemplate.all.first(where: { $0.id == id }) else { return }
         let existing = store.projects.first { $0.name == "shot-\(id)" }

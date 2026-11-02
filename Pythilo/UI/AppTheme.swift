@@ -66,7 +66,7 @@ enum AppTheme {
     static var warnPanel: Color { adaptive(light: 0xFBF3DC, dark: 0x1D1A0E) }
     static let run = Color(uiColor: UIColor(hex: 0xFFD43B))
     static let onRun = Color(uiColor: UIColor(hex: 0x14110A))
-    static let onBlue = Color(uiColor: UIColor(hex: 0x07121F))
+    static var onBlue: Color { adaptive(light: 0xFFFFFF, dark: 0x07121F) }
 
     static let mono = Font.system(size: 13, design: .monospaced)
 }
