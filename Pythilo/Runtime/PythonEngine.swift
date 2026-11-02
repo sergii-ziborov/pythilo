@@ -15,6 +15,7 @@ enum PythonEvent: Sendable {
     case problems(token: String, path: String, [PythonProblem])
     case completions(token: String, [PythonCompletion])
     case cell(CellEvent)
+    case custom(kind: String, data: Data)
 }
 
 enum RunStream: Sendable {
@@ -181,7 +182,7 @@ final class PythonEngine: @unchecked Sendable {
             struct End: Decodable { let cell: String; let ok: Bool }
             return (try? decoder.decode(End.self, from: data)).map { .cell(.ended(cell: $0.cell, ok: $0.ok)) }
         default:
-            return nil
+            return .custom(kind: kind, data: data)
         }
     }
 

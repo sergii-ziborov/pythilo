@@ -15,6 +15,11 @@ enum RunPhase: Equatable, Sendable {
     case unresponsive
 }
 
+enum OutputChannel: Sendable {
+    case output
+    case terminal
+}
+
 struct OutputChunk: Identifiable, Equatable, Sendable {
     enum Kind: Sendable { case stdout, stderr, input, system }
     let id: Int
@@ -35,7 +40,13 @@ final class RunSession {
     private(set) var pythonVersion: String?
     private(set) var hostError: String?
     private(set) var output: [OutputChunk] = []
+    private(set) var terminalOutput: [OutputChunk] = []
+    /// Bumps on every change, so a text view can tell an append from a clear.
+    private(set) var outputRevision = 0
+    private(set) var terminalRevision = 0
     private(set) var droppedCharacters = 0
+    private(set) var activeChannel: OutputChannel = .output
+    private(set) var runStartedAt: Date?
     private(set) var lastOutcome: RunOutcome?
     private(set) var debugPause: DebugPause?
     private(set) var debugEvaluations: [DebugEvaluation] = []
@@ -47,10 +58,12 @@ final class RunSession {
     var onProblems: ((String, String, [PythonProblem]) -> Void)?
     var onCompletions: ((String, [PythonCompletion]) -> Void)?
     var onCell: ((CellEvent) -> Void)?
+    var onCustom: ((String, Data) -> Void)?
 
     private let engine: PythonEngine
     private var nextChunk = 0
     private var outputCount = 0
+    private var terminalCount = 0
     private var escalation: Task<Void, Never>?
     private let pendingLock = PendingOutput()
 
@@ -124,21 +137,42 @@ final class RunSession {
             onCompletions?(token, items)
         case let .cell(cell):
             onCell?(cell)
+        case let .custom(kind, data):
+            onCustom?(kind, data)
         }
     }
 
-    private func append(_ kind: OutputChunk.Kind, _ text: String) {
-        if let last = output.indices.last, output[last].kind == kind, output[last].text.utf8.count < 16_000 {
-            output[last].text += text
-        } else {
-            output.append(OutputChunk(id: nextChunk, kind: kind, text: text))
-            nextChunk += 1
+    private func append(_ kind: OutputChunk.Kind, _ text: String, channel: OutputChannel? = nil) {
+        switch channel ?? activeChannel {
+        case .output:
+            Self.add(kind, text, to: &output, count: &outputCount, dropped: &droppedCharacters, next: &nextChunk)
+            outputRevision += 1
+        case .terminal:
+            var dropped = 0
+            Self.add(kind, text, to: &terminalOutput, count: &terminalCount, dropped: &dropped, next: &nextChunk)
+            terminalRevision += 1
         }
-        outputCount += text.utf8.count
-        while outputCount > Self.maximumOutput, output.count > 1 {
-            let removed = output.removeFirst()
-            outputCount -= removed.text.utf8.count
-            droppedCharacters += removed.text.utf8.count
+    }
+
+    private static func add(
+        _ kind: OutputChunk.Kind,
+        _ text: String,
+        to chunks: inout [OutputChunk],
+        count: inout Int,
+        dropped: inout Int,
+        next: inout Int
+    ) {
+        if let last = chunks.indices.last, chunks[last].kind == kind, chunks[last].text.utf8.count < 16_000 {
+            chunks[last].text += text
+        } else {
+            chunks.append(OutputChunk(id: next, kind: kind, text: text))
+            next += 1
+        }
+        count += text.utf8.count
+        while count > maximumOutput, chunks.count > 1 {
+            let removed = chunks.removeFirst()
+            count -= removed.text.utf8.count
+            dropped += removed.text.utf8.count
         }
     }
 
@@ -146,6 +180,17 @@ final class RunSession {
         output = []
         outputCount = 0
         droppedCharacters = 0
+        outputRevision += 1
+    }
+
+    func clearTerminal() {
+        terminalOutput = []
+        terminalCount = 0
+        terminalRevision += 1
+    }
+
+    func noteTerminal(_ text: String, kind: OutputChunk.Kind = .system) {
+        append(kind, text, channel: .terminal)
     }
 
     func note(_ text: String) {
@@ -157,8 +202,10 @@ final class RunSession {
     }
 
     @discardableResult
-    func submit(_ job: [String: Any], label: String) -> String? {
+    func submit(_ job: [String: Any], label: String, channel: OutputChannel = .output) -> String? {
         guard phase == .idle else { return nil }
+        activeChannel = channel
+        runStartedAt = Date()
         let id = UUID().uuidString
         var job = job
         job["id"] = id

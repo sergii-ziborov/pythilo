@@ -230,6 +230,18 @@ def _perform(job):
         from . import notebook
 
         notebook.run_cell(job)
+    elif kind == "lesson_check":
+        from . import lessons
+
+        lessons.check(job)
+    elif kind == "lab_trace":
+        from . import labs
+
+        labs.trace_sort(job)
+    elif kind == "lab_measure":
+        from . import labs
+
+        labs.measure_sort(job)
     elif kind == "notebook_reset":
         from . import notebook
 

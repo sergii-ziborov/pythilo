@@ -20,6 +20,9 @@ settings:
     # and the embed script copies exactly one.
     "EXCLUDED_ARCHS[sdk=iphonesimulator*]": x86_64
     ONLY_ACTIVE_ARCH: YES
+    # The fold reserved-region API first appears in the iOS 27.1 SDK.
+    "SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphoneos27.1*]": "$(inherited) PYTHILO_DUO_SDK"
+    "SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator27.1*]": "$(inherited) PYTHILO_DUO_SDK"
 
 packages:
   PythiloGitCore:
@@ -34,6 +37,10 @@ targets:
         excludes:
           - PythonRuntime
           - Resources/Info.plist
+          - Resources/Courses
+      - path: Pythilo/Resources/Courses
+        type: folder
+        buildPhase: resources
     dependencies:
       - framework: Vendor/Python.xcframework
         embed: true
