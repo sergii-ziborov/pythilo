@@ -1,0 +1,368 @@
+{
+  "id": "foundations",
+  "title": "Python foundations",
+  "summary": "Values, control flow, data structures, errors and files.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "values-and-names",
+      "title": "Values and names",
+      "body": "# Values and names\n\nEverything Python works with is a value, and every value has a type. A name is a label that points at a value. Assignment with `=` attaches the label. It never copies anything.\n\n```python\na = [1, 2]\nb = a        # same list, two names\nb.append(3)\nprint(a)     # [1, 2, 3]\na = \"text\"   # a now points elsewhere\nprint(b)     # still [1, 2, 3]\n```\n\n## Looking at a value\n\n- `type(x).__name__` gives the name of its type.\n- `repr(x)` gives an unambiguous text form, with quotes around strings.\n- `None` is the value that means \"nothing here\".\n- `==` compares values. `is` asks whether two names point at the same object, so keep it for `None`.\n\nThe right side of an assignment runs first, which is why `x, y = y, x` swaps two names without a temporary variable.",
+      "task": "Write `describe(value)` returning `\"<type name>: <repr of value>\"`, and `swap(a, b)` returning `(b, a)`. At the end of the file, print `describe(42)`.",
+      "starter": "def describe(value):\n    # Return \"<type name>: <repr of value>\"\n    pass\n\n\ndef swap(a, b):\n    # Return the two values in reverse order\n    pass\n\n\n# Print describe(42) here\n",
+      "solution": "def describe(value):\n    return type(value).__name__ + \": \" + repr(value)\n\n\ndef swap(a, b):\n    return b, a\n\n\nprint(describe(42))\n",
+      "checks": [
+        {
+          "name": "describes an int",
+          "code": "assert describe(3) == \"int: 3\", describe(3)"
+        },
+        {
+          "name": "strings keep their quotes",
+          "code": "assert describe(\"hi\") == \"str: 'hi'\", describe(\"hi\")"
+        },
+        {
+          "name": "None and lists have types too",
+          "code": "assert describe(None) == \"NoneType: None\", describe(None)\nassert describe([1]) == \"list: [1]\", describe([1])"
+        },
+        {
+          "name": "swap reverses a pair",
+          "code": "assert swap(1, \"x\") == (\"x\", 1), swap(1, \"x\")\nassert swap(None, None) == (None, None), swap(None, None)"
+        },
+        {
+          "name": "prints describe(42)",
+          "code": "assert \"int: 42\" in _stdout, _stdout"
+        }
+      ],
+      "hints": [
+        "`type(value)` gives the type itself. You want its name as text.",
+        "`type(value).__name__` is the name and `repr(value)` is the text form. Join them with `\": \"`.",
+        "`return type(value).__name__ + \": \" + repr(value)`, and `return b, a` for the swap."
+      ],
+      "explanation": "`repr` is the form meant for programmers, so `\"hi\"` keeps its quotes and is easy to tell apart from the number or name it might look like.\n\n`return b, a` builds a tuple. Commas make tuples, not parentheses. The same mechanism on the left side of `=` is what makes `x, y = y, x` work."
+    },
+    {
+      "id": "strings-and-fstrings",
+      "title": "Strings and f-strings",
+      "body": "# Strings and f-strings\n\nA string is an immutable sequence of characters. Methods return new strings and leave the original alone.\n\n- `s.strip()` removes surrounding whitespace.\n- `s.split()` breaks on any run of whitespace and returns a list.\n- `\"-\".join(parts)` glues a list back together.\n- `s.upper()`, `s.lower()` and `s[0]` do what they look like.\n\n## f-strings\n\nPut `f` before the quote and expressions inside braces. After a colon you can add a format spec.\n\n```python\nname = \"Ada\"\ncost = 3.5\nprint(f\"{name}: {cost:.2f}\")\nprint(f\"[{name:<6}]\")   # [Ada   ]\nprint(f\"[{cost:>6.2f}]\")  # [  3.50]\nprint(f\"{cost = }\")     # cost = 3.5\n```\n\n`<` pads on the right, `>` pads on the left, and the number is the minimum width. Text longer than the width is not cut.\n\nPython 3.14 also adds t-strings, a template form aimed at libraries. For everyday text, f-strings are the tool.",
+      "task": "Write `receipt_line(name, price, qty)` returning the name padded to width 10, a space, `x` and the quantity, a space, then `price * qty` right-aligned in width 7 with 2 decimals. Write `initials(full_name)` returning the upper-case first letter of each word.",
+      "starter": "def receipt_line(name, price, qty):\n    return name\n\n\ndef initials(full_name):\n    return \"\"\n",
+      "solution": "def receipt_line(name, price, qty):\n    total = price * qty\n    return f\"{name:<10} x{qty} {total:>7.2f}\"\n\n\ndef initials(full_name):\n    words = full_name.split()\n    return \"\".join(w[0].upper() for w in words)\n",
+      "checks": [
+        {
+          "name": "formats a line",
+          "code": "got = receipt_line(\"Tea\", 3.5, 2)\nassert got == \"Tea        x2    7.00\", repr(got)"
+        },
+        {
+          "name": "long names are not cut",
+          "code": "got = receipt_line(\"Cappuccino grande\", 4, 1)\nassert got == \"Cappuccino grande x1    4.00\", repr(got)"
+        },
+        {
+          "name": "large totals still fit",
+          "code": "got = receipt_line(\"Desk\", 1234.5, 3)\nassert got == \"Desk       x3 3703.50\", repr(got)"
+        },
+        {
+          "name": "initials",
+          "code": "assert initials(\"ada lovelace\") == \"AL\", initials(\"ada lovelace\")"
+        },
+        {
+          "name": "extra spaces and empty names",
+          "code": "assert initials(\"  grace   brewster hopper \") == \"GBH\", initials(\"  grace   brewster hopper \")\nassert initials(\"\") == \"\", initials(\"\")"
+        }
+      ],
+      "hints": [
+        "Each part of the line maps to one format spec: `<10` for the name and `>7.2f` for the total.",
+        "`split()` with no argument ignores extra whitespace, so empty words never appear in `initials`.",
+        "`f\"{name:<10} x{qty} {total:>7.2f}\"` for the line, and `\"\".join(w[0].upper() for w in full_name.split())` for the initials."
+      ],
+      "explanation": "Format specs keep layout in one place instead of counting spaces by hand. The width is a minimum, which is why a long name pushes the rest of the line right instead of being cut.\n\n`split()` with no argument treats any run of whitespace as one separator, so `w[0]` is always safe. `split(\" \")` would produce empty strings for double spaces, and `w[0]` would then raise `IndexError`."
+    },
+    {
+      "id": "numbers",
+      "title": "Numbers",
+      "body": "# Numbers\n\n`int` has no size limit. `float` is a 64-bit binary fraction, so most decimals are stored only approximately.\n\n```python\nprint(7 / 2)    # 3.5, always a float\nprint(7 // 2)   # 3\nprint(-7 // 2)  # -4, rounds down\nprint(7 % 2)    # 1\nprint(2 ** 100) # exact, however large\nprint(divmod(7, 2))  # (3, 1)\n```\n\n## Comparing floats\n\n```python\nprint(0.1 + 0.2 == 0.3)  # False\nimport math\nprint(math.isclose(0.1 + 0.2, 0.3))  # True\n```\n\n`math.isclose` compares relative to the size of the numbers. Near zero that fails, because nothing is close relative to zero, so pass `abs_tol` too.\n\n`round` sends exact halves to the nearest even number: `round(2.5)` is `2` and `round(3.5)` is `4`. For money, count whole cents in an `int` or use `decimal.Decimal`.",
+      "task": "Write `split_bill(total_cents, people)` returning `(share, left_over)` in whole cents. Write `almost_equal(a, b)` using `math.isclose` with `abs_tol=1e-9`.",
+      "starter": "import math\n\n\ndef split_bill(total_cents, people):\n    return (total_cents / people, 0)\n\n\ndef almost_equal(a, b):\n    return a == b\n",
+      "solution": "import math\n\n\ndef split_bill(total_cents, people):\n    return divmod(total_cents, people)\n\n\ndef almost_equal(a, b):\n    return math.isclose(a, b, abs_tol=1e-9)\n",
+      "checks": [
+        {
+          "name": "splits with a remainder",
+          "code": "assert split_bill(1000, 3) == (333, 1), split_bill(1000, 3)"
+        },
+        {
+          "name": "even split leaves nothing",
+          "code": "assert split_bill(900, 3) == (300, 0), split_bill(900, 3)"
+        },
+        {
+          "name": "shares are whole numbers",
+          "code": "share, left = split_bill(5, 10)\nassert (share, left) == (0, 5), (share, left)\nassert isinstance(share, int), type(share)"
+        },
+        {
+          "name": "float noise is ignored",
+          "code": "assert almost_equal(0.1 + 0.2, 0.3), \"0.1 + 0.2 should count as 0.3\"\nassert not almost_equal(1.0, 1.1), \"1.0 and 1.1 are different\""
+        },
+        {
+          "name": "works near zero",
+          "code": "assert almost_equal(1e-12, 0.0), \"needs abs_tol to work near zero\""
+        }
+      ],
+      "hints": [
+        "You want two results from one division. Python has a builtin for exactly that.",
+        "`/` always gives a float. `//` and `%` keep whole numbers, and `divmod` returns both at once.",
+        "`return divmod(total_cents, people)`, and `return math.isclose(a, b, abs_tol=1e-9)`."
+      ],
+      "explanation": "`divmod(a, b)` returns `(a // b, a % b)`. Keeping money in integer cents means no result is ever approximate.\n\n`isclose` defaults to a relative tolerance of `1e-09`. Relative to zero, that tolerance is zero, so `isclose(1e-12, 0.0)` is false without `abs_tol`."
+    },
+    {
+      "id": "branching",
+      "title": "Branching",
+      "body": "# Branching\n\n`if`, `elif` and `else` run the first block whose condition is true. Indentation marks the block.\n\n```python\ndef label(n):\n    if n < 0:\n        return \"negative\"\n    elif n == 0:\n        return \"zero\"\n    else:\n        return \"positive\"\n```\n\n## Truthiness\n\nAny value can be a condition. These count as false: `0`, `0.0`, `\"\"`, `[]`, `{}`, `None` and `False`. Almost everything else is true.\n\n## Combining conditions\n\n- `and`, `or` and `not` combine conditions and stop as soon as the answer is known.\n- Comparisons chain: `0 < x <= 10` means `0 < x and x <= 10`.\n- `a if condition else b` is an expression, handy for short choices.\n\nConditions are checked from top to bottom. Order them so that an earlier test does not swallow a case meant for a later one. Boundaries are where most branching bugs live, so test them first.",
+      "task": "Write `shipping_cost(weight_kg, express=False)`: 0 for weight 0 or less, 5 up to and including 1 kg, 9 up to and including 5 kg, 15 above that, and express doubles the price. Write `is_leap(year)` for the Gregorian rule: divisible by 4, except centuries, unless divisible by 400.",
+      "starter": "def shipping_cost(weight_kg, express=False):\n    if weight_kg < 1:\n        return 5\n    return 9\n\n\ndef is_leap(year):\n    return year % 4 == 0\n",
+      "solution": "def shipping_cost(weight_kg, express=False):\n    if weight_kg <= 0:\n        return 0\n    if weight_kg <= 1:\n        cost = 5\n    elif weight_kg <= 5:\n        cost = 9\n    else:\n        cost = 15\n    return cost * 2 if express else cost\n\n\ndef is_leap(year):\n    if year % 400 == 0:\n        return True\n    if year % 100 == 0:\n        return False\n    return year % 4 == 0\n",
+      "checks": [
+        {
+          "name": "price bands",
+          "code": "for weight, want in [(0.5, 5), (3, 9), (10, 15)]:\n    assert shipping_cost(weight) == want, (weight, shipping_cost(weight))"
+        },
+        {
+          "name": "boundaries are inclusive",
+          "code": "assert shipping_cost(1) == 5, shipping_cost(1)\nassert shipping_cost(5) == 9, shipping_cost(5)"
+        },
+        {
+          "name": "nothing to ship",
+          "code": "assert shipping_cost(0) == 0, shipping_cost(0)\nassert shipping_cost(-2, express=True) == 0, shipping_cost(-2, express=True)"
+        },
+        {
+          "name": "express doubles",
+          "code": "assert shipping_cost(1, express=True) == 10, shipping_cost(1, express=True)\nassert shipping_cost(6, express=True) == 30, shipping_cost(6, express=True)"
+        },
+        {
+          "name": "leap years",
+          "code": "assert is_leap(2024) and is_leap(2000), \"2024 and 2000 are leap years\"\nassert not is_leap(2023) and not is_leap(1900), \"2023 and 1900 are not\""
+        }
+      ],
+      "hints": [
+        "Handle the zero case first and return early, so the remaining branches only see real weights.",
+        "Pick the base price with `if`/`elif`/`else`, then apply express once at the end. For leap years, test the most specific rule first.",
+        "`if weight_kg <= 1: cost = 5`, `elif weight_kg <= 5: cost = 9`, `else: cost = 15`, then `return cost * 2 if express else cost`. For leap years test `% 400`, then `% 100`, then `% 4`."
+      ],
+      "explanation": "Returning early for the special case keeps the main logic flat. Each `elif` only runs when earlier conditions were false, so `weight_kg <= 5` already implies the weight is over 1.\n\nThe leap rule reads most clearly from the narrowest case outward: 400 wins over 100, and 100 wins over 4."
+    },
+    {
+      "id": "loops",
+      "title": "Loops",
+      "body": "# Loops\n\n`for` walks over anything iterable. `while` repeats as long as a condition holds.\n\n```python\nfor i in range(3):\n    print(i)        # 0, 1, 2\n\nnames = [\"a\", \"b\"]\nfor i, n in enumerate(names):\n    print(i, n)     # 0 a, then 1 b\n\nfor x, y in zip([1, 2], [3, 4]):\n    print(x + y)    # 4, then 6\n```\n\n- `range(stop)` stops before `stop`. `range(start, stop, step)` also works, including negative steps.\n- `enumerate` gives you the position without index arithmetic.\n- `zip` stops at the shortest input.\n- `break` leaves the loop. `continue` skips to the next pass.\n\nPrefer `for` when you know what you are walking over. Use `while` when you only know when to stop:\n\n```python\nn = 40\nwhile n > 1:\n    n = n // 2\nprint(n)  # 1\n```",
+      "task": "Write `collatz_steps(n)`: repeatedly halve even numbers and turn odd `n` into `3 * n + 1`, returning how many steps it takes to reach 1. Write `first_negative_index(numbers)` returning the index of the first negative number, or -1 if there is none.",
+      "starter": "def collatz_steps(n):\n    steps = 0\n    return steps\n\n\ndef first_negative_index(numbers):\n    return 0\n",
+      "solution": "def collatz_steps(n):\n    steps = 0\n    while n != 1:\n        if n % 2 == 0:\n            n = n // 2\n        else:\n            n = 3 * n + 1\n        steps += 1\n    return steps\n\n\ndef first_negative_index(numbers):\n    for i, number in enumerate(numbers):\n        if number < 0:\n            return i\n    return -1\n",
+      "checks": [
+        {
+          "name": "already at one",
+          "code": "assert collatz_steps(1) == 0, collatz_steps(1)"
+        },
+        {
+          "name": "counts steps",
+          "code": "assert collatz_steps(6) == 8, collatz_steps(6)\nassert collatz_steps(27) == 111, collatz_steps(27)"
+        },
+        {
+          "name": "stays an int",
+          "code": "assert collatz_steps(2**40) == 40, collatz_steps(2**40)"
+        },
+        {
+          "name": "finds the first negative",
+          "code": "assert first_negative_index([1, -2, -3]) == 1, first_negative_index([1, -2, -3])\nassert first_negative_index([-5]) == 0, first_negative_index([-5])"
+        },
+        {
+          "name": "no negatives",
+          "code": "assert first_negative_index([0, 3]) == -1, first_negative_index([0, 3])\nassert first_negative_index([]) == -1, first_negative_index([])"
+        }
+      ],
+      "hints": [
+        "You do not know the number of steps ahead of time, so `collatz_steps` needs `while`. `first_negative_index` walks a known list, so it suits `for`.",
+        "Use `//` for halving, because `/` would give a float. In the other function, `enumerate` hands you the index, and `return` can leave the loop early.",
+        "`while n != 1:` then update `n` and add 1 to `steps`. For the list: `for i, number in enumerate(numbers): if number < 0: return i`, and `return -1` after the loop."
+      ],
+      "explanation": "A `while` loop fits when the stopping condition depends on values computed along the way. A `return` inside a `for` loop stops as soon as the answer is known, and the line after the loop only runs when nothing was found.\n\nUsing `/` in the first function would pass with small inputs and then lose precision on large ones, because floats cannot hold every large integer."
+    },
+    {
+      "id": "functions",
+      "title": "Functions",
+      "body": "# Functions\n\n`def` creates a function. Without a `return`, it returns `None`.\n\n```python\ndef greet(name, greeting=\"Hi\"):\n    return f\"{greeting}, {name}\"\n\ngreet(\"Ada\")\ngreet(\"Ada\", greeting=\"Hello\")\n```\n\n## Parameter kinds\n\n- A parameter with `=` has a default and may be left out.\n- `*args` collects extra positional arguments into a tuple.\n- Anything after `*args` can only be passed by name. Those are keyword-only parameters.\n- `**kwargs` collects extra named arguments into a dict.\n\n```python\ndef log(*parts, sep=\" \"):\n    return sep.join(parts)\n\nlog(\"a\", \"b\")           # \"a b\"\nlog(\"a\", \"b\", sep=\"-\")  # \"a-b\"\n```\n\nNames assigned inside a function are local to it. A default value is computed once, when `def` runs, so never use a list or dict as a default. Use `None` and create the list inside.",
+      "task": "Write `clamp(value, low=0, high=100)` limiting `value` to that range. Write `average(*numbers, default=0)` returning the mean of its arguments, or `default` when there are none.",
+      "starter": "def clamp(value, low=0, high=100):\n    return value\n\n\ndef average(numbers, default=0):\n    return sum(numbers) / len(numbers)\n",
+      "solution": "def clamp(value, low=0, high=100):\n    return max(low, min(value, high))\n\n\ndef average(*numbers, default=0):\n    if not numbers:\n        return default\n    return sum(numbers) / len(numbers)\n",
+      "checks": [
+        {
+          "name": "clamps with defaults",
+          "code": "assert clamp(150) == 100, clamp(150)\nassert clamp(-1) == 0, clamp(-1)\nassert clamp(50) == 50, clamp(50)"
+        },
+        {
+          "name": "custom limits by name",
+          "code": "assert clamp(5, high=3) == 3, clamp(5, high=3)\nassert clamp(1, low=2, high=4) == 2, clamp(1, low=2, high=4)"
+        },
+        {
+          "name": "averages any number of arguments",
+          "code": "assert average(1, 2, 3) == 2, average(1, 2, 3)\nassert average(5) == 5, average(5)"
+        },
+        {
+          "name": "no arguments gives the default",
+          "code": "assert average() == 0, average()\nassert average(default=9) == 9, average(default=9)"
+        },
+        {
+          "name": "default is keyword-only",
+          "code": "assert average(1, 3, default=99) == 2, average(1, 3, default=99)"
+        }
+      ],
+      "hints": [
+        "`min` and `max` together can limit a number from both sides.",
+        "`*numbers` collects arguments into a tuple. An empty tuple is false, and that case must be handled before you divide.",
+        "`return max(low, min(value, high))`. In `average`: `if not numbers: return default`, then `return sum(numbers) / len(numbers)`."
+      ],
+      "explanation": "`min(value, high)` applies the upper limit and `max(low, ...)` applies the lower one. That reads better than three branches once you have seen it.\n\nBecause `default` comes after `*numbers`, it can only be passed by name. Otherwise `average(1, 3, 99)` would be ambiguous."
+    },
+    {
+      "id": "lists",
+      "title": "Lists",
+      "body": "# Lists\n\nA list is an ordered, mutable sequence.\n\n```python\nxs = [30, 10, 20]\nxs.append(40)\nprint(xs[0], xs[-1])  # 30 40\nprint(xs[1:3])        # [10, 20]\nprint(xs[::-1])       # reversed copy\n```\n\nSlices never raise for out-of-range bounds. They return whatever exists, and they build a new list.\n\n## Sort in place or make a copy\n\n- `xs.sort()` changes the list and returns `None`.\n- `sorted(xs)` returns a new list and leaves `xs` alone.\n- Both accept `reverse=True` and `key=len` style functions.\n\nDo not change a list passed to you unless that is the function's stated job. The caller may still need it.\n\n## Comprehensions\n\nA comprehension builds a list from a loop in one expression:\n\n```python\nnums = [1, 2, 3, 4]\nbig = [n * 10 for n in nums if n > 2]\nprint(big)  # [30, 40]\n```",
+      "task": "Write `top_three(scores)` returning the three largest scores, highest first, without changing the input. Write `chunks(items, size)` returning a list of consecutive slices of at most `size` items.",
+      "starter": "def top_three(scores):\n    scores.sort()\n    return scores[:3]\n\n\ndef chunks(items, size):\n    return [items]\n",
+      "solution": "def top_three(scores):\n    return sorted(scores, reverse=True)[:3]\n\n\ndef chunks(items, size):\n    return [\n        items[i:i + size]\n        for i in range(0, len(items), size)\n    ]\n",
+      "checks": [
+        {
+          "name": "three largest, highest first",
+          "code": "got = top_three([5, 1, 9, 7, 3])\nassert got == [9, 7, 5], got"
+        },
+        {
+          "name": "fewer than three scores",
+          "code": "assert top_three([2, 8]) == [8, 2], top_three([2, 8])\nassert top_three([]) == [], top_three([])"
+        },
+        {
+          "name": "input is left alone",
+          "code": "scores = [1, 3, 2, 5]\ntop_three(scores)\nassert scores == [1, 3, 2, 5], scores"
+        },
+        {
+          "name": "splits into chunks",
+          "code": "got = chunks([1, 2, 3, 4, 5], 2)\nassert got == [[1, 2], [3, 4], [5]], got"
+        },
+        {
+          "name": "chunk edge cases",
+          "code": "assert chunks([], 3) == [], chunks([], 3)\nassert chunks([1, 2], 5) == [[1, 2]], chunks([1, 2], 5)\nassert chunks([1, 2], 1) == [[1], [2]], chunks([1, 2], 1)"
+        }
+      ],
+      "hints": [
+        "`sorted` makes a new list, and a slice then trims it. A short list is fine, because slices do not raise.",
+        "For `chunks`, `range` takes a step. `range(0, len(items), size)` gives the start of every chunk.",
+        "`return sorted(scores, reverse=True)[:3]`, and `[items[i:i + size] for i in range(0, len(items), size)]`."
+      ],
+      "explanation": "`sorted` is `O(n log n)` and leaves the caller's list untouched. The slice handles short input with no special case.\n\nThe range step in `chunks` gives each start position once. The final slice may be short, and an empty input produces no starts at all, so the empty case needs no extra code."
+    },
+    {
+      "id": "dicts-and-sets",
+      "title": "Dicts and sets",
+      "body": "# Dicts and sets\n\nA dict maps keys to values. Lookup by key takes about the same time however large the dict is. Dicts keep insertion order.\n\n```python\nages = {\"ada\": 36}\nages[\"alan\"] = 41\nprint(ages.get(\"bob\", 0))  # 0, no error\nprint(\"ada\" in ages)       # True\nfor k, v in ages.items():\n    print(k, v)\n```\n\n`d[key]` raises `KeyError` when the key is missing. `d.get(key, default)` does not. Keys must be hashable, so strings, numbers and tuples work and lists do not.\n\n## Sets\n\nA set holds unique values with no useful order, and it supports membership tests and set algebra.\n\n```python\na = {1, 2, 3}\nb = {2, 3, 4}\nprint(a & b)  # intersection\nprint(a | b)  # union\nprint(a - b)  # difference\n```\n\nBecause a set's order is not guaranteed, sort it before showing or comparing it. Write `set()` for an empty set, since `{}` is an empty dict.",
+      "task": "Write `word_counts(text)` returning a dict from lower-cased word to how many times it appears. Write `common_items(a, b)` returning a sorted list of the values present in both lists, without duplicates.",
+      "starter": "def word_counts(text):\n    counts = {}\n    for word in text.split():\n        counts[word] = 1\n    return counts\n\n\ndef common_items(a, b):\n    return [x for x in a if x in b]\n",
+      "solution": "def word_counts(text):\n    counts = {}\n    for word in text.lower().split():\n        counts[word] = counts.get(word, 0) + 1\n    return counts\n\n\ndef common_items(a, b):\n    return sorted(set(a) & set(b))\n",
+      "checks": [
+        {
+          "name": "counts words",
+          "code": "got = word_counts(\"to be or not to be\")\nassert got == {\"to\": 2, \"be\": 2, \"or\": 1, \"not\": 1}, got"
+        },
+        {
+          "name": "ignores case",
+          "code": "assert word_counts(\"Tea tea TEA\") == {\"tea\": 3}, word_counts(\"Tea tea TEA\")"
+        },
+        {
+          "name": "empty text",
+          "code": "assert word_counts(\"\") == {}, word_counts(\"\")\nassert word_counts(\"   \") == {}, word_counts(\"   \")"
+        },
+        {
+          "name": "common items are sorted and unique",
+          "code": "got = common_items([3, 1, 2, 2], [2, 3, 3, 9])\nassert got == [2, 3], got"
+        },
+        {
+          "name": "nothing in common",
+          "code": "assert common_items([1], [2]) == [], common_items([1], [2])\nassert common_items([], [1]) == [], common_items([], [1])"
+        }
+      ],
+      "hints": [
+        "`counts.get(word, 0)` gives the current count, or 0 for a word you have not seen.",
+        "Normalize the text once, before splitting. For the second function, converting both lists to sets removes duplicates and allows `&`.",
+        "`counts[word] = counts.get(word, 0) + 1` over `text.lower().split()`, and `return sorted(set(a) & set(b))`."
+      ],
+      "explanation": "The `get` pattern avoids a separate first-time branch. `collections.Counter` does the same job, and you will meet it in the next course.\n\nScanning with `x in b` on a list is `O(n)` per lookup. Building sets makes the intersection about `O(len(a) + len(b))`, and `sorted` then gives the result a predictable order."
+    },
+    {
+      "id": "errors-and-try-except",
+      "title": "Errors and try/except",
+      "body": "# Errors and try/except\n\nAn exception stops normal flow and travels up the call stack until something handles it.\n\n```python\ndef to_int(text):\n    try:\n        return int(text)\n    except ValueError:\n        return None\n```\n\n- `try` holds the code that might fail.\n- `except SomeError` handles only that type, and its subclasses.\n- `else` runs if nothing was raised.\n- `finally` always runs, which suits cleanup.\n\n## Catch what you expect\n\nA bare `except:` or a wide `except Exception:` also hides your own bugs. Name the exact error you know how to handle and let the rest propagate.\n\n## Raising\n\n```python\ndef set_age(age):\n    if age < 0:\n        raise ValueError(f\"bad age: {age}\")\n    return age\n```\n\nUse `except (ValueError, TypeError):` for several types at once. Python 3.14 also accepts that without the parentheses, when there is no `as` clause.",
+      "task": "Write `parse_age(text)` converting text to an int and raising `ValueError` if it is not a number or is outside 0 to 150. Write `safe_ratio(a, b)` returning `a / b`, or `None` when `b` is zero. Other errors must still propagate.",
+      "starter": "def parse_age(text):\n    return int(text)\n\n\ndef safe_ratio(a, b):\n    try:\n        return a / b\n    except Exception:\n        return None\n",
+      "solution": "def parse_age(text):\n    age = int(text)\n    if not 0 <= age <= 150:\n        raise ValueError(f\"age out of range: {age}\")\n    return age\n\n\ndef safe_ratio(a, b):\n    try:\n        return a / b\n    except ZeroDivisionError:\n        return None\n",
+      "checks": [
+        {
+          "name": "parses valid ages",
+          "code": "assert parse_age(\"42\") == 42, parse_age(\"42\")\nassert parse_age(\" 7 \") == 7, parse_age(\" 7 \")"
+        },
+        {
+          "name": "limits are inclusive",
+          "code": "assert parse_age(\"0\") == 0, parse_age(\"0\")\nassert parse_age(\"150\") == 150, parse_age(\"150\")"
+        },
+        {
+          "name": "rejects bad values",
+          "code": "for text in [\"abc\", \"\", \"-1\", \"151\"]:\n    raised = False\n    try:\n        parse_age(text)\n    except ValueError:\n        raised = True\n    assert raised, f\"{text!r} should raise ValueError\""
+        },
+        {
+          "name": "ratio handles zero",
+          "code": "assert safe_ratio(1, 2) == 0.5, safe_ratio(1, 2)\nassert safe_ratio(1, 0) is None, safe_ratio(1, 0)"
+        },
+        {
+          "name": "other errors propagate",
+          "code": "raised = False\ntry:\n    safe_ratio(\"a\", 1)\nexcept TypeError:\n    raised = True\nassert raised, \"a TypeError should not be swallowed\""
+        }
+      ],
+      "hints": [
+        "`int` already raises `ValueError` for bad text, so `parse_age` only has to add the range rule.",
+        "In `safe_ratio`, replace the wide `except Exception` with the one error that dividing by zero raises.",
+        "`if not 0 <= age <= 150: raise ValueError(...)`, and `except ZeroDivisionError: return None`."
+      ],
+      "explanation": "Reusing the `ValueError` that `int` raises means callers handle one error type for every kind of bad input.\n\nCatching only `ZeroDivisionError` documents exactly what `None` means here. If someone passes a string, that is a bug, and it should stay loud."
+    },
+    {
+      "id": "reading-and-writing-files",
+      "title": "Reading and writing files",
+      "body": "# Reading and writing files\n\n`open` returns a file object. Use `with` so it closes even if an error happens.\n\n```python\nwith open(\"notes.txt\", \"w\",\n          encoding=\"utf-8\") as f:\n    f.write(\"first\\n\")\n\nwith open(\"notes.txt\",\n          encoding=\"utf-8\") as f:\n    for line in f:\n        print(line.rstrip(\"\\n\"))\n```\n\n- Mode `\"r\"` reads and is the default. `\"w\"` replaces the file. `\"a\"` appends.\n- Always pass `encoding=\"utf-8\"`, so text behaves the same everywhere.\n- Each line you iterate over keeps its newline. `write` adds none, so you add it yourself.\n- Opening a missing file for reading raises `FileNotFoundError`.\n\n## pathlib\n\n`pathlib.Path` wraps a path in an object, with shortcuts for whole-file work:\n\n```python\nfrom pathlib import Path\n\np = Path(\"notes.txt\")\np.write_text(\"hi\\n\", encoding=\"utf-8\")\nprint(p.read_text(encoding=\"utf-8\"))\nprint(p.exists(), p.suffix)\n```",
+      "task": "Write `save_lines(path, lines)` writing each string on its own line, replacing any existing file. Write `count_nonblank(path)` returning how many lines contain something other than whitespace, or 0 if the file does not exist.",
+      "starter": "def save_lines(path, lines):\n    with open(path, \"a\", encoding=\"utf-8\") as f:\n        for line in lines:\n            f.write(line)\n\n\ndef count_nonblank(path):\n    with open(path, encoding=\"utf-8\") as f:\n        return len(f.readlines())\n",
+      "solution": "def save_lines(path, lines):\n    with open(path, \"w\", encoding=\"utf-8\") as f:\n        for line in lines:\n            f.write(line + \"\\n\")\n\n\ndef count_nonblank(path):\n    try:\n        with open(path, encoding=\"utf-8\") as f:\n            return sum(1 for line in f if line.strip())\n    except FileNotFoundError:\n        return 0\n",
+      "checks": [
+        {
+          "name": "writes one line each",
+          "code": "import os, tempfile\nwith tempfile.TemporaryDirectory() as folder:\n    path = os.path.join(folder, \"a.txt\")\n    save_lines(path, [\"one\", \"two\"])\n    with open(path, encoding=\"utf-8\") as f:\n        text = f.read()\nassert text == \"one\\ntwo\\n\", repr(text)"
+        },
+        {
+          "name": "replaces an existing file",
+          "code": "import os, tempfile\nwith tempfile.TemporaryDirectory() as folder:\n    path = os.path.join(folder, \"a.txt\")\n    save_lines(path, [\"old\", \"old\"])\n    save_lines(path, [\"new\"])\n    with open(path, encoding=\"utf-8\") as f:\n        text = f.read()\nassert text == \"new\\n\", repr(text)"
+        },
+        {
+          "name": "keeps non-ASCII text",
+          "code": "import os, tempfile\nwith tempfile.TemporaryDirectory() as folder:\n    path = os.path.join(folder, \"a.txt\")\n    save_lines(path, [\"café привет\"])\n    with open(path, encoding=\"utf-8\") as f:\n        text = f.read()\nassert text == \"café привет\\n\", repr(text)"
+        },
+        {
+          "name": "skips blank lines",
+          "code": "import os, tempfile\nwith tempfile.TemporaryDirectory() as folder:\n    path = os.path.join(folder, \"a.txt\")\n    save_lines(path, [\"a\", \"\", \"   \", \"b\"])\n    got = count_nonblank(path)\nassert got == 2, got"
+        },
+        {
+          "name": "missing file counts as zero",
+          "code": "import os, tempfile\nwith tempfile.TemporaryDirectory() as folder:\n    got = count_nonblank(os.path.join(folder, \"nope.txt\"))\nassert got == 0, got"
+        }
+      ],
+      "hints": [
+        "Mode `\"a\"` keeps old content, and `write` does not add line breaks. Both matter here.",
+        "`line.strip()` is empty, and therefore false, for a blank line. A missing file raises `FileNotFoundError`, which you can catch.",
+        "`f.write(line + \"\\n\")` in mode `\"w\"`. Then `sum(1 for line in f if line.strip())` inside `try`, with `except FileNotFoundError: return 0`."
+      ],
+      "explanation": "`with` closes the file on every exit path, including exceptions. Iterating over the file reads one line at a time, so counting works on files larger than memory.\n\nCatching only `FileNotFoundError` keeps other problems visible, such as a permission error or a path that is a folder."
+    }
+  ]
+}

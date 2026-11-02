@@ -1,0 +1,164 @@
+{
+  "id": "data",
+  "title": "Data and notebooks",
+  "summary": "NumPy arrays, aggregates, cleaning CSV data and reproducible runs.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "numpy-arrays",
+      "title": "NumPy arrays",
+      "body": "# NumPy arrays\n\nA NumPy array is a block of same-typed numbers. Operations apply to every element, in compiled code, without a Python loop.\n\n```python\nimport numpy as np\n\na = np.array([1, 2, 3, 4])\nprint(a * 10)     # [10 20 30 40]\nprint(a.dtype, a.shape)  # int64 (4,)\nprint(a[a > 2])   # [3 4]\n\nm = np.arange(6).reshape(2, 3)\nprint(m[1, 2])    # row 1, column 2\nprint(m[:, 0])    # first column\n```\n\n`a > 2` produces an array of booleans, known as a mask. Using it as an index keeps the matching elements.\n\n## Views and copies\n\nA slice is a view, not a copy. Changing it changes the original.\n\n```python\nb = a[:2]\nb[0] = 99\nprint(a[0])  # 99\nc = a.copy()  # independent\n```\n\nA mask index, unlike a slice, always returns a new array.",
+      "task": "Write `grid(rows, cols)` returning an int array of the numbers from 0 in that shape. Write `last_column(matrix)` returning the final column. Write `above_mean(values)` returning the elements strictly above the mean. Write `zero_negatives(values)` returning a copy with negatives set to 0, leaving the input unchanged.",
+      "starter": "import numpy as np\n\n\ndef grid(rows, cols):\n    return np.arange(rows * cols)\n\n\ndef last_column(matrix):\n    return matrix[-1]\n\n\ndef above_mean(values):\n    return values\n\n\ndef zero_negatives(values):\n    values[values < 0] = 0\n    return values\n",
+      "solution": "import numpy as np\n\n\ndef grid(rows, cols):\n    return np.arange(rows * cols).reshape(rows, cols)\n\n\ndef last_column(matrix):\n    return matrix[:, -1]\n\n\ndef above_mean(values):\n    return values[values > values.mean()]\n\n\ndef zero_negatives(values):\n    result = values.copy()\n    result[result < 0] = 0\n    return result\n",
+      "checks": [
+        {
+          "name": "grid has the right shape and values",
+          "code": "import numpy as np\ngot = grid(2, 3)\nassert got.shape == (2, 3), got.shape\nassert np.array_equal(got, [[0, 1, 2], [3, 4, 5]]), got\nassert grid(1, 1).shape == (1, 1), grid(1, 1).shape"
+        },
+        {
+          "name": "last column",
+          "code": "import numpy as np\ngot = last_column(np.array([[1, 2], [3, 4], [5, 6]]))\nassert np.array_equal(got, [2, 4, 6]), got"
+        },
+        {
+          "name": "above the mean",
+          "code": "import numpy as np\ngot = above_mean(np.array([1, 2, 3, 10]))\nassert np.array_equal(got, [10]), got"
+        },
+        {
+          "name": "equal values are not above the mean",
+          "code": "import numpy as np\ngot = above_mean(np.array([5, 5, 5]))\nassert got.size == 0, got"
+        },
+        {
+          "name": "zeroes negatives",
+          "code": "import numpy as np\ngot = zero_negatives(np.array([-1, 2, -3, 0]))\nassert np.array_equal(got, [0, 2, 0, 0]), got"
+        },
+        {
+          "name": "input is unchanged",
+          "code": "import numpy as np\nvalues = np.array([-1, 2])\nzero_negatives(values)\nassert np.array_equal(values, [-1, 2]), values"
+        }
+      ],
+      "hints": [
+        "`reshape` turns a flat array into rows and columns. `matrix[:, k]` means every row, column `k`.",
+        "`values.mean()` gives a single number. Comparing an array to a number produces a mask you can index with.",
+        "`values[values > values.mean()]`, and for the last one: `result = values.copy()`, then `result[result < 0] = 0`."
+      ],
+      "explanation": "Masks replace the loop-and-if pattern with one expression, and the work runs in compiled code. Each operation is `O(n)`, with a much smaller constant than a Python loop.\n\nAssigning through a mask writes into the array you index, so `values[values < 0] = 0` would have changed the caller's data. The explicit `.copy()` prevents that."
+    },
+    {
+      "id": "broadcasting-and-aggregates",
+      "title": "Broadcasting and aggregates",
+      "body": "# Broadcasting and aggregates\n\nAggregates such as `sum`, `mean`, `max` and `argmax` collapse an array. The `axis` argument picks the direction that disappears.\n\n```python\nimport numpy as np\n\nm = np.array([[1., 2.], [3., 4.]])\nprint(m.sum())        # 10.0\nprint(m.sum(axis=0))  # columns: [4. 6.]\nprint(m.sum(axis=1))  # rows: [3. 7.]\n```\n\n## Broadcasting\n\nOperations between different shapes work when, reading from the last dimension, each pair of sizes is equal or one of them is 1. The size-1 side is stretched.\n\n```python\nprint(m - m.mean(axis=0))\nprint(m.sum(axis=1, keepdims=True))\n```\n\n`m.mean(axis=0)` has shape `(2,)`, which lines up with columns, so each column has its own mean subtracted.\n\nTo work per row, you need shape `(2, 1)`. `keepdims=True` keeps the collapsed axis as size 1, so the result broadcasts against rows correctly.",
+      "task": "Write `center_columns(m)` subtracting each column's mean from that column. Write `row_shares(m)` dividing each row by its own sum, leaving all-zero rows as zeros. Write `best_column(m)` returning the index of the column with the largest total, as an int.",
+      "starter": "import numpy as np\n\n\ndef center_columns(m):\n    return m - m.mean()\n\n\ndef row_shares(m):\n    return m / m.sum()\n\n\ndef best_column(m):\n    return m.sum(axis=1).argmax()\n",
+      "solution": "import numpy as np\n\n\ndef center_columns(m):\n    return m - m.mean(axis=0)\n\n\ndef row_shares(m):\n    totals = m.sum(axis=1, keepdims=True)\n    return np.divide(\n        m,\n        totals,\n        out=np.zeros_like(m, dtype=float),\n        where=totals != 0,\n    )\n\n\ndef best_column(m):\n    return int(m.sum(axis=0).argmax())\n",
+      "checks": [
+        {
+          "name": "centers each column",
+          "code": "import numpy as np\ngot = center_columns(np.array([[1.0, 10.0], [3.0, 30.0]]))\nassert np.allclose(got, [[-1, -10], [1, 10]]), got\nassert np.allclose(got.mean(axis=0), 0), got"
+        },
+        {
+          "name": "row shares sum to one",
+          "code": "import numpy as np\ngot = row_shares(np.array([[1, 3], [2, 2]]))\nassert np.allclose(got, [[0.25, 0.75], [0.5, 0.5]]), got"
+        },
+        {
+          "name": "zero rows stay zero",
+          "code": "import numpy as np\ngot = row_shares(np.array([[0, 0], [1, 1]]))\nassert np.allclose(got, [[0, 0], [0.5, 0.5]]), got\nassert not np.isnan(got).any(), got"
+        },
+        {
+          "name": "input is not changed",
+          "code": "import numpy as np\nm = np.array([[1.0, 3.0]])\nrow_shares(m)\ncenter_columns(m)\nassert np.array_equal(m, [[1.0, 3.0]]), m"
+        },
+        {
+          "name": "best column",
+          "code": "import numpy as np\ngot = best_column(np.array([[1, 9, 2], [3, 1, 2]]))\nassert got == 1, got\nassert type(got) is int, type(got)\nassert best_column(np.array([[5, 5]])) == 0, \"first wins a tie\""
+        }
+      ],
+      "hints": [
+        "Decide which direction collapses: `axis=0` gives one value per column, and `axis=1` gives one per row.",
+        "Dividing by per-row totals needs shape `(rows, 1)`, so use `keepdims=True`. `np.divide` has `out` and `where` arguments for skipping a division.",
+        "`totals = m.sum(axis=1, keepdims=True)`, then `np.divide(m, totals, out=np.zeros_like(m, dtype=float), where=totals != 0)`. And `int(m.sum(axis=0).argmax())`."
+      ],
+      "explanation": "Broadcasting compares shapes from the right, so `(n, k)` with `(k,)` matches columns while `(n, k)` with `(n, 1)` matches rows. That is the whole purpose of `keepdims`.\n\n`where` skips division at positions where it is false, and those positions keep the value from `out`, which is why zero rows stay zero and no warning appears."
+    },
+    {
+      "id": "csv-and-cleaning",
+      "title": "CSV and cleaning data",
+      "body": "# CSV and cleaning data\n\nReal CSV files contain stray spaces, blanks and duplicates. Use the `csv` module rather than `split(\",\")`, because quoted fields may contain commas.\n\n```python\nimport csv, io\n\ntext = 'name,city\\n\"Doe, Jo\",Oslo\\n'\nreader = csv.DictReader(io.StringIO(text))\nfor row in reader:\n    print(row[\"name\"])  # Doe, Jo\n```\n\n`DictReader` uses the header row as keys. Every value is a string, and a row with too few fields gets `None` for the missing ones. For a file, pass an open file with `newline=\"\"` instead of `StringIO`.\n\n## A cleaning routine\n\n- Trim whitespace before anything else.\n- Convert types, deciding what to do with failures.\n- Choose a rule for duplicates, and normalize before comparing.\n- Keep the rules in one function, so you can read and rerun them.\n\nIn a notebook, keep the original data untouched and clean into a new variable. Then you can compare the two and rerun from the top.",
+      "task": "Write `clean_rows(text)` reading CSV text with `name` and `age` columns and returning a list of `{\"name\": str, \"age\": int}`. Trim both fields, drop rows with an empty name or an age that is not a whole number, and drop later duplicates of a name, ignoring case. Write `average_age(rows)` returning the mean, or `None` if there are no rows.",
+      "starter": "import csv\nimport io\n\n\ndef clean_rows(text):\n    rows = []\n    for line in text.splitlines()[1:]:\n        name, age = line.split(\",\")\n        rows.append({\"name\": name, \"age\": int(age)})\n    return rows\n\n\ndef average_age(rows):\n    return sum(r[\"age\"] for r in rows) / len(rows)\n",
+      "solution": "import csv\nimport io\n\n\ndef clean_rows(text):\n    rows = []\n    seen = set()\n    for row in csv.DictReader(io.StringIO(text)):\n        name = (row.get(\"name\") or \"\").strip()\n        age = (row.get(\"age\") or \"\").strip()\n        if not name or name.lower() in seen:\n            continue\n        try:\n            age = int(age)\n        except ValueError:\n            continue\n        seen.add(name.lower())\n        rows.append({\"name\": name, \"age\": age})\n    return rows\n\n\ndef average_age(rows):\n    if not rows:\n        return None\n    return sum(r[\"age\"] for r in rows) / len(rows)\n",
+      "checks": [
+        {
+          "name": "reads and trims",
+          "code": "got = clean_rows(\"name,age\\n  Ada , 36 \\nAlan,41\\n\")\nassert got == [{\"name\": \"Ada\", \"age\": 36}, {\"name\": \"Alan\", \"age\": 41}], got"
+        },
+        {
+          "name": "handles quoted commas",
+          "code": "got = clean_rows('name,age\\n\"Doe, Jo\",30\\n')\nassert got == [{\"name\": \"Doe, Jo\", \"age\": 30}], got"
+        },
+        {
+          "name": "drops bad rows",
+          "code": "text = \"name,age\\nAda,abc\\n,20\\nBo,\\nCy\\nDi,4.5\\nEd,7\\n\"\ngot = clean_rows(text)\nassert got == [{\"name\": \"Ed\", \"age\": 7}], got"
+        },
+        {
+          "name": "drops later duplicates, ignoring case",
+          "code": "got = clean_rows(\"name,age\\nAda,1\\nADA,2\\n ada ,3\\n\")\nassert got == [{\"name\": \"Ada\", \"age\": 1}], got"
+        },
+        {
+          "name": "a bad first row does not block a good second",
+          "code": "got = clean_rows(\"name,age\\nAda,x\\nAda,5\\n\")\nassert got == [{\"name\": \"Ada\", \"age\": 5}], got"
+        },
+        {
+          "name": "average age",
+          "code": "assert average_age([{\"name\": \"a\", \"age\": 2}, {\"name\": \"b\", \"age\": 4}]) == 3, \"mean of 2 and 4\"\nassert average_age([]) is None, average_age([])\nassert clean_rows(\"name,age\\n\") == [], clean_rows(\"name,age\\n\")"
+        }
+      ],
+      "hints": [
+        "`csv.DictReader(io.StringIO(text))` takes care of quoting and headers. A short row gives `None`, not an empty string.",
+        "Clean in stages for each row: trim, validate the name, convert the age, then record the name as seen. Only a kept row should count as seen.",
+        "`(row.get(\"age\") or \"\").strip()` handles `None`. Use `try: age = int(age)`, `except ValueError: continue`, and a `seen` set of `name.lower()`."
+      ],
+      "explanation": "Recording a name as seen only after the row passes validation means a broken row cannot block a good one with the same name. That detail often goes unnoticed until it hides data.\n\nThe set makes the duplicate check `O(1)`, so the whole clean is `O(n)`. `int(\"4.5\")` raises `ValueError`, so fractional ages are rejected rather than silently truncated."
+    },
+    {
+      "id": "reproducibility-with-seeds",
+      "title": "Reproducibility with seeds",
+      "body": "# Reproducibility with seeds\n\nPseudo-random numbers come from a generator that starts at a seed. The same seed gives the same sequence, so a run can be repeated exactly.\n\n```python\nimport random\n\na = random.Random(42)\nb = random.Random(42)\nprint(a.random() == b.random())  # True\n```\n\n## Own your generator\n\n`random.seed(42)` sets one shared global generator. Any other code calling `random.random()` will shift your sequence, and your code will shift theirs. Creating `random.Random(seed)` keeps the stream private.\n\nNumPy has the same idea: `np.random.default_rng(seed)`.\n\n## Notebooks\n\nNotebook cells can run in any order, and that is a common reason for results that cannot be reproduced. Before you trust a result, restart and run every cell from the top.\n\n## Limits\n\nA seed reproduces a sequence for a given version of the library. Do not hard-code expected random values across Python versions. Save the seed and the results together.",
+      "task": "Write `shuffled_copy(items, seed)` returning a new list shuffled by `random.Random(seed).shuffle`. Write `split_rows(rows, test_fraction, seed)` shuffling a copy the same way and returning `(train, test)`, where `test` is the first `int(len(rows) * test_fraction)` shuffled rows. Neither may change the input or the global generator.",
+      "starter": "import random\n\n\ndef shuffled_copy(items, seed):\n    random.seed(seed)\n    random.shuffle(items)\n    return items\n\n\ndef split_rows(rows, test_fraction, seed):\n    return rows, []\n",
+      "solution": "import random\n\n\ndef shuffled_copy(items, seed):\n    result = list(items)\n    random.Random(seed).shuffle(result)\n    return result\n\n\ndef split_rows(rows, test_fraction, seed):\n    shuffled = shuffled_copy(rows, seed)\n    count = int(len(rows) * test_fraction)\n    return shuffled[count:], shuffled[:count]\n",
+      "checks": [
+        {
+          "name": "uses the seeded shuffle",
+          "code": "import random\nitems = list(range(20))\nwant = list(items)\nrandom.Random(7).shuffle(want)\nassert shuffled_copy(items, 7) == want, shuffled_copy(items, 7)"
+        },
+        {
+          "name": "same seed, same result",
+          "code": "items = list(range(50))\nassert shuffled_copy(items, 1) == shuffled_copy(items, 1), \"should repeat\"\nassert shuffled_copy(items, 1) != shuffled_copy(items, 2), \"different seeds should differ\""
+        },
+        {
+          "name": "input is unchanged",
+          "code": "items = [1, 2, 3, 4, 5]\nshuffled_copy(items, 3)\nsplit_rows(items, 0.4, 3)\nassert items == [1, 2, 3, 4, 5], items"
+        },
+        {
+          "name": "global generator is untouched",
+          "code": "import random\nrandom.seed(123)\nwant = random.random()\nrandom.seed(123)\nshuffled_copy([1, 2, 3], 9)\nsplit_rows([1, 2, 3], 0.5, 9)\ngot = random.random()\nassert got == want, \"use random.Random(seed), not random.seed\""
+        },
+        {
+          "name": "split matches the shuffled order",
+          "code": "import random\nrows = list(range(10))\norder = list(rows)\nrandom.Random(5).shuffle(order)\ntrain, test = split_rows(rows, 0.3, 5)\nassert test == order[:3], test\nassert train == order[3:], train"
+        },
+        {
+          "name": "split sizes at the edges",
+          "code": "train, test = split_rows([1, 2, 3], 0.0, 1)\nassert (len(train), test) == (3, []), (train, test)\ntrain, test = split_rows([1, 2, 3], 1.0, 1)\nassert (train, len(test)) == ([], 3), (train, test)\nassert split_rows([], 0.5, 1) == ([], []), split_rows([], 0.5, 1)"
+        }
+      ],
+      "hints": [
+        "`list(items)` makes the copy. Then build a private generator with `random.Random(seed)`, instead of touching the global one.",
+        "Reuse `shuffled_copy` inside `split_rows`, then slice at the count. Watch which slice is `test` and which is `train`.",
+        "`random.Random(seed).shuffle(result)`, then `count = int(len(rows) * test_fraction)` and `return shuffled[count:], shuffled[:count]`."
+      ],
+      "explanation": "A private `Random` object has no effect on code that uses the module-level functions, and they have no effect on it, so calling order elsewhere cannot change your split. The shuffle is `O(n)`.\n\nThe checks compute their expected values with the same seeded generator rather than storing numbers, so they stay valid even if a future Python version changes the shuffle algorithm."
+    }
+  ]
+}

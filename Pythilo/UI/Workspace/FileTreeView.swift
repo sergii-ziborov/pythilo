@@ -172,6 +172,7 @@ struct FileTreeView: View {
         }
         .background {
             ZStack(alignment: .leading) {
+                Color.clear
                 if selected {
                     RoundedRectangle(cornerRadius: 9, style: .continuous).fill(AppTheme.selection)
                 }

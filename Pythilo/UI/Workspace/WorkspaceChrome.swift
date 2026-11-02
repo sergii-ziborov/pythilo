@@ -15,7 +15,6 @@ struct RunControl: View {
                 Button(action: model.runSelected) {
                     runLabel
                 }
-                .disabled(session.phase == .starting)
                 .contextMenu {
                     Button("Debug", systemImage: "ladybug") { model.debugSelected() }
                     Button("Run tests", systemImage: "checkmark.circle") {

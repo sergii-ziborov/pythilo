@@ -43,7 +43,12 @@ struct RootView: View {
             WorkspaceView(model: model) { workspace = nil }
         }
         .sheet(isPresented: $showingSettings) { SettingsView() }
-        .task { _ = RunSession.shared }
+        .task {
+            _ = RunSession.shared
+            #if DEBUG
+            openFromLaunchArguments()
+            #endif
+        }
     }
 
     @ViewBuilder
@@ -63,6 +68,24 @@ struct RootView: View {
     private func open(_ project: Project) {
         workspace = WorkspaceModel(project: project)
     }
+
+    #if DEBUG
+    /// For screenshots: -openTemplate django -panel terminal -drawer YES.
+    private func openFromLaunchArguments() {
+        let defaults = UserDefaults.standard
+        guard let id = defaults.string(forKey: "openTemplate"),
+              let template = ProjectTemplate.all.first(where: { $0.id == id }) else { return }
+        let existing = store.projects.first { $0.name == "shot-\(id)" }
+        guard let project = existing ?? (try? store.create(name: "shot-\(id)", template: template)) else { return }
+        let model = WorkspaceModel(project: project)
+        if let panel = defaults.string(forKey: "panel").flatMap(WorkspacePanel.init(rawValue:)) { model.panel = panel }
+        for path in (defaults.string(forKey: "expand") ?? "").split(separator: ",") { model.expanded.insert(String(path)) }
+        if let file = defaults.string(forKey: "openFile") { model.open(file); model.panel = defaults.string(forKey: "panel").flatMap(WorkspacePanel.init(rawValue:)) ?? .code }
+        model.drawerOpen = defaults.bool(forKey: "drawer")
+        if let line = defaults.string(forKey: "terminal") { model.panel = .terminal; model.runTerminal(line) }
+        workspace = model
+    }
+    #endif
 }
 
 extension WorkspaceModel: Identifiable {

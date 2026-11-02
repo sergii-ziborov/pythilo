@@ -203,7 +203,8 @@ final class RunSession {
 
     @discardableResult
     func submit(_ job: [String: Any], label: String, channel: OutputChannel = .output) -> String? {
-        guard phase == .idle else { return nil }
+        // A job sent while Python starts waits in the host's queue.
+        guard phase == .idle || phase == .starting else { return nil }
         activeChannel = channel
         runStartedAt = Date()
         let id = UUID().uuidString

@@ -1,0 +1,204 @@
+{
+  "id": "web",
+  "title": "Web and backend",
+  "summary": "HTTP, JSON, URLs, WSGI, Flask and how Django routes requests.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "http-and-json",
+      "title": "HTTP and JSON",
+      "body": "# HTTP and JSON\n\nHTTP is text exchanged in pairs. A request has a method, a path, headers and an optional body. A response has a status code, headers and a body.\n\n- `GET` reads, `POST` creates, `PUT` replaces, `DELETE` removes.\n- `2xx` means success, `4xx` a client mistake, and `5xx` a server failure.\n- `Content-Type` says how to interpret the body.\n\nMost APIs send JSON. The `json` module converts between JSON text and Python values.\n\n```python\nimport json\n\ntext = json.dumps({\"id\": 1, \"ok\": True})\nprint(text)  # {\"id\": 1, \"ok\": true}\ndata = json.loads(text)\nprint(data[\"ok\"])  # True\n```\n\n## What changes on the way\n\n- `None` becomes `null`, and tuples become arrays.\n- Dict keys become strings, so `{1: \"a\"}` returns as `{\"1\": \"a\"}`.\n- Types with no JSON form, such as a `set`, raise `TypeError`.\n- Bad input raises `json.JSONDecodeError`, a subclass of `ValueError`.",
+      "task": "Write `make_response(data, status=200)` returning a dict with `status`, `headers` (`{\"Content-Type\": \"application/json\"}`) and `body` as compact JSON text with sorted keys. Write `read_response(response)` returning the parsed body, raising `ValueError` for status 400 or above (including the body's `error` value if it has one) or for invalid JSON.",
+      "starter": "import json\n\n\ndef make_response(data, status=200):\n    return {\"status\": status, \"body\": str(data)}\n\n\ndef read_response(response):\n    return response[\"body\"]\n",
+      "solution": "import json\n\n\ndef make_response(data, status=200):\n    body = json.dumps(\n        data,\n        sort_keys=True,\n        separators=(\",\", \":\"),\n    )\n    return {\n        \"status\": status,\n        \"headers\": {\"Content-Type\": \"application/json\"},\n        \"body\": body,\n    }\n\n\ndef read_response(response):\n    try:\n        data = json.loads(response[\"body\"])\n    except json.JSONDecodeError:\n        data = None\n        if response[\"status\"] < 400:\n            raise\n    if response[\"status\"] >= 400:\n        error = \"request failed\"\n        if isinstance(data, dict):\n            error = data.get(\"error\", error)\n        raise ValueError(f\"{response['status']}: {error}\")\n    return data\n",
+      "checks": [
+        {
+          "name": "builds a response",
+          "code": "got = make_response({\"b\": 1, \"a\": 2})\nassert got[\"status\"] == 200, got\nassert got[\"headers\"] == {\"Content-Type\": \"application/json\"}, got\nassert got[\"body\"] == '{\"a\":2,\"b\":1}', got[\"body\"]"
+        },
+        {
+          "name": "round trip",
+          "code": "assert read_response(make_response([1, None, \"x\"])) == [1, None, \"x\"], \"values should survive\""
+        },
+        {
+          "name": "dict keys become strings",
+          "code": "assert read_response(make_response({1: \"a\"})) == {\"1\": \"a\"}, \"JSON keys are strings\""
+        },
+        {
+          "name": "error statuses raise with the message",
+          "code": "message = None\ntry:\n    read_response(make_response({\"error\": \"no such item\"}, status=404))\nexcept ValueError as error:\n    message = str(error)\nassert message is not None, \"status 404 should raise ValueError\"\nassert \"no such item\" in message, message"
+        },
+        {
+          "name": "error status with a non-JSON body",
+          "code": "raised = False\ntry:\n    read_response({\"status\": 500, \"headers\": {}, \"body\": \"<h1>oops</h1>\"})\nexcept ValueError:\n    raised = True\nassert raised, \"status 500 should raise ValueError\""
+        },
+        {
+          "name": "invalid JSON raises ValueError",
+          "code": "raised = False\ntry:\n    read_response({\"status\": 200, \"headers\": {}, \"body\": \"not json\"})\nexcept ValueError:\n    raised = True\nassert raised, \"bad JSON should raise ValueError\""
+        }
+      ],
+      "hints": [
+        "`json.dumps` takes `sort_keys=True` and `separators=(\",\", \":\")` for compact output.",
+        "`JSONDecodeError` is already a `ValueError`, but a server error page may not be JSON at all, so the error path must not depend on parsing.",
+        "Parse inside `try`. On failure, set `data = None` and re-raise only if the status is below 400. Then, if the status is 400 or above, raise `ValueError` using `data.get(\"error\", ...)` when `data` is a dict."
+      ],
+      "explanation": "Parsing is done before the status test so an error body can supply a helpful message, but a failure to parse must not hide the real error. Proxies and crashed servers often answer with HTML.\n\nSorted keys and compact separators make the output byte-for-byte predictable, which helps with tests, caching and signatures."
+    },
+    {
+      "id": "parsing-urls",
+      "title": "Parsing a URL",
+      "body": "# Parsing a URL\n\nNever take URLs apart with `split`. Encoding rules and optional parts make that fragile. `urllib.parse` handles them.\n\n```python\nfrom urllib.parse import (\n    urlsplit, parse_qsl, urlencode)\n\nu = urlsplit(\n    \"https://a.io:8000/s?q=a+b&p=2#top\")\nprint(u.scheme, u.hostname, u.port)\nprint(u.path, u.query, u.fragment)\nprint(parse_qsl(u.query))\n# [('q', 'a b'), ('p', '2')]\nprint(urlencode({\"q\": \"a b\"}))\n# q=a+b\n```\n\n- `u.port` is `None` when the URL does not state one.\n- `parse_qsl` drops parameters with blank values unless you pass `keep_blank_values=True`.\n- `parse_qs` returns a dict of lists, since a key may repeat.\n- A split URL is a named tuple, so `u._replace(query=\"x=1\").geturl()` builds a new URL with one part changed.\n\n`quote` and `unquote` handle percent-encoding, and `urljoin` resolves relative links.",
+      "task": "Write `query_params(url)` returning a dict from each key to its first value, keeping blank values. Write `add_param(url, key, value)` setting one query parameter, replacing it in place if present, otherwise appending, and leaving other URL parts alone. Write `host_and_port(url)` returning `(host, port)`, using 443 for https and 80 for http when none is given.",
+      "starter": "from urllib.parse import urlsplit\n\n\ndef query_params(url):\n    query = url.split(\"?\")[1]\n    return dict(p.split(\"=\") for p in query.split(\"&\"))\n\n\ndef add_param(url, key, value):\n    return url + \"?\" + key + \"=\" + value\n\n\ndef host_and_port(url):\n    parts = urlsplit(url)\n    return parts.hostname, parts.port\n",
+      "solution": "from urllib.parse import parse_qsl, urlencode, urlsplit\n\n\ndef query_params(url):\n    query = urlsplit(url).query\n    pairs = parse_qsl(query, keep_blank_values=True)\n    result = {}\n    for key, value in pairs:\n        result.setdefault(key, value)\n    return result\n\n\ndef add_param(url, key, value):\n    parts = urlsplit(url)\n    pairs = parse_qsl(parts.query, keep_blank_values=True)\n    params = dict(pairs)\n    params[key] = value\n    return parts._replace(query=urlencode(params)).geturl()\n\n\ndef host_and_port(url):\n    parts = urlsplit(url)\n    default = 443 if parts.scheme == \"https\" else 80\n    return parts.hostname, parts.port or default\n",
+      "checks": [
+        {
+          "name": "decodes values",
+          "code": "got = query_params(\"https://a.io/s?q=caf%C3%A9+au+lait&p=2\")\nassert got == {\"q\": \"café au lait\", \"p\": \"2\"}, got"
+        },
+        {
+          "name": "edge cases in queries",
+          "code": "assert query_params(\"https://a.io/\") == {}, query_params(\"https://a.io/\")\nassert query_params(\"/s?empty=&x=1\") == {\"empty\": \"\", \"x\": \"1\"}, query_params(\"/s?empty=&x=1\")\nassert query_params(\"/s?a=1&a=2\") == {\"a\": \"1\"}, query_params(\"/s?a=1&a=2\")"
+        },
+        {
+          "name": "query_params ignores the fragment",
+          "code": "assert query_params(\"/s?a=1#b=2\") == {\"a\": \"1\"}, query_params(\"/s?a=1#b=2\")"
+        },
+        {
+          "name": "add_param appends and encodes",
+          "code": "got = add_param(\"https://a.io/\", \"q\", \"a b\")\nassert got == \"https://a.io/?q=a+b\", got\ngot = add_param(\"https://a.io/s?x=1\", \"y\", \"2\")\nassert got == \"https://a.io/s?x=1&y=2\", got"
+        },
+        {
+          "name": "add_param replaces in place and keeps the fragment",
+          "code": "got = add_param(\"https://a.io/s?q=1&p=2&z=3#top\", \"p\", \"9\")\nassert got == \"https://a.io/s?q=1&p=9&z=3#top\", got"
+        },
+        {
+          "name": "host and port",
+          "code": "assert host_and_port(\"https://example.com/x\") == (\"example.com\", 443), host_and_port(\"https://example.com/x\")\nassert host_and_port(\"http://example.com\") == (\"example.com\", 80), host_and_port(\"http://example.com\")\nassert host_and_port(\"http://localhost:8000/\") == (\"localhost\", 8000), host_and_port(\"http://localhost:8000/\")"
+        }
+      ],
+      "hints": [
+        "`urlsplit(url).query` isolates the query string, whether or not there is a fragment. `parse_qsl` decodes it into pairs.",
+        "A dict keeps insertion order, so assigning to an existing key keeps its place. `_replace` on the split result swaps one part.",
+        "For `query_params`, loop over the pairs with `result.setdefault(key, value)`. For `add_param`, `params = dict(parse_qsl(parts.query, keep_blank_values=True))`, set the key, then `parts._replace(query=urlencode(params)).geturl()`."
+      ],
+      "explanation": "`urlsplit` knows where each part starts, so a `#` in the fragment or a missing `?` needs no special handling. `parse_qsl` undoes `+` and percent-encoding, and `urlencode` applies them again, so values stay correct in both directions.\n\n`setdefault` keeps the first value when a key repeats, whereas `dict(pairs)` would keep the last."
+    },
+    {
+      "id": "wsgi",
+      "title": "WSGI",
+      "body": "# WSGI\n\nWSGI is the standard interface between Python web apps and servers. An app is one callable with this shape:\n\n```python\ndef app(environ, start_response):\n    start_response(\n        \"200 OK\",\n        [(\"Content-Type\", \"text/plain\")],\n    )\n    return [b\"hello\"]\n```\n\n- `environ` is a dict describing the request, with keys such as `REQUEST_METHOD`, `PATH_INFO` and `QUERY_STRING`.\n- `start_response(status, headers)` sets the status line and a list of header tuples.\n- The return value is an iterable of `bytes`.\n\nFlask and Django are both WSGI apps underneath, and a server such as gunicorn just calls this function once per request.\n\nSince it is only a function, you can test it with no server and no network. Build an `environ` dict, pass a `start_response` that records its arguments, and join the returned bytes.",
+      "task": "Write a WSGI function `app`. `GET /` returns `200 OK` with body `hello`. `GET /echo?msg=x` returns `200 OK` with the decoded value of `msg` as UTF-8 (empty if absent). Any other path returns `404 Not Found`. A method other than GET returns `405 Method Not Allowed` with an `Allow: GET` header. Every response has `Content-Type: text/plain; charset=utf-8`.",
+      "starter": "def app(environ, start_response):\n    start_response(\"200 OK\", [])\n    return \"hello\"\n",
+      "solution": "from urllib.parse import parse_qs\n\n\ndef app(environ, start_response):\n    headers = [\n        (\"Content-Type\", \"text/plain; charset=utf-8\"),\n    ]\n    path = environ[\"PATH_INFO\"]\n    if environ[\"REQUEST_METHOD\"] != \"GET\":\n        status = \"405 Method Not Allowed\"\n        headers.append((\"Allow\", \"GET\"))\n        text = \"method not allowed\"\n    elif path == \"/\":\n        status, text = \"200 OK\", \"hello\"\n    elif path == \"/echo\":\n        query = parse_qs(environ.get(\"QUERY_STRING\", \"\"))\n        status = \"200 OK\"\n        text = query.get(\"msg\", [\"\"])[0]\n    else:\n        status, text = \"404 Not Found\", \"not found\"\n    start_response(status, headers)\n    return [text.encode(\"utf-8\")]\n",
+      "checks": [
+        {
+          "name": "home page",
+          "code": "started = []\nbody = app({\"REQUEST_METHOD\": \"GET\", \"PATH_INFO\": \"/\", \"QUERY_STRING\": \"\"}, lambda s, h: started.append((s, h)))\nassert started[0][0] == \"200 OK\", started\nassert b\"\".join(body) == b\"hello\", body"
+        },
+        {
+          "name": "content type on every response",
+          "code": "for method, path in [(\"GET\", \"/\"), (\"GET\", \"/nope\"), (\"POST\", \"/\")]:\n    started = []\n    app({\"REQUEST_METHOD\": method, \"PATH_INFO\": path, \"QUERY_STRING\": \"\"}, lambda s, h: started.append((s, h)))\n    headers = dict(started[0][1])\n    assert headers.get(\"Content-Type\") == \"text/plain; charset=utf-8\", (method, path, headers)"
+        },
+        {
+          "name": "echo decodes the query",
+          "code": "started = []\nquery = \"msg=caf%C3%A9+now\"\nbody = app({\"REQUEST_METHOD\": \"GET\", \"PATH_INFO\": \"/echo\", \"QUERY_STRING\": query}, lambda s, h: started.append((s, h)))\nassert started[0][0] == \"200 OK\", started\nassert b\"\".join(body) == \"café now\".encode(\"utf-8\"), body"
+        },
+        {
+          "name": "echo with no msg",
+          "code": "started = []\nbody = app({\"REQUEST_METHOD\": \"GET\", \"PATH_INFO\": \"/echo\"}, lambda s, h: started.append((s, h)))\nassert started[0][0] == \"200 OK\", started\nassert b\"\".join(body) == b\"\", body"
+        },
+        {
+          "name": "unknown path is 404",
+          "code": "started = []\napp({\"REQUEST_METHOD\": \"GET\", \"PATH_INFO\": \"/nope\", \"QUERY_STRING\": \"\"}, lambda s, h: started.append((s, h)))\nassert started[0][0] == \"404 Not Found\", started"
+        },
+        {
+          "name": "wrong method is 405",
+          "code": "started = []\napp({\"REQUEST_METHOD\": \"POST\", \"PATH_INFO\": \"/echo\", \"QUERY_STRING\": \"\"}, lambda s, h: started.append((s, h)))\nassert started[0][0] == \"405 Method Not Allowed\", started\nassert dict(started[0][1]).get(\"Allow\") == \"GET\", started"
+        }
+      ],
+      "hints": [
+        "Decide the status, headers and text first, then call `start_response` once and return a list holding encoded bytes.",
+        "Test the method before the path, since a POST to any path is a 405. `QUERY_STRING` may be missing, so use `environ.get`.",
+        "`parse_qs(environ.get(\"QUERY_STRING\", \"\"))` returns a dict of lists, so `query.get(\"msg\", [\"\"])[0]` gives the value. Finish with `return [text.encode(\"utf-8\")]`."
+      ],
+      "explanation": "This is what every Python web framework does at its core: read `environ`, pick a handler, call `start_response`, return bytes. Frameworks add routing tables, request objects and templates on top.\n\nReturning a list rather than a single `bytes` value matters. A `bytes` object is itself iterable, one integer at a time, and servers expect each item to be `bytes`."
+    },
+    {
+      "id": "flask-routes",
+      "title": "Flask routes",
+      "body": "# Flask routes\n\nFlask maps URLs to functions. A route returns a value, and Flask builds the response. Returning a dict or list sends JSON.\n\n```python\nfrom flask import Flask, request\n\napp = Flask(__name__)\n\n@app.get(\"/users/<int:user_id>\")\ndef user(user_id):\n    return {\"id\": user_id}\n\n@app.post(\"/users\")\ndef add():\n    data = request.get_json(silent=True)\n    return {\"ok\": True}, 201\n```\n\n- A route may return `(body, status)`.\n- `<int:x>` only matches digits and passes an `int`, so other text gets a 404.\n- `abort(404)` stops with that status.\n- `get_json(silent=True)` returns `None` rather than an error for a body that is not JSON.\n\n## Testing without a server\n\n`app.test_client()` drives the whole app through WSGI with no socket, which suits a phone well. In larger apps, a `create_app()` function builds a fresh app and fresh state for each test.",
+      "task": "Finish `create_app()`. `POST /items` with JSON `{\"name\": \"tea\"}` stores an item with the next id from 1 and returns it with status 201. A body with no non-empty `name`, or a body that is not JSON, returns status 400 with `{\"error\": ...}`. `GET /items/<int:item_id>` returns the item or a 404.",
+      "starter": "from flask import Flask, jsonify, request\n\n\ndef create_app():\n    app = Flask(\"todo\")\n    items = []\n\n    @app.get(\"/items\")\n    def list_items():\n        return jsonify(items)\n\n    # Add POST /items and GET /items/<int:item_id>\n\n    return app\n",
+      "solution": "from flask import Flask, abort, jsonify, request\n\n\ndef create_app():\n    app = Flask(\"todo\")\n    items = []\n\n    @app.get(\"/items\")\n    def list_items():\n        return jsonify(items)\n\n    @app.post(\"/items\")\n    def add_item():\n        data = request.get_json(silent=True)\n        if not isinstance(data, dict):\n            data = {}\n        name = data.get(\"name\")\n        if not name:\n            return {\"error\": \"name is required\"}, 400\n        item = {\"id\": len(items) + 1, \"name\": name}\n        items.append(item)\n        return item, 201\n\n    @app.get(\"/items/<int:item_id>\")\n    def get_item(item_id):\n        for item in items:\n            if item[\"id\"] == item_id:\n                return item\n        abort(404)\n\n    return app\n",
+      "checks": [
+        {
+          "name": "starts empty",
+          "code": "client = create_app().test_client()\nresp = client.get(\"/items\")\nassert resp.status_code == 200, resp.status_code\nassert resp.get_json() == [], resp.get_json()"
+        },
+        {
+          "name": "creates items with rising ids",
+          "code": "client = create_app().test_client()\nfirst = client.post(\"/items\", json={\"name\": \"tea\"})\nsecond = client.post(\"/items\", json={\"name\": \"milk\"})\nassert first.status_code == 201, first.status_code\nassert first.get_json() == {\"id\": 1, \"name\": \"tea\"}, first.get_json()\nassert second.get_json() == {\"id\": 2, \"name\": \"milk\"}, second.get_json()\nassert len(client.get(\"/items\").get_json()) == 2, \"both items should be listed\""
+        },
+        {
+          "name": "rejects bad bodies",
+          "code": "client = create_app().test_client()\nfor kwargs in [{\"json\": {}}, {\"json\": {\"name\": \"\"}}, {\"json\": [\"x\"]}, {\"data\": \"not json\"}]:\n    resp = client.post(\"/items\", **kwargs)\n    assert resp.status_code == 400, (kwargs, resp.status_code)\n    assert \"error\" in resp.get_json(), resp.get_json()\nassert client.get(\"/items\").get_json() == [], \"bad bodies should store nothing\""
+        },
+        {
+          "name": "fetches one item",
+          "code": "client = create_app().test_client()\nclient.post(\"/items\", json={\"name\": \"tea\"})\nresp = client.get(\"/items/1\")\nassert resp.status_code == 200, resp.status_code\nassert resp.get_json() == {\"id\": 1, \"name\": \"tea\"}, resp.get_json()"
+        },
+        {
+          "name": "missing items are 404",
+          "code": "client = create_app().test_client()\nassert client.get(\"/items/99\").status_code == 404, \"unknown id\"\nassert client.get(\"/items/abc\").status_code == 404, \"not a number\""
+        },
+        {
+          "name": "apps do not share state",
+          "code": "one = create_app().test_client()\ntwo = create_app().test_client()\none.post(\"/items\", json={\"name\": \"tea\"})\nassert two.get(\"/items\").get_json() == [], \"each app should start empty\""
+        }
+      ],
+      "hints": [
+        "Add two functions inside `create_app`, using `@app.post(\"/items\")` and `@app.get(\"/items/<int:item_id>\")`. `items` stays local to the app.",
+        "`request.get_json(silent=True)` may return `None` or a list, so confirm it is a dict before reading `name`.",
+        "`return {\"error\": \"name is required\"}, 400` for bad input. `item = {\"id\": len(items) + 1, \"name\": name}`, append it, then `return item, 201`. Import `abort` for the 404."
+      ],
+      "explanation": "`create_app` gives each test a clean app, so no test depends on what another left behind. Bigger projects use the same pattern with a database connection.\n\n`Flask(\"todo\")` passes an import name, which Flask uses to find templates and static files. In a real module, `Flask(__name__)` is the convention.\n\nThe list scan is `O(n)`. A dict keyed by id would be `O(1)`, and a real app would use a database."
+    },
+    {
+      "id": "django-url-routing",
+      "title": "How Django routes URLs",
+      "body": "# How Django routes URLs\n\nDjango is a full framework. A project holds apps, and each app usually has models (database tables as classes), views (functions from request to response), and templates (HTML). Requests pass through middleware, then the URL dispatcher picks a view.\n\nRoutes are listed in `urls.py`:\n\n```python\nurlpatterns = [\n    path(\"articles/\", index),\n    path(\"articles/<int:year>/\", by_year),\n    path(\"u/<str:name>/\", profile),\n]\n```\n\n## The rules\n\n- Routes have no leading slash.\n- The list is tried in order, and the first match wins.\n- A converter captures one part: `<int:x>` matches digits and gives an `int`, and `<str:x>` matches any text except `/`. A plain `<x>` means `str`.\n- Captured values reach the view as keyword arguments.\n- The whole path must match, so a missing trailing slash is a different URL.\n- If nothing matches, the result is a 404.\n\nThe exercise builds this logic with no Django at all, so you can see that it is ordinary code.",
+      "task": "Write `resolve(url, patterns)`, where `patterns` is a list of `(route, view)` tuples using `<int:x>`, `<str:x>` or `<x>`. Return `(view, kwargs)` for the first full match, with int captures converted. Raise the given `NotFound` when nothing matches.",
+      "starter": "class NotFound(Exception):\n    pass\n\n\ndef resolve(url, patterns):\n    for route, view in patterns:\n        if route == url:\n            return view, {}\n",
+      "solution": "import re\n\n\nclass NotFound(Exception):\n    pass\n\n\nCAPTURE = re.compile(r\"<(?:(int|str):)?(\\w+)>\")\nREGEX = {\"int\": \"[0-9]+\", \"str\": \"[^/]+\", None: \"[^/]+\"}\n\n\ndef compile_route(route):\n    pattern = \"\"\n    converters = {}\n    position = 0\n    for match in CAPTURE.finditer(route):\n        kind, name = match.groups()\n        pattern += re.escape(route[position:match.start()])\n        pattern += f\"(?P<{name}>{REGEX[kind]})\"\n        converters[name] = kind\n        position = match.end()\n    pattern += re.escape(route[position:])\n    return re.compile(pattern), converters\n\n\ndef resolve(url, patterns):\n    for route, view in patterns:\n        regex, converters = compile_route(route)\n        match = regex.fullmatch(url)\n        if match:\n            kwargs = match.groupdict()\n            for name, kind in converters.items():\n                if kind == \"int\":\n                    kwargs[name] = int(kwargs[name])\n            return view, kwargs\n    raise NotFound(url)\n",
+      "checks": [
+        {
+          "name": "static routes",
+          "code": "routes = [(\"about/\", \"about\"), (\"articles/\", \"index\")]\nassert resolve(\"articles/\", routes) == (\"index\", {}), resolve(\"articles/\", routes)"
+        },
+        {
+          "name": "converts ints and keeps strings",
+          "code": "routes = [(\"articles/<int:year>/\", \"year\"), (\"u/<str:name>/\", \"user\"), (\"t/<tag>/\", \"tag\")]\nassert resolve(\"articles/2024/\", routes) == (\"year\", {\"year\": 2024}), resolve(\"articles/2024/\", routes)\nassert resolve(\"u/ada/\", routes) == (\"user\", {\"name\": \"ada\"}), resolve(\"u/ada/\", routes)\nassert resolve(\"t/42/\", routes) == (\"tag\", {\"tag\": \"42\"}), resolve(\"t/42/\", routes)"
+        },
+        {
+          "name": "several captures",
+          "code": "routes = [(\"a/<int:y>/<int:m>/<str:slug>/\", \"post\")]\ngot = resolve(\"a/2024/5/hi-there/\", routes)\nassert got == (\"post\", {\"y\": 2024, \"m\": 5, \"slug\": \"hi-there\"}), got"
+        },
+        {
+          "name": "first match wins",
+          "code": "routes = [(\"a/<str:x>/\", \"first\"), (\"a/b/\", \"second\")]\nassert resolve(\"a/b/\", routes)[0] == \"first\", resolve(\"a/b/\", routes)"
+        },
+        {
+          "name": "strict matching",
+          "code": "routes = [(\"a/<int:n>/\", \"num\"), (\"b/<str:s>/\", \"str\"), (\"c/\", \"c\"), (\"d.e/\", \"dot\")]\nfor url in [\"a/x/\", \"a/1\", \"b/x/y/\", \"c\", \"xc/\", \"c/x\", \"dxe/\"]:\n    raised = False\n    try:\n        got = resolve(url, routes)\n    except NotFound:\n        raised = True\n    assert raised, f\"{url!r} should raise NotFound, got {got!r}\"\nassert resolve(\"d.e/\", routes) == (\"dot\", {}), \"dots in routes are literal\""
+        }
+      ],
+      "hints": [
+        "Turn each route into a regular expression, and use `fullmatch` so that the whole URL has to match.",
+        "Use `re.finditer` to find each `<...>` capture. Escape the text between captures with `re.escape`, and use a named group for each capture: `(?P<name>[0-9]+)` or `(?P<name>[^/]+)`.",
+        "After `regex.fullmatch(url)`, `match.groupdict()` gives the kwargs as strings. Convert the `int` ones, return `(view, kwargs)`, and `raise NotFound(url)` after the loop."
+      ],
+      "explanation": "Django does essentially this: it compiles each route to a regular expression and walks the list in order. Matching is therefore `O(number of routes)`, which is why order can matter for both behaviour and speed.\n\n`re.escape` keeps literal text literal, so the `.` in `d.e/` cannot match any character. Non-digit captures can never reach `int()`, because the regex has already rejected them."
+    }
+  ]
+}

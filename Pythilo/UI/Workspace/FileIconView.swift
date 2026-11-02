@@ -16,7 +16,7 @@ struct FileIconView: View {
         let lower = name.lowercased()
         let ext = (lower as NSString).pathExtension
         if lower == "__init__.py" { return Tile(glyph: "in", back: 0x2B2A18, front: 0xD8C76A) }
-        if lower == "manage.py" { return Tile(glyph: "mg", back: 0x16263A, front: 0x5AA9FF) }
+        if lower == "manage.py" { return Tile(glyph: "mg", back: 0x1F3F66, front: 0x8CC4FF) }
         if ext == "py", lower.hasPrefix("test_") || lower.hasSuffix("_test.py") || lower == "conftest.py" {
             return Tile(glyph: "ts", back: 0x123529, front: 0x5FD6A8)
         }

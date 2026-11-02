@@ -131,7 +131,9 @@ def compile_strict(source, label):
 
 def parse_or_none(source):
     try:
-        return ast.parse(source)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return ast.parse(source)
     except (SyntaxError, ValueError):
         return None
 
@@ -434,10 +436,11 @@ def main():
                 continue
             before = len(failures)
             lesson_id = lesson.get("id")
-            if lesson_id in seen_ids:
-                fail(where, f"id already used in {seen_ids[lesson_id]}")
-            else:
-                seen_ids[lesson_id] = course_id
+            if is_text(lesson_id):
+                if lesson_id in seen_ids:
+                    fail(where, f"id already used in {seen_ids[lesson_id]}")
+                else:
+                    seen_ids[lesson_id] = course_id
 
             problems, lesson_notes = static_problems(lesson, kind)
             notes += [f"note {where}: {note}" for note in lesson_notes]

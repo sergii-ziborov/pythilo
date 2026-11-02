@@ -24,12 +24,15 @@ struct WorkspaceView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let layout = WorkspaceLayout.resolve(size: geometry.size, container: geometry.frame(in: .global), fold: fold)
+            let layout = resolvedLayout(geometry)
+            let size = layout == .cover ? CGSize(width: min(466, geometry.size.width), height: min(678, geometry.size.height)) : geometry.size
             ZStack {
                 AppTheme.background.ignoresSafeArea()
-                content(layout, size: geometry.size, safeArea: geometry.safeAreaInsets)
-                if usesDrawer(layout) { drawer(layout, size: geometry.size) }
+                content(layout, size: size, safeArea: geometry.safeAreaInsets)
+                if usesDrawer(layout) { drawer(layout, size: size) }
             }
+            .frame(width: size.width, height: size.height)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background { HingeReader { fold = $0 } }
         }
         .ignoresSafeArea(.container)
@@ -53,6 +56,20 @@ struct WorkspaceView: View {
         }
         .onChange(of: model.selectedPath) { model.clearCompletions() }
         .background { shortcuts }
+    }
+
+    private func resolvedLayout(_ geometry: GeometryProxy) -> WorkspaceLayout {
+        #if DEBUG
+        // Device Hub cannot always drive the hinge, so a debug launch argument can
+        // stand in for it: -fakeLayout laptop | book | cover.
+        switch UserDefaults.standard.string(forKey: "fakeLayout") {
+        case "laptop": return .duoLaptop(top: geometry.size.height / 2 - 12, hinge: 12)
+        case "book": return .duoBook(left: geometry.size.width / 2 - 6, hinge: 12)
+        case "cover": return .cover
+        default: break
+        }
+        #endif
+        return WorkspaceLayout.resolve(size: geometry.size, container: geometry.frame(in: .global), fold: fold)
     }
 
     private func usesDrawer(_ layout: WorkspaceLayout) -> Bool {

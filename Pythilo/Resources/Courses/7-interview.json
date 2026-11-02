@@ -1,0 +1,796 @@
+{
+  "id": "interview",
+  "title": "Interview practice",
+  "summary": "Twenty timed coding problems, from warm-ups to hard.",
+  "kind": "interview",
+  "lessons": [
+    {
+      "id": "iv-rotate-list",
+      "title": "Rotate a list",
+      "level": "Easy",
+      "minutes": 10,
+      "body": "# Rotate a list\n\nA rotation moves items off the right end and back in at the left. Rotating `[1, 2, 3, 4]` right by one gives `[4, 1, 2, 3]`.\n\n```python\nrotate_right([1, 2, 3, 4], 1)\n# [4, 1, 2, 3]\nrotate_right([1, 2, 3], 4)\n# [3, 1, 2]\n```\n\n## Things to clarify\n\n- `k` can be larger than the list. Rotating a list of length `n` by `n` changes nothing, so only the remainder matters.\n- `k` can be zero, and the list can be empty.\n- Return a new list, leaving the input as it was.\n\nLook out for `items[-0:]`. Since `-0` equals `0`, that slice is the whole list and not an empty one. This is a common source of bugs in slice-based answers.",
+      "task": "Write `rotate_right(items, k)` returning a new list rotated right by `k` places, where `k` is 0 or more.",
+      "starter": "def rotate_right(items, k):\n    return items\n",
+      "solution": "def rotate_right(items, k):\n    if not items:\n        return []\n    k %= len(items)\n    cut = len(items) - k\n    return items[cut:] + items[:cut]\n",
+      "checks": [
+        {
+          "name": "rotates by one",
+          "code": "assert rotate_right([1, 2, 3, 4], 1) == [4, 1, 2, 3], rotate_right([1, 2, 3, 4], 1)"
+        },
+        {
+          "name": "k larger than the list",
+          "code": "assert rotate_right([1, 2, 3], 4) == [3, 1, 2], rotate_right([1, 2, 3], 4)\nassert rotate_right([1, 2, 3], 300) == [1, 2, 3], rotate_right([1, 2, 3], 300)"
+        },
+        {
+          "name": "zero and full rotations",
+          "code": "assert rotate_right([1, 2], 0) == [1, 2], rotate_right([1, 2], 0)\nassert rotate_right([1, 2], 2) == [1, 2], rotate_right([1, 2], 2)"
+        },
+        {
+          "name": "empty list",
+          "code": "assert rotate_right([], 3) == [], rotate_right([], 3)"
+        },
+        {
+          "name": "returns a new list",
+          "code": "items = [1, 2, 3]\ngot = rotate_right(items, 3)\nassert items == [1, 2, 3], items\nassert got is not items, \"should return a new list\""
+        }
+      ],
+      "hints": [
+        "Rotating by `n` gives back the original, so reduce `k` with `%` first. Mind the empty list.",
+        "A rotation is two slices swapped. Work out where to cut the list.",
+        "`cut = len(items) - (k % len(items))`, then `return items[cut:] + items[:cut]`."
+      ],
+      "explanation": "Using `cut = len(items) - k` avoids the `-0` trap. When `k` is 0, `cut` equals the length, so `items[cut:]` is empty and `items[:cut]` is a full copy.\n\nTime is `O(n)` and extra space is `O(n)` for the new list. `collections.deque.rotate` does the same in place."
+    },
+    {
+      "id": "iv-balanced-brackets",
+      "title": "Balanced brackets",
+      "level": "Easy",
+      "minutes": 15,
+      "body": "# Balanced brackets\n\nA text is balanced if every closing bracket matches the most recent bracket still open. Three kinds appear: `()`, `[]` and `{}`. All other characters are ignored.\n\n```python\nis_balanced(\"(a[b]{c})\")  # True\nis_balanced(\"([)]\")       # False\nis_balanced(\"(\")          # False\n```\n\nCounting each kind is not enough, because `([)]` has matching counts but crosses over. What you need is the most recently opened bracket, which is exactly what a stack gives you.\n\nA Python list works as a stack: `append` pushes and `pop` removes the last item, both in constant time.\n\n```python\nstack = []\nstack.append(\"(\")\nprint(stack.pop())  # (\n```\n\nTwo failure cases are easy to forget: a closing bracket when the stack is empty, and items left on the stack at the end.",
+      "task": "Write `is_balanced(text)` returning `True` when all `()`, `[]` and `{}` in the text are properly matched and nested.",
+      "starter": "def is_balanced(text):\n    return text.count(\"(\") == text.count(\")\")\n",
+      "solution": "def is_balanced(text):\n    pairs = {\")\": \"(\", \"]\": \"[\", \"}\": \"{\"}\n    stack = []\n    for char in text:\n        if char in \"([{\":\n            stack.append(char)\n        elif char in pairs:\n            if not stack or stack.pop() != pairs[char]:\n                return False\n    return not stack\n",
+      "checks": [
+        {
+          "name": "nested and ignored characters",
+          "code": "assert is_balanced(\"(a[b]{c})\") is True, is_balanced(\"(a[b]{c})\")\nassert is_balanced(\"no brackets\") is True, is_balanced(\"no brackets\")"
+        },
+        {
+          "name": "empty text",
+          "code": "assert is_balanced(\"\") is True, is_balanced(\"\")"
+        },
+        {
+          "name": "crossed pairs",
+          "code": "assert is_balanced(\"([)]\") is False, is_balanced(\"([)]\")\nassert is_balanced(\"(]\") is False, is_balanced(\"(]\")"
+        },
+        {
+          "name": "left open",
+          "code": "assert is_balanced(\"((\") is False, is_balanced(\"((\")\nassert is_balanced(\"()[\") is False, is_balanced(\"()[\")"
+        },
+        {
+          "name": "closes with nothing open",
+          "code": "assert is_balanced(\")\") is False, is_balanced(\")\")\nassert is_balanced(\"())(\") is False, is_balanced(\"())(\")"
+        }
+      ],
+      "hints": [
+        "Push each opening bracket. When you see a closing one, which bracket must be on top?",
+        "A dict from closer to opener, such as `{\")\": \"(\"}`, keeps the matching logic to one line.",
+        "`if not stack or stack.pop() != pairs[char]: return False` for closers, and finish with `return not stack`."
+      ],
+      "explanation": "The stack holds exactly the brackets still open, with the most recent on top, which is the one the next closer has to match.\n\nTesting `not stack` first prevents `pop` from raising on an empty list. Time is `O(n)` and space is `O(n)` in the worst case of all openers."
+    },
+    {
+      "id": "iv-first-unique",
+      "title": "First character seen once",
+      "level": "Easy",
+      "minutes": 10,
+      "body": "# First character seen once\n\nGiven a string, find the position of the first character that appears exactly once. Upper and lower case count as different characters.\n\n```python\nfirst_unique(\"stress\")  # 1, the \"t\"\nfirst_unique(\"aabb\")    # -1\n```\n\n## Approach\n\nA nested loop that compares each character against all others takes quadratic time. Two passes with a dict is better:\n\n- The first pass counts every character.\n- The second pass walks the string in order and stops at the first count of 1.\n\n`collections.Counter` does the counting:\n\n```python\nfrom collections import Counter\n\nCounter(\"aab\")  # Counter({'a': 2, 'b': 1})\n```\n\nWalk the original string in the second pass, because that is where the order you need lives. Dict order alone would also work here, but the string makes the intent clear and gives you the index.",
+      "task": "Write `first_unique(text)` returning the index of the first character that occurs exactly once, or -1 if there is none.",
+      "starter": "def first_unique(text):\n    return 0\n",
+      "solution": "from collections import Counter\n\n\ndef first_unique(text):\n    counts = Counter(text)\n    for index, char in enumerate(text):\n        if counts[char] == 1:\n            return index\n    return -1\n",
+      "checks": [
+        {
+          "name": "finds the first single",
+          "code": "assert first_unique(\"stress\") == 1, first_unique(\"stress\")\nassert first_unique(\"abcab\") == 2, first_unique(\"abcab\")"
+        },
+        {
+          "name": "nothing unique",
+          "code": "assert first_unique(\"aabb\") == -1, first_unique(\"aabb\")"
+        },
+        {
+          "name": "empty text",
+          "code": "assert first_unique(\"\") == -1, first_unique(\"\")"
+        },
+        {
+          "name": "one character and case",
+          "code": "assert first_unique(\"z\") == 0, first_unique(\"z\")\nassert first_unique(\"aA\") == 0, first_unique(\"aA\")"
+        },
+        {
+          "name": "unique character at the end",
+          "code": "assert first_unique(\"aabbc\") == 4, first_unique(\"aabbc\")"
+        }
+      ],
+      "hints": [
+        "Knowing how often each character appears is the hard part. A dict can record that in one pass.",
+        "After counting, walk the string again in order. `enumerate` gives you the index.",
+        "`counts = Counter(text)`, then `for index, char in enumerate(text): if counts[char] == 1: return index`, and `return -1`."
+      ],
+      "explanation": "Two linear passes make this `O(n)` time. Space is `O(k)`, where `k` is the number of distinct characters.\n\nCalling `text.count(char)` inside the loop looks shorter but rescans the string every time, which makes it `O(n^2)` on long inputs."
+    },
+    {
+      "id": "iv-pair-with-sum",
+      "title": "A pair that hits the target",
+      "level": "Easy",
+      "minutes": 15,
+      "body": "# A pair that hits the target\n\nYou have a list of numbers and a target. Find two different positions whose values add up to the target.\n\n```python\npair_with_sum([4, 7, 1, 5], 6)  # (2, 3)\npair_with_sum([3], 6)           # None\n```\n\nIf several pairs work, return the one that finishes earliest, meaning the smallest second index. If several first indexes work with that second index, take the smallest.\n\n## Approach\n\nTrying all pairs is quadratic. Instead, walk the list once and ask, for each value, whether its complement has already appeared:\n\n```python\nneed = target - value\nif need in seen:\n    ...\n```\n\nStore each value's first index in a dict as you go. Check before you store, so a value cannot pair with itself. Stopping at the first hit gives the earliest finish automatically.",
+      "task": "Write `pair_with_sum(numbers, target)` returning `(i, j)` with `i < j` as described, or `None` if no pair adds up to the target.",
+      "starter": "def pair_with_sum(numbers, target):\n    return None\n",
+      "solution": "def pair_with_sum(numbers, target):\n    seen = {}\n    for j, value in enumerate(numbers):\n        need = target - value\n        if need in seen:\n            return seen[need], j\n        seen.setdefault(value, j)\n    return None\n",
+      "checks": [
+        {
+          "name": "finds a pair",
+          "code": "assert pair_with_sum([4, 7, 1, 5], 6) == (2, 3), pair_with_sum([4, 7, 1, 5], 6)"
+        },
+        {
+          "name": "duplicates can pair",
+          "code": "assert pair_with_sum([3, 3], 6) == (0, 1), pair_with_sum([3, 3], 6)"
+        },
+        {
+          "name": "a value cannot pair with itself",
+          "code": "assert pair_with_sum([3], 6) is None, pair_with_sum([3], 6)\nassert pair_with_sum([3, 1], 6) is None, pair_with_sum([3, 1], 6)\nassert pair_with_sum([], 0) is None, pair_with_sum([], 0)"
+        },
+        {
+          "name": "earliest finish wins",
+          "code": "assert pair_with_sum([1, 5, 2, 4], 6) == (0, 1), pair_with_sum([1, 5, 2, 4], 6)"
+        },
+        {
+          "name": "smallest first index",
+          "code": "assert pair_with_sum([2, 2, 4], 6) == (0, 2), pair_with_sum([2, 2, 4], 6)"
+        },
+        {
+          "name": "negatives and zero",
+          "code": "assert pair_with_sum([-2, 9, 2], 0) == (0, 2), pair_with_sum([-2, 9, 2], 0)\nassert pair_with_sum([0, 0], 0) == (0, 1), pair_with_sum([0, 0], 0)"
+        }
+      ],
+      "hints": [
+        "For each value, you know exactly what other value you need. How can you look that up quickly?",
+        "Keep a dict from value to index for everything before the current position. Look up first, then store.",
+        "`need = target - value`, `if need in seen: return seen[need], j`, then `seen.setdefault(value, j)`, which keeps the first index of a repeated value."
+      ],
+      "explanation": "Each dict lookup is `O(1)` on average, so the whole scan is `O(n)` time and `O(n)` space, trading memory for speed against the `O(n^2)` nested loop.\n\n`setdefault` keeps the earliest index for repeated values, which is what gives the smallest `i`."
+    },
+    {
+      "id": "iv-clean-palindrome",
+      "title": "Palindrome through the noise",
+      "level": "Easy",
+      "minutes": 15,
+      "body": "# Palindrome through the noise\n\nA phrase counts as a palindrome here if it reads the same both ways after ignoring case and every character other than letters and digits.\n\n```python\nis_clean_palindrome(\"No lemon, no melon\")\n# True\nis_clean_palindrome(\"ab\")\n# False\n```\n\n## Two pointers\n\nYou could build a filtered string and compare it with its reverse, but that uses extra memory. Two indexes can do it in place:\n\n- `left` starts at the beginning and `right` at the end.\n- Move each inward past characters that do not count. `str.isalnum` tells you which those are.\n- Compare the two characters with `lower()`. A mismatch ends the search.\n- Stop when the indexes meet.\n\nText with nothing to compare, such as `\"!!\"` or an empty string, counts as a palindrome.",
+      "task": "Write `is_clean_palindrome(text)` using two pointers, returning `True` if the letters and digits of `text` read the same in both directions, ignoring case.",
+      "starter": "def is_clean_palindrome(text):\n    return text == text[::-1]\n",
+      "solution": "def is_clean_palindrome(text):\n    left, right = 0, len(text) - 1\n    while left < right:\n        if not text[left].isalnum():\n            left += 1\n        elif not text[right].isalnum():\n            right -= 1\n        elif text[left].lower() != text[right].lower():\n            return False\n        else:\n            left += 1\n            right -= 1\n    return True\n",
+      "checks": [
+        {
+          "name": "ignores case and punctuation",
+          "code": "assert is_clean_palindrome(\"No lemon, no melon\") is True, \"lemon melon\"\nassert is_clean_palindrome(\"Was it a car, or a cat I saw?\") is True, \"car cat\""
+        },
+        {
+          "name": "rejects non-palindromes",
+          "code": "assert is_clean_palindrome(\"ab\") is False, \"ab\"\nassert is_clean_palindrome(\"race a car\") is False, \"race a car\""
+        },
+        {
+          "name": "nothing to compare",
+          "code": "assert is_clean_palindrome(\"\") is True, \"empty\"\nassert is_clean_palindrome(\"!!\") is True, \"only punctuation\"\nassert is_clean_palindrome(\" a \") is True, \"one letter\""
+        },
+        {
+          "name": "digits count",
+          "code": "assert is_clean_palindrome(\"1a2\") is False, \"1a2\"\nassert is_clean_palindrome(\"12 21\") is True, \"12 21\""
+        }
+      ],
+      "hints": [
+        "Use two indexes, starting at each end, moving toward each other.",
+        "On each pass, do one thing: skip the left character, skip the right character, or compare them.",
+        "`while left < right:`, then `if not text[left].isalnum(): left += 1`, `elif not text[right].isalnum(): right -= 1`, `elif` the lowercase forms differ `return False`, `else` move both."
+      ],
+      "explanation": "Each pass moves at least one index inward, so the loop runs at most `n` times, giving `O(n)` time and `O(1)` extra space.\n\nDoing one step per pass avoids nested skip loops and their bounds errors. A middle character in an odd-length string is never compared, and that is fine since it matches itself."
+    },
+    {
+      "id": "iv-shared-default",
+      "title": "The shared default",
+      "level": "Easy",
+      "minutes": 10,
+      "body": "# The shared default\n\nAn interviewer shows you this and asks why it misbehaves:\n\n```python\ndef add_tag(tag, tags=[]):\n    tags.append(tag)\n    return tags\n\nprint(add_tag(\"a\"))  # ['a']\nprint(add_tag(\"b\"))  # ['a', 'b']\n```\n\nDefault values are created once, when `def` runs, and stored on the function. You can see the stored list in `add_tag.__defaults__`. Every call that omits `tags` gets that same list, so changes accumulate.\n\nNumbers and strings do not show the problem, because they cannot be changed in place. Lists, dicts and sets do.\n\nThe standard fix uses `None` as a marker and creates the object inside the function:\n\n```python\ndef f(items=None):\n    if items is None:\n        items = []\n```\n\nTest with `is None` and not `if not items`, so an empty list passed by the caller is still the caller's list.",
+      "task": "Fix `add_tag(tag, tags=None)` so each call without `tags` starts from a new list. A list passed in must be appended to and returned, even if it is empty.",
+      "starter": "def add_tag(tag, tags=[]):\n    tags.append(tag)\n    return tags\n",
+      "solution": "def add_tag(tag, tags=None):\n    if tags is None:\n        tags = []\n    tags.append(tag)\n    return tags\n",
+      "checks": [
+        {
+          "name": "calls do not share a list",
+          "code": "assert add_tag(\"a\") == [\"a\"], \"first call\"\nassert add_tag(\"b\") == [\"b\"], \"second call should start fresh\""
+        },
+        {
+          "name": "results are separate objects",
+          "code": "assert add_tag(\"a\") is not add_tag(\"a\"), \"each call should build a new list\""
+        },
+        {
+          "name": "uses the caller's list",
+          "code": "mine = [\"x\"]\nassert add_tag(\"y\", mine) is mine, \"should return the same list\"\nassert mine == [\"x\", \"y\"], mine"
+        },
+        {
+          "name": "keeps an empty list from the caller",
+          "code": "mine = []\nassert add_tag(\"y\", mine) is mine, \"an empty list is still the caller's list\"\nassert mine == [\"y\"], mine"
+        },
+        {
+          "name": "default is None",
+          "code": "import inspect\ndefault = inspect.signature(add_tag).parameters[\"tags\"].default\nassert default is None, default"
+        }
+      ],
+      "hints": [
+        "The list is created when `def` runs, not when you call the function. Move its creation into the body.",
+        "Use `None` as the default, so \"nothing passed\" can be detected.",
+        "`def add_tag(tag, tags=None):`, then `if tags is None: tags = []`, followed by the append and return."
+      ],
+      "explanation": "The function body runs per call, so `tags = []` there creates a new list each time. The cost is `O(1)` per call.\n\nWriting `tags = tags or []` is a tempting shortcut with a hidden bug: an empty list from the caller is falsy, so it gets replaced and the caller never sees the new item."
+    },
+    {
+      "id": "iv-closures-in-a-loop",
+      "title": "Closures in a loop",
+      "level": "Easy",
+      "minutes": 10,
+      "body": "# Closures in a loop\n\nWhat does this print?\n\n```python\nfuncs = []\nfor i in range(3):\n    funcs.append(lambda x: x * i)\nprint([f(10) for f in funcs])\n# [20, 20, 20]\n```\n\nThe lambdas do not capture the value of `i`. They capture the variable. By the time they are called, the loop has finished and `i` is 2 for all of them. This is called late binding.\n\n## Two fixes\n\n- Bind the current value as a default argument, which is evaluated right when the function is created.\n- Call a factory function, so each closure gets its own variable.\n\n```python\ndef times(n):\n    return lambda x: x * n\n```\n\nComprehensions behave the same way, since each lambda still looks up the name when called.",
+      "task": "Fix `make_multipliers(n)` so it returns a list of `n` functions where the function at position `i` multiplies its argument by `i`.",
+      "starter": "def make_multipliers(n):\n    funcs = []\n    for i in range(n):\n        funcs.append(lambda x: x * i)\n    return funcs\n",
+      "solution": "def times(factor):\n    def multiply(x):\n        return x * factor\n    return multiply\n\n\ndef make_multipliers(n):\n    return [times(i) for i in range(n)]\n",
+      "checks": [
+        {
+          "name": "each function keeps its own factor",
+          "code": "got = [f(10) for f in make_multipliers(3)]\nassert got == [0, 10, 20], got"
+        },
+        {
+          "name": "works in any calling order",
+          "code": "funcs = make_multipliers(4)\nassert funcs[3](2) == 6, funcs[3](2)\nassert funcs[1](2) == 2, funcs[1](2)"
+        },
+        {
+          "name": "no functions and one function",
+          "code": "assert make_multipliers(0) == [], make_multipliers(0)\nassert make_multipliers(1)[0](5) == 0, make_multipliers(1)[0](5)"
+        },
+        {
+          "name": "results are independent between calls",
+          "code": "one = make_multipliers(3)\ntwo = make_multipliers(5)\nassert one[2](1) == 2, one[2](1)\nassert two[4](1) == 4, two[4](1)"
+        }
+      ],
+      "hints": [
+        "All the lambdas read the same `i`, and they read it when called. You need one variable per function.",
+        "Default arguments are evaluated when the function is created, which gives you a way to freeze a value.",
+        "`lambda x, i=i: x * i` works. So does a helper, `def times(factor):` returning an inner function, used as `[times(i) for i in range(n)]`."
+      ],
+      "explanation": "Each call to `times` creates a new `factor` variable, so each returned function closes over its own value. Creating the list is `O(n)`, and each multiply is `O(1)`.\n\nThe default-argument fix works too, but it adds a parameter that callers could accidentally override, which is why many reviewers prefer the factory."
+    },
+    {
+      "id": "iv-merge-intervals",
+      "title": "Merge intervals",
+      "level": "Medium",
+      "minutes": 20,
+      "body": "# Merge intervals\n\nYou are given ranges of time as `(start, end)` pairs, in any order. Combine all that overlap so the result covers the same time with the fewest ranges.\n\n```python\nmerge_intervals([(5, 7), (1, 3), (2, 4)])\n# [(1, 4), (5, 7)]\nmerge_intervals([(1, 3), (3, 5)])\n# [(1, 5)]\n```\n\nTouching pairs count as overlapping, as the second example shows.\n\n## Approach\n\nSort by start. Now every interval that could overlap the current one comes right after it, so one pass is enough. For each interval, either it starts within the last merged range, which you then extend, or it begins a new range.\n\nBe careful when extending. An interval can sit fully inside another, as `(1, 10)` and `(2, 3)` do. Take the larger of the two ends.",
+      "task": "Write `merge_intervals(intervals)` returning a sorted list of merged `(start, end)` tuples, merging overlapping and touching pairs, without changing the input.",
+      "starter": "def merge_intervals(intervals):\n    return intervals\n",
+      "solution": "def merge_intervals(intervals):\n    merged = []\n    for start, end in sorted(intervals):\n        if merged and start <= merged[-1][1]:\n            last_start, last_end = merged[-1]\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n",
+      "checks": [
+        {
+          "name": "merges unsorted input",
+          "code": "got = merge_intervals([(5, 7), (1, 3), (2, 4)])\nassert got == [(1, 4), (5, 7)], got"
+        },
+        {
+          "name": "touching pairs merge",
+          "code": "got = merge_intervals([(1, 3), (3, 5)])\nassert got == [(1, 5)], got"
+        },
+        {
+          "name": "a gap stays separate",
+          "code": "got = merge_intervals([(1, 2), (4, 5)])\nassert got == [(1, 2), (4, 5)], got\ngot = merge_intervals([(1, 2), (2, 2), (3, 4)])\nassert got == [(1, 2), (3, 4)], got"
+        },
+        {
+          "name": "nested intervals keep the larger end",
+          "code": "got = merge_intervals([(1, 10), (2, 3), (4, 5)])\nassert got == [(1, 10)], got"
+        },
+        {
+          "name": "empty and single",
+          "code": "assert merge_intervals([]) == [], merge_intervals([])\nassert merge_intervals([(2, 2)]) == [(2, 2)], merge_intervals([(2, 2)])"
+        },
+        {
+          "name": "input is left alone",
+          "code": "data = [(3, 4), (1, 2)]\nmerge_intervals(data)\nassert data == [(3, 4), (1, 2)], data"
+        }
+      ],
+      "hints": [
+        "Sort first. Then each interval only has to be compared with the last range in your result.",
+        "It overlaps when `start <= last_end`. Using `<=` rather than `<` is what merges touching pairs.",
+        "`for start, end in sorted(intervals):`, and if `merged and start <= merged[-1][1]`, replace the last entry with `(merged[-1][0], max(merged[-1][1], end))`. Otherwise append."
+      ],
+      "explanation": "After sorting by start, any interval overlapping an earlier range must also overlap the most recent merged one, so one comparison per item is enough.\n\nSorting costs `O(n log n)` and the pass costs `O(n)`, for `O(n log n)` overall with `O(n)` space. `sorted` compares tuples element by element, so starts come first."
+    },
+    {
+      "id": "iv-group-by-letters",
+      "title": "Group by letters",
+      "level": "Medium",
+      "minutes": 20,
+      "body": "# Group by letters\n\nTwo words belong together if one is a rearrangement of the other's letters, ignoring case. Group a list of words this way.\n\n```python\ngroup_by_letters(\n    [\"stone\", \"cat\", \"notes\", \"act\"])\n# [[\"stone\", \"notes\"], [\"cat\", \"act\"]]\n```\n\nGroups appear in the order their first word appears, and words stay in their original order within a group.\n\n## Approach\n\nComparing every pair of words is slow. Find a key that is equal exactly when two words belong together, then let a dict do the grouping. Sorting a word's letters gives such a key: `\"stone\"` and `\"notes\"` both become `\"enost\"`.\n\n`collections.defaultdict` creates a list the first time you touch a key:\n\n```python\nfrom collections import defaultdict\n\ngroups = defaultdict(list)\ngroups[\"k\"].append(1)\n```\n\nDicts keep insertion order, which handles the group ordering for you.",
+      "task": "Write `group_by_letters(words)` returning a list of groups as described. The word's original spelling is kept in the output.",
+      "starter": "def group_by_letters(words):\n    return [words]\n",
+      "solution": "from collections import defaultdict\n\n\ndef group_by_letters(words):\n    groups = defaultdict(list)\n    for word in words:\n        key = \"\".join(sorted(word.lower()))\n        groups[key].append(word)\n    return list(groups.values())\n",
+      "checks": [
+        {
+          "name": "groups rearrangements",
+          "code": "got = group_by_letters([\"stone\", \"cat\", \"notes\", \"act\"])\nassert got == [[\"stone\", \"notes\"], [\"cat\", \"act\"]], got"
+        },
+        {
+          "name": "all in one and all separate",
+          "code": "got = group_by_letters([\"listen\", \"silent\", \"enlist\"])\nassert got == [[\"listen\", \"silent\", \"enlist\"]], got\ngot = group_by_letters([\"a\", \"b\"])\nassert got == [[\"a\"], [\"b\"]], got"
+        },
+        {
+          "name": "ignores case, keeps spelling",
+          "code": "got = group_by_letters([\"Act\", \"cat\", \"TAC\"])\nassert got == [[\"Act\", \"cat\", \"TAC\"]], got"
+        },
+        {
+          "name": "duplicates and repeated letters",
+          "code": "got = group_by_letters([\"aab\", \"aba\", \"aab\", \"abb\"])\nassert got == [[\"aab\", \"aba\", \"aab\"], [\"abb\"]], got"
+        },
+        {
+          "name": "empty inputs",
+          "code": "assert group_by_letters([]) == [], group_by_letters([])\nassert group_by_letters([\"\"]) == [[\"\"]], group_by_letters([\"\"])"
+        }
+      ],
+      "hints": [
+        "What can you compute from a word that comes out the same for all of its rearrangements?",
+        "A sorted form of the lower-cased letters works as a dict key, once it is joined into a string.",
+        "`key = \"\".join(sorted(word.lower()))`, `groups[key].append(word)`, and `return list(groups.values())`."
+      ],
+      "explanation": "With `n` words of length up to `m`, sorting each costs `O(m log m)`, so the total is `O(n m log m)` time and `O(n m)` space.\n\nThe key must capture letter counts, not just which letters appear, which is why a `set` of letters would wrongly group `aab` with `abb`. A tuple of letter counts is a faster key on very long words."
+    },
+    {
+      "id": "iv-longest-unique-run",
+      "title": "Longest run with no repeats",
+      "level": "Medium",
+      "minutes": 25,
+      "body": "# Longest run with no repeats\n\nFind the length of the longest stretch of consecutive characters in which no character appears twice.\n\n```python\nlongest_unique_run(\"abbacdeb\")  # 5\nlongest_unique_run(\"aaaa\")      # 1\n```\n\nIn the first example, `bacde` and `acdeb` both have length 5.\n\n## Sliding window\n\nChecking every substring is far too slow. Keep a window with a left and a right edge. Move the right edge one step at a time and remember where you last saw each character.\n\n- If the new character was last seen inside the window, move the left edge just past that spot.\n- If it was last seen before the window, ignore it. The left edge must never move backward.\n\nTry `\"abba\"` by hand. When the last `a` arrives, its previous position is already outside the window, and moving left back there would be wrong. The answer is 2.",
+      "task": "Write `longest_unique_run(text)` returning the length of the longest substring with no repeated character.",
+      "starter": "def longest_unique_run(text):\n    return len(set(text))\n",
+      "solution": "def longest_unique_run(text):\n    last_seen = {}\n    left = 0\n    best = 0\n    for right, char in enumerate(text):\n        if last_seen.get(char, -1) >= left:\n            left = last_seen[char] + 1\n        last_seen[char] = right\n        best = max(best, right - left + 1)\n    return best\n",
+      "checks": [
+        {
+          "name": "typical cases",
+          "code": "assert longest_unique_run(\"abbacdeb\") == 5, longest_unique_run(\"abbacdeb\")\nassert longest_unique_run(\"pqrpqs\") == 4, longest_unique_run(\"pqrpqs\")\nassert longest_unique_run(\"abcbde\") == 4, longest_unique_run(\"abcbde\")"
+        },
+        {
+          "name": "all the same",
+          "code": "assert longest_unique_run(\"aaaa\") == 1, longest_unique_run(\"aaaa\")\nassert longest_unique_run(\"aabbcc\") == 2, longest_unique_run(\"aabbcc\")"
+        },
+        {
+          "name": "all different",
+          "code": "assert longest_unique_run(\"abcdef\") == 6, longest_unique_run(\"abcdef\")"
+        },
+        {
+          "name": "empty and single",
+          "code": "assert longest_unique_run(\"\") == 0, longest_unique_run(\"\")\nassert longest_unique_run(\"z\") == 1, longest_unique_run(\"z\")"
+        },
+        {
+          "name": "left edge never moves back",
+          "code": "assert longest_unique_run(\"abba\") == 2, longest_unique_run(\"abba\")\nassert longest_unique_run(\"xyyxz\") == 3, longest_unique_run(\"xyyxz\")"
+        }
+      ],
+      "hints": [
+        "Think of a window that only grows on the right and only shrinks from the left. What should happen when a character repeats?",
+        "A dict from character to its latest index tells you where to move the left edge in one step.",
+        "`if last_seen.get(char, -1) >= left: left = last_seen[char] + 1`. Then record `last_seen[char] = right` and update `best` with `right - left + 1`."
+      ],
+      "explanation": "Each edge only moves forward, and each character costs `O(1)`, so the total is `O(n)` time. Space is `O(k)` for `k` distinct characters.\n\nThe test `>= left` is the key detail. It means the earlier sighting still counts only if it is inside the current window, and that is what keeps the left edge from jumping backward."
+    },
+    {
+      "id": "iv-count-pairs-below",
+      "title": "Count pairs below a limit",
+      "level": "Medium",
+      "minutes": 20,
+      "body": "# Count pairs below a limit\n\nCount how many pairs of positions in a list have values adding up to strictly less than a limit.\n\n```python\ncount_pairs_below([1, 2, 3, 4], 6)  # 4\n```\n\nThe pairs are `1+2`, `1+3`, `1+4` and `2+3`.\n\n## Two pointers on sorted data\n\nSort first, then place `left` at the smallest value and `right` at the largest.\n\n- If `values[left] + values[right] < limit`, then `left` pairs successfully with every position from `left + 1` through `right`, because those values are all no larger. That is `right - left` pairs at once. Move `left` up.\n- Otherwise the largest value is too big to pair with `left` or anything after it. Move `right` down.\n\nEach step moves a pointer, so the pass is linear. Remember to sort a copy, since the input belongs to the caller.",
+      "task": "Write `count_pairs_below(numbers, limit)` returning the number of index pairs `i < j` with `numbers[i] + numbers[j] < limit`, in `O(n log n)` time and without changing the input.",
+      "starter": "def count_pairs_below(numbers, limit):\n    return len(numbers)\n",
+      "solution": "def count_pairs_below(numbers, limit):\n    values = sorted(numbers)\n    left, right = 0, len(values) - 1\n    count = 0\n    while left < right:\n        if values[left] + values[right] < limit:\n            count += right - left\n            left += 1\n        else:\n            right -= 1\n    return count\n",
+      "checks": [
+        {
+          "name": "counts pairs",
+          "code": "assert count_pairs_below([1, 2, 3, 4], 6) == 4, count_pairs_below([1, 2, 3, 4], 6)"
+        },
+        {
+          "name": "limit is strict",
+          "code": "assert count_pairs_below([1, 2], 3) == 0, count_pairs_below([1, 2], 3)\nassert count_pairs_below([1, 2], 4) == 1, count_pairs_below([1, 2], 4)"
+        },
+        {
+          "name": "too few values",
+          "code": "assert count_pairs_below([], 5) == 0, count_pairs_below([], 5)\nassert count_pairs_below([1], 5) == 0, count_pairs_below([1], 5)"
+        },
+        {
+          "name": "duplicates and negatives",
+          "code": "assert count_pairs_below([2, 2, 2], 5) == 3, count_pairs_below([2, 2, 2], 5)\nassert count_pairs_below([-1, 0, 1], 0) == 1, count_pairs_below([-1, 0, 1], 0)"
+        },
+        {
+          "name": "matches brute force",
+          "code": "import itertools\ndata = [5, -3, 8, 0, 2, 2, 7, -6, 4, 1]\nfor limit in range(-10, 16):\n    want = sum(1 for a, b in itertools.combinations(data, 2) if a + b < limit)\n    got = count_pairs_below(data, limit)\n    assert got == want, (limit, got, want)"
+        },
+        {
+          "name": "input is left alone",
+          "code": "data = [3, 1, 2]\ncount_pairs_below(data, 4)\nassert data == [3, 1, 2], data"
+        }
+      ],
+      "hints": [
+        "Sorting lets you draw conclusions about many pairs from a single comparison.",
+        "If the smallest plus the largest is below the limit, the smallest also works with everything in between.",
+        "`while left < right:`, then `if values[left] + values[right] < limit: count += right - left; left += 1`, `else: right -= 1`."
+      ],
+      "explanation": "Sorting takes `O(n log n)`, and the scan takes `O(n)` because the two pointers together move at most `n` steps. Extra space is `O(n)` for the sorted copy.\n\nEach comparison settles many pairs at once. That is how the scan can count up to about `n^2 / 2` pairs without looking at each one."
+    },
+    {
+      "id": "iv-tree-levels",
+      "title": "Tree level by level",
+      "level": "Medium",
+      "minutes": 20,
+      "body": "# Tree level by level\n\nReturn the values of a binary tree grouped by depth, top to bottom and left to right within each level.\n\n```python\n#      1\n#     / \\\n#    2   3\n#         \\\n#          4\nlevels(root)  # [[1], [2, 3], [4]]\n```\n\n## Breadth-first search\n\nA queue visits nodes in the order they were discovered, which is level order. To know where one level ends, take the queue's current length before processing, and handle exactly that many nodes.\n\n```python\nfrom collections import deque\n\nqueue = deque([root])\nnode = queue.popleft()\n```\n\n`deque.popleft` is constant time, while `list.pop(0)` shifts every remaining item.\n\nHandle the empty tree before you start, or `None` will end up in the queue.",
+      "task": "Using the `Node` class in the starter, write `levels(root)` returning a list of lists of values, one inner list per depth. An empty tree (`None`) gives `[]`.",
+      "starter": "class Node:\n    def __init__(self, value, left=None, right=None):\n        self.value = value\n        self.left = left\n        self.right = right\n\n\ndef levels(root):\n    return []\n",
+      "solution": "from collections import deque\n\n\nclass Node:\n    def __init__(self, value, left=None, right=None):\n        self.value = value\n        self.left = left\n        self.right = right\n\n\ndef levels(root):\n    if root is None:\n        return []\n    result = []\n    queue = deque([root])\n    while queue:\n        level = []\n        for _ in range(len(queue)):\n            node = queue.popleft()\n            level.append(node.value)\n            if node.left:\n                queue.append(node.left)\n            if node.right:\n                queue.append(node.right)\n        result.append(level)\n    return result\n",
+      "checks": [
+        {
+          "name": "small tree",
+          "code": "root = Node(1, Node(2), Node(3, None, Node(4)))\nassert levels(root) == [[1], [2, 3], [4]], levels(root)"
+        },
+        {
+          "name": "empty tree",
+          "code": "assert levels(None) == [], levels(None)"
+        },
+        {
+          "name": "single node",
+          "code": "assert levels(Node(7)) == [[7]], levels(Node(7))"
+        },
+        {
+          "name": "one-sided tree",
+          "code": "root = Node(1, Node(2, Node(3)))\nassert levels(root) == [[1], [2], [3]], levels(root)"
+        },
+        {
+          "name": "keeps left-to-right order",
+          "code": "root = Node(1, Node(2, Node(4), Node(5)), Node(3, Node(6), Node(7)))\nassert levels(root) == [[1], [2, 3], [4, 5, 6, 7]], levels(root)"
+        },
+        {
+          "name": "zero is a real value",
+          "code": "root = Node(0, Node(0), None)\nassert levels(root) == [[0], [0]], levels(root)"
+        }
+      ],
+      "hints": [
+        "Visit nodes with a queue. Children go in at the back, and the next node comes off the front.",
+        "At the start of each pass, `len(queue)` tells you how many nodes belong to the current level.",
+        "`for _ in range(len(queue)):` pop a node, add its value to `level`, and enqueue its children. Append `level` to the result after the inner loop."
+      ],
+      "explanation": "Every node enters and leaves the queue once, so time is `O(n)`. Space is `O(w)`, where `w` is the widest level, which can be about `n / 2` in a full tree.\n\nTaking the length up front is what separates levels, since children added during the inner loop are not counted until the next pass."
+    },
+    {
+      "id": "iv-fewest-hops",
+      "title": "Fewest hops",
+      "level": "Medium",
+      "minutes": 20,
+      "body": "# Fewest hops\n\nA graph is given as a dict from each node to the nodes it links to. Find the smallest number of edges from one node to another.\n\n```python\ng = {\"a\": [\"b\", \"c\"], \"b\": [\"d\"],\n     \"c\": [\"d\"], \"d\": []}\nfewest_hops(g, \"a\", \"d\")  # 2\n```\n\n## Breadth-first search\n\nWhen edges have no weights, breadth-first search finds shortest paths. It explores everything one hop away, then two hops, and so on, so the first time it reaches a node is by a shortest route.\n\n- Use a `deque` of `(node, distance)` pairs.\n- Mark nodes as seen when you add them to the queue, not when you remove them. Otherwise a node can be queued many times.\n- Without a seen set, a cycle would loop forever.\n\nA node may appear only as a link and have no key of its own, so read neighbours with `graph.get(node, [])`.",
+      "task": "Write `fewest_hops(graph, start, goal)` returning the smallest number of edges from `start` to `goal`, or -1 if `goal` cannot be reached. If `start` equals `goal`, the answer is 0.",
+      "starter": "from collections import deque\n\n\ndef fewest_hops(graph, start, goal):\n    return len(graph.get(start, []))\n",
+      "solution": "from collections import deque\n\n\ndef fewest_hops(graph, start, goal):\n    if start == goal:\n        return 0\n    seen = {start}\n    queue = deque([(start, 0)])\n    while queue:\n        node, distance = queue.popleft()\n        for next_node in graph.get(node, []):\n            if next_node == goal:\n                return distance + 1\n            if next_node not in seen:\n                seen.add(next_node)\n                queue.append((next_node, distance + 1))\n    return -1\n",
+      "checks": [
+        {
+          "name": "simple path",
+          "code": "g = {\"a\": [\"b\", \"c\"], \"b\": [\"d\"], \"c\": [\"d\"], \"d\": []}\nassert fewest_hops(g, \"a\", \"d\") == 2, fewest_hops(g, \"a\", \"d\")"
+        },
+        {
+          "name": "start equals goal",
+          "code": "assert fewest_hops({\"a\": [\"b\"]}, \"a\", \"a\") == 0, \"same node\"\nassert fewest_hops({}, \"x\", \"x\") == 0, \"same node, empty graph\""
+        },
+        {
+          "name": "picks the shortest of several",
+          "code": "g = {\"a\": [\"b\", \"e\"], \"b\": [\"c\"], \"c\": [\"d\"], \"d\": [\"z\"], \"e\": [\"z\"], \"z\": []}\nassert fewest_hops(g, \"a\", \"z\") == 2, fewest_hops(g, \"a\", \"z\")"
+        },
+        {
+          "name": "unreachable",
+          "code": "g = {\"a\": [\"b\"], \"b\": [], \"c\": [\"a\"]}\nassert fewest_hops(g, \"a\", \"c\") == -1, fewest_hops(g, \"a\", \"c\")"
+        },
+        {
+          "name": "survives cycles",
+          "code": "g = {\"a\": [\"b\"], \"b\": [\"a\", \"c\"], \"c\": [\"c\"]}\nassert fewest_hops(g, \"a\", \"c\") == 2, fewest_hops(g, \"a\", \"c\")\nassert fewest_hops(g, \"c\", \"a\") == -1, fewest_hops(g, \"c\", \"a\")"
+        },
+        {
+          "name": "nodes without their own key",
+          "code": "assert fewest_hops({\"a\": [\"leaf\"]}, \"a\", \"leaf\") == 1, \"leaf only appears as a link\"\nassert fewest_hops({\"a\": [\"leaf\"]}, \"leaf\", \"a\") == -1, \"leaf has no links\""
+        }
+      ],
+      "hints": [
+        "Explore in rings around the start, so the first arrival is the shortest. A queue gives you that order.",
+        "Store the distance beside each node in the queue, and keep a set of nodes already queued.",
+        "Pop `(node, distance)`, loop over `graph.get(node, [])`, return `distance + 1` on reaching the goal, and otherwise add unseen nodes with `distance + 1`."
+      ],
+      "explanation": "Each node is queued at most once and each edge is checked at most once, so time is `O(V + E)` and space is `O(V)`.\n\nThe first arrival is the shortest because nodes leave the queue in order of distance. Depth-first search has no such guarantee: it can reach the goal through a long route first."
+    },
+    {
+      "id": "iv-count-components",
+      "title": "Count connected groups",
+      "level": "Medium",
+      "minutes": 20,
+      "body": "# Count connected groups\n\nNodes are connected by undirected edges. Count the separate groups, where two nodes are in the same group if a path joins them.\n\n```python\ncount_components(\n    [1, 2, 3, 4], [(1, 2), (2, 3)])\n# 2: {1, 2, 3} and {4}\n```\n\n## Depth-first search\n\nBuild an adjacency dict that lists each edge in both directions. Then, for every node not yet visited, count one group and visit everything reachable from it.\n\nRecursion looks natural here, but Python raises `RecursionError` at a depth of about 1000 frames by default. A chain of 5000 nodes would crash it. An explicit stack has no such limit:\n\n```python\nstack = [start]\nwhile stack:\n    node = stack.pop()\n    # visit, then push neighbours\n```\n\nNodes with no edges still count as groups of one, so loop over `nodes` rather than over the edges.",
+      "task": "Write `count_components(nodes, edges)` returning the number of connected groups, using an explicit stack. It must handle a chain of thousands of nodes.",
+      "starter": "def count_components(nodes, edges):\n    return len(nodes) - len(edges)\n",
+      "solution": "def count_components(nodes, edges):\n    links = {node: [] for node in nodes}\n    for a, b in edges:\n        links[a].append(b)\n        links[b].append(a)\n    seen = set()\n    groups = 0\n    for node in nodes:\n        if node in seen:\n            continue\n        groups += 1\n        seen.add(node)\n        stack = [node]\n        while stack:\n            current = stack.pop()\n            for other in links[current]:\n                if other not in seen:\n                    seen.add(other)\n                    stack.append(other)\n    return groups\n",
+      "checks": [
+        {
+          "name": "two groups",
+          "code": "assert count_components([1, 2, 3, 4], [(1, 2), (2, 3)]) == 2, count_components([1, 2, 3, 4], [(1, 2), (2, 3)])"
+        },
+        {
+          "name": "no edges and no nodes",
+          "code": "assert count_components([1, 2, 3], []) == 3, count_components([1, 2, 3], [])\nassert count_components([], []) == 0, count_components([], [])"
+        },
+        {
+          "name": "cycles are not extra groups",
+          "code": "got = count_components([1, 2, 3], [(1, 2), (2, 3), (3, 1)])\nassert got == 1, got"
+        },
+        {
+          "name": "repeated edges and self loops",
+          "code": "got = count_components([1, 2, 3], [(1, 2), (1, 2), (2, 1), (3, 3)])\nassert got == 2, got"
+        },
+        {
+          "name": "edges count in both directions",
+          "code": "got = count_components([\"a\", \"b\", \"c\"], [(\"b\", \"a\"), (\"c\", \"b\")])\nassert got == 1, got"
+        },
+        {
+          "name": "handles a very long chain",
+          "code": "nodes = list(range(5000))\nedges = [(i, i + 1) for i in range(4999)]\nassert count_components(nodes, edges) == 1, \"one long chain is one group\""
+        }
+      ],
+      "hints": [
+        "Each unvisited node you reach in the outer loop starts a new group. Everything reachable from it belongs to the same group.",
+        "Create an adjacency dict with every node as a key, even those with no edges, and add each edge both ways.",
+        "`stack = [node]`, then `while stack:` pop, and for each neighbour not in `seen`, add it to `seen` and push it."
+      ],
+      "explanation": "Each node is pushed once and each edge is examined twice, so time is `O(V + E)` and space is `O(V + E)`.\n\nMarking when you push keeps a node from entering the stack twice. The union-find structure solves the same problem and can handle edges arriving over time."
+    },
+    {
+      "id": "iv-exact-change",
+      "title": "Exact change",
+      "level": "Medium",
+      "minutes": 25,
+      "body": "# Exact change\n\nGiven coin values and an amount, find the fewest coins that add up to exactly that amount. You may use each coin as many times as you like.\n\n```python\nfewest_coins([1, 5, 12], 15)  # 3\nfewest_coins([5], 3)          # -1\n```\n\nTaking the biggest coin first fails here: `12 + 1 + 1 + 1` uses four coins, while `5 + 5 + 5` uses three.\n\n## Dynamic programming\n\nSolve smaller amounts first and build on them. Let `best[a]` be the fewest coins for amount `a`. Then:\n\n```python\nbest[0] = 0\nbest[a] = 1 + min(\n    best[a - c]\n    for c in coins if c <= a)\n```\n\nFill the table from 0 to the amount, using a large marker such as `float(\"inf\")` for amounts that cannot be made, and turn it into -1 at the end.",
+      "task": "Write `fewest_coins(coins, amount)` returning the smallest number of coins that sum to `amount`, or -1 if it cannot be done. An amount of 0 takes 0 coins.",
+      "starter": "def fewest_coins(coins, amount):\n    count = 0\n    for coin in sorted(coins, reverse=True):\n        count += amount // coin\n        amount %= coin\n    return count\n",
+      "solution": "def fewest_coins(coins, amount):\n    inf = float(\"inf\")\n    best = [0] + [inf] * amount\n    for a in range(1, amount + 1):\n        for coin in coins:\n            if coin <= a:\n                best[a] = min(best[a], best[a - coin] + 1)\n    answer = best[amount]\n    return answer if answer != inf else -1\n",
+      "checks": [
+        {
+          "name": "greedy would be wrong",
+          "code": "assert fewest_coins([1, 5, 12], 15) == 3, fewest_coins([1, 5, 12], 15)"
+        },
+        {
+          "name": "exact single coin",
+          "code": "assert fewest_coins([2], 4) == 2, fewest_coins([2], 4)\nassert fewest_coins([1, 2, 5], 5) == 1, fewest_coins([1, 2, 5], 5)"
+        },
+        {
+          "name": "impossible amounts",
+          "code": "assert fewest_coins([5], 3) == -1, fewest_coins([5], 3)\nassert fewest_coins([4, 6], 7) == -1, fewest_coins([4, 6], 7)\nassert fewest_coins([], 5) == -1, fewest_coins([], 5)"
+        },
+        {
+          "name": "zero amount",
+          "code": "assert fewest_coins([1], 0) == 0, fewest_coins([1], 0)\nassert fewest_coins([], 0) == 0, fewest_coins([], 0)"
+        },
+        {
+          "name": "returns an int",
+          "code": "got = fewest_coins([3, 7], 13)\nassert got == 3, got\nassert type(got) is int, type(got)"
+        },
+        {
+          "name": "larger amount",
+          "code": "assert fewest_coins([1, 7, 10], 1000) == 100, fewest_coins([1, 7, 10], 1000)"
+        }
+      ],
+      "hints": [
+        "Greedy does not work here. If you knew the answer for every smaller amount, how would you get the answer for this one?",
+        "Use a list `best` of length `amount + 1`, with `best[0] = 0` and everything else infinite.",
+        "For `a` from 1 to `amount` and each `coin <= a`: `best[a] = min(best[a], best[a - coin] + 1)`. Return -1 if `best[amount]` is still infinite."
+      ],
+      "explanation": "There are `amount` subproblems, each trying every coin, so time is `O(amount * coins)` and space is `O(amount)`.\n\nThe choice of last coin is what makes the recurrence work. Any optimal answer ends with some coin, and what comes before it must be optimal for the smaller amount."
+    },
+    {
+      "id": "iv-tile-ways",
+      "title": "Tiling with memoization",
+      "level": "Medium",
+      "minutes": 20,
+      "body": "# Tiling with memoization\n\nTiles come in lengths 1, 2 and 3. How many different ordered ways can you cover a strip of length `n`?\n\nThe first tile placed leaves a smaller strip, so the answer is a sum of three smaller answers:\n\n```python\ndef ways(n):\n    if n < 0:\n        return 0\n    if n == 0:\n        return 1\n    return (ways(n - 1) + ways(n - 2)\n            + ways(n - 3))\n```\n\nThat is correct but hopeless for large `n`. It solves the same strips over and over, and the calls grow exponentially.\n\n## Memoization\n\nSave each answer the first time it is computed. `functools.cache` does this with one line:\n\n```python\nfrom functools import cache\n\n@cache\ndef f(n): ...\n```\n\nA strip of length 0 has exactly one cover, which is placing nothing. A negative length has none.",
+      "task": "Write `tile_ways(n)` returning the number of ordered ways to cover a strip of length `n` with tiles of lengths 1, 2 and 3, using recursion with memoization. It must return quickly for `n = 60`.",
+      "starter": "def tile_ways(n):\n    if n < 0:\n        return 0\n    if n == 0:\n        return 1\n    return tile_ways(n - 1) + tile_ways(n - 2)\n",
+      "solution": "from functools import cache\n\n\n@cache\ndef tile_ways(n):\n    if n < 0:\n        return 0\n    if n == 0:\n        return 1\n    return (\n        tile_ways(n - 1)\n        + tile_ways(n - 2)\n        + tile_ways(n - 3)\n    )\n",
+      "checks": [
+        {
+          "name": "small strips",
+          "code": "got = [tile_ways(n) for n in range(6)]\nassert got == [1, 1, 2, 4, 7, 13], got"
+        },
+        {
+          "name": "negative length",
+          "code": "assert tile_ways(-1) == 0, tile_ways(-1)"
+        },
+        {
+          "name": "n = 60 without repeating work",
+          "code": "import sys\ncalls = 0\ndef count_calls(frame, event, arg):\n    global calls\n    if event == \"call\":\n        calls += 1\n        if calls > 20000:\n            raise RuntimeError(\"too many calls: add memoization\")\nsys.setprofile(count_calls)\ntry:\n    got = tile_ways(60)\nfinally:\n    sys.setprofile(None)\na, b, c = 1, 1, 2\nfor _ in range(58):\n    a, b, c = b, c, a + b + c\nassert got == c, got"
+        }
+      ],
+      "hints": [
+        "Write the plain recursion first. It should branch on each of the three tile lengths.",
+        "Each `n` only has one answer, so store it. A decorator from `functools` can do that for you.",
+        "Add `@cache` above the function, and return `tile_ways(n - 1) + tile_ways(n - 2) + tile_ways(n - 3)` after the two base cases."
+      ],
+      "explanation": "Memoization reduces the work to one computation per distinct `n`, so time is `O(n)` arithmetic steps and space is `O(n)` for the cache plus the recursion depth.\n\nRecursion depth grows with `n`, and Python's default limit is about 1000 frames. For very large `n`, fill a table from the bottom up, or keep just the last three values."
+    },
+    {
+      "id": "iv-cheapest-route",
+      "title": "Cheapest route",
+      "level": "Hard",
+      "minutes": 35,
+      "body": "# Cheapest route\n\nA map is a dict from each place to `(neighbour, cost)` pairs, with no negative costs. Find the cheapest route between two places and the route itself.\n\n```python\ng = {\"a\": [(\"b\", 7), (\"c\", 1)],\n     \"c\": [(\"b\", 2)], \"b\": []}\ncheapest_route(g, \"a\", \"b\")\n# (3, [\"a\", \"c\", \"b\"])\n```\n\n## Dijkstra's algorithm\n\nKeep a priority queue of places to visit, ordered by cost so far. The cheapest entry you pop can never be improved, because every other route costs at least as much and costs are not negative.\n\n```python\nimport heapq\n\nheap = [(0, \"a\")]\ncost, node = heapq.heappop(heap)\nheapq.heappush(heap, (cost + 7, \"b\"))\n```\n\nA place can sit in the heap several times with different costs. When you pop an entry worse than the best known cost, skip it. To rebuild the route, remember each place's predecessor.",
+      "task": "Write `cheapest_route(graph, start, goal)` returning `(total_cost, path)`, where `path` is the list of places from `start` to `goal`, or `None` if `goal` cannot be reached. Use `heapq`. A place may appear only as a neighbour, without a key of its own.",
+      "starter": "import heapq\n\n\ndef cheapest_route(graph, start, goal):\n    return None\n",
+      "solution": "import heapq\n\n\ndef cheapest_route(graph, start, goal):\n    best = {start: 0}\n    previous = {}\n    heap = [(0, start)]\n    while heap:\n        cost, node = heapq.heappop(heap)\n        if cost > best[node]:\n            continue\n        if node == goal:\n            path = [node]\n            while path[-1] in previous:\n                path.append(previous[path[-1]])\n            return cost, path[::-1]\n        for next_node, step in graph.get(node, []):\n            new_cost = cost + step\n            if new_cost < best.get(next_node, float(\"inf\")):\n                best[next_node] = new_cost\n                previous[next_node] = node\n                heapq.heappush(heap, (new_cost, next_node))\n    return None\n",
+      "checks": [
+        {
+          "name": "cheaper route with more stops",
+          "code": "g = {\"a\": [(\"b\", 7), (\"c\", 1)], \"c\": [(\"b\", 2)], \"b\": []}\nassert cheapest_route(g, \"a\", \"b\") == (3, [\"a\", \"c\", \"b\"]), cheapest_route(g, \"a\", \"b\")"
+        },
+        {
+          "name": "start equals goal",
+          "code": "assert cheapest_route({\"a\": [(\"b\", 1)]}, \"a\", \"a\") == (0, [\"a\"]), \"same place\"\nassert cheapest_route({}, \"x\", \"x\") == (0, [\"x\"]), \"same place, empty map\""
+        },
+        {
+          "name": "unreachable",
+          "code": "g = {\"a\": [(\"b\", 1)], \"b\": [], \"c\": [(\"a\", 1)]}\nassert cheapest_route(g, \"a\", \"c\") is None, cheapest_route(g, \"a\", \"c\")"
+        },
+        {
+          "name": "cycles and zero costs",
+          "code": "g = {\"a\": [(\"b\", 0)], \"b\": [(\"a\", 0), (\"c\", 4)], \"c\": [(\"a\", 1)]}\nassert cheapest_route(g, \"a\", \"c\") == (4, [\"a\", \"b\", \"c\"]), cheapest_route(g, \"a\", \"c\")"
+        },
+        {
+          "name": "improves on a route already queued",
+          "code": "g = {\n    \"s\": [(\"a\", 1), (\"b\", 5)],\n    \"a\": [(\"b\", 1), (\"t\", 10)],\n    \"b\": [(\"t\", 1)],\n    \"t\": [],\n}\nassert cheapest_route(g, \"s\", \"t\") == (3, [\"s\", \"a\", \"b\", \"t\"]), cheapest_route(g, \"s\", \"t\")"
+        },
+        {
+          "name": "goal without its own key",
+          "code": "assert cheapest_route({\"a\": [(\"z\", 2)]}, \"a\", \"z\") == (2, [\"a\", \"z\"]), \"z only appears as a neighbour\""
+        }
+      ],
+      "hints": [
+        "Pop the cheapest entry from the heap. What should you do if you already know a cheaper way to reach that place?",
+        "Keep two dicts: `best` for the lowest known cost and `previous` for the place you came from. Only push when a new cost beats `best`.",
+        "On `pop`, `continue` if `cost > best[node]`. Return when `node == goal`, walking `previous` back to build the path and reversing it. Otherwise push improved neighbours."
+      ],
+      "explanation": "With a binary heap, each of the `E` edges can cause a push costing `O(log E)`, so time is `O((V + E) log V)` and space is `O(V + E)`.\n\nSkipping stale entries replaces the decrease-key operation the classic description uses, since `heapq` does not offer one. If costs could be negative, the \"cannot be improved\" argument fails, and you would need Bellman-Ford instead."
+    },
+    {
+      "id": "iv-edit-distance",
+      "title": "Edit distance",
+      "level": "Hard",
+      "minutes": 35,
+      "body": "# Edit distance\n\nHow many single-character edits turn one string into another? An edit is an insertion, a deletion or a substitution.\n\n```python\nedit_distance(\"book\", \"back\")  # 2\nedit_distance(\"\", \"abc\")       # 3\n```\n\n## Building the table\n\nLet `d[i][j]` be the distance between the first `i` characters of `a` and the first `j` characters of `b`.\n\n- `d[i][0] = i`: delete everything.\n- `d[0][j] = j`: insert everything.\n- If the last characters match, `d[i][j] = d[i-1][j-1]`.\n- Otherwise it is 1 plus the smallest of `d[i-1][j]` (delete), `d[i][j-1]` (insert) and `d[i-1][j-1]` (substitute).\n\nEach row only depends on the row before it, so you can keep just two rows and save memory.",
+      "task": "Write `edit_distance(a, b)` returning the minimum number of insertions, deletions and substitutions needed to turn `a` into `b`.",
+      "starter": "def edit_distance(a, b):\n    return abs(len(a) - len(b))\n",
+      "solution": "def edit_distance(a, b):\n    previous = list(range(len(b) + 1))\n    for i, char_a in enumerate(a, start=1):\n        current = [i]\n        for j, char_b in enumerate(b, start=1):\n            if char_a == char_b:\n                current.append(previous[j - 1])\n            else:\n                current.append(1 + min(\n                    previous[j],\n                    current[j - 1],\n                    previous[j - 1],\n                ))\n        previous = current\n    return previous[-1]\n",
+      "checks": [
+        {
+          "name": "substitutions",
+          "code": "assert edit_distance(\"book\", \"back\") == 2, edit_distance(\"book\", \"back\")"
+        },
+        {
+          "name": "identical strings",
+          "code": "assert edit_distance(\"same\", \"same\") == 0, edit_distance(\"same\", \"same\")\nassert edit_distance(\"\", \"\") == 0, edit_distance(\"\", \"\")"
+        },
+        {
+          "name": "empty on one side",
+          "code": "assert edit_distance(\"\", \"abc\") == 3, edit_distance(\"\", \"abc\")\nassert edit_distance(\"abc\", \"\") == 3, edit_distance(\"abc\", \"\")"
+        },
+        {
+          "name": "mixed edits",
+          "code": "assert edit_distance(\"sunday\", \"saturday\") == 3, edit_distance(\"sunday\", \"saturday\")\nassert edit_distance(\"pythilo\", \"python\") == 3, edit_distance(\"pythilo\", \"python\")"
+        },
+        {
+          "name": "is symmetric",
+          "code": "for a, b in [(\"abc\", \"yabd\"), (\"kettle\", \"metal\"), (\"a\", \"ba\")]:\n    assert edit_distance(a, b) == edit_distance(b, a), (a, b)"
+        },
+        {
+          "name": "handles longer strings",
+          "code": "a = \"ab\" * 100\nb = \"ba\" * 100\nassert edit_distance(a, b) == 2, edit_distance(a, b)"
+        }
+      ],
+      "hints": [
+        "Think about the last character of each string. There are only a few things that can have happened to it.",
+        "Start the table with the empty-string rows: distance from `\"\"` to a prefix of length `j` is `j`.",
+        "For each pair: if the characters match, take `previous[j - 1]`. Otherwise take `1 + min(previous[j], current[j - 1], previous[j - 1])`."
+      ],
+      "explanation": "The table has `len(a) * len(b)` cells with constant work each, so time is `O(len(a) * len(b))`. Keeping two rows reduces space to `O(len(b))`, and swapping the arguments so that `b` is the shorter string makes it `O(min(len(a), len(b)))`.\n\nRecursion with a cache reaches the same complexity, but deep calls can hit the recursion limit on long strings, which is a good reason to prefer the table here."
+    },
+    {
+      "id": "iv-best-tree-path",
+      "title": "Best path in a tree",
+      "level": "Hard",
+      "minutes": 40,
+      "body": "# Best path in a tree\n\nA tree is written as nested tuples, `(value, left, right)`, with `None` for a missing child. Values may be negative.\n\nA path is a connected chain of nodes, each used at most once. It need not pass through the root, but it cannot branch. Find the largest possible sum of a path with at least one node.\n\n```python\nleaf = lambda v: (v, None, None)\nbest_path((1, leaf(2), leaf(3)))  # 6\n```\n\n## Two different questions\n\nAt each node, you need to work out two things:\n\n- The best sum of a path bending here, which may use both children. That is a candidate for the overall answer.\n- The best sum going down one side only. That is all a parent can extend.\n\nChildren that would reduce the total should be left out, so treat a negative downward sum as 0. Track the overall best in a variable shared across calls with `nonlocal`.",
+      "task": "Write `best_path(tree)` returning the largest sum of any path in a non-empty tree given as nested `(value, left, right)` tuples.",
+      "starter": "def best_path(tree):\n    value, left, right = tree\n    return value\n",
+      "solution": "def best_path(tree):\n    best = tree[0]\n\n    def down(node):\n        nonlocal best\n        if node is None:\n            return 0\n        value, left, right = node\n        from_left = max(down(left), 0)\n        from_right = max(down(right), 0)\n        best = max(best, value + from_left + from_right)\n        return value + max(from_left, from_right)\n\n    down(tree)\n    return best\n",
+      "checks": [
+        {
+          "name": "bends at the root",
+          "code": "leaf = lambda v: (v, None, None)\nassert best_path((1, leaf(2), leaf(3))) == 6, best_path((1, leaf(2), leaf(3)))"
+        },
+        {
+          "name": "need not use the root",
+          "code": "leaf = lambda v: (v, None, None)\ntree = (-5, leaf(4), (8, leaf(6), leaf(-1)))\nassert best_path(tree) == 14, best_path(tree)"
+        },
+        {
+          "name": "all negative",
+          "code": "leaf = lambda v: (v, None, None)\nassert best_path(leaf(-3)) == -3, best_path(leaf(-3))\nassert best_path((-3, leaf(-1), leaf(-2))) == -1, best_path((-3, leaf(-1), leaf(-2)))"
+        },
+        {
+          "name": "skips harmful children",
+          "code": "leaf = lambda v: (v, None, None)\nassert best_path((10, leaf(-1), leaf(-1))) == 10, best_path((10, leaf(-1), leaf(-1)))"
+        },
+        {
+          "name": "a parent cannot extend a bend",
+          "code": "leaf = lambda v: (v, None, None)\ntree = (1, (5, leaf(10), leaf(10)), None)\nassert best_path(tree) == 25, best_path(tree)"
+        },
+        {
+          "name": "one-sided chain",
+          "code": "tree = (1, (2, (3, None, None), None), None)\nassert best_path(tree) == 6, best_path(tree)"
+        }
+      ],
+      "hints": [
+        "Recursion fits. A helper for a node should return one number to its parent and record a candidate answer on the side.",
+        "The helper returns the value plus the better child path, and the candidate is the value plus both child paths. Ignore any child path below 0.",
+        "`from_left = max(down(left), 0)` and likewise for the right. `best = max(best, value + from_left + from_right)`, then `return value + max(from_left, from_right)`. Start `best` at the root value."
+      ],
+      "explanation": "Each node is visited once, so time is `O(n)`, and space is `O(h)` for a tree of height `h`.\n\nSeparating the return value from the candidate is the whole trick. A path bending at a node cannot continue upward, because the node would have three connections. Starting `best` at the root's value rather than at 0 handles trees where every value is negative."
+    },
+    {
+      "id": "iv-gather-limited",
+      "title": "Limit concurrent jobs",
+      "level": "Hard",
+      "minutes": 40,
+      "body": "# Limit concurrent jobs\n\nYou have many asynchronous jobs but must run at most `limit` at the same time. A job here is a zero-argument async function, so nothing starts until you call it.\n\n`asyncio` runs tasks on one thread. Tasks switch only at `await`.\n\n```python\nimport asyncio\n\nasync def main():\n    results = await asyncio.gather(\n        job_a(), job_b())\n    return results\n```\n\n`gather` runs coroutines concurrently and returns results in the order passed in, not finishing order. If one raises, that exception reaches the awaiting code.\n\n## Semaphore\n\n`asyncio.Semaphore(n)` is a counter of slots. `async with` waits for a free slot, and releases it on exit, even after an error:\n\n```python\nsem = asyncio.Semaphore(2)\n\nasync def guarded(job):\n    async with sem:\n        return await job()\n```\n\nCall the job inside the `async with`, so its work only begins when it holds a slot.",
+      "task": "Write `async def gather_limited(jobs, limit)` running zero-argument async functions with at most `limit` running at once, and returning their results in input order. An exception from a job propagates unchanged. Raise `ValueError` if `limit` is below 1.",
+      "starter": "import asyncio\n\n\nasync def gather_limited(jobs, limit):\n    results = []\n    for job in jobs:\n        results.append(await job())\n    return results\n",
+      "solution": "import asyncio\n\n\nasync def gather_limited(jobs, limit):\n    if limit < 1:\n        raise ValueError(\"limit must be at least 1\")\n    semaphore = asyncio.Semaphore(limit)\n\n    async def guarded(job):\n        async with semaphore:\n            return await job()\n\n    return await asyncio.gather(\n        *(guarded(job) for job in jobs)\n    )\n",
+      "checks": [
+        {
+          "name": "keeps input order",
+          "code": "import asyncio\ndef make(value, pauses):\n    async def job():\n        for _ in range(pauses):\n            await asyncio.sleep(0)\n        return value\n    return job\njobs = [make(\"a\", 5), make(\"b\", 0), make(\"c\", 2)]\ngot = asyncio.run(gather_limited(jobs, 2))\nassert list(got) == [\"a\", \"b\", \"c\"], got"
+        },
+        {
+          "name": "uses all its slots but no more",
+          "code": "import asyncio\nrunning = peak = 0\nasync def tracked():\n    global running, peak\n    running += 1\n    peak = max(peak, running)\n    for _ in range(3):\n        await asyncio.sleep(0)\n    running -= 1\nasyncio.run(gather_limited([tracked] * 10, 3))\nassert peak == 3, f\"peak concurrency was {peak}, wanted 3\""
+        },
+        {
+          "name": "limit of one runs in sequence",
+          "code": "import asyncio\nrunning = peak = 0\nasync def tracked():\n    global running, peak\n    running += 1\n    peak = max(peak, running)\n    await asyncio.sleep(0)\n    running -= 1\nasyncio.run(gather_limited([tracked] * 4, 1))\nassert peak == 1, f\"peak concurrency was {peak}, wanted 1\""
+        },
+        {
+          "name": "no jobs",
+          "code": "import asyncio\nassert list(asyncio.run(gather_limited([], 2))) == [], \"no jobs, no results\""
+        },
+        {
+          "name": "bad limit raises",
+          "code": "import asyncio\nraised = False\ntry:\n    asyncio.run(gather_limited([], 0))\nexcept ValueError:\n    raised = True\nassert raised, \"limit 0 should raise ValueError\""
+        },
+        {
+          "name": "job errors propagate",
+          "code": "import asyncio\nasync def boom():\n    raise KeyError(\"broken\")\nasync def fine():\n    return 1\nraised = False\ntry:\n    asyncio.run(gather_limited([fine, boom], 2))\nexcept KeyError:\n    raised = True\nassert raised, \"the KeyError should reach the caller\""
+        }
+      ],
+      "hints": [
+        "Awaiting one job after another is correct but runs them one at a time. You want to start them all and let something else limit them.",
+        "Create a semaphore with `limit` slots. Wrap each job in a small `async def` that holds a slot while it runs.",
+        "`async def guarded(job): async with semaphore: return await job()`, then `return await asyncio.gather(*(guarded(job) for job in jobs))`."
+      ],
+      "explanation": "With `n` jobs and a limit `k`, the semaphore keeps at most `k` jobs past `async with`, and `gather` keeps at most `n` waiting wrappers, so memory is `O(n)`.\n\n`gather` keeps input order regardless of who finishes first. `asyncio.TaskGroup` also works and cancels siblings when one fails, but it wraps errors in an `ExceptionGroup`, so it would need unwrapping to meet this contract. Note that `gather` does not cancel the other jobs when one fails."
+    }
+  ]
+}

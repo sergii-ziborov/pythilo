@@ -474,7 +474,7 @@ final class WorkspaceModel {
             Task { await GitTerminal.run(trimmed, in: self) }
             return
         }
-        guard session.phase == .idle else {
+        guard session.phase == .idle || session.phase == .starting else {
             session.noteTerminal("Python is busy. Stop the running program first.\n", kind: .stderr)
             return
         }

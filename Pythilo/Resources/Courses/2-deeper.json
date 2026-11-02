@@ -1,0 +1,348 @@
+{
+  "id": "deeper",
+  "title": "Python deeper",
+  "summary": "Modules, classes, iteration, decorators, closures and typing.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "modules-and-imports",
+      "title": "Modules and imports",
+      "body": "# Modules and imports\n\nEvery `.py` file is a module. A folder of modules is a package. `import` runs a module's top-level code once, caches it in `sys.modules`, and gives you a name for it.\n\n```python\nimport math\nimport json as js\nfrom collections import Counter\n\nprint(math.pi)\nprint(js.dumps({\"a\": 1}))\nprint(Counter(\"aab\"))\n```\n\n## Where Python looks\n\nPython searches the folders in `sys.path`: the script's folder, then the standard library, then installed packages. A file named `random.py` next to your script hides the real `random`, so avoid names of standard modules.\n\n## The main guard\n\n```python\ndef main():\n    print(\"running\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nA module's `__name__` is `\"__main__\"` only when it runs as a script, so importing this file will not start `main`. Prefer `import x` over `from x import *`, so readers can see where every name came from.",
+      "task": "Import from the standard library at the top of the file. Write `circle_area(r)` using `math.pi`. Write `most_common_word(words)` using `from collections import Counter`, returning the most frequent word (first seen wins a tie) or `None` for an empty list. Write `to_json(data)` returning JSON text with sorted keys.",
+      "starter": "def circle_area(r):\n    return 3.14 * r * r\n\n\ndef most_common_word(words):\n    return None\n\n\ndef to_json(data):\n    return str(data)\n",
+      "solution": "import json\nimport math\nfrom collections import Counter\n\n\ndef circle_area(r):\n    return math.pi * r * r\n\n\ndef most_common_word(words):\n    if not words:\n        return None\n    return Counter(words).most_common(1)[0][0]\n\n\ndef to_json(data):\n    return json.dumps(data, sort_keys=True)\n",
+      "checks": [
+        {
+          "name": "uses math.pi",
+          "code": "import math\nassert math.isclose(circle_area(2), math.pi * 4), circle_area(2)"
+        },
+        {
+          "name": "imports Counter by name",
+          "code": "from collections import Counter as real_counter\nassert globals().get(\"Counter\") is real_counter, \"use: from collections import Counter\""
+        },
+        {
+          "name": "most common word",
+          "code": "got = most_common_word([\"a\", \"b\", \"b\", \"c\"])\nassert got == \"b\", got"
+        },
+        {
+          "name": "ties and empty lists",
+          "code": "got = most_common_word([\"x\", \"y\", \"y\", \"x\"])\nassert got == \"x\", got\nassert most_common_word([]) is None, most_common_word([])"
+        },
+        {
+          "name": "JSON with sorted keys",
+          "code": "got = to_json({\"b\": 1, \"a\": [True, None]})\nassert got == '{\"a\": [true, null], \"b\": 1}', got"
+        }
+      ],
+      "hints": [
+        "All three tools come from the standard library: `math`, `collections` and `json`. Your imports go at the top.",
+        "`Counter(words).most_common(1)` returns a list holding one `(word, count)` pair. `json.dumps` has a `sort_keys` argument.",
+        "`Counter(words).most_common(1)[0][0]` after handling the empty list, and `json.dumps(data, sort_keys=True)`."
+      ],
+      "explanation": "`most_common` orders equal counts by first appearance, so ties resolve predictably without extra code.\n\n`import math` keeps the module name visible at the call site. `from collections import Counter` is reasonable when one name is used often and its origin is obvious."
+    },
+    {
+      "id": "classes",
+      "title": "Classes",
+      "body": "# Classes\n\nA class bundles data with the functions that work on it. Each object, or instance, has its own attributes.\n\n```python\nclass Dog:\n    legs = 4  # shared by all dogs\n\n    def __init__(self, name):\n        self.name = name  # per dog\n\n    def speak(self):\n        return f\"{self.name}: woof\"\n\n    def __repr__(self):\n        return f\"Dog({self.name!r})\"\n```\n\n`__init__` sets up a new object. `self` is that object, and Python passes it for you when you call `rex.speak()`. `__repr__` controls how the object appears when printed in a list or a debugger.\n\n## Inheritance\n\n```python\nclass Puppy(Dog):\n    def __init__(self, name, age):\n        super().__init__(name)\n        self.age = age\n```\n\n`Puppy` gets every `Dog` method and can add or replace them. `super()` calls the parent version. Keep hierarchies shallow. Often a plain function or a stored object is simpler.",
+      "task": "Write `Wallet(owner, balance=0)` with `deposit(amount)` and `withdraw(amount)`, each returning the new balance and raising `ValueError` for a non-positive amount or, for `withdraw`, too little money. Its repr is `Wallet('Ada', 10)`. Write `SavingsWallet(Wallet)` taking `rate=0.1`, with `add_interest()` adding `balance * rate`.",
+      "starter": "class Wallet:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n\n    def deposit(self, amount):\n        pass\n\n    def withdraw(self, amount):\n        pass\n\n\nclass SavingsWallet(Wallet):\n    pass\n",
+      "solution": "class Wallet:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n        self.balance = balance\n\n    def deposit(self, amount):\n        if amount <= 0:\n            raise ValueError(\"amount must be positive\")\n        self.balance += amount\n        return self.balance\n\n    def withdraw(self, amount):\n        if amount <= 0:\n            raise ValueError(\"amount must be positive\")\n        if amount > self.balance:\n            raise ValueError(\"not enough money\")\n        self.balance -= amount\n        return self.balance\n\n    def __repr__(self):\n        name = type(self).__name__\n        return f\"{name}({self.owner!r}, {self.balance})\"\n\n\nclass SavingsWallet(Wallet):\n    def __init__(self, owner, balance=0, rate=0.1):\n        super().__init__(owner, balance)\n        self.rate = rate\n\n    def add_interest(self):\n        self.balance += self.balance * self.rate\n        return self.balance\n",
+      "checks": [
+        {
+          "name": "deposit and withdraw",
+          "code": "w = Wallet(\"Ada\")\nassert w.balance == 0, w.balance\nassert w.deposit(10) == 10, w.balance\nassert w.withdraw(3) == 7, w.balance"
+        },
+        {
+          "name": "rejects bad amounts",
+          "code": "w = Wallet(\"Ada\", 5)\nfor call, amount in [(w.deposit, 0), (w.deposit, -1), (w.withdraw, 0), (w.withdraw, 6)]:\n    raised = False\n    try:\n        call(amount)\n    except ValueError:\n        raised = True\n    assert raised, f\"{call.__name__}({amount}) should raise ValueError\"\nassert w.balance == 5, w.balance"
+        },
+        {
+          "name": "can withdraw everything",
+          "code": "w = Wallet(\"Ada\", 5)\nassert w.withdraw(5) == 0, w.balance"
+        },
+        {
+          "name": "repr",
+          "code": "assert repr(Wallet(\"Ada\", 10)) == \"Wallet('Ada', 10)\", repr(Wallet(\"Ada\", 10))"
+        },
+        {
+          "name": "wallets are independent",
+          "code": "a = Wallet(\"A\")\nb = Wallet(\"B\")\na.deposit(5)\nassert b.balance == 0, b.balance"
+        },
+        {
+          "name": "savings wallet inherits and adds interest",
+          "code": "s = SavingsWallet(\"Bo\", 100, rate=0.5)\nassert isinstance(s, Wallet), type(s).__mro__\ns.add_interest()\nassert s.balance == 150, s.balance\nassert s.deposit(50) == 200, s.balance\nassert SavingsWallet(\"Bo\").rate == 0.1, SavingsWallet(\"Bo\").rate"
+        }
+      ],
+      "hints": [
+        "Store `balance` on `self` in `__init__`. Everything else reads and updates `self.balance`.",
+        "Validate first and change the balance after, so a failed call leaves it untouched. In the subclass, call `super().__init__(owner, balance)`.",
+        "`if amount > self.balance: raise ValueError(\"not enough money\")`. For the repr: `f\"Wallet({self.owner!r}, {self.balance})\"`. In `add_interest`: `self.balance += self.balance * self.rate`."
+      ],
+      "explanation": "Validating before changing state means a raised error leaves the object as it was. That is the easiest invariant to keep.\n\n`!r` in the f-string uses `repr`, which adds the quotes around the owner name. The subclass reuses parent setup through `super()` instead of repeating it, so a later change to `Wallet` reaches both classes."
+    },
+    {
+      "id": "dataclasses",
+      "title": "Dataclasses",
+      "body": "# Dataclasses\n\n`@dataclass` writes `__init__`, `__repr__` and `__eq__` from a list of annotated fields. Use it for objects that mainly hold data.\n\n```python\nfrom dataclasses import dataclass, field\n\n@dataclass\nclass Order:\n    item: str\n    qty: int = 1\n    notes: list[str] = field(\n        default_factory=list)\n```\n\nEach `Order` gets its own `notes` list. A plain `notes: list = []` is rejected with an error, because all instances would share one list.\n\n## Options\n\n- `frozen=True` makes instances immutable and hashable, so they can be dict keys.\n- `order=True` adds `<`, `>` and friends, comparing fields in order.\n- `slots=True` uses less memory and blocks stray attributes.\n\n## Validation\n\n`__post_init__` runs right after the generated `__init__`:\n\n```python\n@dataclass\nclass Age:\n    years: int\n\n    def __post_init__(self):\n        if self.years < 0:\n            raise ValueError(\"negative\")\n```",
+      "task": "Write a dataclass `Task` with `title: str`, `priority: int = 0` and `tags: list[str]` defaulting to a new empty list, raising `ValueError` for an empty title. Write a frozen dataclass `Point` with `x: int` and `y: int`.",
+      "starter": "class Task:\n    pass\n\n\nclass Point:\n    pass\n",
+      "solution": "from dataclasses import dataclass, field\n\n\n@dataclass\nclass Task:\n    title: str\n    priority: int = 0\n    tags: list[str] = field(default_factory=list)\n\n    def __post_init__(self):\n        if not self.title:\n            raise ValueError(\"title is required\")\n\n\n@dataclass(frozen=True)\nclass Point:\n    x: int\n    y: int\n",
+      "checks": [
+        {
+          "name": "Task is a dataclass with defaults",
+          "code": "import dataclasses\nassert dataclasses.is_dataclass(Task), \"use @dataclass\"\nt = Task(\"write\")\nassert (t.title, t.priority, t.tags) == (\"write\", 0, []), t"
+        },
+        {
+          "name": "compares by value",
+          "code": "assert Task(\"a\", 1) == Task(\"a\", 1), \"equal fields should compare equal\"\nassert Task(\"a\", 1) != Task(\"a\", 2), \"different fields should differ\""
+        },
+        {
+          "name": "tags are not shared",
+          "code": "a = Task(\"a\")\nb = Task(\"b\")\na.tags.append(\"x\")\nassert b.tags == [], b.tags"
+        },
+        {
+          "name": "rejects an empty title",
+          "code": "raised = False\ntry:\n    Task(\"\")\nexcept ValueError:\n    raised = True\nassert raised, \"Task('') should raise ValueError\""
+        },
+        {
+          "name": "Point is frozen",
+          "code": "import dataclasses\np = Point(1, 2)\nassert (p.x, p.y) == (1, 2), p\nraised = False\ntry:\n    p.x = 5\nexcept dataclasses.FrozenInstanceError:\n    raised = True\nassert raised, \"assigning to a frozen Point should raise\""
+        },
+        {
+          "name": "Point is hashable",
+          "code": "assert {Point(1, 2): \"a\"}[Point(1, 2)] == \"a\", \"equal points should find the same key\"\nassert len({Point(0, 0), Point(0, 0), Point(0, 1)}) == 2, \"sets should drop equal points\""
+        }
+      ],
+      "hints": [
+        "Import `dataclass` and `field` from `dataclasses`, and put the annotated fields directly in the class body.",
+        "A list default needs `field(default_factory=list)`. Validation goes in `__post_init__`, and `@dataclass(frozen=True)` handles `Point`.",
+        "`tags: list[str] = field(default_factory=list)`, then `def __post_init__(self): if not self.title: raise ValueError(\"title is required\")`."
+      ],
+      "explanation": "`default_factory` runs once per instance, so tags are never shared. Dataclasses refuse a bare mutable default because it would be a bug in nearly every case.\n\nFreezing a dataclass with the default `eq=True` also generates `__hash__`. That is what lets `Point` work as a dict key. Hash and equality must agree, and frozen fields cannot change, so they always will."
+    },
+    {
+      "id": "protocols-and-duck-typing",
+      "title": "Protocols and duck typing",
+      "body": "# Protocols and duck typing\n\nPython does not ask what class an object is. It asks whether the object has the attribute you are about to use. That is duck typing: if it has `.read()`, it can be read.\n\n```python\ndef shout(thing):\n    return thing.text().upper()\n```\n\nAny object with a `text` method works, and no shared base class is needed.\n\n## Writing the contract down\n\n`typing.Protocol` names the shape you expect, so type checkers can verify it. Classes do not inherit from it.\n\n```python\nfrom typing import Protocol\nfrom typing import runtime_checkable\n\n@runtime_checkable\nclass HasText(Protocol):\n    def text(self) -> str: ...\n\nclass Note:\n    def text(self):\n        return \"hi\"\n\nisinstance(Note(), HasText)  # True\n```\n\n`runtime_checkable` allows `isinstance`, but it only checks that the method name exists. It does not look at parameters or return types.",
+      "task": "Write a runtime-checkable protocol `Renderer` with `render(self) -> str`. Write classes `Text(value)` rendering the value and `Bold(value)` rendering `**value**`, neither inheriting from `Renderer`. Write `render_all(items)` joining the rendered items with newlines.",
+      "starter": "from typing import Protocol, runtime_checkable\n\n\nclass Text:\n    def __init__(self, value):\n        self.value = value\n\n\nclass Bold:\n    def __init__(self, value):\n        self.value = value\n\n\ndef render_all(items):\n    return \"\"\n",
+      "solution": "from typing import Protocol, runtime_checkable\n\n\n@runtime_checkable\nclass Renderer(Protocol):\n    def render(self) -> str: ...\n\n\nclass Text:\n    def __init__(self, value):\n        self.value = value\n\n    def render(self):\n        return self.value\n\n\nclass Bold:\n    def __init__(self, value):\n        self.value = value\n\n    def render(self):\n        return f\"**{self.value}**\"\n\n\ndef render_all(items):\n    return \"\\n\".join(i.render() for i in items)\n",
+      "checks": [
+        {
+          "name": "renders each class",
+          "code": "assert Text(\"a\").render() == \"a\", Text(\"a\").render()\nassert Bold(\"a\").render() == \"**a**\", Bold(\"a\").render()"
+        },
+        {
+          "name": "joins with newlines",
+          "code": "got = render_all([Text(\"a\"), Bold(\"b\")])\nassert got == \"a\\n**b**\", repr(got)\nassert render_all([]) == \"\", render_all([])"
+        },
+        {
+          "name": "accepts any object with render",
+          "code": "class Custom:\n    def render(self):\n        return \"custom\"\nassert render_all([Custom()]) == \"custom\", render_all([Custom()])"
+        },
+        {
+          "name": "matches the protocol",
+          "code": "assert isinstance(Text(\"a\"), Renderer), \"Text should match Renderer\"\nassert isinstance(Bold(\"a\"), Renderer), \"Bold should match Renderer\"\nassert not isinstance(3, Renderer), \"an int has no render method\""
+        },
+        {
+          "name": "no inheritance needed",
+          "code": "assert Renderer not in Text.__mro__, \"Text should not inherit from Renderer\"\nassert Renderer not in Bold.__mro__, \"Bold should not inherit from Renderer\""
+        }
+      ],
+      "hints": [
+        "A protocol is a class that inherits `Protocol`, with method bodies of `...`. Add `@runtime_checkable` above it.",
+        "`Text` and `Bold` each gain a `render` method. `render_all` only needs to call `.render()`, without checking types.",
+        "`class Renderer(Protocol):` with `def render(self) -> str: ...`, and `return \"\\n\".join(i.render() for i in items)`."
+      ],
+      "explanation": "`render_all` never names a class, so it accepts anything with a `render` method, including classes written later.\n\nA protocol adds a checkable contract without forcing a shared base class. Use one when you want tools to catch a missing method before the code runs. `isinstance` against a protocol only confirms the name exists, so it is not a full proof."
+    },
+    {
+      "id": "iterators-and-generators",
+      "title": "Iterators and generators",
+      "body": "# Iterators and generators\n\nAn iterable is anything `for` can walk. `iter(x)` gets an iterator from it, and `next(it)` returns one item at a time, raising `StopIteration` at the end. An iterator is used up once.\n\n```python\nit = iter([1, 2])\nnext(it)  # 1\nnext(it)  # 2\n# next(it) would raise StopIteration\n```\n\nA class joins in by defining `__iter__`. If `__iter__` builds a fresh iterator each time, the object can be looped over repeatedly.\n\n## Generators\n\nA function containing `yield` returns a generator, which is an iterator that pauses at each `yield`. Values are made on demand, so sequences can be huge or endless.\n\n```python\ndef evens():\n    n = 0\n    while True:\n        yield n\n        n += 2\n\ndef both(a, b):\n    yield from a\n    yield from b\n```\n\n`yield from` hands over to another iterable, which is ideal for recursive walks.",
+      "task": "Write a class `Countdown(start)` whose instances can be looped over more than once, producing `start` down to 1. Write a generator function `flatten(items)` yielding every non-list value from arbitrarily nested lists.",
+      "starter": "class Countdown:\n    def __init__(self, start):\n        self.start = start\n\n\ndef flatten(items):\n    return items\n",
+      "solution": "class Countdown:\n    def __init__(self, start):\n        self.start = start\n\n    def __iter__(self):\n        n = self.start\n        while n > 0:\n            yield n\n            n -= 1\n\n\ndef flatten(items):\n    for item in items:\n        if isinstance(item, list):\n            yield from flatten(item)\n        else:\n            yield item\n",
+      "checks": [
+        {
+          "name": "counts down",
+          "code": "assert list(Countdown(3)) == [3, 2, 1], list(Countdown(3))\nassert list(Countdown(0)) == [], list(Countdown(0))"
+        },
+        {
+          "name": "can be looped twice",
+          "code": "c = Countdown(2)\nassert list(c) == [2, 1], \"first loop\"\nassert list(c) == [2, 1], \"second loop should start again\""
+        },
+        {
+          "name": "follows the iterator protocol",
+          "code": "it = iter(Countdown(1))\nassert next(it) == 1, \"first value\"\nraised = False\ntry:\n    next(it)\nexcept StopIteration:\n    raised = True\nassert raised, \"an exhausted iterator should raise StopIteration\""
+        },
+        {
+          "name": "flattens any depth",
+          "code": "got = list(flatten([1, [2, [3, [4]]], 5]))\nassert got == [1, 2, 3, 4, 5], got\nassert list(flatten([[], [[]]])) == [], list(flatten([[], [[]]]))"
+        },
+        {
+          "name": "strings stay whole",
+          "code": "got = list(flatten([\"ab\", [\"cd\"]]))\nassert got == [\"ab\", \"cd\"], got"
+        },
+        {
+          "name": "flatten is a lazy generator",
+          "code": "import inspect\nassert inspect.isgeneratorfunction(flatten), \"flatten should use yield\"\nassert next(flatten([1, [2]])) == 1, \"first value\""
+        }
+      ],
+      "hints": [
+        "If `__iter__` contains `yield`, every call to it gets a fresh generator with its own position.",
+        "In `flatten`, check `isinstance(item, list)`. A list needs another call to `flatten`, and anything else is yielded as it is.",
+        "`def __iter__(self):` with a local `n = self.start` and `while n > 0: yield n; n -= 1`. Then `yield from flatten(item)` for lists and `yield item` otherwise."
+      ],
+      "explanation": "Counting in a local variable inside `__iter__` keeps the position out of the object, so two loops over one `Countdown` cannot interfere.\n\n`yield from flatten(item)` passes along everything the inner call produces. A generator holds one frame per nesting level, so memory use follows the depth rather than the number of items."
+    },
+    {
+      "id": "context-managers",
+      "title": "Context managers",
+      "body": "# Context managers\n\n`with` guarantees cleanup, whichever way a block ends. An object supports it by defining `__enter__` and `__exit__`.\n\n```python\nclass Timer:\n    def __enter__(self):\n        return self\n\n    def __exit__(self, kind, err, tb):\n        print(\"done\")\n        return False  # do not swallow\n```\n\n`__exit__` receives details of any exception. A true return value suppresses it, so usually return `False`.\n\n## The short form\n\n`contextlib.contextmanager` turns a generator into a context manager. Code before `yield` is the setup. Code after it is the cleanup.\n\n```python\nfrom contextlib import contextmanager\n\n@contextmanager\ndef tag(out, name):\n    out.append(f\"<{name}>\")\n    try:\n        yield\n    finally:\n        out.append(f\"</{name}>\")\n```\n\nThe `try`/`finally` matters. An exception inside the `with` block is raised at the `yield`, so without `finally` your cleanup would be skipped.",
+      "task": "Write a context manager `temporary_setting(settings, key, value)` that sets `settings[key] = value` for the block, then restores the old value, or removes the key if it did not exist before. It must clean up after an exception and let the exception propagate.",
+      "starter": "from contextlib import contextmanager\n\n\n@contextmanager\ndef temporary_setting(settings, key, value):\n    settings[key] = value\n    yield\n",
+      "solution": "from contextlib import contextmanager\n\n\n@contextmanager\ndef temporary_setting(settings, key, value):\n    had_key = key in settings\n    old = settings.get(key)\n    settings[key] = value\n    try:\n        yield\n    finally:\n        if had_key:\n            settings[key] = old\n        else:\n            del settings[key]\n",
+      "checks": [
+        {
+          "name": "sets the value inside the block",
+          "code": "s = {\"debug\": False}\nwith temporary_setting(s, \"debug\", True):\n    assert s[\"debug\"] is True, s"
+        },
+        {
+          "name": "restores the old value",
+          "code": "s = {\"debug\": False}\nwith temporary_setting(s, \"debug\", True):\n    pass\nassert s == {\"debug\": False}, s"
+        },
+        {
+          "name": "removes a key that was absent",
+          "code": "s = {}\nwith temporary_setting(s, \"debug\", True):\n    assert s == {\"debug\": True}, s\nassert s == {}, s"
+        },
+        {
+          "name": "a stored None still counts as present",
+          "code": "s = {\"mode\": None}\nwith temporary_setting(s, \"mode\", \"fast\"):\n    pass\nassert s == {\"mode\": None}, s"
+        },
+        {
+          "name": "cleans up after an exception",
+          "code": "s = {\"debug\": False}\nraised = False\ntry:\n    with temporary_setting(s, \"debug\", True):\n        raise KeyError(\"boom\")\nexcept KeyError:\n    raised = True\nassert raised, \"the exception should propagate\"\nassert s == {\"debug\": False}, s"
+        },
+        {
+          "name": "nests correctly",
+          "code": "s = {\"n\": 1}\nwith temporary_setting(s, \"n\", 2):\n    with temporary_setting(s, \"n\", 3):\n        assert s[\"n\"] == 3, s\n    assert s[\"n\"] == 2, s\nassert s[\"n\"] == 1, s"
+        }
+      ],
+      "hints": [
+        "Before changing anything, record what is there now. You need to know whether the key existed and what its value was.",
+        "`None` could be a real stored value, so `key in settings` is the reliable test. Wrap the `yield` in `try`/`finally`.",
+        "`had_key = key in settings`, `old = settings.get(key)`, set the value, then `try: yield`, and `finally:` restore `old` if `had_key`, otherwise `del settings[key]`."
+      ],
+      "explanation": "An exception raised in the `with` block appears at the `yield`, so `finally` is what guarantees restoration. No `except` means the exception keeps travelling to the caller.\n\nTesting `key in settings` separately from reading the value keeps \"missing\" distinct from \"stored as `None`\"."
+    },
+    {
+      "id": "decorators",
+      "title": "Decorators",
+      "body": "# Decorators\n\nA decorator takes a function and returns a replacement, which then runs in its place on every call. `@name` above a `def` is shorthand for `f = name(f)`.\n\n```python\nfrom functools import wraps\n\ndef shout(fn):\n    @wraps(fn)\n    def wrapper(*args, **kwargs):\n        result = fn(*args, **kwargs)\n        return result.upper()\n    return wrapper\n\n@shout\ndef hello(name):\n    return f\"hi {name}\"\n```\n\n- `*args, **kwargs` lets the wrapper accept whatever the original accepts.\n- `@wraps(fn)` copies the name and docstring, which keeps tracebacks and tools readable.\n\n## Decorators with arguments\n\nFor `@repeat(3)`, you need one more layer: `repeat(3)` must return the decorator.\n\n```python\ndef repeat(n):\n    def decorator(fn):\n        @wraps(fn)\n        def wrapper(*a, **k):\n            for _ in range(n):\n                out = fn(*a, **k)\n            return out\n        return wrapper\n    return decorator\n```",
+      "task": "Write a decorator `count_calls` that stores how many times the function ran in a `.calls` attribute, starting at 0. Write a decorator factory `retry(times)` that calls the function up to `times` times in total, returning the first success and re-raising the last exception if all fail. Both keep the function's name.",
+      "starter": "def count_calls(fn):\n    return fn\n\n\ndef retry(times):\n    def decorator(fn):\n        return fn\n    return decorator\n",
+      "solution": "from functools import wraps\n\n\ndef count_calls(fn):\n    @wraps(fn)\n    def wrapper(*args, **kwargs):\n        wrapper.calls += 1\n        return fn(*args, **kwargs)\n    wrapper.calls = 0\n    return wrapper\n\n\ndef retry(times):\n    def decorator(fn):\n        @wraps(fn)\n        def wrapper(*args, **kwargs):\n            for attempt in range(times):\n                try:\n                    return fn(*args, **kwargs)\n                except Exception:\n                    if attempt == times - 1:\n                        raise\n        return wrapper\n    return decorator\n",
+      "checks": [
+        {
+          "name": "counts calls",
+          "code": "@count_calls\ndef add(a, b=0):\n    return a + b\nassert add.calls == 0, add.calls\nassert add(1, b=2) == 3, \"should pass arguments through\"\nadd(1)\nassert add.calls == 2, add.calls"
+        },
+        {
+          "name": "keeps the name",
+          "code": "@count_calls\ndef first(): pass\n@retry(2)\ndef second(): pass\nassert first.__name__ == \"first\", first.__name__\nassert second.__name__ == \"second\", second.__name__"
+        },
+        {
+          "name": "counters are separate",
+          "code": "@count_calls\ndef a(): pass\n@count_calls\ndef b(): pass\na()\nassert b.calls == 0, b.calls"
+        },
+        {
+          "name": "retries until success",
+          "code": "attempts = []\n@retry(3)\ndef flaky(x):\n    attempts.append(x)\n    if len(attempts) < 3:\n        raise ValueError(\"not yet\")\n    return x * 2\nassert flaky(4) == 8, \"should return the first success\"\nassert attempts == [4, 4, 4], attempts"
+        },
+        {
+          "name": "gives up and re-raises",
+          "code": "attempts = []\n@retry(2)\ndef broken():\n    attempts.append(1)\n    raise KeyError(\"always\")\nraised = False\ntry:\n    broken()\nexcept KeyError:\n    raised = True\nassert raised, \"the last exception should be re-raised\"\nassert len(attempts) == 2, attempts"
+        },
+        {
+          "name": "does not retry after success",
+          "code": "attempts = []\n@retry(5)\ndef fine():\n    attempts.append(1)\n    return \"ok\"\nassert fine() == \"ok\", \"return value\"\nassert len(attempts) == 1, attempts"
+        }
+      ],
+      "hints": [
+        "Functions are objects, so you can set `wrapper.calls = 0` before returning `wrapper`, and add to it inside.",
+        "`retry` has three layers: `retry(times)`, `decorator(fn)`, `wrapper(*args, **kwargs)`. The wrapper loops, and `return` inside `try` stops on the first success.",
+        "`for attempt in range(times):`, `try: return fn(*args, **kwargs)`, `except Exception:` and `if attempt == times - 1: raise`."
+      ],
+      "explanation": "Storing the count on the wrapper gives each decorated function its own counter, reachable from outside.\n\nIn `retry`, a bare `raise` inside `except` re-raises the current exception with its original traceback. Catching `Exception` leaves `KeyboardInterrupt` and `SystemExit` alone, so a stop request is never retried."
+    },
+    {
+      "id": "functions-that-return-functions",
+      "title": "Functions that return functions",
+      "body": "# Functions that return functions\n\nA function defined inside another can read the outer function's variables. When the inner function is returned, it keeps those variables alive. That pairing is a closure.\n\n```python\ndef make_adder(n):\n    def add(x):\n        return x + n\n    return add\n\nadd_two = make_adder(2)\nadd_two(3)  # 5\n```\n\nEach call to `make_adder` creates a new `n`, so closures from separate calls do not interfere.\n\n## Changing a captured variable\n\nReading works automatically. Assigning would make a new local variable, so declare the name with `nonlocal` first:\n\n```python\ndef counter():\n    count = 0\n    def tick():\n        nonlocal count\n        count += 1\n        return count\n    return tick\n```\n\nClosures give you small pieces of private state without a class. Reach for a class when you need several methods or want other code to inspect that state.",
+      "task": "Write `running_total()` returning a function `add(n)`. Each call adds `n` to a total kept inside the closure and returns the new total. Separate calls to `running_total()` keep separate totals.",
+      "starter": "total = 0\n\n\ndef running_total():\n    def add(n):\n        return total + n\n    return add\n",
+      "solution": "def running_total():\n    total = 0\n\n    def add(n):\n        nonlocal total\n        total += n\n        return total\n\n    return add\n",
+      "checks": [
+        {
+          "name": "adds up",
+          "code": "add = running_total()\nassert add(5) == 5, \"first call\"\nassert add(3) == 8, \"second call\"\nassert add(-2) == 6, \"third call\""
+        },
+        {
+          "name": "adding zero keeps the total",
+          "code": "add = running_total()\nadd(4)\nassert add(0) == 4, \"adding 0\""
+        },
+        {
+          "name": "totals are independent",
+          "code": "a = running_total()\nb = running_total()\na(10)\nassert b(1) == 1, \"b should not see a's total\"\nassert a(1) == 11, \"a should keep its own total\""
+        },
+        {
+          "name": "state lives in the closure",
+          "code": "add = running_total()\nadd(1)\nassert add.__closure__, \"add should capture total from running_total\""
+        }
+      ],
+      "hints": [
+        "The total has to be created inside `running_total`, so each call gets its own.",
+        "Assigning to `total` inside `add` makes Python treat it as local, which raises `UnboundLocalError`. One keyword fixes that.",
+        "Inside `running_total`: `total = 0`, then `def add(n):` with `nonlocal total`, `total += n`, `return total`. Finally `return add`."
+      ],
+      "explanation": "Each call to `running_total` runs its body once, creating a new `total` and a new `add` bound to it. The function object carries a reference to that variable in `__closure__`, which is why the value survives after `running_total` returns.\n\n`nonlocal` tells Python that the assignment targets the enclosing variable. A module-level total would be shared by every counter."
+    },
+    {
+      "id": "typing",
+      "title": "Typing",
+      "body": "# Typing\n\nAnnotations describe what a function expects. Python does not enforce them at runtime. Tools such as type checkers and editors read them, and so do people.\n\n```python\ndef lengths(\n    words: list[str],\n) -> dict[str, int]:\n    return {w: len(w) for w in words}\n```\n\n- `list[str]`, `dict[str, int]` and `tuple[int, int]` describe contents.\n- `int | None` means either one.\n- `type UserId = int` creates a named alias.\n\n## Generic functions\n\nA type parameter links an input type to an output type:\n\n```python\ndef last[T](items: list[T]) -> T:\n    return items[-1]\n```\n\nNow a checker knows that `last([\"a\"])` is a `str`.\n\n## Lazy annotations\n\nSince Python 3.14, annotations are evaluated only when something asks for them, so a class can name itself in its own methods without quotes. `typing.get_type_hints(fn)` returns the evaluated annotations.",
+      "task": "Add exact annotations: `word_lengths(words: list[str]) -> dict[str, int]`, and make `first_or_none` generic with a type parameter `T`, taking `items: list[T]` and returning `T | None`. Define the alias `type Scores = dict[str, int]`. Fix `first_or_none` so that it returns `None` for an empty list.",
+      "starter": "def word_lengths(words):\n    return {w: len(w) for w in words}\n\n\ndef first_or_none(items):\n    return items[0]\n",
+      "solution": "type Scores = dict[str, int]\n\n\ndef word_lengths(words: list[str]) -> dict[str, int]:\n    return {w: len(w) for w in words}\n\n\ndef first_or_none[T](items: list[T]) -> T | None:\n    return items[0] if items else None\n",
+      "checks": [
+        {
+          "name": "word_lengths annotations",
+          "code": "import typing\nhints = typing.get_type_hints(word_lengths)\nassert hints == {\"words\": list[str], \"return\": dict[str, int]}, hints"
+        },
+        {
+          "name": "word_lengths still works",
+          "code": "assert word_lengths([\"ab\", \"c\"]) == {\"ab\": 2, \"c\": 1}, word_lengths([\"ab\", \"c\"])"
+        },
+        {
+          "name": "first_or_none is generic",
+          "code": "import typing\nparams = first_or_none.__type_params__\nassert len(params) == 1, \"use def first_or_none[T](...)\"\nT = params[0]\nhints = typing.get_type_hints(first_or_none)\nassert hints == {\"items\": list[T], \"return\": T | None}, hints"
+        },
+        {
+          "name": "first_or_none behaviour",
+          "code": "assert first_or_none([3, 4]) == 3, first_or_none([3, 4])\nassert first_or_none([]) is None, first_or_none([])\nassert first_or_none([0]) == 0, first_or_none([0])"
+        },
+        {
+          "name": "Scores alias",
+          "code": "import typing\nassert isinstance(Scores, typing.TypeAliasType), \"use: type Scores = dict[str, int]\"\nassert Scores.__value__ == dict[str, int], Scores.__value__"
+        }
+      ],
+      "hints": [
+        "Start with the annotation on `word_lengths`, which is written out in the task. Then handle the empty case of `first_or_none`.",
+        "A type parameter goes in square brackets after the function name, as in `def f[T](...)`. The alias uses the `type` statement.",
+        "`def first_or_none[T](items: list[T]) -> T | None:` with `return items[0] if items else None`, and `type Scores = dict[str, int]`."
+      ],
+      "explanation": "Annotations do not change how the code runs, which is why the empty-list bug needed a real fix. They do let a checker warn callers that the result might be `None`.\n\nThe type parameter ties the element type to the return type. `items[0] if items else None` tests whether the list is empty rather than whether its first value is falsy, so `[0]` still returns `0`."
+    }
+  ]
+}
