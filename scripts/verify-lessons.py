@@ -25,6 +25,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 COURSES_DIR = ROOT / "Pythilo" / "Resources" / "Courses"
 TIMEOUT_SECONDS = 10
+# Importing torch alone takes a few seconds, before any training starts.
+TORCH_IMPORT_SECONDS = 20
 
 # File stem -> (course id, kind, number of lessons)
 EXPECTED_COURSES = {
@@ -33,8 +35,9 @@ EXPECTED_COURSES = {
     "3-tools": ("tools", "path", 5),
     "4-web": ("web", "path", 5),
     "5-data": ("data", "path", 4),
-    "6-ai": ("ai", "path", 3),
-    "7-interview": ("interview", "interview", 20),
+    "6-ml": ("ml", "path", 10),
+    "7-ai": ("ai", "path", 3),
+    "8-interview": ("interview", "interview", 20),
 }
 INTERVIEW_LEVELS = {"Easy": 7, "Medium": 9, "Hard": 4}
 REQUIRED_TEXT_FIELDS = ("id", "title", "body", "task", "starter", "solution", "explanation")
@@ -309,7 +312,7 @@ def run_source(python, source, checks):
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
-            timeout=TIMEOUT_SECONDS,
+            timeout=TIMEOUT_SECONDS + (TORCH_IMPORT_SECONDS if "torch" in source + json.dumps(checks) else 0),
         )
         if not result_path.exists():
             detail = completed.stderr.decode("utf-8", "replace").strip().splitlines()

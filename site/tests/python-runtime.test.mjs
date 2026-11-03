@@ -93,10 +93,10 @@ test("the checker's messages are the app's: a failing starter explains what came
 });
 
 test("course content is built from the app's files, and lessons needing missing packages say so", () => {
-  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "tools", "web", "data", "ai", "interview"]);
+  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "tools", "web", "data", "ml", "ai", "interview"]);
   const all = courses.flatMap(course => course.lessons);
   assert.ok(all.every(lesson => lesson.sections[0].chip === "Idea" && lesson.checks.length && lesson.starter));
-  assert.deepEqual(all.filter(lesson => lesson.missing.length).map(lesson => [lesson.id, lesson.missing]), [["flask-routes", ["flask"]]]);
+  assert.deepEqual(all.filter(lesson => lesson.missing.length).map(lesson => [lesson.id, lesson.missing]), [["flask-routes", ["flask"]], ...courses.find(course => course.id === "ml").lessons.map(lesson => [lesson.id, ["torch"]])]);
   assert.deepEqual(all.filter(lesson => lesson.packages.includes("numpy")).map(lesson => lesson.id), ["numpy-arrays", "broadcasting-and-aggregates"]);
 });
 
