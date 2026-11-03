@@ -1,63 +1,161 @@
 # Pythilo
 
-A Python IDE, course and lab for iPhone and iPad. CPython runs on the device, with
-no cloud runtime. `Pythilo` is a working name.
+**Real Python on your iPhone and iPad.** Pythilo is an IDE, a course and a set of
+algorithm labs in one app. CPython 3.14 runs on the device itself: your code, your
+tests, your Django site and your debugger session never leave the phone, and none of
+it needs a network.
 
-## Build
+Pythilo is a paid app, in TestFlight now. This repository is public to read; it is not
+open source (see [License](#license)).
 
-Needs Xcode 27, xcodegen and Python 3.14 on the Mac.
+<p align="center">
+  <img src="docs/screenshots/django-running.png" width="200" alt="A Django project running, with Open site">
+  <img src="docs/screenshots/site-preview.png" width="200" alt="The site in the built-in preview">
+  <img src="docs/screenshots/lesson.png" width="200" alt="A lesson, reading mode">
+  <img src="docs/screenshots/checks.png" width="200" alt="Checks that say what came back">
+</p>
+<p align="center">
+  <img src="docs/screenshots/labs.png" width="200" alt="The four labs">
+  <img src="docs/screenshots/graph-lab.png" width="200" alt="Graph Explorer tracing a BFS">
+  <img src="docs/screenshots/dp-lab.png" width="200" alt="Dynamic Programming counting repeated calls">
+  <img src="docs/screenshots/room.png" width="200" alt="A shared room">
+</p>
+
+## What it does
+
+### A real workspace
+
+- **CPython 3.14.10, embedded.** Not a web view, not a cloud box: the interpreter
+  ships in the app, with `input()`, real files, tracebacks that point at your line,
+  and a Stop that works on endless loops, `sleep`, blocking sockets and asyncio.
+- **Projects with many files**, a file drawer with nested folders, an editor built
+  for touch, a terminal and a problems list fed by pyflakes, with Jedi
+  completion that knows your own modules.
+- **Run web servers on the phone.** Django with SQLite and migrations, Flask, FastAPI
+  with Pydantic, Starlette on Uvicorn. When a server starts, Pythilo says so and opens
+  the site in a preview where you can go to any path, such as `/admin/`. The
+  framework's own commands (`runserver`, `migrate`, `flask run`, `uvicorn main:app`)
+  sit one tap away in the terminal.
+- **A debugger** with breakpoints, stepping and variables, which also stops inside
+  threads, web request handlers and async code.
+- **Tests and packages.** pytest runs as it would on a computer. pip installs
+  pure-Python packages from PyPI into the project; NumPy and the web frameworks come
+  bundled.
+- **Git, for real.** A genuine `.git` folder: commit, branches, diff, `git merge` with
+  conflict markers and `--abort`, `git rebase`, and HTTPS clone.
+- **Notebooks** that open and save ordinary `.ipynb` files.
+
+### Learn
+
+- **36 lessons** from values and names to typing, tools, the web and data, and **20
+  interview tasks** with a timer and hints.
+- Every exercise is checked by running your code on the device. When a check fails it
+  says what happened: `describe(3) returned None, expected 'int: 3'. Is a return missing?`
+- Reading and coding take turns on the whole screen on a phone, and sit side by side on
+  an iPad.
+
+### Labs
+
+Four labs that trace **your own code** while it runs, then measure it on the device.
+Correctness first, then time.
+
+- **Sorting Bench**: every read and write your sort makes, on four kinds of input.
+- **Graph Explorer**: your BFS, DFS or Dijkstra expanding a grid, tree or random graph,
+  step by step. A DFS is judged as a valid depth-first order, not one fixed answer.
+- **Search & Hashing**: build a hash table and watch buckets fill and keys collide;
+  comparisons are counted by the keys themselves.
+- **Dynamic Programming**: how many calls a recursion repeats, what a cache saves, and
+  a table filling cell by cell.
+
+### Work with others, and with AI
+
+- **An AI client on your computer** (Claude, Codex or any MCP client) can work on one
+  project over your local network. Reading, editing, running, installing packages and
+  committing are separate permissions, and every write checks that the file has not
+  changed underneath it.
+- **Shared rooms** put a project in front of a browser or an AI client by link, with
+  live edits and cursors, end-to-end encrypted so the relay only sees ciphertext. Code
+  runs where someone asks it to, and every result says where: this browser, or an
+  iPhone whose owner allowed it. The relay is built and tested; it is not hosted yet.
+- **A website** with the same lessons running in the browser on Pyodide, a playground
+  and rooms. Built and tested locally; it goes live with the relay.
+
+### Every shape
+
+Layouts for the iPhone held either way, the iPad with or without a keyboard, and the
+folding iPhone in each of its poses. On a phone the IDE uses the whole screen: buttons
+sit beside the camera, and code runs to the bottom edge.
+
+## What it does not do (yet)
+
+- No pandas, Matplotlib, SciPy or PyTorch: nobody publishes iOS builds of them for
+  Python 3.14 ([details](docs/research/ml-on-ios.md)).
+- Compiled packages work only when Pythilo bundles them; pip installs pure Python.
+- No Jupyter server: notebooks run on Pythilo's own kernel.
+- iOS pauses apps in the background, so a server runs while Pythilo is open.
+
+[`docs/STATUS.md`](docs/STATUS.md) lists what is done, how it was checked, and what is
+missing, item by item.
+
+## How it is built
+
+| Part | What it is |
+| --- | --- |
+| `Pythilo/Runtime` | The C host and Swift session around the embedded interpreter |
+| `Pythilo/PythonRuntime/pythilo_runtime` | The Python side: runner, terminal, debugger, pip, analysis, notebooks, lessons, labs |
+| `Pythilo/Projects` | Project folders, the open workspace, Git commands, framework commands |
+| `Pythilo/UI` | SwiftUI: one arrangement per screen shape |
+| `Pythilo/MCP` | The MCP server the app hosts on the local network |
+| `Pythilo/Playground` | Shared rooms: relay session, encryption, Yjs codec, the device as a runtime host |
+| `Pythilo/Resources/Courses` | Lessons and interview tasks |
+| `Vendor/PythiloGitCore` | libgit2 and its Swift wrapper |
+| `site/` | Website, room relay and browser playground (Next.js, Pyodide) |
+| `sdk/` | `pythilo`, the MCP bridge an AI client runs |
+| `docs/` | Status, design notes, research, App Store materials |
+
+CPython comes from BeeWare's iOS support package. `pydantic-core`, which FastAPI
+needs, has no iOS build anywhere, so `scripts/build-pydantic-core.sh` builds it here
+from source with Rust.
+
+## Building it
+
+There is no CI and no CD, by design: nothing runs on GitHub. Builds, tests and
+releases are run by hand on a Mac.
+
+Needs Xcode 27, xcodegen, Python 3.14, and Rust with the `aarch64-apple-ios` and
+`aarch64-apple-ios-sim` targets.
 
 ```sh
-scripts/generate-project.sh
+scripts/build-pydantic-core.sh
 python3 scripts/vendor-packages.py
+scripts/generate-project.sh
 open Pythilo.xcodeproj
 ```
 
-Tests run inside the app, against the embedded interpreter:
+The tests run inside the app, against the embedded interpreter:
 
 ```sh
 xcodebuild -project Pythilo.xcodeproj -scheme Pythilo -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
-`python3 scripts/verify-lessons.py` checks the course files on the Mac.
+`python3 scripts/verify-lessons.py` checks the course on the Mac. For TestFlight,
+`scripts/testflight.sh` archives and uploads, and `scripts/testflight-finish.mjs` waits
+for Apple, then adds the notes and the testers.
 
-This repository has no CI or CD. Builds, tests and releases are run by hand. For
-TestFlight, `scripts/testflight.sh` archives and uploads, then
-`scripts/testflight-finish.mjs` waits for Apple and adds the notes and the internal group.
-
-`pydantic-core` has no iOS wheel anywhere, so `scripts/build-pydantic-core.sh` builds it
-with Rust (`rustup target add aarch64-apple-ios aarch64-apple-ios-sim`) before
-`scripts/vendor-packages.py` runs.
-
-## Website, relay and MCP bridge
-
-`site/` is the website, the room relay and the browser playground (Next.js, Pyodide).
-`sdk/` is the `pythilo` MCP bridge an AI client runs. Neither is deployed or published
-yet, and nothing in them names a production domain. Locally:
+The website and relay, and the MCP bridge:
 
 ```sh
 cd site && pnpm install && pnpm build && SITE_ORIGIN=http://127.0.0.1:3212 pnpm start
 cd sdk && npm install && npm run build && npm test
 ```
 
-The app joins a local relay in Debug builds with the launch argument
-`-pythiloRelay http://127.0.0.1:3212`. `docs/design/ROOMS.md` is the contract the three
-clients share; `site/DEPLOY.md` covers hosting.
+A Debug build of the app joins that local relay with the launch argument
+`-pythiloRelay http://127.0.0.1:3212`. [`docs/design/ROOMS.md`](docs/design/ROOMS.md)
+is the contract the app, the website and the bridge share.
 
-## Layout
+## License
 
-| Path | What it is |
-| --- | --- |
-| `Pythilo/Runtime` | The C host and Swift session around CPython |
-| `Pythilo/PythonRuntime/pythilo_runtime` | The Python side: runner, shell, debugger, pip, analysis, notebooks, lessons, labs |
-| `Pythilo/Projects` | Project folders, the open workspace, Git commands |
-| `Pythilo/MCP` | The MCP server the app hosts over Streamable HTTP on the local network |
-| `Pythilo/Playground` | Shared rooms: relay session, encryption, Yjs codec, the device as a runtime host |
-| `site/` | Website, relay and browser playground |
-| `sdk/` | The `pythilo` MCP bridge for AI clients |
-| `Pythilo/UI/Workspace` | The IDE, with one arrangement per screen shape |
-| `Pythilo/Resources/Courses` | Lessons and interview tasks |
-| `Vendor/PythiloGitCore` | libgit2 and its Swift wrapper |
-| `docs/STATUS.md` | What works, what was checked, what is missing |
-
-The screens are designed on the [design canvas](https://claude.ai/artifact/1Nh2dSBeFktQYok5CT3Qeb).
+Copyright (c) 2026 Serhii Ziborov. All rights reserved. Pythilo is a paid app; this
+source is public to read, and no licence is granted to use, copy, modify or distribute
+it. See [LICENSE](LICENSE). Third-party components keep their own licences:
+[THIRD-PARTY.md](THIRD-PARTY.md).

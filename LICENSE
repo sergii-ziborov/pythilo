@@ -1,8 +1,11 @@
 Pythilo
 Copyright (c) 2026 Serhii Ziborov. All rights reserved.
 
-This source is proprietary. No licence is granted to use, copy, modify or
-distribute it without prior written permission.
+Pythilo is a paid app. This repository is public so its source can be read; that
+does not make it open source. No licence is granted to use, copy, modify, build,
+publish or distribute this source, in whole or in part, without prior written
+permission from the copyright holder. This covers the app, the website in site/,
+the MCP bridge in sdk/, the course content and the design.
 
-Third-party components keep their own licences: see THIRD-PARTY.md. Your own
-programs stay yours.
+Third-party components keep their own licences: see THIRD-PARTY.md and
+sdk/ThirdPartyNotices.txt. Programs you write in Pythilo stay yours.
