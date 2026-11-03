@@ -48,6 +48,9 @@ boundary, and the app says so.
 | Item | State |
 | --- | --- |
 | 36 lessons and 20 interview tasks | Every solution passes on the embedded interpreter |
+| Learn screens: path, course timeline, lesson read and code modes, check sheet | Checked on the simulator. Drawn on the canvas, iPad lesson included |
+| Failed checks say what came back and what was expected | Checked against every lesson's starter code on the Mac |
+| Long lines wrap in the lesson editor | Built. Not checked by hand yet |
 | Sorting Bench: traces of the user's real code, measurements without the tracer | Checked |
 | Graph, hashing and dynamic programming labs | Not done |
 

@@ -83,6 +83,8 @@ struct SyntaxCodeEditor: UIViewRepresentable {
     var debugLine: Int?
     var onBreakpoint: ((Int) -> Void)?
     let tracksTyping: Bool
+    /// Long lines fold onto the next row instead of scrolling sideways.
+    let wrapsLines: Bool
     let diagnostics: [EditorDiagnostic]
     let navigationTarget: EditorNavigationTarget?
     /// Whether the assistant key will actually reach Apple Intelligence. When
@@ -110,6 +112,7 @@ struct SyntaxCodeEditor: UIViewRepresentable {
         debugLine: Int? = nil,
         onBreakpoint: ((Int) -> Void)? = nil,
         tracksTyping: Bool = true,
+        wrapsLines: Bool = false,
         diagnostics: [EditorDiagnostic] = [],
         navigationTarget: EditorNavigationTarget?,
         assistantUsesAppleIntelligence: Bool = false,
@@ -131,6 +134,7 @@ struct SyntaxCodeEditor: UIViewRepresentable {
         self.debugLine = debugLine
         self.onBreakpoint = onBreakpoint
         self.tracksTyping = tracksTyping
+        self.wrapsLines = wrapsLines
         self.diagnostics = diagnostics
         self.navigationTarget = navigationTarget
         self.assistantUsesAppleIntelligence = assistantUsesAppleIntelligence
@@ -155,6 +159,7 @@ struct SyntaxCodeEditor: UIViewRepresentable {
         textView.font = .monospacedSystemFont(ofSize: editorFontSize, weight: .regular)
         textView.textContainerInset = UIEdgeInsets(top: 16, left: 54, bottom: 16, right: 14)
         textView.textContainer.lineFragmentPadding = 0
+        textView.wrapsLines = wrapsLines
         textView.autocorrectionType = .no
         textView.autocapitalizationType = .none
         textView.smartDashesType = .no
@@ -231,6 +236,7 @@ struct SyntaxCodeEditor: UIViewRepresentable {
             coordinator?.cursorOffset(projectID: projectID, file: file)
         }
         textView.isEditable = isEditable
+        textView.wrapsLines = wrapsLines
         canvas.setChromeInsets(bottom: chrome.bottom, trailing: chrome.trailing)
         canvas.backgroundColor = UIColor(AppTheme.editor)
         // applyHighlighting owns foreground attributes; textColor here erases token colours.
@@ -497,6 +503,9 @@ struct SyntaxCodeEditor: UIViewRepresentable {
                     range: range
                 )
             }
+            if parent.wrapsLines {
+                indentFoldedLines(in: textView.textStorage, source: source as NSString, font: baseFont)
+            }
             textView.textStorage.endEditing()
             textView.typingAttributes = base
             // Only when it actually moved: assigning an unchanged selection
@@ -514,6 +523,20 @@ struct SyntaxCodeEditor: UIViewRepresentable {
             highlightedColorScheme = parent.colorScheme
             highlightedAppearanceRaw = parent.appearanceRaw
             highlightedDiagnosticsSignature = parent.diagnosticsSignature
+        }
+
+        /// A folded line goes on one step further in than its own code, so its
+        /// tail never reads as a line of its own.
+        private func indentFoldedLines(in storage: NSTextStorage, source: NSString, font: UIFont) {
+            let space = (" " as NSString).size(withAttributes: [.font: font]).width
+            let whole = NSRange(location: 0, length: source.length)
+            source.enumerateSubstrings(in: whole, options: [.byParagraphs, .substringNotRequired]) { _, line, paragraphRange, _ in
+                let leading = source.substring(with: line).prefix { $0 == " " || $0 == "\t" }
+                let columns = leading.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
+                let style = NSMutableParagraphStyle()
+                style.headIndent = CGFloat(columns + 4) * space
+                storage.addAttribute(.paragraphStyle, value: style, range: paragraphRange)
+            }
         }
 
         private func carryDiagnostics(to source: String, filePath: String) {
@@ -927,17 +950,24 @@ extension CodeEditorCanvas: UIScrollViewDelegate {
     }
 }
 
-/// The text view itself: never scrolls, never wraps, and is laid out at the
-/// size of the whole file by the canvas around it.
+/// The text view itself: never scrolls, wraps only when asked, and is laid out
+/// at the size of the whole file by the canvas around it.
 final class SourceTextView: UITextView {
     var editorInputAccessoryView: UIView? {
         didSet { inputAccessoryView = editorInputAccessoryView }
     }
 
+    /// Folds long lines at the editor's width, so nothing scrolls sideways.
+    var wrapsLines = false {
+        didSet { if wrapsLines != oldValue { onLayoutChanged?() } }
+    }
+
     /// Where the caret sits, measured from the text before it on its line.
     /// Around an edit on the last lines, UIKit answers with the far end of the
-    /// file's widest line instead.
+    /// file's widest line instead. A folded line has no single x to measure,
+    /// and nothing scrolls sideways then, so UIKit's answer stands.
     fileprivate func measuredCaretX(at position: UITextPosition) -> CGFloat? {
+        guard !wrapsLines else { return nil }
         let source = text as NSString
         let offset = self.offset(from: beginningOfDocument, to: position)
         guard offset <= source.length, let font else { return nil }
@@ -1010,6 +1040,15 @@ final class SourceTextView: UITextView {
         let verticalInset = textContainerInset.top + textContainerInset.bottom
         let available = max(visible.width - horizontalInset, 1)
 
+        if wrapsLines {
+            setContainerWidth(available)
+            layoutManager.ensureLayout(for: textContainer)
+            return CGSize(
+                width: visible.width,
+                height: max(visible.height, ceil(laidOutTextSize().height) + verticalInset)
+            )
+        }
+
         // Room to lay the longest line out in one piece...
         setContainerWidth(max(available, estimatedLongestLineWidth()))
         layoutManager.ensureLayout(for: textContainer)
@@ -1067,7 +1106,8 @@ final class SourceTextView: UITextView {
     private func setContainerWidth(_ width: CGFloat) {
         if textContainer.widthTracksTextView { textContainer.widthTracksTextView = false }
         if textContainer.heightTracksTextView { textContainer.heightTracksTextView = false }
-        if textContainer.lineBreakMode != .byClipping { textContainer.lineBreakMode = .byClipping }
+        let breaking: NSLineBreakMode = wrapsLines ? .byWordWrapping : .byClipping
+        if textContainer.lineBreakMode != breaking { textContainer.lineBreakMode = breaking }
         let size = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
         if abs(textContainer.size.width - size.width) > 0.5
             || textContainer.size.height != size.height {

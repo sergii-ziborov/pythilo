@@ -165,13 +165,15 @@ final class FeatureGateTests: XCTestCase {
                     ["name": "adds", "code": "assert add(1, 2) == 3"],
                     ["name": "wrong", "code": "assert add(1, 2) == 4, 'expected four'"],
                     ["name": "stdout", "code": "assert _stdout == 'hi\\n'"],
+                    ["name": "bare value", "code": "assert add(1, 1) == 3, add(1, 1)"],
                 ],
             ],
             label: "lesson"
         )
         try await waitUntil(timeout: 30) { report != nil && self.session.phase == .idle }
-        XCTAssertEqual(report?.results.map(\.ok), [true, false, true])
-        XCTAssertEqual(report?.results[1].message, "expected four")
+        XCTAssertEqual(report?.results.map(\.ok), [true, false, true, false])
+        XCTAssertEqual(report?.results[1].message, "expected four\nadd(1, 2) returned 3, expected 4.")
+        XCTAssertEqual(report?.results[3].message, "add(1, 1) returned 2, expected 3.")
     }
 
     func testEveryBundledLessonSolutionPassesOnTheDevice() async throws {

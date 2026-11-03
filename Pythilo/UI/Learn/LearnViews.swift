@@ -730,6 +730,7 @@ struct LessonView: View {
                 filePath: "solution.py",
                 isEditable: !session.isBusy,
                 tracksTyping: false,
+                wrapsLines: true,
                 navigationTarget: nil,
                 keyboardBridge: bridge,
                 onRequestCompletion: {}
