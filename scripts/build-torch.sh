@@ -9,7 +9,7 @@
 # Each platform takes about an hour and 6 GB while it builds.
 set -euo pipefail
 
-commit=1f9e7caba40e05760ad565a59fde48adc45bcb0b
+commit=316698928484da98738265cc1fbec302d0e34cb1
 root=$(cd "$(dirname "$0")/.." && pwd)
 tools="$root/build/torch-ios"
 platform=${1:?iphonesimulator or iphoneos}
