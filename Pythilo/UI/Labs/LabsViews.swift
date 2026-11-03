@@ -32,30 +32,22 @@ struct LabMeasure: Decodable, Sendable {
 }
 
 struct LabsView: View {
+    @State private var path: [String] = []
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    NavigationLink {
-                        SortingBenchView()
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "chart.bar.fill").font(.system(size: 20)).foregroundStyle(AppTheme.run).frame(width: 40, height: 40)
-                                .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 12))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Sorting Bench").font(.system(size: 16, weight: .semibold))
-                                Text("Trace your own sort step by step, then measure it").font(.system(size: 13)).foregroundStyle(AppTheme.muted)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(AppTheme.muted)
-                        }
-                        .padding(12)
-                        .panelCard()
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("lab-sorting")
-                    Text("Graphs, hashing and dynamic programming labs are not built yet.")
-                        .font(.system(size: 13.5))
+                    Text("Your own code, traced while it runs and measured on this device. Correctness first, then time.")
+                        .font(.system(size: 15))
+                        .foregroundStyle(AppTheme.secondary)
+                        .padding(.bottom, 4)
+                    lab("Sorting Bench", "Trace your sort read by read, then time it on four inputs", "chart.bar.fill", AppTheme.run, id: "sorting")
+                    lab("Graph Explorer", "Watch your BFS, DFS or Dijkstra expand a grid, tree or random graph", "point.3.connected.trianglepath.dotted", AppTheme.blue, id: "graph")
+                    lab("Search & Hashing", "Build a hash table and see buckets fill and keys collide", "square.stack.3d.up.fill", AppTheme.mint, id: "hash")
+                    lab("Dynamic Programming", "Count repeated calls, add a cache, fill the table cell by cell", "tablecells", AppTheme.violet, id: "dp")
+                    Text("Timings come from this device. They suggest a growth rate; they do not prove Big O.")
+                        .font(.system(size: 13))
                         .foregroundStyle(AppTheme.muted)
                         .padding(.horizontal, 4)
                 }
@@ -65,7 +57,40 @@ struct LabsView: View {
             }
             .background(AppTheme.background)
             .navigationTitle("Labs")
+            .navigationDestination(for: String.self) { lab in
+                switch lab {
+                case "graph": GraphLabView()
+                case "hash": HashLabView()
+                case "dp": DPLabView()
+                default: SortingBenchView()
+                }
+            }
+            #if DEBUG
+            // For screenshots: -openLab graph|hash|dp|sorting, -labRun YES.
+            .onAppear {
+                if path.isEmpty, let lab = UserDefaults.standard.string(forKey: "openLab") { path = [lab] }
+            }
+            #endif
         }
+    }
+
+    private func lab(_ title: String, _ summary: String, _ symbol: String, _ tint: Color, id: String) -> some View {
+        NavigationLink(value: id) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol).font(.system(size: 19)).foregroundStyle(tint).frame(width: 44, height: 44)
+                    .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.system(size: 16.5, weight: .bold))
+                    Text(summary).font(.system(size: 13.5)).foregroundStyle(AppTheme.muted)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(AppTheme.muted)
+            }
+            .padding(12)
+            .panelCard(cornerRadius: 16)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("lab-\(id)")
     }
 }
 

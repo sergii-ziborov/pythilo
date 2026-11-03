@@ -68,6 +68,8 @@ struct DebugPause: Decodable, Sendable, Equatable {
     let file: String
     let line: Int
     let frames: [DebugFrame]
+    /// The paused thread's name; others keep running.
+    let thread: String?
 }
 
 struct DebugEvaluation: Decodable, Sendable, Equatable {

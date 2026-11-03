@@ -236,5 +236,6 @@ let package = Package(
             .define("UNICODE_ICONV", to: "1")
         ],
         linkerSettings: [.linkedFramework("Security"), .linkedFramework("CoreFoundation"),
-            .linkedLibrary("z"), .linkedLibrary("iconv")])]
+            .linkedLibrary("z"), .linkedLibrary("iconv")]),
+        .testTarget(name: "PythiloGitTests", dependencies: ["PythiloGit"])]
 )

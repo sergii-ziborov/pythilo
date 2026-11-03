@@ -272,37 +272,50 @@ public struct ProjectRepository: Sendable {
             var index: OpaquePointer?
             try Self.check(git_repository_index(&index, repository))
             defer { git_index_free(index) }
+            // After a merge stopped at conflicts, this commit is the merge commit.
+            let merging = Self.isMerging(repository)
+            if merging, git_index_has_conflicts(index) == 1 {
+                throw GitFailure("Resolve every conflicted file and stage it before committing the merge.")
+            }
             var treeID = git_oid()
             try Self.check(git_index_write_tree(&treeID, index))
             let parentID = Self.headOID(repository)
             var tree: OpaquePointer?
             var parent: OpaquePointer?
+            var mergedIn: OpaquePointer?
             try Self.check(git_tree_lookup(&tree, repository, &treeID))
             defer {
                 git_tree_free(tree)
                 git_commit_free(parent)
+                git_commit_free(mergedIn)
             }
             if var parentID {
                 try Self.check(git_commit_lookup(&parent, repository, &parentID))
-                if let parentTree = git_commit_tree_id(parent), git_oid_equal(parentTree, &treeID) == 1 {
+                if !merging, let parentTree = git_commit_tree_id(parent), git_oid_equal(parentTree, &treeID) == 1 {
                     throw GitFailure("Nothing is staged. Stage a file first.")
                 }
             } else if git_index_entrycount(index) == 0 {
                 throw GitFailure("Nothing is staged. Stage a file first.")
             }
+            if merging {
+                var mergeHead = git_oid()
+                try Self.check(git_reference_name_to_id(&mergeHead, repository, "MERGE_HEAD"))
+                try Self.check(git_commit_lookup(&mergedIn, repository, &mergeHead))
+            }
             var signature: UnsafeMutablePointer<git_signature>?
             try Self.check(git_signature_now(&signature, author, email))
             defer { git_signature_free(signature) }
             var created = git_oid()
-            var parentPointer = parent
-            try withUnsafeMutablePointer(to: &parentPointer) { parents in
+            var parents: [OpaquePointer?] = parentID == nil ? [] : merging ? [parent, mergedIn] : [parent]
+            try parents.withUnsafeMutableBufferPointer { buffer in
                 try Self.check(
                     git_commit_create(
                         &created, repository, "HEAD", signature, signature, nil,
-                        cleanMessage, tree, parentID == nil ? 0 : 1, parents
+                        cleanMessage, tree, buffer.count, buffer.baseAddress
                     )
                 )
             }
+            if merging { try Self.check(git_repository_state_cleanup(repository)) }
             return GitCommitSummary(id: Self.string(created), message: cleanMessage, author: author, date: Date())
         }
     }
@@ -313,7 +326,8 @@ public struct ProjectRepository: Sendable {
             var walker: OpaquePointer?
             try Self.check(git_revwalk_new(&walker, repository))
             defer { git_revwalk_free(walker) }
-            try Self.check(git_revwalk_sorting(walker, UInt32(GIT_SORT_TIME.rawValue)))
+            // Topological first: commits replayed by a rebase share one timestamp.
+            try Self.check(git_revwalk_sorting(walker, UInt32(GIT_SORT_TOPOLOGICAL.rawValue | GIT_SORT_TIME.rawValue)))
             try Self.check(git_revwalk_push_head(walker))
             var result: [GitCommitSummary] = []
             var id = git_oid()
@@ -492,7 +506,7 @@ public struct ProjectRepository: Sendable {
             try Self.check(git_graph_ahead_behind(&ahead, &behind, repository, &local, &upstream))
             if behind == 0 { return "Already up to date." }
             guard ahead == 0 else {
-                throw GitFailure("Local and remote history diverged. Nothing was changed. Merge or rebase this repository on a computer.")
+                throw GitFailure("Local and remote history diverged. Nothing was changed. Run git merge origin/\(branch) or git rebase origin/\(branch).")
             }
             var target: OpaquePointer?
             try Self.check(git_object_lookup(&target, repository, &upstream, GIT_OBJECT_COMMIT))
@@ -595,5 +609,228 @@ final class GitTransfer: @unchecked Sendable {
             return 0
         }
         return value
+    }
+}
+
+public struct GitMergeOutcome: Sendable, Equatable {
+    public enum Kind: String, Sendable { case upToDate, fastForward, merged, conflicts }
+    public let kind: Kind
+    public let message: String
+    public let conflicts: [String]
+}
+
+extension ProjectRepository {
+    /// Whether a merge stopped at conflicts and waits for its commit.
+    public var isMerging: Bool {
+        (try? open { Self.isMerging($0) }) ?? false
+    }
+
+    fileprivate static func isMerging(_ repository: OpaquePointer) -> Bool {
+        git_repository_state(repository) == Int32(GIT_REPOSITORY_STATE_MERGE.rawValue)
+    }
+
+    /// Merges a local branch, or `origin/<branch>`, into the current branch.
+    /// Conflicts stay in the files between markers; the next commit records the merge.
+    public func merge(_ name: String, author: String, email: String) throws -> GitMergeOutcome {
+        try open { repository in
+            guard Self.headOID(repository) != nil else { throw GitFailure("Make a first commit before merging.") }
+            try Self.requireCleanState(repository, for: "merging")
+            var their = try Self.annotatedCommit(repository, name)
+            defer { git_annotated_commit_free(their) }
+            var analysis = git_merge_analysis_t(rawValue: 0)
+            var preference = git_merge_preference_t(rawValue: 0)
+            try withUnsafeMutablePointer(to: &their) { heads in
+                try Self.check(git_merge_analysis(&analysis, &preference, repository, heads, 1))
+            }
+            if analysis.rawValue & GIT_MERGE_ANALYSIS_UP_TO_DATE.rawValue != 0 {
+                return GitMergeOutcome(kind: .upToDate, message: "Already up to date with \(name).", conflicts: [])
+            }
+            if analysis.rawValue & GIT_MERGE_ANALYSIS_FASTFORWARD.rawValue != 0 {
+                var target = git_annotated_commit_id(their).pointee
+                try Self.fastForward(repository, to: &target)
+                return GitMergeOutcome(kind: .fastForward, message: "Fast-forwarded \(Self.currentBranch(repository)) to \(name).", conflicts: [])
+            }
+            var mergeOptions = git_merge_options()
+            try Self.check(git_merge_options_init(&mergeOptions, UInt32(GIT_MERGE_OPTIONS_VERSION)))
+            var checkout = git_checkout_options()
+            try Self.check(git_checkout_options_init(&checkout, UInt32(GIT_CHECKOUT_OPTIONS_VERSION)))
+            checkout.checkout_strategy = UInt32(GIT_CHECKOUT_SAFE.rawValue | GIT_CHECKOUT_ALLOW_CONFLICTS.rawValue)
+            try withUnsafeMutablePointer(to: &their) { heads in
+                try Self.check(git_merge(repository, heads, 1, &mergeOptions, &checkout))
+            }
+            let conflicts = try Self.conflictedPaths(repository)
+            if !conflicts.isEmpty {
+                return GitMergeOutcome(
+                    kind: .conflicts,
+                    message: "\(conflicts.count == 1 ? "1 file conflicts" : "\(conflicts.count) files conflict"). Fix the marked parts, stage them and commit to finish the merge.",
+                    conflicts: conflicts
+                )
+            }
+            let summary = try commitMerge(repository, message: "Merge \(name) into \(Self.currentBranch(repository))", author: author, email: email)
+            return GitMergeOutcome(kind: .merged, message: "Merged \(name) as \(summary.shortID).", conflicts: [])
+        }
+    }
+
+    /// Puts every tracked file back as it was at the last commit and forgets the merge.
+    public func abortMerge() throws {
+        try open { repository in
+            guard Self.isMerging(repository) else { throw GitFailure("No merge is in progress.") }
+            guard var head = Self.headOID(repository) else { throw GitFailure("This branch has no commits.") }
+            var target: OpaquePointer?
+            try Self.check(git_object_lookup(&target, repository, &head, GIT_OBJECT_COMMIT))
+            defer { git_object_free(target) }
+            var checkout = git_checkout_options()
+            try Self.check(git_checkout_options_init(&checkout, UInt32(GIT_CHECKOUT_OPTIONS_VERSION)))
+            checkout.checkout_strategy = UInt32(GIT_CHECKOUT_FORCE.rawValue)
+            try Self.check(git_reset(repository, target, GIT_RESET_HARD, &checkout))
+            try Self.check(git_repository_state_cleanup(repository))
+        }
+    }
+
+    /// Replays this branch's own commits on top of another branch. All or nothing:
+    /// at the first conflict the rebase is undone and the branch is left as it was.
+    public func rebase(onto name: String, author: String, email: String) throws -> String {
+        try open { repository in
+            guard Self.headOID(repository) != nil else { throw GitFailure("Make a first commit before rebasing.") }
+            try Self.requireCleanState(repository, for: "rebasing")
+            let upstream = try Self.annotatedCommit(repository, name)
+            defer { git_annotated_commit_free(upstream) }
+            var options = git_rebase_options()
+            try Self.check(git_rebase_options_init(&options, UInt32(GIT_REBASE_OPTIONS_VERSION)))
+            options.checkout_options.checkout_strategy = UInt32(GIT_CHECKOUT_SAFE.rawValue)
+            var rebase: OpaquePointer?
+            try Self.check(git_rebase_init(&rebase, repository, nil, upstream, nil, &options))
+            defer { git_rebase_free(rebase) }
+            var signature: UnsafeMutablePointer<git_signature>?
+            try Self.check(git_signature_now(&signature, author, email))
+            defer { git_signature_free(signature) }
+            var replayed = 0
+            while true {
+                var operation: UnsafeMutablePointer<git_rebase_operation>?
+                let step = git_rebase_next(&operation, rebase)
+                if step == GIT_ITEROVER.rawValue { break }
+                guard step >= 0 else {
+                    git_rebase_abort(rebase)
+                    try Self.check(step)
+                    break
+                }
+                let conflicts = try Self.conflictedPaths(repository)
+                if !conflicts.isEmpty {
+                    git_rebase_abort(rebase)
+                    throw GitFailure("Rebasing stopped at a conflict in \(conflicts.joined(separator: ", ")) and was undone, so nothing changed. Merge instead to resolve it here.")
+                }
+                var created = git_oid()
+                let result = git_rebase_commit(&created, rebase, nil, signature, nil, nil)
+                if result == GIT_EAPPLIED.rawValue { continue }
+                guard result >= 0 else {
+                    git_rebase_abort(rebase)
+                    try Self.check(result)
+                    break
+                }
+                replayed += 1
+            }
+            try Self.check(git_rebase_finish(rebase, signature))
+            return replayed == 0 ? "Nothing to replay: \(Self.currentBranch(repository)) already contains \(name)." : "Replayed \(replayed) commit\(replayed == 1 ? "" : "s") on top of \(name)."
+        }
+    }
+
+    private static func annotatedCommit(_ repository: OpaquePointer, _ name: String) throws -> OpaquePointer? {
+        let full = name.hasPrefix("origin/") ? "refs/remotes/" + name : "refs/heads/" + name
+        var reference: OpaquePointer?
+        guard git_reference_lookup(&reference, repository, full) >= 0 else {
+            throw GitFailure("There is no branch named \(name).")
+        }
+        defer { git_reference_free(reference) }
+        var annotated: OpaquePointer?
+        try check(git_annotated_commit_from_ref(&annotated, repository, reference))
+        return annotated
+    }
+
+    /// Merging or rebasing over uncommitted edits could lose them, as `git merge` warns.
+    private static func requireCleanState(_ repository: OpaquePointer, for action: String) throws {
+        guard git_repository_state(repository) == Int32(GIT_REPOSITORY_STATE_NONE.rawValue) else {
+            throw GitFailure("Finish or abort the merge in progress before \(action).")
+        }
+        var options = git_status_options()
+        try check(git_status_options_init(&options, UInt32(GIT_STATUS_OPTIONS_VERSION)))
+        options.show = GIT_STATUS_SHOW_INDEX_AND_WORKDIR
+        options.flags = UInt32(GIT_STATUS_OPT_EXCLUDE_SUBMODULES.rawValue)
+        var list: OpaquePointer?
+        try check(git_status_list_new(&list, repository, &options))
+        defer { git_status_list_free(list) }
+        if git_status_list_entrycount(list) > 0 {
+            throw GitFailure("Commit or discard your changes before \(action).")
+        }
+    }
+
+    private static func conflictedPaths(_ repository: OpaquePointer) throws -> [String] {
+        var index: OpaquePointer?
+        try check(git_repository_index(&index, repository))
+        defer { git_index_free(index) }
+        guard git_index_has_conflicts(index) == 1 else { return [] }
+        var iterator: OpaquePointer?
+        try check(git_index_conflict_iterator_new(&iterator, index))
+        defer { git_index_conflict_iterator_free(iterator) }
+        var paths: [String] = []
+        var ancestor: UnsafePointer<git_index_entry>?
+        var ours: UnsafePointer<git_index_entry>?
+        var theirs: UnsafePointer<git_index_entry>?
+        while git_index_conflict_next(&ancestor, &ours, &theirs, iterator) == 0 {
+            if let path = (ours ?? theirs ?? ancestor)?.pointee.path { paths.append(String(cString: path)) }
+        }
+        return paths.sorted()
+    }
+
+    private static func fastForward(_ repository: OpaquePointer, to target: inout git_oid) throws {
+        var object: OpaquePointer?
+        try check(git_object_lookup(&object, repository, &target, GIT_OBJECT_COMMIT))
+        defer { git_object_free(object) }
+        var options = git_checkout_options()
+        try check(git_checkout_options_init(&options, UInt32(GIT_CHECKOUT_OPTIONS_VERSION)))
+        options.checkout_strategy = UInt32(GIT_CHECKOUT_SAFE.rawValue)
+        try check(git_checkout_tree(repository, object, &options))
+        var reference: OpaquePointer?
+        var updated: OpaquePointer?
+        try check(git_reference_lookup(&reference, repository, "refs/heads/" + currentBranch(repository)))
+        defer {
+            git_reference_free(reference)
+            git_reference_free(updated)
+        }
+        try check(git_reference_set_target(&updated, reference, &target, "Pythilo fast-forward"))
+    }
+
+    private func commitMerge(_ repository: OpaquePointer, message: String, author: String, email: String) throws -> GitCommitSummary {
+        guard !author.isEmpty, !email.isEmpty else {
+            throw GitFailure("Set a Git name and email first, in Settings or with git config.")
+        }
+        var index: OpaquePointer?
+        try Self.check(git_repository_index(&index, repository))
+        defer { git_index_free(index) }
+        var treeID = git_oid()
+        try Self.check(git_index_write_tree(&treeID, index))
+        var tree: OpaquePointer?
+        var ours: OpaquePointer?
+        var theirs: OpaquePointer?
+        defer {
+            git_tree_free(tree)
+            git_commit_free(ours)
+            git_commit_free(theirs)
+        }
+        try Self.check(git_tree_lookup(&tree, repository, &treeID))
+        guard var head = Self.headOID(repository) else { throw GitFailure("This branch has no commits.") }
+        try Self.check(git_commit_lookup(&ours, repository, &head))
+        var mergeHead = git_oid()
+        try Self.check(git_reference_name_to_id(&mergeHead, repository, "MERGE_HEAD"))
+        try Self.check(git_commit_lookup(&theirs, repository, &mergeHead))
+        var signature: UnsafeMutablePointer<git_signature>?
+        try Self.check(git_signature_now(&signature, author, email))
+        defer { git_signature_free(signature) }
+        var created = git_oid()
+        var parents: [OpaquePointer?] = [ours, theirs]
+        try parents.withUnsafeMutableBufferPointer { buffer in
+            try Self.check(git_commit_create(&created, repository, "HEAD", signature, signature, nil, message, tree, 2, buffer.baseAddress))
+        }
+        try Self.check(git_repository_state_cleanup(repository))
+        return GitCommitSummary(id: Self.string(created), message: message, author: author, date: Date())
     }
 }

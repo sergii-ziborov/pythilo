@@ -3,6 +3,7 @@
 import random
 import statistics
 import time
+import traceback
 import types
 
 from . import emit_json
@@ -12,6 +13,17 @@ MAXIMUM_STEPS = 4000
 
 class _Stop(Exception):
     pass
+
+
+def describe_failure(error, filename):
+    """The error and the line of the user's file it came from, for a lab's result card."""
+    line = ""
+    for frame in reversed(traceback.extract_tb(error.__traceback__)):
+        if frame.filename == filename:
+            line = f" (line {frame.lineno}: {frame.line or ''})"
+            break
+    text = str(error.args[0]) if isinstance(error, KeyError) and error.args else str(error)
+    return f"{type(error).__name__}: {text}{line}"
 
 
 class TracedList(list):

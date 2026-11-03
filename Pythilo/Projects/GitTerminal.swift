@@ -55,7 +55,11 @@ enum GitTerminal {
             try repository.initialize()
             return "Initialized a Git repository on main."
         case "status":
-            return describe(try repository.snapshot())
+            var text = describe(try repository.snapshot())
+            if repository.isMerging {
+                text += "\nMerging. Fix the conflicted files, git add them, then git commit. git merge --abort undoes the merge."
+            }
+            return text
         case "add":
             let all = rest.isEmpty || rest.contains(".") || rest.contains("-A")
             try repository.stage(all ? [] : rest)
@@ -93,6 +97,23 @@ enum GitTerminal {
             model.saveAll()
             try repository.switchBranch(name)
             return "Switched to \(name)."
+        case "merge":
+            if rest.first == "--abort" {
+                try repository.abortMerge()
+                return "Merge aborted. Tracked files are back as they were at the last commit."
+            }
+            guard let name = rest.first(where: { !$0.hasPrefix("-") }) else {
+                throw GitFailure("Name the branch to merge, for example git merge feature.")
+            }
+            model.saveAll()
+            let outcome = try repository.merge(name, author: author, email: email)
+            return ([outcome.message] + outcome.conflicts.map { "  both modified: \($0)" }).joined(separator: "\n")
+        case "rebase":
+            guard let name = rest.first(where: { !$0.hasPrefix("-") }) else {
+                throw GitFailure("Name the branch to replay onto, for example git rebase main.")
+            }
+            model.saveAll()
+            return try repository.rebase(onto: name, author: author, email: email)
         case "remote":
             if rest.first == "add" || rest.first == "set-url", rest.count >= 3 {
                 try repository.setRemote(url: rest[2])
@@ -130,7 +151,7 @@ enum GitTerminal {
         }
     }
 
-    private static let usage = "Available: init status add reset commit log diff branch switch remote fetch pull push config"
+    private static let usage = "Available: init status add reset commit log diff branch switch merge rebase remote fetch pull push config"
 
     static func describe(_ snapshot: GitSnapshot) -> String {
         var lines = ["On branch \(snapshot.branch)"]

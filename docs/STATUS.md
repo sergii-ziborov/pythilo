@@ -27,20 +27,22 @@ boundary, and the app says so.
 | --- | --- |
 | Django with SQLite, migrations, real HTTP, Stop, restart on the same port | Checked |
 | Flask, and Starlette on Uvicorn, real HTTP and restart | Checked |
-| FastAPI | Not bundled. Needs an iOS build of `pydantic-core`, which nobody publishes |
+| FastAPI with Pydantic validation, async routes, a WebSocket, TestClient | Checked: the template's pytest passes on the device. `pydantic-core` is built here by `scripts/build-pydantic-core.sh`, since nobody publishes an iOS wheel. `/docs` loads Swagger UI from a CDN |
 | Notebooks: `.ipynb` round trip, shared namespace, rich output, stale marker | Checked at the model level. Native notebook, not Jupyter |
 | Real Jupyter server and kernel | Not done |
-| pandas and Matplotlib | Not bundled. No cp314 iOS wheels were found |
+| pandas and Matplotlib | Not bundled. No cp314 iOS wheels exist on PyPI or BeeWare's channel (checked 3 November 2026), and building them here was not attempted |
 
 ## Tools (sections 14 and 15)
 
 | Item | State |
 | --- | --- |
 | Debugger: breakpoints, stepping, locals, evaluate, stop while paused | Checked in the runtime. Screen not driven by hand yet |
-| Debugging threads, async code, web handlers and notebook cells | Not done |
+| Breakpoints in threads, web request handlers and async code | Checked. One thread pauses at a time and the panel names it; the others keep running |
+| Debugging notebook cells | Not done |
 | Git with libgit2 and a real `.git`: init, stage, commit, log, diff, branches, safe switch, HTTPS clone | Checked |
 | Fetch, fast-forward pull, push, Keychain tokens | Written. Not run against a real remote |
-| Merge, rebase, SSH, submodules, LFS | Not done, and refused rather than faked |
+| `git merge` (fast-forward, merge commit, conflicts with markers, `--abort`) and `git rebase` | Checked by the package's own tests on macOS, the same libgit2 code. Rebase is all or nothing: at a conflict it is undone |
+| SSH, submodules, LFS | Not done, and refused rather than faked |
 | Pyflakes problems and Jedi completion on their own thread | Problems checked. Completion not exercised |
 
 ## Learning (sections 16 and 17)
@@ -50,9 +52,9 @@ boundary, and the app says so.
 | 36 lessons and 20 interview tasks | Every solution passes on the embedded interpreter |
 | Learn screens: path, course timeline, lesson read and code modes, check sheet | Checked on the simulator. Drawn on the canvas, iPad lesson included |
 | Failed checks say what came back and what was expected | Checked against every lesson's starter code on the Mac |
-| Long lines wrap in the lesson editor | Built. Not checked by hand yet |
+| Long lines wrap in the lesson editor, the tail indented under its own code | Checked by screenshot |
 | Sorting Bench: traces of the user's real code, measurements without the tracer | Checked |
-| Graph, hashing and dynamic programming labs | Not done |
+| Graph Explorer (BFS, DFS, Dijkstra), Search & Hashing, Dynamic Programming | Checked: traces come from the user's code through instrumented graph, keys and table. DFS orders are judged as valid depth-first orders, not one fixed answer |
 
 ## MCP (section 18)
 
@@ -93,8 +95,12 @@ App Store release:
 - Crashes inside the prebuilt Python and NumPy frameworks will not symbolicate, because
   those frameworks come without dSYMs.
 
+## Machine learning (section 19)
+
+No iOS wheels exist for PyTorch, ExecuTorch, ONNX Runtime, SciPy or scikit-learn on
+CPython 3.14. A full PyTorch build was not attempted on this Mac; the reasons and the
+Core ML route are in `docs/research/ml-on-ios.md`. The Core ML bridge is not built.
+
 ## Not started
 
-- PyTorch and the Neural Engine (section 19, P0-F, P0-G)
-- Website, Pyodide playground (section 18, P4)
 - StoreKit purchase and App Review materials (section 4, P6)

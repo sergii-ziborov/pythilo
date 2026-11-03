@@ -9,7 +9,7 @@ struct ProjectTemplate: Identifiable, Sendable {
 
     private static let ignore = ".pythilo/\n__pycache__/\n*.sqlite3\n"
 
-    static let all: [ProjectTemplate] = [blank, csvCleaner, djangoNotes, flaskAPI, asgiAPI, notebook]
+    static let all: [ProjectTemplate] = [blank, csvCleaner, djangoNotes, flaskAPI, fastAPI, asgiAPI, notebook]
 
     static let blank = ProjectTemplate(
         id: "blank",
@@ -247,6 +247,86 @@ struct ProjectTemplate: Identifiable, Sendable {
 
             """,
             "README.md": "# ASGI\n\nIn the Terminal: `uvicorn main:app`\n",
+            ".gitignore": ignore,
+        ]
+    )
+
+    static let fastAPI = ProjectTemplate(
+        id: "fastapi",
+        title: "FastAPI",
+        summary: "Validated models, async, a WebSocket",
+        systemImage: "bolt.horizontal",
+        files: [
+            "main.py": """
+            from fastapi import FastAPI, HTTPException, WebSocket
+            from pydantic import BaseModel, Field
+
+            app = FastAPI(title="Tasks")
+
+
+            class TaskIn(BaseModel):
+                title: str = Field(min_length=1, max_length=80)
+                done: bool = False
+
+
+            class Task(TaskIn):
+                id: int
+
+
+            tasks: dict[int, Task] = {}
+
+
+            @app.get("/tasks")
+            async def list_tasks() -> list[Task]:
+                return list(tasks.values())
+
+
+            @app.post("/tasks", status_code=201)
+            async def add_task(task: TaskIn) -> Task:
+                created = Task(id=len(tasks) + 1, **task.model_dump())
+                tasks[created.id] = created
+                return created
+
+
+            @app.get("/tasks/{task_id}")
+            async def get_task(task_id: int) -> Task:
+                if task_id not in tasks:
+                    raise HTTPException(status_code=404, detail="No such task")
+                return tasks[task_id]
+
+
+            @app.websocket("/shout")
+            async def shout(socket: WebSocket):
+                await socket.accept()
+                async for text in socket.iter_text():
+                    await socket.send_text(text.upper())
+
+            """,
+            "test_main.py": """
+            from fastapi.testclient import TestClient
+
+            from main import app
+
+            client = TestClient(app)
+
+
+            def test_add_and_read_a_task():
+                created = client.post("/tasks", json={"title": "Write tests"})
+                assert created.status_code == 201
+                assert client.get(f"/tasks/{created.json()['id']}").json()["title"] == "Write tests"
+
+
+            def test_an_empty_title_is_rejected():
+                assert client.post("/tasks", json={"title": ""}).status_code == 422
+
+
+            def test_the_socket_shouts_back():
+                with client.websocket_connect("/shout") as socket:
+                    socket.send_text("hi")
+                    assert socket.receive_text() == "HI"
+
+            """,
+            "README.md": "# Task API\n\nIn the Terminal: `uvicorn main:app`, then open the preview. `pytest` runs the tests.\n\n`/openapi.json` works offline. `/docs` loads Swagger UI from a CDN, so it needs the network.\n",
             ".gitignore": ignore,
         ]
     )

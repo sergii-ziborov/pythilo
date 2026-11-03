@@ -250,6 +250,68 @@ final class FeatureGateTests: XCTestCase {
         XCTAssertEqual(measure?.rows.first?.cells["random"]?.correct, true)
     }
 
+    func testGraphExplorerTracesEachAlgorithmAndJudgesIt() async throws {
+        var trace: GraphLabTrace?
+        session.onCustom = { kind, data in
+            if kind == "lab_graph_trace" { trace = try? JSONDecoder().decode(GraphLabTrace.self, from: data) }
+        }
+        for algorithm in GraphLabView.Algorithm.allCases {
+            trace = nil
+            session.submit(["kind": "lab_graph_trace", "algorithm": algorithm.rawValue, "source": GraphLabView.templates[algorithm]!, "topology": "sparse", "size": 16], label: "t")
+            try await waitUntil(timeout: 30) { trace != nil && self.session.phase == .idle }
+            XCTAssertEqual(trace?.correct, true, "\(algorithm): \(trace?.message ?? "no trace")")
+            XCTAssertEqual(trace?.steps.count, 16, "every reachable node is expanded once")
+        }
+        trace = nil
+        let wrong = GraphLabView.templates[.bfs]!.replacingOccurrences(of: "def bfs", with: "def dijkstra")
+        session.submit(["kind": "lab_graph_trace", "algorithm": "dijkstra", "source": wrong, "topology": "grid", "size": 16], label: "t")
+        try await waitUntil(timeout: 30) { trace != nil && self.session.phase == .idle }
+        XCTAssertEqual(trace?.correct, false)
+        XCTAssertTrue(trace?.message.contains("(node, weight) pairs") == true, trace?.message ?? "")
+    }
+
+    func testHashingLabCountsComparisonsAndCollisions() async throws {
+        var result: HashLabResult?
+        session.onCustom = { kind, data in
+            if kind == "lab_hash" { result = try? JSONDecoder().decode(HashLabResult.self, from: data) }
+        }
+        session.submit(["kind": "lab_hash", "source": HashLabView.template, "workload": "colliding", "count": 200], label: "h")
+        try await waitUntil(timeout: 30) { result != nil && self.session.phase == .idle }
+        XCTAssertEqual(result?.correct, true, result?.message ?? "")
+        XCTAssertEqual(result?.longest, 200, "multiples of the bucket count share one bucket")
+        XCTAssertGreaterThan(result?.averageProbes ?? 0, 50)
+    }
+
+    func testDynamicProgrammingLabCountsRepeatedCallsAndTableWrites() async throws {
+        var trace: DPLabTrace?
+        session.onCustom = { kind, data in
+            if kind == "lab_dp_trace" { trace = try? JSONDecoder().decode(DPLabTrace.self, from: data) }
+        }
+        session.submit(["kind": "lab_dp_trace", "problem": "stairs", "source": DPLabView.templates[.stairs]!], label: "d")
+        try await waitUntil(timeout: 30) { trace != nil && self.session.phase == .idle }
+        XCTAssertEqual(trace?.calls, 177)
+        XCTAssertEqual(trace?.distinct, 11)
+        XCTAssertEqual(trace?.repeated.first?.args, "ways(1)")
+
+        trace = nil
+        session.submit(["kind": "lab_dp_trace", "problem": "edit", "source": DPLabView.templates[.edit]!], label: "d")
+        try await waitUntil(timeout: 30) { trace != nil && self.session.phase == .idle }
+        XCTAssertEqual(trace?.correct, true, trace?.message ?? "")
+        XCTAssertEqual(trace?.rows, 7)
+        XCTAssertEqual(trace?.columns, 8)
+        XCTAssertEqual(trace?.writes.count, 57)
+    }
+
+    func testFastAPITemplatePassesItsTestsOnTheDevice() async throws {
+        let store = ProjectStore(root: root.appending(path: "library"))
+        let project = try store.create(name: "tasks", template: .fastAPI)
+        let id = session.submit(["kind": "shell", "line": "pytest -q", "root": project.url.path, "cwd": project.url.path], label: "t")
+        try await waitUntil(timeout: 90) { self.session.lastOutcome?.id == id && self.session.phase == .idle }
+        let output = session.output.map(\.text).joined()
+        XCTAssertEqual(session.lastOutcome?.code, 0, output)
+        XCTAssertTrue(output.contains("3 passed"), output)
+    }
+
     func testNotebookCellsShareNamespaceAndRoundTrip() async throws {
         let path = root.appending(path: "n.ipynb")
         try ProjectTemplate.notebook.files["study.ipynb"]!.write(to: path, atomically: true, encoding: .utf8)

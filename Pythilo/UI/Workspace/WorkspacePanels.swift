@@ -382,7 +382,15 @@ struct DebugPanel: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("CALL STACK").sectionLabel().padding(.leading, 4)
+                        HStack {
+                            Text("CALL STACK").sectionLabel()
+                            Spacer()
+                            // Other threads keep running while this one is paused.
+                            if let thread = pause.thread, thread != "MainThread" {
+                                Text(thread).font(.system(size: 12, weight: .semibold, design: .monospaced)).foregroundStyle(AppTheme.selectionInk)
+                            }
+                        }
+                        .padding(.horizontal, 4)
                         ForEach(Array(pause.frames.enumerated()), id: \.offset) { index, frame in
                             Button {
                                 frameIndex = index

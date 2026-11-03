@@ -258,6 +258,43 @@ final class RuntimeGateTests: XCTestCase {
         XCTAssertTrue(outputText().contains("result 5"), outputText())
     }
 
+    func testDebuggerStopsInAWebHandlerThreadAndInAsyncCode() async throws {
+        let path = try write("serve.py", """
+        import asyncio, threading, urllib.request
+        from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                name = self.path.strip("/")
+                self.send_response(200); self.end_headers(); self.wfile.write(f"hello {name}".encode())
+            def log_message(self, *args):
+                pass
+
+        async def later(x):
+            await asyncio.sleep(0)
+            y = x + 1
+            return y
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        print(urllib.request.urlopen(f"http://127.0.0.1:{server.server_port}/ada").read().decode())
+        server.shutdown()
+        print("async", asyncio.run(later(4)))
+        """)
+        _ = try await runJob(["kind": "debug", "path": path, "root": root.path, "cwd": root.path, "breakpoints": [path: [7, 14]]], timeout: 60) {
+            try await self.waitUntil(timeout: 30) { self.session.debugPause?.line == 7 }
+            XCTAssertTrue(self.session.debugPause?.thread?.contains("process_request_thread") == true, self.session.debugPause?.thread ?? "no thread")
+            XCTAssertEqual(self.session.debugPause?.frames.first?.locals.first { $0.name == "name" }?.value, "'ada'")
+            self.session.debug("continue")
+            try await self.waitUntil(timeout: 30) { self.session.debugPause?.line == 14 }
+            XCTAssertEqual(self.session.debugPause?.thread, "MainThread")
+            XCTAssertEqual(self.session.debugPause?.frames.first?.locals.first { $0.name == "x" }?.value, "4")
+            self.session.debug("continue")
+        }
+        XCTAssertTrue(outputText().contains("hello ada"), outputText())
+        XCTAssertTrue(outputText().contains("async 5"), outputText())
+    }
+
     func testStopWhilePausedInDebugger() async throws {
         let path = try write("debug.py", "x = 1\ny = 2\n")
         let outcome = try await runJob(["kind": "debug", "path": path, "root": root.path, "cwd": root.path, "breakpoints": [path: [1]]], timeout: 30) {

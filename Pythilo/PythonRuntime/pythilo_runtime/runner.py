@@ -73,7 +73,13 @@ def _purge_modules():
 
 def _leftover_threads():
     current = threading.current_thread()
-    return [thread.name for thread in threading.enumerate() if thread is not current and thread.is_alive()]
+    # A dummy thread stands for a native thread the app started, not one the
+    # program left running.
+    return [
+        thread.name
+        for thread in threading.enumerate()
+        if thread is not current and thread.is_alive() and not isinstance(thread, threading._DummyThread)
+    ]
 
 
 def _run_exit_handlers():
@@ -245,6 +251,18 @@ def _perform(job):
         from . import labs
 
         labs.measure_sort(job)
+    elif kind in ("lab_graph_trace", "lab_graph_measure"):
+        from . import labs_graph
+
+        (labs_graph.trace if kind == "lab_graph_trace" else labs_graph.measure)(job)
+    elif kind == "lab_hash":
+        from . import labs_hashing
+
+        labs_hashing.run(job)
+    elif kind in ("lab_dp_trace", "lab_dp_measure"):
+        from . import labs_dp
+
+        (labs_dp.trace if kind == "lab_dp_trace" else labs_dp.measure)(job)
     elif kind == "notebook_reset":
         from . import notebook
 

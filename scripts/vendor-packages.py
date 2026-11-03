@@ -44,6 +44,8 @@ def main():
             "--abi", "cp314", "--abi", "abi3", "--abi", "none",
             "--index-url", "https://pypi.org/simple",
             "--extra-index-url", "https://pypi.anaconda.org/beeware/simple",
+            # pydantic-core, built here by scripts/build-pydantic-core.sh.
+            "--find-links", str(ROOT / "build" / "native" / "wheels"),
             "-r", str(source),
         ]
         for version in IOS_VERSIONS:
