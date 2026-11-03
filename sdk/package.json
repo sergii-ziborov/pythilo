@@ -1,0 +1,64 @@
+{
+  "name": "pythilo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared, encrypted, temporary Python rooms for AI clients and people: an MCP bridge and JavaScript SDK for Pythilo, with Run on a device someone in the room allows.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./mcp": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.mjs"
+    }
+  },
+  "bin": {
+    "pythilo": "dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "ThirdPartyNotices.txt"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit",
+    "test": "node test.mjs",
+    "prepack": "npm run check && npm run build"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/server": "2.4.0",
+    "@types/node": "24.0.0",
+    "esbuild": "0.25.12",
+    "typescript": "5.9.3",
+    "y-protocols": "1.0.7",
+    "yjs": "13.6.33",
+    "zod": "4.6.7"
+  },
+  "keywords": [
+    "pythilo",
+    "mcp",
+    "python",
+    "playground",
+    "agents",
+    "collaboration",
+    "pyodide",
+    "end-to-end-encryption"
+  ]
+}

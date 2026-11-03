@@ -1,0 +1,259 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { createServer } from "node:http";
+import { PlaygroundRooms } from "./support/rooms";
+import { PlaygroundRoom, authorizedLink } from "../src/room";
+import { Y, yDocument, documentFromY, updateYDocument } from "../src/core/playground-collab";
+import { createPresence, remoteSelections } from "../src/core/playground-presence";
+import { PlaygroundSession, playgroundLink } from "../src/core/playground-session";
+import { newPlaygroundDocument, type PlaygroundDocument } from "../src/core/playground-document";
+import { decryptPlayground, encryptPlayground, newEncryptionSecret } from "../src/core/playground-crypto";
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+async function wait(check: () => boolean) { const end = Date.now() + 10_000; while (!check()) { if (Date.now() >= end) throw new Error("Timed out"); await sleep(30); } }
+
+test("private links refuse other origins, queries, expired and non-room URLs", () => {
+  for (const input of ["https://example.com/", "file:///tmp/source", "https://relay.example/playground/", "https://user@relay.example/playground/", "http://127.0.0.1:1/", "http://relay.example/playground/room/" + "r".repeat(24) + "/"]) assert.throws(() => authorizedLink(input));
+});
+
+test("real encrypted relay: edits, conflicting revisions, read-only links, UTF-16 selection and expiry", async () => {
+  const rooms = new PlaygroundRooms();
+  let forceConflict = false, loseReply = false, plaintextOnRelay = false;
+  const server = createServer(async (req, res) => {
+    try {
+      const url = new URL(req.url!, "http://local"), id = url.pathname.split("/")[4], access = (req.headers.authorization ?? "").slice(7);
+      res.setHeader("Content-Type", "application/json");
+      if (url.pathname.endsWith("/events/")) {
+        const peer = url.searchParams.get("peer")!;
+        res.setHeader("Content-Type", "text/event-stream");
+        const send = (type: string, data: unknown) => res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+        const release = rooms.subscribe(id, access, peer, e => typeof e === "string" ? (send(e, {}), res.end()) : send("kind" in e ? "presence" : "update", e));
+        req.on("close", release); send("state", rooms.state(id, access)); return;
+      }
+      if (req.method === "GET") { res.end(JSON.stringify(rooms.state(id, access))); return; }
+      if (req.method === "DELETE") { rooms.close(id, access); res.statusCode = 204; res.end(); return; }
+      const chunks: Buffer[] = []; for await (const b of req) chunks.push(b);
+      const raw = Buffer.concat(chunks).toString();
+      if (raw.includes("private-sentinel")) plaintextOnRelay = true;
+      const body = JSON.parse(raw);
+      if (url.pathname === "/api/playground/rooms/") { res.end(JSON.stringify(rooms.create(body.snapshot, body.lifetimeSeconds))); return; }
+      if (body.type === "presence") { rooms.publishPresence(id, access, body.peer, body.packet); res.statusCode = 204; res.end(); return; }
+      if (body.type === "snapshot") { res.end(JSON.stringify(rooms.compact(id, access, body.sequence, body.packet))); return; }
+      if (forceConflict) body.expectedSequence--;
+      const result = rooms.append(id, access, body.peer, body.messageID, body.packet, body.expectedSequence);
+      if (loseReply) { loseReply = false; res.destroy(); return; }
+      res.end(JSON.stringify(result));
+    } catch (e: any) { res.statusCode = e.status ?? 500; res.end(JSON.stringify({ error: e.message })); }
+  });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const origin = `http://127.0.0.1:${(server.address() as any).port}`;
+  const mcp = new PlaygroundRoom(origin), viewer = new PlaygroundRoom(origin);
+  const browserDoc = new Y.Doc(), presence = createPresence(browserDoc, "Browser human");
+  let browser: PlaygroundSession | undefined;
+  try {
+    const created = await mcp.create("Interview", { "main.py": 'print("private-sentinel 🐍")\n' });
+    assert.equal(created.linkType, "temporary editable Playground");
+    const editHandoff = await mcp.share("edit"), viewHandoff = await mcp.share("view");
+    assert.equal(editHandoff.link, created.link);
+    assert.equal(viewHandoff.schema, "pythilo-handoff-v1");
+    assert.notEqual(authorizedLink(viewHandoff.link, origin).link.access, authorizedLink(created.link, origin).link.access);
+    assert.equal((await mcp.snapshot()).document.files["main.py"], 'print("private-sentinel 🐍")\n');
+    await viewer.connect(viewHandoff.link);
+    assert.equal((await viewer.share()).mode, "view");
+    await assert.rejects(() => viewer.share("edit"), /cannot grant/);
+    await assert.rejects(async () => viewer.apply((await viewer.read("main.py")).revision,[{path:"main.py",text:"no"}]), /view-only/);
+    viewer.disconnect();
+    const { link } = authorizedLink(created.link, origin);
+    assert.equal(Math.round((link.expiresAt - Date.now()) / 60_000), 60);
+    browser = new PlaygroundSession(browserDoc, link, () => {}, () => {}, presence, origin); void browser.start();
+    await wait(() => browser!.receivedState);
+    let file = await mcp.read("main.py");
+    const next = file.text.replace("private-sentinel", "private-sentinel changed");
+    await mcp.apply(file.revision, [{ path: "main.py", text: next }]);
+    await wait(() => documentFromY(browserDoc).files["main.py"] === next);
+    await assert.rejects(() => mcp.apply(file.revision, [{ path: "main.py", text: "wrong" }]), /Revision conflict/);
+    assert.equal((await mcp.read("main.py")).text, next);
+    file = await mcp.read("main.py");
+    forceConflict = true;
+    await assert.rejects(() => mcp.apply(file.revision, [{ path: "main.py", text: "must not apply" }]), /conflict/);
+    forceConflict = false;
+    assert.equal((await mcp.read("main.py")).text, next);
+    loseReply = true;
+    await mcp.apply(file.revision, [{ path: "main.py", text: next + "# acknowledged once\n" }]);
+    assert.equal(rooms.state(link.id, link.access).sequence, 2);
+    file = await mcp.read("main.py");
+    const snake = file.text.indexOf("🐍");
+    await mcp.select("main.py", snake, snake + 2, file.revision);
+    await wait(() => remoteSelections(browserDoc, presence).some(s => s.name === "Agent · Pythilo" && s.anchor === snake && s.head === snake + 2));
+    await assert.rejects(() => mcp.select("main.py", snake + 1, snake + 2, file.revision), /surrogate/);
+    const value = { ...documentFromY(browserDoc), files: { "main.py": file.text + "# human edit\n" } };
+    updateYDocument(browserDoc, value);
+    await wait(() => rooms.state(link.id, link.access).sequence === 3);
+    assert.match((await mcp.read("main.py")).text, /human edit/);
+    await assert.rejects(async () => mcp.apply((await mcp.read("main.py")).revision, [{ path: "../evil.py", text: "" }]), /path/);
+    const nonOwner = new PlaygroundRoom(origin);
+    await nonOwner.connect(created.link);
+    await assert.rejects(() => nonOwner.endRoom(), /only a room it created/);
+    nonOwner.disconnect();
+    await mcp.endRoom();
+    assert.throws(() => rooms.state(link.id, link.access), /expired/);
+    // Obtain the test room's independently generated view capability without
+    // ever returning an owner token from the MCP API.
+    const key = newEncryptionSecret(), seeded = yDocument(newPlaygroundDocument());
+    const second = rooms.create(await encryptPlayground(key, Y.encodeStateAsUpdate(seeded)), 60); seeded.destroy();
+    const viewURL = origin + "/playground/room/" + second.id + "/#" + new URLSearchParams({ key, access: second.view, expires: String(second.expiresAt), mode: "view" });
+    await viewer.connect(viewURL);
+    await assert.rejects(async () => viewer.apply((await viewer.read("main.py")).revision, [{ path: "main.py", text: "no" }]), /view-only/);
+    rooms.now = () => second.expiresAt + 1; rooms.prune();
+    await assert.rejects(() => viewer.read("main.py"), /expired|Connect/);
+    assert.equal(plaintextOnRelay, false);
+  } finally {
+    mcp.disconnect(); viewer.disconnect(); browser?.stop(); presence.destroy(); browserDoc.destroy();
+    server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});
+
+// Real relay limits behind HTTP, reporting what the clients sent.
+async function relay(rooms: PlaygroundRooms) {
+  const log = { updates: [] as number[], snapshots: [] as number[] };
+  const server = createServer(async (req, res) => {
+    try {
+      const url = new URL(req.url!, "http://local"), id = url.pathname.split("/")[4], access = (req.headers.authorization ?? "").slice(7);
+      res.setHeader("Content-Type", "application/json");
+      if (url.pathname.endsWith("/events/")) {
+        const peer = url.searchParams.get("peer")!;
+        res.setHeader("Content-Type", "text/event-stream");
+        const send = (type: string, data: unknown) => res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+        const release = rooms.subscribe(id, access, peer, e => typeof e === "string" ? (send(e, {}), res.end()) : send("kind" in e ? "presence" : "update", e));
+        req.on("close", release); send("state", rooms.state(id, access)); return;
+      }
+      if (req.method === "GET") { res.end(JSON.stringify(rooms.state(id, access))); return; }
+      if (req.method === "DELETE") { rooms.close(id, access); res.statusCode = 204; res.end(); return; }
+      const chunks: Buffer[] = []; for await (const b of req) chunks.push(b);
+      const body = JSON.parse(Buffer.concat(chunks).toString());
+      if (body.type === "presence") { rooms.publishPresence(id, access, body.peer, body.packet); res.statusCode = 204; res.end(); return; }
+      const report = body.type === "snapshot" ? log.snapshots : log.updates;
+      try {
+        const result = body.type === "snapshot" ? rooms.compact(id, access, body.sequence, body.packet) : rooms.append(id, access, body.peer, body.messageID, body.packet, body.expectedSequence);
+        report.push(200); res.end(JSON.stringify(result));
+      } catch (e: any) { report.push(e.status ?? 500); throw e; }
+    } catch (e: any) { res.statusCode = e.status ?? 500; res.end(JSON.stringify({ error: e.message })); }
+  });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const origin = `http://127.0.0.1:${(server.address() as any).port}`;
+  return { log, origin, close: async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); } };
+}
+
+async function seededRoom(rooms: PlaygroundRooms, origin: string, source: PlaygroundDocument) {
+  const key = newEncryptionSecret(), seed = yDocument(source);
+  const created = rooms.create(await encryptPlayground(key, Y.encodeStateAsUpdate(seed)), 600);
+  const link = { id: created.id, key, access: created.edit, expiresAt: created.expiresAt, mode: "edit" as const };
+  return { key, seed, created, link, url: playgroundLink(link, origin) };
+}
+const filesOf = async (rooms: PlaygroundRooms, id: string, access: string, key: string) => {
+  const state = rooms.state(id, access), doc = new Y.Doc();
+  try {
+    Y.applyUpdate(doc, await decryptPlayground(key, state.snapshot));
+    for (const event of state.events) Y.applyUpdate(doc, await decryptPlayground(key, event.packet, 192 * 1024));
+    return documentFromY(doc).files;
+  } finally { doc.destroy(); }
+};
+async function fillEvents(rooms: PlaygroundRooms, session: PlaygroundSession, id: string, access: string, key: string) {
+  // Reaching the event limit is the subject here, not the per-peer update rate.
+  const limit = rooms.limit; rooms.limit = () => {};
+  const empty = await encryptPlayground(key, new Uint8Array([0, 0]));
+  for (let i = 0; i < 256; i++) rooms.append(id, access, session.peer, newEncryptionSecret(), empty);
+  rooms.limit = limit;
+  await wait(() => session.sequence === 256);
+}
+
+test("a room at its event limit publishes a validated snapshot despite pending edits, then relays them", async () => {
+  const rooms = new PlaygroundRooms(), { log, origin, close } = await relay(rooms), source = newPlaygroundDocument();
+  const { key, seed, link } = await seededRoom(rooms, origin, source), doc = new Y.Doc();
+  const session = new PlaygroundSession(doc, link, () => {}, () => {}, undefined, origin);
+  try {
+    void session.start();
+    await wait(() => session.receivedState);
+    await fillEvents(rooms, session, link.id, link.access, key);
+    const edited = "print(\"kept through the drain\")\n";
+    updateYDocument(doc, { ...documentFromY(doc), files: { ...documentFromY(doc).files, "main.py": edited } });
+    await wait(() => log.updates.includes(409));
+    assert.equal(session.snapshotOverdue, true);
+    assert.equal(session.pending.length > 0, true);
+    await wait(() => log.snapshots.includes(200));
+    assert.equal(session.snapshotOverdue, false);
+    await wait(() => log.updates.includes(200));
+    assert.equal((await filesOf(rooms, link.id, link.access, key))["main.py"], edited);
+    assert.equal(session.pending.length, 0);
+    session.snapshotOverdue = true;
+    await (session as any).receiveState(rooms.state(link.id, link.access));
+    assert.equal(session.snapshotOverdue, false);
+  } finally { session.stop(); doc.destroy(); seed.destroy(); await close(); }
+});
+
+test("a forced snapshot refuses a document that fails validation", async () => {
+  const rooms = new PlaygroundRooms(), { log, origin, close } = await relay(rooms);
+  const { seed, link } = await seededRoom(rooms, origin, newPlaygroundDocument()), doc = new Y.Doc();
+  const session = new PlaygroundSession(doc, link, () => {}, () => {}, undefined, origin);
+  try {
+    void session.start();
+    await wait(() => session.receivedState);
+    doc.getMap<Y.Text>("files").set("../outside.py", new Y.Text("no"));
+    session.snapshotOverdue = true;
+    await (session as any).snapshot();
+    assert.deepEqual(log.snapshots, []);
+  } finally { session.stop(); doc.destroy(); seed.destroy(); await close(); }
+});
+
+test("runtime edit confirmation in a full room schedules the drain and succeeds afterwards", async () => {
+  const rooms = new PlaygroundRooms(), { log, origin, close } = await relay(rooms);
+  const { key, seed, link } = await seededRoom(rooms, origin, newPlaygroundDocument()), doc = new Y.Doc();
+  const session = new PlaygroundSession(doc, link, () => {}, () => {}, undefined, origin);
+  try {
+    void session.start();
+    await wait(() => session.receivedState);
+    await fillEvents(rooms, session, link.id, link.access, key);
+    await assert.rejects(() => session.confirmRuntimeEditAccess(), /did not confirm/);
+    assert.equal(session.snapshotOverdue, true);
+    await wait(() => log.snapshots.includes(200));
+    await session.confirmRuntimeEditAccess();
+    assert.equal(session.runtimeEditConfirmed, true);
+  } finally { session.stop(); doc.destroy(); seed.destroy(); await close(); }
+});
+
+test("MCP joins a room at its byte budget, drains it to commit, and still refuses a stale revision", async () => {
+  const rooms = new PlaygroundRooms(), { log, origin, close } = await relay(rooms);
+  const { key, seed, created, link, url } = await seededRoom(rooms, origin, { ...newPlaygroundDocument(), files: { "main.py": "print()\n" } });
+  const release = rooms.subscribe(link.id, link.access, "earlier-participant", () => {});
+  const mcp = new PlaygroundRoom(origin), viewer = new PlaygroundRoom(origin);
+  try {
+    // The room is full, with nobody connected who could compact it.
+    let full = false, last = "";
+    for (let i = 0; !full; i++) {
+      const before = Y.encodeStateVector(seed), next = "# " + "abcdefghij"[i % 10].repeat(60_000) + "\n";
+      updateYDocument(seed, { ...documentFromY(seed), files: { "main.py": next } });
+      const packet = await encryptPlayground(key, Y.encodeStateAsUpdate(seed, before));
+      try { rooms.append(link.id, link.access, "earlier-participant", newEncryptionSecret(), packet); last = next; }
+      catch (error: any) { assert.equal(error.status, 409); assert.match(error.message, /snapshot/); full = true; }
+    }
+    const retained = rooms.state(link.id, link.access).events.length;
+    assert.ok(retained > 10 && retained < 256, String(retained));
+    assert.ok(JSON.stringify(rooms.state(link.id, link.access)).length < 2_000_000);
+    await mcp.connect(url);
+    const view = playgroundLink({ ...link, access: created.view, mode: "view" }, origin);
+    await viewer.connect(view);
+    assert.equal((await viewer.read("main.py")).text, last);
+    viewer.disconnect();
+    const file = await mcp.read("main.py");
+    assert.equal(file.text, last);
+    const drained = "# " + "z".repeat(60_000) + "\n";
+    const applied = await mcp.apply(file.revision, [{ path: "main.py", text: drained }]);
+    assert.equal(applied.changed, true);
+    assert.deepEqual(log.updates, [409, 200]);
+    assert.deepEqual(log.snapshots, [200]);
+    assert.equal(rooms.state(link.id, link.access).events.length, 1);
+    assert.equal((await mcp.read("main.py")).text, drained);
+    await assert.rejects(() => mcp.apply(file.revision, [{ path: "main.py", text: "stale" }]), /Revision conflict/);
+    assert.equal((await filesOf(rooms, link.id, link.access, key))["main.py"], drained);
+  } finally { release(); mcp.disconnect(); viewer.disconnect(); seed.destroy(); await close(); }
+});

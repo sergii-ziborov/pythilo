@@ -18,6 +18,17 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.sergiiziborov.Pythilo.room</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>pythilo</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
@@ -35,6 +46,8 @@
 	<string>© 2026 Serhii Ziborov. All rights reserved.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Pythilo opens the local web servers you start from your own Python projects.</string>
+	<key>PythiloRelayOrigin</key>
+	<string></string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIFileSharingEnabled</key>

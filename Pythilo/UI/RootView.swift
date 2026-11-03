@@ -30,6 +30,8 @@ struct RootView: View {
     @State private var store = ProjectStore.shared
     @State private var workspace: WorkspaceModel?
     @State private var showingSettings = false
+    @State private var incomingRoomLink: String?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         TabView(selection: $section) {
@@ -44,6 +46,16 @@ struct RootView: View {
             WorkspaceView(model: model) { workspace = nil }
         }
         .sheet(isPresented: $showingSettings) { SettingsView() }
+        .onOpenURL { url in
+            guard url.scheme?.lowercased() == "pythilo" else { return }
+            incomingRoomLink = url.absoluteString
+            workspace?.saveAll()
+            workspace = nil
+            section = .playground
+        }
+        .onChange(of: scenePhase) { _, phase in
+            PlaygroundRooms.shared.setForeground(phase == .active)
+        }
         .task {
             _ = RunSession.shared
             #if DEBUG
@@ -62,7 +74,7 @@ struct RootView: View {
         case .labs:
             LabsView()
         case .playground:
-            PlaygroundView(store: store, onOpen: open)
+            PlaygroundView(store: store, onOpen: open, incomingLink: $incomingRoomLink)
         }
     }
 
@@ -75,6 +87,14 @@ struct RootView: View {
     private func openFromLaunchArguments() {
         let defaults = UserDefaults.standard
         if let tab = defaults.string(forKey: "tab").flatMap(AppSection.init(rawValue:)) { section = tab }
+        if let link = defaults.string(forKey: "roomLink") {
+            incomingRoomLink = link
+            section = .playground
+        }
+        if let name = defaults.string(forKey: "openProject"), let project = store.projects.first(where: { $0.name == name }) {
+            workspace = WorkspaceModel(project: project)
+            return
+        }
         guard let id = defaults.string(forKey: "openTemplate"),
               let template = ProjectTemplate.all.first(where: { $0.id == id }) else { return }
         let existing = store.projects.first { $0.name == "shot-\(id)" }

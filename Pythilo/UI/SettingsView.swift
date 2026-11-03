@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("pythilo.appearance") private var appearance = AppAppearance.system.rawValue
     @AppStorage("pythilo.gitName") private var gitName = ""
     @AppStorage("pythilo.gitEmail") private var gitEmail = ""
+    @AppStorage("pythilo.roomName") private var roomName = ""
 
     var body: some View {
         NavigationStack {
@@ -29,6 +30,14 @@ struct SettingsView: View {
                     TextField("Name", text: $gitName).textContentType(.name)
                     TextField("Email", text: $gitEmail).textInputAutocapitalization(.never).keyboardType(.emailAddress)
                     LabeledContent("HTTPS tokens", value: "\(GitCredentialVault.count()) in Keychain")
+                }
+                Section {
+                    TextField("Your name", text: $roomName).textContentType(.givenName)
+                    LabeledContent("Relay", value: PlaygroundRelayConfiguration.origin?.host() ?? "Not set up")
+                } header: {
+                    Text("Shared rooms")
+                } footer: {
+                    Text("Others see it beside your cursor, and this device as \(PlaygroundRuntimeHost.deviceName).")
                 }
                 Section("Python") {
                     LabeledContent("Version", value: RunSession.shared.pythonVersion ?? "Starting")

@@ -62,6 +62,13 @@ targets:
         UILaunchScreen: {}
         UIRequiresFullScreen: false
         UIUserInterfaceStyle: Automatic
+        # Shared rooms relay origin, https only. Empty until there is a domain;
+        # Debug builds take -pythiloRelay http://127.0.0.1:3212 instead.
+        PythiloRelayOrigin: ""
+        CFBundleURLTypes:
+          - CFBundleURLName: com.sergiiziborov.Pythilo.room
+            CFBundleURLSchemes:
+              - pythilo
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: Pythilo opens the local web servers you start from your own Python projects.

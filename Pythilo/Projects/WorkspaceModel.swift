@@ -96,6 +96,7 @@ final class WorkspaceModel {
             self?.runEnded(outcome)
         }
         refreshGit()
+        PlaygroundRooms.shared.workspace = self
     }
 
     private static func firstEntry(in nodes: [FileNode]) -> String? {
@@ -287,6 +288,7 @@ final class WorkspaceModel {
     func setText(_ text: String, for path: String) {
         guard buffers[path] != text else { return }
         buffers[path] = text
+        PlaygroundRooms.shared.edited(project: project, path: path, text: text)
         scheduleAutosave()
         scheduleLint(path)
     }
@@ -528,6 +530,16 @@ final class WorkspaceModel {
             buffers[path] = text
             savedText[path] = text
         }
+    }
+
+    /// A shared room wrote these files. Open tabs take the room's text as saved text.
+    func roomChanged(_ files: [String: String], treeChanged: Bool) {
+        for (path, text) in files where buffers[path] != nil {
+            if buffers[path] != text { buffers[path] = text }
+            savedText[path] = text
+        }
+        if treeChanged { reloadTree() }
+        if let selectedPath, files[selectedPath] != nil { scheduleLint(selectedPath) }
     }
 
     /// The address of the server the project started, once it prints one.

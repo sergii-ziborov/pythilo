@@ -1,0 +1,18 @@
+{
+  "schema": "pythilo-core-provenance-v1",
+  "note": "Where each shared core file came from. The core is ported from the Crabrix SDK and renamed per docs/design/ROOMS.md. Maintained by hand when the core is ported; build.mjs adds the SDK file hashes to docs/protocol-core.json and refuses a core file that is not listed here.",
+  "repository": "https://github.com/sergii-ziborov/crabrix-sdk",
+  "commit": "df4ddd4cc2d85b2dadc0588f8b1c97b33de770d0",
+  "files": {
+    "src/core/playground-collab.ts": { "donor": "src/core/playground-collab.ts", "donorSHA256": "7f0a68a96f3e1da1947edfb3381bd2d56df936d7c7aca525320237839aed3175", "adaptations": "No edition in meta; no format 2 guard." },
+    "src/core/playground-crypto.ts": { "donor": "src/core/playground-crypto.ts", "donorSHA256": "4e583c7ad05bc1c1a309d203e55bb2e3107b51a367e449423af3eaea388c464a", "adaptations": "AES-GCM additional data pythilo-playground-v1." },
+    "src/core/playground-document.ts": { "donor": "src/core/playground-document.ts", "donorSHA256": "82a9d6985b76f701ae09dcc5787a8fcfae87bcb02973a3171131cf54a7391bf9", "adaptations": "Python rules from ROOMS.md: allowed extensions and root names, refused folders, .py entry file, main.py default; no edition; source origin hosts github.com and gist.github.com; __pythiloSourceOrigin fallback." },
+    "src/core/playground-presence.ts": { "donor": "src/core/playground-presence.ts", "donorSHA256": "e6c9dd02a8a20da6244446e13bbce752a9742e0f294dc48b0d50ac0ef7c0928b", "adaptations": "None." },
+    "src/core/playground-runtime-controller.ts": { "donor": "src/core/playground-runtime-controller.ts", "donorSHA256": "e3987f73c80b89709409fd0d1f1500c72ac0788254098fb70ee6f463854ff789", "adaptations": "Profile python3-v1 with check, run and test. Hosts must state kind, name and runtime fingerprint; requests go only to a listed host offering the operations. Grants and jobs keep the host, and every command result carries ranOn, source revision, start time, duration, status and exit code. Owned jobs are listed in status." },
+    "src/core/playground-runtime-protocol.ts": { "donor": "src/core/playground-runtime-protocol.ts", "donorSHA256": "59ee69e34c00dfa190e2378a1519bef3f49498cd75eb09ab9d745c51638e2a15", "adaptations": "pythilo-runtime-v1 and pythilo-runtime-edit-proof-v1; operations without build, debug, step, continue, locals and breakpoints, with test; RUNTIME_PROFILE and startOperations." },
+    "src/core/playground-runtime-source.ts": { "donor": "src/core/playground-runtime-source.ts", "donorSHA256": "eb245ce8ed415a81d3a7e612547bd455ebf9ba3aa5cdaed18a6f9fc271831aa2", "adaptations": "pythilo-runtime-source-v1 without edition." },
+    "src/core/playground-session.ts": { "donor": "src/core/playground-session.ts", "donorSHA256": "3f21af7cac403b16413cca47c7dfb650669a04442765868a8960b2a392597d75", "adaptations": "Format 1 only; X-Pythilo-Codecs; a snapshot that fails authentication is reported as unreadable instead of retried." },
+    "test/support/rooms.ts": { "donor": "test/support/rooms.ts", "donorSHA256": "208a23207236914ba44f69ceb78ec830b5ba7a7d0228dad156c7e65af25e1946", "adaptations": "Format 1 only; Pythilo names. The relay class, used behind loopback HTTP in tests." },
+    "test/support/relay.ts": { "donor": "test/support/relay.ts", "donorSHA256": "779ddb66801d2362fdaea0dc555f387868be63882de8235a59cdd5bba8c03aaf", "adaptations": "x-pythilo-codecs; GET /healthz." }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "pythilo",
+  "owner": {
+    "name": "Sergii Ziborov"
+  },
+  "description": "Pythilo tools for shared Python work between AI clients and people.",
+  "plugins": [
+    {
+      "name": "pythilo",
+      "source": "./",
+      "description": "Shared, encrypted, temporary Python rooms: live editing, handoff links, and check, run and test on a device or browser its owner allows."
+    }
+  ]
+}

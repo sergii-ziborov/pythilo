@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "pythilo": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "pythilo@0.1.0"
+      ]
+    }
+  }
+}

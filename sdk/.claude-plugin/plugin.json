@@ -1,0 +1,16 @@
+{
+  "name": "pythilo",
+  "version": "0.1.0",
+  "description": "Shared, encrypted, temporary Python rooms for AI clients and people: live editing, handoff links, and check, run and test on a device or browser its owner allows.",
+  "author": {
+    "name": "Sergii Ziborov"
+  },
+  "license": "UNLICENSED",
+  "keywords": [
+    "python",
+    "playground",
+    "mcp",
+    "collaboration",
+    "pyodide"
+  ]
+}

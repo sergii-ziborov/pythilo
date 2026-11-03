@@ -1,0 +1,77 @@
+.lesson-shell { height: 100dvh; display: flex; flex-direction: column; }
+.lesson-header { min-height: 64px; border-bottom: 1px solid var(--divider); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 24px; }
+.lesson-header .brand { font-size: 17px; }
+.lesson-breadcrumb { font-size: 14.5px; color: var(--muted); min-width: 0; }
+.lesson-breadcrumb a { color: var(--muted); }
+.lesson-breadcrumb a:hover { color: var(--text); }
+.lesson-breadcrumb span { color: var(--text); }
+.lesson-position { margin-left: auto; font-size: 13.5px; color: var(--muted); }
+.lesson { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.lesson-reading { padding: 28px 32px 40px; border-right: 1px solid var(--divider); min-width: 0; overflow-y: auto; }
+.lesson-reading > * { max-width: 680px; }
+.lesson-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+.lesson-chips button { height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid var(--border-strong); color: var(--text); display: flex; align-items: center; gap: 7px; font-size: 14.5px; font-weight: 600; }
+.lesson-chips button span { color: var(--muted); font-weight: 800; }
+.lesson-chips button[aria-current="step"] { background: var(--select); border-color: var(--select); color: var(--select-ink); font-weight: 700; }
+.lesson-chips button[aria-current="step"] span { color: var(--select-ink); }
+.lesson-reading h1 { margin: 0 0 14px; font-size: 34px; line-height: 40px; font-weight: 800; }
+.lesson-prose { font-size: 18px; line-height: 28px; color: var(--body); }
+.lesson-prose p, .lesson-prose ul, .lesson-prose ol { margin: 0 0 16px; }
+.lesson-prose li + li { margin-top: 6px; }
+.lesson-prose h2 { font-size: 20px; line-height: 26px; margin: 24px 0 10px; color: var(--text); }
+.lesson-prose h3 { font-size: 17px; margin: 20px 0 8px; color: var(--text); }
+.lesson-prose code, .lesson-task code { font-size: .89em; color: var(--link); }
+.lesson-prose .code-block code { color: var(--text); font-size: inherit; }
+.lesson-prose > div > .code-block, .lesson-prose > .code-block { margin: 0 0 16px; }
+.example { margin: 0 0 16px; border-radius: 14px; background: var(--panel); border: 1px solid var(--border); overflow: hidden; }
+.example .code-block { border: 0; border-radius: 0; background: none; }
+.example-run { width: 100%; height: 44px; border-top: 1px solid var(--border); background: var(--select-bg); color: var(--link); font-size: 15px; font-weight: 650; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.example-run:hover:not(:disabled) { background: #1B3048; }
+.example-output { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+.lesson-continue { margin-top: 8px; }
+.lesson-solution { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.lesson-task { padding: 16px 20px; border-bottom: 1px solid var(--divider); background: var(--rail); display: flex; flex-direction: column; gap: 6px; }
+.lesson-task p { margin: 0; font-size: 15.5px; line-height: 22px; color: var(--body); }
+.lesson-task code { font-size: 14.5px; }
+.lesson-blocked { padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--body) !important; font-size: 14.5px !important; }
+.lesson-editor { flex: 1; min-height: 280px; position: relative; }
+.plain-editor { position: absolute; inset: 0; overflow: hidden; }
+.plain-editor .cm-editor { height: 100%; font-size: 14.5px; }
+.lesson-results { margin: 0 20px 14px; display: flex; flex-direction: column; gap: 10px; max-height: 45%; overflow-y: auto; flex: none; }
+.lesson-results:empty { display: none; }
+.lesson-hint { padding: 12px 14px; border-radius: 14px; background: var(--warn-bg); border: 1px solid var(--warn-border); font-size: 14.5px; line-height: 21px; }
+.lesson-hint strong { color: var(--warn); font-size: 13.5px; }
+.lesson-hint p { margin: 4px 0 0; color: var(--body); }
+.check-card { padding: 12px 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+.check-card strong { font-size: 15.5px; font-weight: 700; }
+.check-card > span { font-size: 13.5px; color: var(--soft); }
+.check-card small { font-size: 12.5px; color: var(--muted); }
+.check-card.ok { background: var(--ok-bg); border-color: var(--ok-border); }
+.check-card.ok strong { color: var(--ok); }
+.check-card.fail { background: var(--stop-bg); border-color: var(--stop-border); }
+.check-card.fail strong { color: var(--stop); }
+.check-card ul { margin: 2px 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.check-card li { display: flex; flex-direction: column; }
+.check-message { white-space: pre-wrap; font-family: var(--mono); font-size: 13px; color: var(--body); }
+.lesson-output { display: flex; flex-direction: column; gap: 6px; }
+.lesson-output .transcript { max-height: 220px; }
+.lesson-bar { min-height: 72px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--divider); background: var(--rail); }
+.lesson-bar .pill-button { height: 44px; border-radius: 22px; font-size: 15px; }
+.lesson-bar .pill-button.hint { color: var(--warn); }
+.lesson-next { margin-left: auto; font-size: 15px; font-weight: 650; }
+.lesson-check { height: 46px; padding: 0 18px 0 15px; border-radius: 23px; background: var(--run); color: var(--run-ink); display: flex; align-items: center; gap: 7px; font-size: 16px; font-weight: 750; }
+.lesson-check:hover:not(:disabled) { background: #FFDC5C; }
+@media (max-width: 900px) {
+  .lesson-shell { height: auto; min-height: 100dvh; }
+  .lesson { grid-template-columns: 1fr; grid-template-rows: none; }
+  .lesson-reading { overflow: visible; }
+  .lesson-results { max-height: none; }
+  .lesson-reading { border-right: 0; border-bottom: 1px solid var(--divider); padding: 20px 16px 28px; }
+  .lesson-reading h1 { font-size: 28px; line-height: 34px; }
+  .lesson-prose { font-size: 17px; line-height: 26px; }
+  .lesson-header { padding: 8px 16px; }
+  .lesson-position { margin-left: 0; width: 100%; }
+  .lesson-editor { min-height: 320px; flex: none; height: 50vh; }
+  .lesson-task, .lesson-bar { padding-left: 16px; padding-right: 16px; }
+  .lesson-results { margin: 0 16px 14px; }
+}

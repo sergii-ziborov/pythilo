@@ -227,11 +227,16 @@ struct EditorPane: View {
     }
 
     private func editor(_ path: String) -> some View {
-        SyntaxCodeEditor(
+        let room = PlaygroundRooms.shared.room(for: model.project)
+        let shared = room?.session.document?.files[path] != nil
+        return SyntaxCodeEditor(
             text: Binding(get: { model.text(path) }, set: { model.setText($0, for: path); model.requestCompletions() }),
             cursorOffset: $model.cursorOffset,
             filePath: path,
-            isEditable: true,
+            isEditable: !(shared && room?.session.link.isReadOnly == true),
+            remoteSelections: shared ? room?.session.selections ?? [] : [],
+            collaborationSelection: shared ? room?.session.localSelection : nil,
+            onSelectionChange: { range in if shared { room?.select(path: path, range: range) } },
             breakpoints: model.breakpoints[path] ?? [],
             debugLine: debugLine(path),
             onBreakpoint: { line in

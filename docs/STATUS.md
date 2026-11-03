@@ -56,18 +56,21 @@ boundary, and the app says so.
 | Sorting Bench: traces of the user's real code, measurements without the tracer | Checked |
 | Graph Explorer (BFS, DFS, Dijkstra), Search & Hashing, Dynamic Programming | Checked: traces come from the user's code through instrumented graph, keys and table. DFS orders are judged as valid depth-first orders, not one fixed answer |
 
-## MCP (section 18)
+## Rooms, website and MCP (section 18)
 
-The plan's route was a relay and a room, as in `crabrix-sdk`. A relay needs hosting
-and a domain, so the first version serves MCP from the app itself, over Streamable
-HTTP on the local network, with a bearer token that ends when sharing stops. Read,
-edit, run, packages, commit and push are separate grants, and writes check revisions.
+Ported from the Crabrix playground with its own namespace (`docs/design/ROOMS.md`).
+The relay keeps rooms in memory and only ever sees encrypted text.
 
-Checked with a real HTTP client inside the tests: bearer token, handshake, tools,
-stale-revision conflict, path escapes, approval and denial, push off by default.
-
-Not done: rooms with other people, the website and browser playground, anything
-reaching the app from outside the local network.
+| Item | State |
+| --- | --- |
+| App: share a project as a room, join by link or `pythilo://`, edits both ways, remote cursors, end room | Checked against a local relay, by tests and by hand |
+| App as a runtime host: check, run and test for a browser or an AI client, asked each time or allowed for the room, result says where it ran | Checked: a browser and the MCP bridge each ran pytest on the simulator |
+| Website: home, lessons that run and check in Pyodide, playground, rooms, Connect AI | Checked in a browser against the local server. 56 lessons' solutions pass the app's own checker in Pyodide; Flask's lesson says it needs the app |
+| Browser "Run on" another device in the room | Checked: browser to simulator |
+| MCP bridge `pythilo`: 15 tools, revision conflicts, runtime requests | 58 tests, and checked against the live room. Not on npm yet |
+| MCP served by the app on the local network | Checked, as before |
+| Hosting the relay and website | Not done: no domain or server chosen. `site/DEPLOY.md` is ready for one |
+| A browser host only runs while its tab is visible; `asyncio.run` in the browser needs Chrome or Edge | Known limits |
 
 ## Screens
 
@@ -86,8 +89,8 @@ The test suite has not run on a physical iPhone yet: Xcode lost the connection t
 phone each time. Run it with the phone unlocked and on a cable.
 
 TestFlight is uploaded by hand with `scripts/testflight.sh` and
-`scripts/testflight-finish.mjs`, built with Xcode 27.2. App Store Connect accepted build
-0.1.0 (1), which is in beta testing for the internal group. Two things to settle before an
+`scripts/testflight-finish.mjs`, built with Xcode 27.2. Every build so far reached beta
+testing for the internal group. Two things to settle before an
 App Store release:
 
 - `ITSAppUsesNonExemptEncryption` is false, but the app ships OpenSSL with Python and
