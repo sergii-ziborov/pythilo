@@ -60,7 +60,7 @@ final class PlaygroundTests: XCTestCase {
         XCTAssertNil(PlaygroundRelayConfiguration.normalized("https://user@rooms.example"))
         XCTAssertNil(PlaygroundRelayConfiguration.normalized("https://rooms.example/api"))
         XCTAssertNil(PlaygroundRelayConfiguration.normalized("https://rooms.example/?a=1"))
-        XCTAssertNil(PlaygroundRelayConfiguration.origin, "The shipped Info.plist has no relay yet")
+        XCTAssertEqual(PlaygroundRelayConfiguration.origin?.absoluteString, "https://pythilo.com", "The shipped Info.plist names the public relay")
     }
 
     // MARK: Encryption

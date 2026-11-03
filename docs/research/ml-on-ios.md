@@ -9,7 +9,7 @@ BeeWare's channel. None of these has one for cp314:
 
 | Package | PyPI | BeeWare channel |
 | --- | --- | --- |
-| torch | none | none |
+| torch | none (Pythilo builds its own, below) | none |
 | executorch | none (only yanked 0.1.x) | none |
 | onnxruntime | none | none |
 | scipy, scikit-learn | none | none |
@@ -29,15 +29,26 @@ python3 -m pip download <name> --only-binary=:all: \
 
 ## P0-G: full PyTorch build
 
-Not attempted on this Mac, and the reason is concrete rather than a guess: a
-PyTorch source build needs tens of gigabytes of build space and hours of compile
-time, and this Mac had between 1 and 5 GB free while the work ran. PyTorch has
-no iOS target for its Python package; its own iOS story was LibTorch-Lite, which
-is C++ only and no longer developed, and ExecuTorch, which runs exported models
-from C++ or Swift, not a Python `torch` module on the phone.
+Done on 3 November 2026: PyTorch 2.15.0, built from the upstream source by
+[torch-ios](https://github.com/sergii-ziborov/torch-ios), which Pythilo uses at a
+pinned commit through `scripts/build-torch.sh`.
 
-Result for the gate: unresolved. Nothing in Pythilo may say PyTorch runs on the
-device.
+PyTorch treats every iOS target as "mobile" (no autograd, no Python bindings), so
+torch-ios carries one patch that keeps the desktop build while cross-compiling:
+everything native is force-loaded into a single `torch/_C` module (iOS loads native
+code only as frameworks, and `embed-python.sh` makes one per extension module), which
+links `Python.framework` and Accelerate (BLAS and LAPACK). Host-side generators
+(protoc for ONNX, SLEEF's) are built for the Mac first. Built for iOS 13.0 (device)
+and 14.0 (simulator), like the other native modules.
+
+| | |
+| --- | --- |
+| Wheel | about 50 MB; `torch/_C` 115 MB installed, about 175 MB with the Python side |
+| Dependencies | sympy, mpmath, networkx, jinja2, fsspec, filelock (pure Python) |
+| Checked | simulator, in `RuntimeGateTests`: training, NumPy interop, linalg, fft, conv, `torch.func`, `torch.jit`, DataLoader, float16 and bfloat16, save and load |
+| Not there | MPS and CUDA, `torch.compile` (no compiler or JIT on iOS), DataLoader workers and `torch.distributed` (one process) |
+
+A physical iPhone has not run it yet.
 
 ## P0-F: the route that can work
 

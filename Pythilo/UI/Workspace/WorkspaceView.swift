@@ -223,8 +223,17 @@ struct WorkspaceView: View {
 
     /// pip lives in the terminal too; this keeps the project's packages one tap away.
     private var packagesButton: some View {
-        RoundIconButton(systemImage: "shippingbox", label: "Packages") { showingPackages = true }
-            .accessibilityIdentifier("packages-button")
+        Button { showingPackages = true } label: {
+            Label("Packages", systemImage: "shippingbox")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppTheme.primary)
+                .padding(.horizontal, 14)
+                .frame(height: 44)
+                .background(AppTheme.raised, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .accessibilityIdentifier("packages-button")
     }
 
     @ViewBuilder

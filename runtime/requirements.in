@@ -1,6 +1,7 @@
 # Everything Pythilo bundles. Compiled packages come from BeeWare's iOS wheel
-# channel, except pydantic-core, which scripts/build-pydantic-core.sh builds;
-# scripts/vendor-packages.py builds one tree per platform from this.
+# channel, except pydantic-core, which scripts/build-pydantic-core.sh builds, and
+# torch, which scripts/build-torch.sh builds; scripts/vendor-packages.py builds one
+# tree per platform from this.
 pip
 pytest
 pyflakes
@@ -13,3 +14,4 @@ starlette
 fastapi
 httpx
 numpy
+torch

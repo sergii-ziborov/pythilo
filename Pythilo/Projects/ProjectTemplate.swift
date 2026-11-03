@@ -9,7 +9,7 @@ struct ProjectTemplate: Identifiable, Sendable {
 
     private static let ignore = ".pythilo/\n__pycache__/\n*.sqlite3\n"
 
-    static let all: [ProjectTemplate] = [blank, csvCleaner, djangoNotes, flaskAPI, fastAPI, reactFastAPI, asgiAPI, notebook, coreML]
+    static let all: [ProjectTemplate] = [blank, csvCleaner, djangoNotes, flaskAPI, fastAPI, reactFastAPI, asgiAPI, notebook, pyTorch, coreML]
 
     static let blank = ProjectTemplate(
         id: "blank",
@@ -509,8 +509,73 @@ struct ProjectTemplate: Identifiable, Sendable {
                 print(f"class {int(probabilities.argmax())}, p={probabilities.max():.3f}, in {model.last_milliseconds:.2f} ms")
 
             """,
-            "README.md": "# Neural Engine\n\nPyTorch does not run on an iPhone or iPad, and the Neural Engine is only reached through Core ML. So: train on a computer, convert with coremltools, copy the .mlpackage or .mlmodel into this project, then\n\n    from pythilo import coreml\n    model = coreml.load(\"classifier.mlpackage\", compute=\"ane\")\n    out = model.predict({\"image\": array})\n\nmain.py times Pythilo's sample model on each compute unit. Its weights are random; the point is speed and agreement, not the answer.\n",
+            "README.md": "# Neural Engine\n\nThe Neural Engine is only reached through Core ML. PyTorch trains here on the CPU (see the PyTorch template); for the Neural Engine, convert the model with coremltools on a computer, copy the .mlpackage or .mlmodel into this project, then\n\n    from pythilo import coreml\n    model = coreml.load(\"classifier.mlpackage\", compute=\"ane\")\n    out = model.predict({\"image\": array})\n\nmain.py times Pythilo's sample model on each compute unit. Its weights are random; the point is speed and agreement, not the answer.\n",
             ".gitignore": ignore,
+        ]
+    )
+
+    static let pyTorch = ProjectTemplate(
+        id: "torch",
+        title: "PyTorch",
+        summary: "Train a network on the device",
+        systemImage: "brain",
+        files: [
+            "main.py": """
+            \"\"\"A small network learns to tell two spirals apart, trained here with
+            PyTorch: tensors, autograd, nn and an optimizer. Nothing is downloaded.\"\"\"
+
+            import math
+            import time
+
+            import torch
+            from torch import nn
+
+            torch.manual_seed(0)
+
+
+            def spirals(count=600, noise=0.05):
+                \"\"\"Two interleaved spirals, one per class.\"\"\"
+                turn = torch.linspace(0.3, 3 * math.pi, count // 2)
+                arm = torch.stack([turn * torch.cos(turn), turn * torch.sin(turn)], dim=1) / (3 * math.pi)
+                points = torch.cat([arm, -arm]) + noise * torch.randn(count, 2)
+                labels = torch.cat([torch.zeros(count // 2), torch.ones(count // 2)]).long()
+                order = torch.randperm(count)
+                return points[order], labels[order]
+
+
+            points, labels = spirals()
+            train_x, train_y = points[:480], labels[:480]
+            test_x, test_y = points[480:], labels[480:]
+
+            model = nn.Sequential(
+                nn.Linear(2, 64), nn.Tanh(),
+                nn.Linear(64, 64), nn.Tanh(),
+                nn.Linear(64, 2),
+            )
+            optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+            loss_fn = nn.CrossEntropyLoss()
+
+            weights = sum(p.numel() for p in model.parameters())
+            print(f"PyTorch {torch.__version__}, {weights} weights, {torch.get_num_threads()} threads")
+
+            start = time.perf_counter()
+            for epoch in range(1, 401):
+                optimizer.zero_grad()
+                loss = loss_fn(model(train_x), train_y)
+                loss.backward()
+                optimizer.step()
+                if epoch % 50 == 0:
+                    with torch.no_grad():
+                        accuracy = (model(test_x).argmax(dim=1) == test_y).float().mean().item()
+                    print(f"epoch {epoch:3}  loss {loss.item():.3f}  test accuracy {accuracy:.0%}")
+            print(f"Trained in {time.perf_counter() - start:.2f} s")
+
+            torch.save(model.state_dict(), "spirals.pt")
+            print("Saved the weights to spirals.pt")
+
+            """,
+            "README.md": "# PyTorch\n\nThe full PyTorch library, built for iOS: tensors, autograd, `torch.nn`, `torch.optim`, `torch.linalg`, saving and loading. Training runs on the CPU, with matrix maths in Apple's Accelerate.\n\nWhat is not here: CUDA and MPS (no GPU training), `torch.compile` (there is no compiler on the device), and DataLoader workers (one process only; leave `num_workers=0`).\n\nmain.py trains a small network on two spirals it makes itself, then saves the weights with `torch.save`.\n",
+            ".gitignore": ignore + "*.pt\n",
         ]
     )
 

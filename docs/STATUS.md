@@ -105,9 +105,14 @@ App Store release:
 
 ## Machine learning (section 19)
 
-No iOS wheels exist for PyTorch, ExecuTorch, ONNX Runtime, SciPy or scikit-learn on
-CPython 3.14. A full PyTorch build was not attempted on this Mac; the reasons are in
-`docs/research/ml-on-ios.md`.
+PyTorch 2.15 is bundled, built from source by
+[torch-ios](https://github.com/sergii-ziborov/torch-ios) (`scripts/build-torch.sh`): the
+full library with autograd and the Python bindings, on the CPU, matrix maths through
+Accelerate. Checked on the simulator by `RuntimeGateTests` (training, NumPy, linalg,
+fft, conv, `torch.func`, `torch.jit`, DataLoader, save and load, and the PyTorch
+template reaching 95 % on its spirals); not yet run on a physical iPhone. No MPS, no
+`torch.compile`, no DataLoader workers. ExecuTorch, ONNX Runtime, SciPy and
+scikit-learn still have no iOS wheels for CPython 3.14.
 
 `pythilo.coreml` runs Core ML models from Python on the CPU, the GPU or the Neural
 Engine, with timings and an agreement check against the CPU, and a sample model

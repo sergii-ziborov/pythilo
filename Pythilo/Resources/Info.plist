@@ -47,7 +47,7 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Pythilo opens the local web servers you start from your own Python projects.</string>
 	<key>PythiloRelayOrigin</key>
-	<string></string>
+	<string>https://pythilo.com</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIFileSharingEnabled</key>

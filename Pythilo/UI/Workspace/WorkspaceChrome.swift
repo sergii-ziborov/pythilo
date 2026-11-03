@@ -4,7 +4,8 @@ import UIKit
 /// Run becomes Stop while Python works, and only reports what Python has done.
 struct RunControl: View {
     @Bindable var model: WorkspaceModel
-    var iconOnly = false
+    /// A round button with only the symbol, which leaves the header room for the rest.
+    var iconOnly = true
     var height: CGFloat = 44
     private var session: RunSession { model.session }
 
@@ -23,6 +24,7 @@ struct RunControl: View {
                     }
                 }
                 .keyboardShortcut("r", modifiers: .command)
+                .accessibilityLabel("Run")
                 .accessibilityIdentifier("run-button")
             case .running, .waitingForInput, .paused:
                 Button(action: session.stop) {
@@ -38,6 +40,7 @@ struct RunControl: View {
                     .overlay { Capsule().stroke(AppTheme.coral, lineWidth: 1) }
                 }
                 .keyboardShortcut(".", modifiers: .command)
+                .accessibilityLabel("Stop")
                 .accessibilityIdentifier("stop-button")
             case .cancelling, .unresponsive:
                 HStack(spacing: 7) {
@@ -58,7 +61,7 @@ struct RunControl: View {
 
     private var runLabel: some View {
         HStack(spacing: 7) {
-            Image(systemName: "play.fill").font(.system(size: 14))
+            Image(systemName: "play.fill").font(.system(size: iconOnly ? 17 : 14))
             if !iconOnly { Text("Run") }
         }
         .font(.system(size: 15, weight: .bold))

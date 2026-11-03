@@ -93,9 +93,10 @@ sit beside the camera, and code runs to the bottom edge.
 
 ## What it does not do (yet)
 
-- No pandas, Matplotlib, SciPy or PyTorch: nobody publishes iOS builds of them for
-  Python 3.14 ([details](docs/research/ml-on-ios.md)). Models trained in PyTorch run
-  here once converted to Core ML.
+- No pandas, Matplotlib or SciPy: nobody publishes iOS builds of them for Python 3.14
+  ([details](docs/research/ml-on-ios.md)).
+- PyTorch trains on the CPU only: no MPS, no `torch.compile`, one process. The Neural
+  Engine is reached through Core ML (`pythilo.coreml`).
 - No Node: npm installs packages and esbuild builds them, but Node tools such as Vite
   or webpack cannot run on an iPhone.
 - Compiled packages work only when Pythilo bundles them; pip installs pure Python.

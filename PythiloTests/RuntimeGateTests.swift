@@ -393,6 +393,99 @@ final class RuntimeGateTests: XCTestCase {
         XCTAssertTrue(outputText().contains("missing: No model at"), outputText())
     }
 
+    func testPyTorchTrainsAModelAndTalksToNumPy() async throws {
+        let outcome = try await run("""
+        import io, time
+        import numpy
+        import torch
+        from torch import nn
+        print("torch", torch.__version__, "threads", torch.get_num_threads() > 0)
+        torch.manual_seed(0)
+        x = torch.randn(256, 4)
+        y = (x @ torch.tensor([1.5, -2.0, 0.5, 3.0]) + 0.25).unsqueeze(1)
+        model = nn.Sequential(nn.Linear(4, 16), nn.ReLU(), nn.Linear(16, 1))
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.03)
+        first = None
+        start = time.perf_counter()
+        for step in range(300):
+            optimizer.zero_grad()
+            loss = nn.functional.mse_loss(model(x), y)
+            loss.backward()
+            optimizer.step()
+            first = first if first is not None else loss.item()
+        print("learned", loss.item() < first / 50, "in", round(time.perf_counter() - start, 2), "s")
+        a = numpy.arange(6, dtype="float32").reshape(2, 3)
+        t = torch.from_numpy(a)
+        print("numpy", t.sum().item(), (t * 2).numpy().tolist())
+        m = torch.tensor([[4.0, 1.0], [2.0, 3.0]])
+        print("solve", [round(v, 4) for v in torch.linalg.solve(m, torch.tensor([1.0, 2.0])).tolist()])
+        print("conv", nn.Conv2d(3, 8, 3)(torch.randn(2, 3, 32, 32)).shape)
+        buffer = io.BytesIO()
+        torch.save(model.state_dict(), buffer)
+        buffer.seek(0)
+        copy = nn.Sequential(nn.Linear(4, 16), nn.ReLU(), nn.Linear(16, 1))
+        copy.load_state_dict(torch.load(buffer))
+        print("saved", torch.equal(copy(x), model(x)))
+        """, timeout: 240)
+        XCTAssertEqual(outcome.code, 0, outputText())
+        XCTAssertTrue(outputText().contains("torch 2.15.0 threads True"), outputText())
+        XCTAssertTrue(outputText().contains("learned True"), outputText())
+        XCTAssertTrue(outputText().contains("numpy 15.0 [[0.0, 2.0, 4.0], [6.0, 8.0, 10.0]]"), outputText())
+        XCTAssertTrue(outputText().contains("solve [0.1, 0.6]"), outputText())
+        XCTAssertTrue(outputText().contains("conv torch.Size([2, 8, 30, 30])"), outputText())
+        XCTAssertTrue(outputText().contains("saved True"), outputText())
+    }
+
+    func testThePyTorchTemplateLearnsTheSpirals() async throws {
+        let outcome = try await run(ProjectTemplate.pyTorch.files["main.py"]!, timeout: 240)
+        XCTAssertEqual(outcome.code, 0, outputText())
+        let last = outputText().components(separatedBy: "\n").last { $0.hasPrefix("epoch 400") } ?? ""
+        let accuracy = Int(last.components(separatedBy: "accuracy ").last?.dropLast() ?? "") ?? 0
+        XCTAssertGreaterThanOrEqual(accuracy, 95, outputText())
+        XCTAssertTrue(outputText().contains("Saved the weights to spirals.pt"), outputText())
+    }
+
+    func testPyTorchCoversTheRestOfTheLibrary() async throws {
+        let outcome = try await run("""
+        import torch
+        from torch import nn
+        from torch.utils.data import DataLoader, TensorDataset
+        x = torch.linspace(-1, 1, 5)
+        print("func", torch.func.grad(lambda v: (v ** 3).sum())(x).tolist() == (3 * x ** 2).tolist(),
+              torch.func.vmap(torch.dot)(torch.ones(3, 4), torch.ones(3, 4)).tolist())
+        print("fft", [round(v, 3) for v in torch.fft.rfft(torch.tensor([1.0, 0.0, -1.0, 0.0])).abs().tolist()])
+        normal = torch.distributions.Normal(0.0, 1.0)
+        print("distributions", round(normal.log_prob(torch.tensor(0.0)).item(), 4))
+        traced = torch.jit.trace(nn.Linear(3, 2), torch.ones(1, 3))
+        print("trace", tuple(traced(torch.ones(4, 3)).shape))
+        @torch.jit.script
+        def twice(v: torch.Tensor) -> torch.Tensor:
+            return v * 2
+        print("script", twice(torch.ones(2)).tolist())
+        loader = DataLoader(TensorDataset(torch.arange(10.0)), batch_size=4, shuffle=True)
+        print("loader", sorted(int(v) for (batch,) in loader for v in batch) == list(range(10)))
+        print("half", (torch.ones(2, dtype=torch.float16) + 1).tolist(), torch.ones(2, dtype=torch.bfloat16).sum().item())
+        print("linalg", [round(v, 3) for v in torch.linalg.svdvals(torch.tensor([[3.0, 0.0], [0.0, 4.0]])).tolist()])
+        print("mps", torch.backends.mps.is_available(), "cuda", torch.cuda.is_available())
+        try:
+            torch.compile(lambda v: v + 1)(torch.ones(1))
+            print("compile ran")
+        except Exception as error:
+            print("compile refused:", type(error).__name__)
+        """, timeout: 240)
+        XCTAssertEqual(outcome.code, 0, outputText())
+        XCTAssertTrue(outputText().contains("func True [4.0, 4.0, 4.0]"), outputText())
+        XCTAssertTrue(outputText().contains("fft [0.0, 2.0, 0.0]"), outputText())
+        XCTAssertTrue(outputText().contains("distributions -0.9189"), outputText())
+        XCTAssertTrue(outputText().contains("trace (4, 2)"), outputText())
+        XCTAssertTrue(outputText().contains("script [2.0, 2.0]"), outputText())
+        XCTAssertTrue(outputText().contains("loader True"), outputText())
+        XCTAssertTrue(outputText().contains("half [2.0, 2.0] 2.0"), outputText())
+        XCTAssertTrue(outputText().contains("linalg [4.0, 3.0]"), outputText())
+        XCTAssertTrue(outputText().contains("mps False cuda False"), outputText())
+        XCTAssertTrue(outputText().contains("compile refused:"), outputText())
+    }
+
     func testAnEsbuildScriptIsRunAndANodeToolIsExplained() throws {
         let build = try NpmScripts.parse(["src/main.jsx", "--bundle", "--minify", "--outdir=static/assets", "--loader:.svg=file", "--target=es2020"])
         XCTAssertEqual(build.entryPoints, ["src/main.jsx"])

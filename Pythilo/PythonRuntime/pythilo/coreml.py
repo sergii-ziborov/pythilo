@@ -1,9 +1,9 @@
 """Core ML from Python: load a model, run it on the CPU, the GPU or the Neural
 Engine, and time it.
 
-PyTorch does not run on an iPhone or iPad, and nothing else reaches the Neural
-Engine: Core ML is the way in. Train on a computer, convert with coremltools,
-copy the .mlpackage or .mlmodel into the project, and run it here:
+PyTorch trains here on the CPU, but only Core ML reaches the Neural Engine. Convert
+a model with coremltools on a computer, copy the .mlpackage or .mlmodel into the
+project, and run it here:
 
     import numpy
     from pythilo import coreml
