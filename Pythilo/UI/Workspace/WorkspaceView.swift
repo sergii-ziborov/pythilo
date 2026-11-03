@@ -30,6 +30,8 @@ struct WorkspaceView: View {
                 AppTheme.background.ignoresSafeArea()
                 content(layout, size: size, safeArea: geometry.safeAreaInsets)
                     .ignoresSafeArea(.container)
+                serverBanner(layout, safeArea: geometry.safeAreaInsets)
+                    .animation(.snappy, value: model.previewURL)
                 if usesDrawer(layout) { drawer(layout, size: size) }
             }
             .frame(width: size.width, height: size.height)
@@ -45,18 +47,48 @@ struct WorkspaceView: View {
         .sheet(isPresented: $showingRoom) { RoomSheet(model: model) }
         .sheet(isPresented: $showingOpenFile) { QuickOpenSheet(model: model) }
         .sheet(isPresented: $model.previewOpen) { PreviewSheet(model: model) }
-        .onChange(of: session.terminalRevision) {
-            if let last = session.terminalOutput.last { model.updatePreview(from: last.text) }
+        // Several chunks can land between two updates, so the recent tail is read,
+        // not only the last chunk.
+        .onChange(of: session.terminalRevision) { noticeOutput(session.terminalOutput) }
+        .onChange(of: session.outputRevision) { noticeOutput(session.output) }
+        .onChange(of: session.listening) { _, server in model.serverStarted(server) }
+        #if DEBUG
+        // For screenshots: -openSite YES opens the preview once the server listens.
+        .onChange(of: model.previewURL) { _, url in
+            if url != nil, UserDefaults.standard.bool(forKey: "openSite") { model.previewOpen = true }
         }
-        .onChange(of: session.outputRevision) {
-            if let last = session.output.last { model.updatePreview(from: last.text) }
-        }
+        #endif
         .onChange(of: session.phase) { _, phase in
             if phase == .idle { model.clearPreview() }
             if phase == .paused { model.panel = .debug }
         }
         .onChange(of: model.selectedPath) { model.clearCompletions() }
         .background { shortcuts }
+    }
+
+    private func noticeOutput(_ chunks: [OutputChunk]) {
+        let tail = chunks.suffix(12).map(\.text).joined()
+        model.updatePreview(from: tail)
+        if !session.isBusy { model.noticeCommandList(in: tail) }
+    }
+
+    /// Over the code it sits above the dock, by the thumb; over a panel it moves
+    /// to the top, so the terminal's keys stay free.
+    @ViewBuilder
+    private func serverBanner(_ layout: WorkspaceLayout, safeArea: EdgeInsets) -> some View {
+        if let url = model.previewURL, !keyboard.isVisible, layout != .padLandscape {
+            let atBottom = layout == .phone && model.panel == .code
+            ServerBanner(
+                url: url,
+                framework: model.commands.framework?.rawValue,
+                onOpen: { model.previewOpen = true }
+            )
+            .frame(maxWidth: 520)
+            .padding(.horizontal, 12)
+            .padding(atBottom ? .bottom : .top, atBottom ? 62 : max(60, safeArea.top + 8))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: atBottom ? .bottom : .top)
+            .transition(.move(edge: atBottom ? .bottom : .top).combined(with: .opacity))
+        }
     }
 
     private func layoutSize(_ layout: WorkspaceLayout, _ geometry: GeometryProxy) -> CGSize {

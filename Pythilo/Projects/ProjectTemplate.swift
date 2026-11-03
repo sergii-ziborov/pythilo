@@ -239,11 +239,15 @@ struct ProjectTemplate: Identifiable, Sendable {
             tasks = [{"id": 1, "title": "Read the docs"}]
 
 
+            async def home(request):
+                return JSONResponse({"name": "Tasks", "try": ["/tasks"]})
+
+
             async def list_tasks(request):
                 return JSONResponse(tasks)
 
 
-            app = Starlette(routes=[Route("/tasks", list_tasks)])
+            app = Starlette(routes=[Route("/", home), Route("/tasks", list_tasks)])
 
             """,
             "README.md": "# ASGI\n\nIn the Terminal: `uvicorn main:app`\n",
@@ -274,6 +278,11 @@ struct ProjectTemplate: Identifiable, Sendable {
 
 
             tasks: dict[int, Task] = {}
+
+
+            @app.get("/")
+            async def home() -> dict:
+                return {"name": "Tasks", "try": ["/tasks", "/tasks/1", "/openapi.json"]}
 
 
             @app.get("/tasks")

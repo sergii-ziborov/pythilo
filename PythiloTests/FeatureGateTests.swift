@@ -302,6 +302,54 @@ final class FeatureGateTests: XCTestCase {
         XCTAssertEqual(trace?.writes.count, 57)
     }
 
+    func testEachWebTemplateOffersItsFrameworksCommands() throws {
+        let store = ProjectStore(root: root.appending(path: "library"))
+        let expected: [(ProjectTemplate, ProjectCommands.Framework, String)] = [
+            (.djangoNotes, .django, "python manage.py runserver"),
+            (.flaskAPI, .flask, "flask --app hello run"),
+            (.fastAPI, .asgi, "uvicorn main:app"),
+            (.asgiAPI, .asgi, "uvicorn main:app"),
+        ]
+        for (template, framework, server) in expected {
+            let project = try store.create(name: template.id, template: template)
+            let commands = ProjectCommands.detect(root: project.url, djangoNames: [])
+            XCTAssertEqual(commands.framework, framework, template.id)
+            XCTAssertEqual(commands.featured.first { $0.servesSite }?.line, server, template.id)
+        }
+        let csv = try store.create(name: "csv", template: .csvCleaner)
+        XCTAssertNil(ProjectCommands.detect(root: csv.url, djangoNames: []).framework)
+        XCTAssertEqual(ProjectCommands.detect(root: csv.url, djangoNames: []).featured.map(\.line), ["pytest -q"])
+    }
+
+    func testDjangosOwnCommandListBecomesTheTerminalsCommands() throws {
+        let help = """
+        Type 'manage.py help <subcommand>' for help on a specific subcommand.
+
+        Available subcommands:
+
+        [auth]
+            changepassword
+            createsuperuser
+
+        [django]
+            check
+            migrate
+            startapp
+
+        [staticfiles]
+            runserver
+        """
+        let found = try XCTUnwrap(ProjectCommands.djangoCommands(in: help))
+        XCTAssertEqual(found.map(\.name), ["changepassword", "createsuperuser", "check", "migrate", "startapp", "runserver"])
+        XCTAssertEqual(found.first?.group, "auth")
+        let project = try ProjectStore(root: root.appending(path: "library")).create(name: "notes", template: .djangoNotes)
+        let commands = ProjectCommands.detect(root: project.url, djangoNames: found)
+        XCTAssertEqual(commands.all.count, 6)
+        XCTAssertEqual(commands.featured.map(\.title), ["runserver", "migrate", "createsuperuser", "check"])
+        XCTAssertEqual(commands.all.first { $0.title == "startapp" }?.needsArgument, true, "startapp needs a name, so its chip only fills the input")
+        XCTAssertNil(ProjectCommands.djangoCommands(in: "Hello\nAvailable subcommands:\n\nnothing here"))
+    }
+
     func testFastAPITemplatePassesItsTestsOnTheDevice() async throws {
         let store = ProjectStore(root: root.appending(path: "library"))
         let project = try store.create(name: "tasks", template: .fastAPI)

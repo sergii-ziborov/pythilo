@@ -52,6 +52,8 @@ final class RunSession {
     private(set) var debugEvaluations: [DebugEvaluation] = []
     private(set) var runLabel: String?
     private(set) var activeRunID: String?
+    /// Where the running program listens, once it does. Ends with the run.
+    private(set) var listening: ListeningServer?
 
     /// A project's terminal keeps its directory between commands.
     var onRunEnded: ((RunOutcome) -> Void)?
@@ -134,6 +136,7 @@ final class RunSession {
             escalation = nil
             debugPause = nil
             activeRunID = nil
+            listening = nil
             lastOutcome = outcome
             phase = .idle
             onRunEnded?(outcome)
@@ -144,6 +147,10 @@ final class RunSession {
         case let .cell(cell):
             onCell?(cell)
         case let .custom(kind, data):
+            if kind == "server_listening" {
+                listening = try? JSONDecoder().decode(ListeningServer.self, from: data)
+                return
+            }
             onCustom?(kind, data)
         }
     }

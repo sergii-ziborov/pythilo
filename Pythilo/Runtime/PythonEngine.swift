@@ -72,6 +72,18 @@ struct DebugPause: Decodable, Sendable, Equatable {
     let thread: String?
 }
 
+struct ListeningServer: Decodable, Sendable, Equatable {
+    let host: String
+    let port: Int
+
+    /// The address a browser on this device opens. A server bound to every
+    /// interface is reached through loopback.
+    var url: URL? {
+        let reachable = ["0.0.0.0", "::", ""].contains(host) ? "127.0.0.1" : host
+        return URL(string: "http://\(reachable.contains(":") ? "[\(reachable)]" : reachable):\(port)/")
+    }
+}
+
 struct DebugEvaluation: Decodable, Sendable, Equatable {
     let expression: String
     let type: String?

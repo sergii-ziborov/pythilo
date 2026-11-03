@@ -340,6 +340,26 @@ final class RuntimeGateTests: XCTestCase {
         XCTAssertEqual(problems?.count, 2, "\(problems ?? [])")
     }
 
+    func testAServerSaysWhereItListens() async throws {
+        let source = """
+        from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+        server = ThreadingHTTPServer(("0.0.0.0", 0), BaseHTTPRequestHandler)
+        print("port", server.server_port, flush=True)
+        try:
+            server.serve_forever()
+        finally:
+            server.server_close()
+        """
+        try await run(source) {
+            try await self.waitUntil(timeout: 30) { self.session.listening != nil && self.outputText().contains("port") }
+            let printed = self.outputText().firstMatch(of: /port (\d+)/).map { Int($0.1) }
+            XCTAssertEqual(self.session.listening?.port, printed ?? -1)
+            XCTAssertEqual(self.session.listening?.url?.host(), "127.0.0.1", "a server on every interface is opened through loopback")
+            self.session.stop()
+        }
+        XCTAssertNil(session.listening, "the address ends with the run")
+    }
+
     func testCompletionKnowsTheProjectsOwnModules() async throws {
         _ = try write("shapes.py", "def area_of_circle(r):\n    return 3.14 * r * r\n\ndef area_of_square(side):\n    return side * side\n")
         let source = "import shapes\nimport collections\nshapes.area_\ncollections.Ord"

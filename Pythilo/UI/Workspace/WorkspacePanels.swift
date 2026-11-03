@@ -136,6 +136,10 @@ struct OutputPanel: View {
                 OutputTextView(chunks: session.output, revision: session.outputRevision, fontSize: fontSize)
                 if session.phase == .unresponsive { UnresponsiveBanner() }
             }
+            // After manage.py prints Django's commands, they are a tap away here too.
+            if model.commands.framework != nil, !session.isBusy, !session.output.isEmpty {
+                ProjectCommandBar(model: model)
+            }
             if session.phase == .waitingForInput, session.activeChannel == .output {
                 HStack(spacing: 8) {
                     Text("input()").font(.system(size: 12, weight: .semibold, design: .monospaced)).foregroundStyle(AppTheme.amber)
@@ -202,6 +206,7 @@ struct TerminalPanel: View {
                 OutputTextView(chunks: session.terminalOutput, revision: session.terminalRevision, fontSize: fontSize)
             }
             .frame(maxHeight: .infinity)
+            if !model.commands.featured.isEmpty { ProjectCommandBar(model: model) }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(["python", "pip", "pytest", "git", "ls"], id: \.self) { word in
@@ -234,6 +239,12 @@ struct TerminalPanel: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 6)
             .background(AppTheme.panel, ignoresSafeAreaEdges: [])
+        }
+        .onChange(of: model.terminalDraft, initial: true) { _, draft in
+            guard let draft else { return }
+            line = draft
+            model.terminalDraft = nil
+            focused = true
         }
     }
 

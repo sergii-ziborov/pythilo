@@ -70,6 +70,11 @@ final class WorkspaceModel {
     private(set) var gitSnapshot: GitSnapshot?
     private(set) var previewURL: URL?
     var previewOpen = false
+    /// The framework's commands, offered as chips in the terminal.
+    private(set) var commands = ProjectCommands.none
+    /// Text a chip puts into the terminal's input for the user to finish.
+    var terminalDraft: String?
+    private var djangoNames: [(group: String, name: String)] = []
     private(set) var completions: [PythonCompletion] = []
     private(set) var runLabel = ""
 
@@ -117,6 +122,35 @@ final class WorkspaceModel {
     func reloadTree() {
         tree = Self.scan(project.url, prefix: "")
         pruneOpenTabs()
+        if djangoNames.isEmpty, let saved = try? Data(contentsOf: djangoCommandsURL),
+           let pairs = try? JSONDecoder().decode([[String]].self, from: saved) {
+            djangoNames = pairs.compactMap { $0.count == 2 ? (group: $0[0], name: $0[1]) : nil }
+        }
+        commands = ProjectCommands.detect(root: project.url, djangoNames: djangoNames)
+    }
+
+    private var djangoCommandsURL: URL { project.url.appending(path: ".pythilo/django-commands.json") }
+
+    /// Django lists its commands when manage.py runs without one; from then on
+    /// the terminal offers all of them, and remembers them for this project.
+    func noticeCommandList(in text: String) {
+        guard commands.framework == .django, let found = ProjectCommands.djangoCommands(in: text),
+              found.map(\.name) != djangoNames.map(\.name) else { return }
+        djangoNames = found
+        commands = ProjectCommands.detect(root: project.url, djangoNames: found)
+        try? FileManager.default.createDirectory(at: djangoCommandsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? JSONEncoder().encode(found.map { [$0.group, $0.name] }).write(to: djangoCommandsURL)
+    }
+
+    /// A command chip: runs it in the terminal, or fills the input when the
+    /// command needs a name typed after it.
+    func use(_ command: ProjectCommands.Command) {
+        panel = .terminal
+        if command.needsArgument || session.isBusy {
+            terminalDraft = command.line
+        } else {
+            runTerminal(command.line)
+        }
     }
 
     private nonisolated static func scan(_ folder: URL, prefix: String) -> [FileNode] {
@@ -542,11 +576,18 @@ final class WorkspaceModel {
         if let selectedPath, files[selectedPath] != nil { scheduleLint(selectedPath) }
     }
 
-    /// The address of the server the project started, once it prints one.
+    /// The address of the server the project started. The runtime reports the
+    /// socket it listens on; a printed address is the fallback, and also keeps
+    /// a path the program printed, such as /admin/.
     func updatePreview(from text: String) {
         guard let match = text.firstMatch(of: /http:\/\/(?:127\.0\.0\.1|localhost|0\.0\.0\.0|\[::\]):\d+[^\s"']*/) else { return }
         let address = String(match.0).replacingOccurrences(of: "0.0.0.0", with: "127.0.0.1").replacingOccurrences(of: "[::]", with: "127.0.0.1")
         previewURL = URL(string: address)
+    }
+
+    func serverStarted(_ server: ListeningServer?) {
+        guard let url = server?.url else { return }
+        if previewURL?.port != url.port { previewURL = url }
     }
 
     func clearPreview() {

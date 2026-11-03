@@ -17,6 +17,8 @@ inside the app on the iOS Simulator. Nothing here has been checked for App Revie
 | NumPy across repeated runs | Checked |
 | pip into a per-project folder, pure wheels from PyPI | Checked |
 | Fork-free terminal: files, Python, pip, pytest, Django, Flask, Uvicorn, Git | Checked, apart from the Git commands listed below |
+| A started server shows "Django is running" with Open site; the preview's path is editable | Checked: the runtime reports the socket a program listens on, for Django, Flask's werkzeug and Uvicorn alike |
+| The framework's commands as chips in the terminal; Django's full list once `manage.py` prints it | Checked |
 
 All projects share one process. Resetting between runs is cleanup, not a security
 boundary, and the app says so.

@@ -22,6 +22,9 @@ def boot(bundle, cache):
     bundle_root = bundle
     cache_root = cache
     streams.install()
+    from . import servers
+
+    servers.install()
 
     packages = os.path.join(bundle, "app_packages")
     certificates = os.path.join(packages, "certifi", "cacert.pem")
