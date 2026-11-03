@@ -8,6 +8,13 @@ typedef void (*PyHostEventCallback)(const char *kind, const char *payload, size_
 
 void pyhost_set_event_callback(PyHostEventCallback callback);
 
+/// Answers `_pythilo.call(request)` from Python, on the calling Python thread,
+/// with the GIL released. Returns 0 and a malloc'd response, or non-zero and a
+/// malloc'd message. The host frees whichever it gets.
+typedef int (*PyHostCallHandler)(const char *request, size_t length, char **response, size_t *response_length);
+
+void pyhost_set_call_handler(PyHostCallHandler handler);
+
 /// Starts the interpreter on its own thread. That thread is Python's main
 /// thread, so signals, asyncio and framework servers behave as they do on a
 /// desktop. Safe to call more than once; only the first call does anything.

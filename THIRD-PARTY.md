@@ -7,6 +7,10 @@
 | OpenSSL, libFFI, XZ, BZip2, mpdecimal, Zstandard | Their own licences | Same package, listed in its `VERSIONS` |
 | libgit2 1.9.7 | GPLv2 with linking exception | `Vendor/PythiloGitCore`, see its `COPYING` |
 | Python packages in `runtime/requirements.lock` | Their own licences | Each keeps its licence in its `.dist-info` folder inside the app |
+| pydantic-core 2.50.2 | MIT | Built from source by `scripts/build-pydantic-core.sh`; its licence ships in its `.dist-info` |
+| esbuild-wasm 0.28.2 | MIT | `build/esbuild`, fetched by `scripts/vendor-packages.py`, with its `LICENSE.md` |
+| Website: Next.js, React, CodeMirror, Yjs, Pyodide and others | Their own licences | `site/`, installed by pnpm; Pyodide's files are copied at build time |
+| MCP bridge dependencies | Their own licences | `sdk/ThirdPartyNotices.txt` |
 
 The editor, the Git core's build profile and the fold layout helpers come from
 Crabrix and SharpRune, which have the same owner.

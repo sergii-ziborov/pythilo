@@ -41,10 +41,14 @@ targets:
           - Resources/Info.plist
           - Resources/Courses
           - Resources/Bundler
+          - Resources/Models
       - path: Pythilo/Resources/Courses
         type: folder
         buildPhase: resources
       - path: Pythilo/Resources/Bundler
+        type: folder
+        buildPhase: resources
+      - path: Pythilo/Resources/Models
         type: folder
         buildPhase: resources
       # esbuild-wasm, fetched by scripts/vendor-packages.py

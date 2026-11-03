@@ -9,7 +9,7 @@ struct ProjectTemplate: Identifiable, Sendable {
 
     private static let ignore = ".pythilo/\n__pycache__/\n*.sqlite3\n"
 
-    static let all: [ProjectTemplate] = [blank, csvCleaner, djangoNotes, flaskAPI, fastAPI, reactFastAPI, asgiAPI, notebook]
+    static let all: [ProjectTemplate] = [blank, csvCleaner, djangoNotes, flaskAPI, fastAPI, reactFastAPI, asgiAPI, notebook, coreML]
 
     static let blank = ProjectTemplate(
         id: "blank",
@@ -478,6 +478,39 @@ struct ProjectTemplate: Identifiable, Sendable {
             """,
             "README.md": "# Tasks: React and FastAPI\n\nIn the Terminal, one at a time:\n\n    npm install\n    npm run build\n    uvicorn main:app\n\nnpm install fetches React from the npm registry. npm run build bundles src/ with esbuild, which runs inside Pythilo. npm run dev rebuilds on every save. FastAPI serves the API at /api/tasks and the built site at /.\n",
             ".gitignore": ignore + "node_modules/\nstatic/assets/\n",
+        ]
+    )
+
+    static let coreML = ProjectTemplate(
+        id: "coreml",
+        title: "Neural Engine",
+        summary: "Core ML models from Python",
+        systemImage: "cpu",
+        files: [
+            "main.py": """
+            \"\"\"The same Core ML model on the CPU, the GPU and the Neural Engine, timed,
+            with every answer checked against the CPU's.\"\"\"
+
+            import numpy
+
+            from pythilo import coreml
+
+            info = coreml.devices()
+            print("Core ML sees:", ", ".join(info["devices"]))
+            if not info["neuralEngine"]:
+                where = " (this is the simulator)" if info["simulator"] else ""
+                print(f"No Neural Engine here{where}, so ane runs on the CPU.")
+
+            coreml.report(coreml.benchmark(runs=10))
+
+            with coreml.sample(compute="ane") as model:
+                image = numpy.random.default_rng(1).standard_normal((3, 224, 224)).astype("float32")
+                probabilities = model.predict({"image": image})["probabilities"]
+                print(f"class {int(probabilities.argmax())}, p={probabilities.max():.3f}, in {model.last_milliseconds:.2f} ms")
+
+            """,
+            "README.md": "# Neural Engine\n\nPyTorch does not run on an iPhone or iPad, and the Neural Engine is only reached through Core ML. So: train on a computer, convert with coremltools, copy the .mlpackage or .mlmodel into this project, then\n\n    from pythilo import coreml\n    model = coreml.load(\"classifier.mlpackage\", compute=\"ane\")\n    out = model.predict({\"image\": array})\n\nmain.py times Pythilo's sample model on each compute unit. Its weights are random; the point is speed and agreement, not the answer.\n",
+            ".gitignore": ignore,
         ]
     )
 

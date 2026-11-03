@@ -86,6 +86,40 @@ static PyObject *host_emit(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+static PyHostCallHandler call_handler = NULL;
+
+void pyhost_set_call_handler(PyHostCallHandler handler) {
+    call_handler = handler;
+}
+
+// A synchronous request to the app, such as a Core ML prediction. Bytes in, bytes out.
+static PyObject *host_call(PyObject *self, PyObject *args) {
+    const char *request;
+    Py_ssize_t length;
+    if (!PyArg_ParseTuple(args, "y#", &request, &length)) {
+        return NULL;
+    }
+    if (call_handler == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "The app does not answer calls here.");
+        return NULL;
+    }
+    char *response = NULL;
+    size_t response_length = 0;
+    int status;
+    Py_BEGIN_ALLOW_THREADS
+    status = call_handler(request, (size_t)length, &response, &response_length);
+    Py_END_ALLOW_THREADS
+    PyObject *result;
+    if (status == 0) {
+        result = PyBytes_FromStringAndSize(response ? response : "", (Py_ssize_t)response_length);
+    } else {
+        PyErr_SetString(PyExc_RuntimeError, response ? response : "The app could not answer.");
+        result = NULL;
+    }
+    free(response);
+    return result;
+}
+
 static PyObject *host_input_fd(PyObject *self, PyObject *args) {
     return PyLong_FromLong(input_pipe[0]);
 }
@@ -96,6 +130,7 @@ static PyObject *host_debug_fd(PyObject *self, PyObject *args) {
 
 static PyMethodDef host_methods[] = {
     {"emit", host_emit, METH_VARARGS, "Send an event to the app."},
+    {"call", host_call, METH_VARARGS, "Ask the app something and wait for the answer."},
     {"input_fd", host_input_fd, METH_NOARGS, "Read end of the stdin pipe."},
     {"debug_fd", host_debug_fd, METH_NOARGS, "Read end of the debugger command pipe."},
     {NULL, NULL, 0, NULL},

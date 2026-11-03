@@ -19,6 +19,9 @@ inside the app on the iOS Simulator. Nothing here has been checked for App Revie
 | Fork-free terminal: files, Python, pip, pytest, Django, Flask, Uvicorn, Git | Checked, apart from the Git commands listed below |
 | A started server shows "Django is running" with Open site; the preview's path is editable | Checked: the runtime reports the socket a program listens on, for Django, Flask's werkzeug and Uvicorn alike |
 | The framework's commands as chips in the terminal; Django's full list once `manage.py` prints it | Checked |
+| `npm install` from the npm registry: semver, hoisting, integrity, package-lock.json; no install scripts | Checked: React and Express on the Mac, React on the simulator |
+| `npm run build` / `dev` / `npx esbuild`: esbuild-wasm in a hidden web view; `dev` rebuilds on save | Checked: the React and FastAPI template installs, builds and serves on the simulator. Scripts that need Node (vite, webpack) say so |
+| Packages has its own button beside Run | Checked by screenshot |
 
 All projects share one process. Resetting between runs is cleanup, not a security
 boundary, and the app says so.
@@ -103,8 +106,13 @@ App Store release:
 ## Machine learning (section 19)
 
 No iOS wheels exist for PyTorch, ExecuTorch, ONNX Runtime, SciPy or scikit-learn on
-CPython 3.14. A full PyTorch build was not attempted on this Mac; the reasons and the
-Core ML route are in `docs/research/ml-on-ios.md`. The Core ML bridge is not built.
+CPython 3.14. A full PyTorch build was not attempted on this Mac; the reasons are in
+`docs/research/ml-on-ios.md`.
+
+`pythilo.coreml` runs Core ML models from Python on the CPU, the GPU or the Neural
+Engine, with timings and an agreement check against the CPU, and a sample model
+(`scripts/make-sample-model.py`). Checked on the simulator, which has no Neural Engine,
+so the Neural Engine numbers still need a physical device.
 
 ## Not started
 

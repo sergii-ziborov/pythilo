@@ -49,5 +49,9 @@ Run models through the operating system instead of a Python framework:
    Python, with the compute units chosen per run (CPU, GPU, Neural Engine), and
    returns the outputs as NumPy arrays plus the measured time.
 
-The bridge is not built yet. Measuring the Neural Engine needs a physical
-device: the simulator has none.
+Built as `pythilo.coreml` (`Pythilo/Runtime/CoreMLBridge.swift`, reached from
+Python through `_pythilo.call`): `load()`, `predict()` with NumPy arrays,
+`devices()`, `benchmark()` over cpu, gpu, ane and all, and a sample convolution
+model. On the simulator Core ML reports a CPU and a GPU and no Neural Engine, so
+`ane` falls back to the CPU there; the numbers that matter need a physical
+iPhone or iPad.

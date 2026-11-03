@@ -370,6 +370,29 @@ final class RuntimeGateTests: XCTestCase {
         XCTAssertTrue(api.contains("Try the React page"), api)
     }
 
+    func testCoreMLRunsTheSampleOnEachComputeUnitAndAgrees() async throws {
+        let outcome = try await run("""
+        import numpy
+        from pythilo import coreml
+        info = coreml.devices()
+        print("devices", info["devices"], "neural", info["neuralEngine"])
+        with coreml.sample(compute="cpu") as model:
+            out = model.predict({"image": numpy.ones((3, 224, 224), "float32")})["probabilities"]
+            print("shape", out.shape, "sum", round(float(out.sum()), 3), "ms", model.last_milliseconds > 0)
+        rows = coreml.benchmark(runs=2)
+        print("rows", [row["compute"] for row in rows], "agree", all(row["max_difference"] < 0.05 for row in rows))
+        try:
+            coreml.load("missing.mlpackage")
+        except RuntimeError as error:
+            print("missing:", error)
+        """, timeout: 120)
+        XCTAssertEqual(outcome.code, 0, outputText())
+        XCTAssertTrue(outputText().contains("'CPU'"), outputText())
+        XCTAssertTrue(outputText().contains("shape (10,) sum 1.0 ms True"), outputText())
+        XCTAssertTrue(outputText().contains("rows ['cpu', 'gpu', 'ane', 'all'] agree True"), outputText())
+        XCTAssertTrue(outputText().contains("missing: No model at"), outputText())
+    }
+
     func testAnEsbuildScriptIsRunAndANodeToolIsExplained() throws {
         let build = try NpmScripts.parse(["src/main.jsx", "--bundle", "--minify", "--outdir=static/assets", "--loader:.svg=file", "--target=es2020"])
         XCTAssertEqual(build.entryPoints, ["src/main.jsx"])

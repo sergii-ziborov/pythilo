@@ -44,6 +44,11 @@ open source (see [License](#license)).
 - **Git, for real.** A genuine `.git` folder: commit, branches, diff, `git merge` with
   conflict markers and `--abort`, `git rebase`, and HTTPS clone.
 - **Notebooks** that open and save ordinary `.ipynb` files.
+- **npm and React.** `npm install` fetches packages from the npm registry and checks
+  each one's integrity; `npm run build` bundles with esbuild, which runs inside the app.
+  A React and FastAPI template installs, builds and serves its site on the device.
+- **Core ML from Python.** `pythilo.coreml` runs a converted model on the CPU, the GPU
+  or the Neural Engine, times each one and checks they agree.
 
 ### Learn
 
@@ -89,7 +94,10 @@ sit beside the camera, and code runs to the bottom edge.
 ## What it does not do (yet)
 
 - No pandas, Matplotlib, SciPy or PyTorch: nobody publishes iOS builds of them for
-  Python 3.14 ([details](docs/research/ml-on-ios.md)).
+  Python 3.14 ([details](docs/research/ml-on-ios.md)). Models trained in PyTorch run
+  here once converted to Core ML.
+- No Node: npm installs packages and esbuild builds them, but Node tools such as Vite
+  or webpack cannot run on an iPhone.
 - Compiled packages work only when Pythilo bundles them; pip installs pure Python.
 - No Jupyter server: notebooks run on Pythilo's own kernel.
 - iOS pauses apps in the background, so a server runs while Pythilo is open.

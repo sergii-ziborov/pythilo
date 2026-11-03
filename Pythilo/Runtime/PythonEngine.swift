@@ -128,6 +128,7 @@ final class PythonEngine: @unchecked Sendable {
             let data = Data(bytes: payload, count: length)
             PythonEngine.shared.receive(kind: name, data: data)
         }
+        pyhost_set_call_handler(CoreMLBridge.handler)
     }
 
     func start() {
