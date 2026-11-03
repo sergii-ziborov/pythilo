@@ -184,6 +184,14 @@ struct WorkspaceView: View {
                     onPackages: {
                         model.drawerOpen = false
                         showingPackages = true
+                    },
+                    onShareRoom: {
+                        model.drawerOpen = false
+                        showingRoom = true
+                    },
+                    onPreview: {
+                        model.drawerOpen = false
+                        model.previewOpen = true
                     }
                 )
             }
@@ -275,7 +283,10 @@ struct WorkspaceView: View {
             VStack(spacing: 0) {
                 Color.clear.frame(height: 54)
                 if model.panel == .code {
-                    FileTabsBar(model: model)
+                    HStack(spacing: 0) {
+                        FileTabsBar(model: model)
+                        menu
+                    }
                     .frame(height: 42)
                     .background(AppTheme.rail, ignoresSafeAreaEdges: [])
                     hairline
@@ -289,12 +300,11 @@ struct WorkspaceView: View {
             HStack {
                 HStack(spacing: 4) {
                     backButton
-                    if drawerSide == .left { filesButton } else { previewButton }
+                    if drawerSide == .left { filesButton }
                 }
                 Spacer()
                 HStack(spacing: 4) {
-                    actionsButton
-                    if drawerSide == .right { filesButton } else { previewButton }
+                    if drawerSide == .right { filesButton }
                     RunControl(model: model)
                 }
             }
@@ -321,7 +331,10 @@ struct WorkspaceView: View {
             if onLeading { landscapeRail(height: size.height) }
             VStack(spacing: 0) {
                 if !keyboard.isVisible, !showsSideOutput, model.panel == .code {
-                    FileTabsBar(model: model)
+                    HStack(spacing: 0) {
+                        FileTabsBar(model: model)
+                        menu
+                    }
                     .frame(height: 36)
                     .background(AppTheme.rail, ignoresSafeAreaEdges: [])
                     hairline
@@ -342,8 +355,6 @@ struct WorkspaceView: View {
                     }
                     if !keyboard.isVisible {
                         HStack(spacing: 6) {
-                            actionsButton
-                            previewButton
                             RunControl(model: model, height: 48)
                         }
                         .padding(.trailing, onLeading ? 14 : 8)

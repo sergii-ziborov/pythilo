@@ -19,6 +19,8 @@ struct ProjectColumn: View {
     var leading: AnyView?
     var onGit: () -> Void = {}
     var onPackages: () -> Void = {}
+    var onShareRoom: (() -> Void)?
+    var onPreview: (() -> Void)?
     @State private var search = ""
     @State private var creating: NewItemKind?
 
@@ -86,6 +88,12 @@ struct ProjectColumn: View {
                 HStack(spacing: 0) {
                     footerButton("shippingbox", "Packages", AppTheme.amber, action: onPackages)
                     footerButton("arrow.triangle.branch", "Git", AppTheme.coral, action: onGit)
+                    if let onShareRoom {
+                        footerButton("person.2", "Room", AppTheme.mint, action: onShareRoom)
+                    }
+                    if let onPreview, model.previewURL != nil {
+                        footerButton("globe", "Site", AppTheme.blue, action: onPreview)
+                    }
                     ShareLink(item: model.project.url) {
                         footerLabel("square.and.arrow.up", "Share", AppTheme.blue)
                     }
