@@ -11,12 +11,12 @@ test('ESM and CommonJS expose a real library without launching an interpreter or
  assert.equal(PLAYGROUND_LIMITS.maximumLifetimeSeconds,86400);
 });
 test('participant labels are bounded and cannot inject controls or malformed Unicode',()=>{for(const name of ['', '\nagent', 'a'.repeat(41),'\ud800'])assert.throws(()=>new Pythilo({name}));});
-test('the relay option is an origin, and create without one says how to configure it',async()=>{
+test('the relay option is an origin, and without one the public relay is used',async()=>{
  for(const relay of ['https://relay.example/api','https://user:pw@relay.example','relay.example','ftp://relay.example'])assert.throws(()=>new Pythilo({relay}),(error:unknown)=>error instanceof PythiloError&&error.code==='RELAY_NOT_CONFIGURED'&&!error.message.includes('pw@'));
  const configured=new Pythilo({relay:'http://127.0.0.1:3212/'});assert.equal((await configured.status()).relay,'http://127.0.0.1:3212');configured.close();
  const saved=process.env.PYTHILO_RELAY;delete process.env.PYTHILO_RELAY;
  const client=new Pythilo();
- try{await assert.rejects(()=>client.create({name:'x'}),(error:unknown)=>{assert(error instanceof PythiloError);assert.equal(error.code,'RELAY_NOT_CONFIGURED');assert.match(error.message,/PYTHILO_RELAY/);assert.match(error.message,/--relay/);return true;});}
+ try{assert.equal((await client.status()).relay,'https://pythilo.com');}
  finally{client.close();if(saved!==undefined)process.env.PYTHILO_RELAY=saved;}
 });
 test('bounded operation queue refuses overload and close cancels pending calls',async()=>{const client=new Pythilo();const requests=Array.from({length:60},()=>client.status());client.close();const result=await Promise.allSettled(requests);assert(result.every(x=>x.status==='rejected'));});

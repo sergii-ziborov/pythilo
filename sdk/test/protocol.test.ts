@@ -92,9 +92,6 @@ test("doctor --json --relay checks a live relay's /healthz and room route", asyn
     assert.equal(report.checks.find((check: any) => check.name === "relay").status, "ok");
     assert.equal(report.checks.find((check: any) => check.name === "release").status, "ok");
   } finally { await close(); }
-  const plain = run(["doctor"]);
-  assert.equal(plain.status, 0, plain.stdout);
-  assert.match(plain.stdout, /Relay: not configured/);
 });
 
 test("official MCP client discovers and invokes the isolated bundled stdio executable", async () => {
@@ -119,11 +116,7 @@ test("official MCP client discovers and invokes the isolated bundled stdio execu
     assert.ok(!/crabrix|\brust\b|cargo|edition|breakpoint|\blocals\b/i.test(words), "no Rust or debugger wording is left");
     const status = await client.callTool({ name: "pythilo_status", arguments: {} });
     assert.equal((status.structuredContent as any).connected, false);
-    assert.equal((status.structuredContent as any).relay, null);
-    const create = await client.callTool({ name: "pythilo_create", arguments: { name: "No relay" } });
-    assert.equal(create.isError, true);
-    assert.equal((create.structuredContent as any).error.code, "RELAY_NOT_CONFIGURED");
-    assert.match((create.content as any)[0].text, /PYTHILO_RELAY/);
+    assert.equal((status.structuredContent as any).relay, "https://pythilo.com");
     const invalid = await client.callTool({ name: "pythilo_connect", arguments: { link: "https://example.com/secret-that-must-not-leak" } });
     assert.equal(invalid.isError, true);
     assert.ok(!JSON.stringify(invalid).includes("secret-that-must-not-leak"));

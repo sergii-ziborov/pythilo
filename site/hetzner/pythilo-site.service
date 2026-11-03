@@ -1,0 +1,46 @@
+# The Pythilo site, lessons, playground and room relay: one Next.js standalone server.
+# Installed as /etc/systemd/system/pythilo-site.service by hetzner/deploy.sh.
+# Rooms live in this process's memory, so it runs as one instance and a restart
+# ends every open room.
+[Unit]
+Description=Pythilo website and room relay (Next.js standalone server)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+CacheDirectory=pythilo-site
+WorkingDirectory=/opt/pythilo/current
+Environment=NODE_ENV=production
+Environment=PORT=3212
+Environment=HOSTNAME=127.0.0.1
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=SITE_ORIGIN=https://pythilo.com
+ExecStart=/usr/bin/node /opt/pythilo/current/server.js
+Restart=on-failure
+RestartSec=3s
+MemoryMax=384M
+CPUQuota=100%
+TasksMax=64
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

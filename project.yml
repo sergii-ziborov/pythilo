@@ -74,9 +74,10 @@ targets:
         UILaunchScreen: {}
         UIRequiresFullScreen: false
         UIUserInterfaceStyle: Automatic
-        # Shared rooms relay origin, https only. Empty until there is a domain;
+        # Shared rooms relay origin, https only: the only thing the app reaches over
+        # the network on its own, and only for a shared room.
         # Debug builds take -pythiloRelay http://127.0.0.1:3212 instead.
-        PythiloRelayOrigin: ""
+        PythiloRelayOrigin: "https://pythilo.com"
         CFBundleURLTypes:
           - CFBundleURLName: com.sergiiziborov.Pythilo.room
             CFBundleURLSchemes:

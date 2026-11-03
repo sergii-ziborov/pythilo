@@ -30,14 +30,16 @@ Only codec 1 (format v1) is supported. Format v2 stays out until it is needed.
 
 ## Relay origin
 
-There is no production domain yet. Nothing may hard-code one.
+Production is `https://pythilo.com` (site, playground and relay in one process on
+the Hetzner analytics node; see `site/DEPLOY.md`).
 
 - Site: `SITE_ORIGIN` env var, as in Crabrix.
-- SDK: a room link carries its origin. Creating a room needs `PYTHILO_RELAY`
-  (or `--relay <origin>`); without it `pythilo_create` explains that.
-- App: Info.plist key `PythiloRelayOrigin` (empty for now), overridden in Debug by
-  the launch argument `-pythiloRelay http://127.0.0.1:3212`. The app accepts room
-  links only from that origin.
+- SDK: a room link carries its origin. Creating a room uses `https://pythilo.com`
+  unless `PYTHILO_RELAY` (or `--relay <origin>`) names another.
+- App: Info.plist key `PythiloRelayOrigin` = `https://pythilo.com`, overridden in
+  Debug by the launch argument `-pythiloRelay http://127.0.0.1:3212`. The app accepts
+  room links only from that origin. Nothing else in the app needs the network: it runs
+  offline, and only a shared room goes online.
 
 Local development runs the site at `http://127.0.0.1:3212`.
 

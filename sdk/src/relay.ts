@@ -1,8 +1,9 @@
 import { PythiloError } from "./errors.js";
 
-// There is no production relay yet, so none is built in. A room link carries its own
-// origin; creating a room needs one configured with PYTHILO_RELAY or --relay.
-export type RelayConfig = { origin: string; source: "--relay" | "PYTHILO_RELAY" | "option" };
+// A room link carries its own origin. Creating a room uses the public relay unless
+// PYTHILO_RELAY or --relay names another, such as a local site at http://127.0.0.1:3212.
+export const DEFAULT_RELAY = "https://pythilo.com";
+export type RelayConfig = { origin: string; source: "--relay" | "PYTHILO_RELAY" | "option" | "default" };
 
 const invalid = (from: string) => new PythiloError("RELAY_NOT_CONFIGURED", `${from} must be a relay origin such as http://127.0.0.1:3212 or https://relay.example, with no path, query or credentials.`);
 
@@ -14,10 +15,10 @@ export function relayOrigin(value: string, from = "PYTHILO_RELAY"): string {
   return url.origin;
 }
 
-export function configuredRelay(option?: string, source: RelayConfig["source"] = "option", environment: NodeJS.ProcessEnv = process.env): RelayConfig | undefined {
+export function configuredRelay(option?: string, source: RelayConfig["source"] = "option", environment: NodeJS.ProcessEnv = process.env): RelayConfig {
   if (option !== undefined) return { origin: relayOrigin(option, source === "--relay" ? "--relay" : "The relay option"), source };
   const value = environment.PYTHILO_RELAY;
-  return value?.trim() ? { origin: relayOrigin(value), source: "PYTHILO_RELAY" } : undefined;
+  return value?.trim() ? { origin: relayOrigin(value), source: "PYTHILO_RELAY" } : { origin: DEFAULT_RELAY, source: "default" };
 }
 
 export const isLoopback = (hostname: string) => hostname === "localhost" || hostname === "[::1]" || /^127(?:\.\d{1,3}){3}$/.test(hostname);

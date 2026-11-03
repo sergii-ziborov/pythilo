@@ -1,4 +1,4 @@
-// Collects a standalone build into a folder that hetzner/Dockerfile.prebuilt runs.
+// Collects a standalone build into site/release/, which hetzner/deploy.sh ships.
 // Run `pnpm build` first. Usage: node scripts/prepare-server-release.mjs [destination]
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -19,6 +19,4 @@ mkdirSync(destination, { recursive: true });
 cpSync(join(site, '.next', 'standalone'), join(destination, 'standalone'), { recursive: true, verbatimSymlinks: true });
 cpSync(join(site, '.next', 'static'), join(destination, 'static'), { recursive: true });
 cpSync(join(site, 'public'), join(destination, 'public'), { recursive: true });
-cpSync(join(site, 'hetzner'), join(destination, 'hetzner'), { recursive: true });
-cpSync(join(site, 'compose.prebuilt.yaml'), join(destination, 'compose.prebuilt.yaml'));
 console.log('Prepared standalone server release:', destination);

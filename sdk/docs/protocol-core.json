@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
   "sha256": {
-    "dist/cli.mjs": "13e0a9cddd3107965bbdd2745c017091213704697751f82c45bdd4839d776035"
+    "dist/cli.mjs": "a19063473927f1e14ffedc0fc614d37d9b48d1c646e61a4ab852bcdc0785fde4"
   },
   "requires": "Node.js 22+",
   "source": "src/cli.ts and src/core",

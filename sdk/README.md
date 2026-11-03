@@ -36,8 +36,8 @@ There is no production relay yet, and none is built in.
 - A **room link carries its relay**: `<origin>/playground/room/<id>/#key=…&access=…&expires=…&mode=edit|view`.
   Joining uses that origin. Links must be https, except plain http for a loopback relay
   (`127.0.0.1`, `localhost`, `[::1]`) or the configured relay.
-- **Creating a room needs a relay**: set `PYTHILO_RELAY`, or start the bridge with
-  `--relay <origin>`. Without one, `pythilo_create` returns `RELAY_NOT_CONFIGURED` and says so.
+- **Creating a room uses the public relay**, `https://pythilo.com`. Set `PYTHILO_RELAY`,
+  or start the bridge with `--relay <origin>`, to use another one (a local site, say).
 - A `pythilo://playground/room/<id>/#…` app link is opened against the configured relay.
 
 Local development runs the site and its relay at `http://127.0.0.1:3212`.
@@ -61,7 +61,7 @@ claude mcp add --transport stdio pythilo -- npx -y pythilo
 ```
 
 Set `PYTHILO_RELAY` in the environment instead of `--relay` if you prefer; without either,
-the bridge can still join rooms from links. This folder is also a Claude Code plugin
+the bridge uses `https://pythilo.com`. This folder is also a Claude Code plugin
 (`.claude-plugin/`, with a `pythilo-rooms` skill). Its `.mcp.json` runs `npx -y pythilo@0.1.0`,
 so it needs the published package. Then, instead of `claude mcp add`:
 
@@ -191,7 +191,7 @@ try {
 }
 ```
 
-`relay` defaults to `PYTHILO_RELAY`. CommonJS: `const { Pythilo } = require('pythilo')`.
+`relay` defaults to `PYTHILO_RELAY`, then `https://pythilo.com`. CommonJS: `const { Pythilo } = require('pythilo')`.
 Failures throw `PythiloError` with `code`, `retryable` and `action`. `pythilo/mcp` exports
 `makeServer` for embedding the MCP server.
 
