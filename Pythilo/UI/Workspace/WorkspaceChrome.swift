@@ -4,8 +4,7 @@ import UIKit
 /// Run becomes Stop while Python works, and only reports what Python has done.
 struct RunControl: View {
     @Bindable var model: WorkspaceModel
-    /// A round button with only the symbol, which leaves the header room for the rest.
-    var iconOnly = true
+    var iconOnly = false
     var height: CGFloat = 44
     private var session: RunSession { model.session }
 
@@ -174,9 +173,18 @@ struct WorkspaceProjectMenu: View {
     let onGit: () -> Void
     let onPackages: () -> Void
     let onShareRoom: () -> Void
+    /// A round header button rather than the plain one at the end of the tabs.
+    var round = false
 
     var body: some View {
         Menu {
+            Button("Packages", systemImage: "shippingbox", action: onPackages)
+            if model.previewURL != nil {
+                Button("Web preview", systemImage: "globe") { model.previewOpen = true }
+            }
+            Button("Git", systemImage: "arrow.triangle.branch", action: onGit)
+            Button("Share with an AI client or person", systemImage: "person.2", action: onShareRoom)
+            Divider()
             Button("Debug", systemImage: "ladybug") {
                 model.panel = .debug
             }
@@ -184,20 +192,24 @@ struct WorkspaceProjectMenu: View {
                 model.panel = .terminal
                 model.runTerminal("pytest -q")
             }
-            Divider()
-            Button("Git", systemImage: "arrow.triangle.branch", action: onGit)
-            Button("Packages", systemImage: "shippingbox", action: onPackages)
-            Button("Share with an AI client or person", systemImage: "person.2", action: onShareRoom)
             if let selected = model.selectedPath {
                 Divider()
                 Button("Close \((selected as NSString).lastPathComponent)", systemImage: "xmark") { model.close(selected) }
             }
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(AppTheme.secondary)
-                .frame(width: 44, height: 40)
-                .contentShape(Rectangle())
+            if round {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(AppTheme.primary)
+                    .frame(width: 44, height: 44)
+                    .background(AppTheme.raised, in: Circle())
+            } else {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(AppTheme.secondary)
+                    .frame(width: 44, height: 40)
+                    .contentShape(Rectangle())
+            }
         }
         .accessibilityLabel("Project actions")
         .accessibilityIdentifier("project-menu")

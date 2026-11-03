@@ -24,7 +24,9 @@ struct WebPreview: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let view = WKWebView()
-        view.isOpaque = false
+        // Pages without their own background read as they would in a browser.
+        view.isOpaque = true
+        view.backgroundColor = .white
         view.navigationDelegate = context.coordinator
         return view
     }

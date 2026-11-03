@@ -221,19 +221,15 @@ struct WorkspaceView: View {
         .accessibilityIdentifier("files-button")
     }
 
-    /// pip lives in the terminal too; this keeps the project's packages one tap away.
-    private var packagesButton: some View {
-        Button { showingPackages = true } label: {
-            Label("Packages", systemImage: "shippingbox")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(AppTheme.primary)
-                .padding(.horizontal, 14)
-                .frame(height: 44)
-                .background(AppTheme.raised, in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .fixedSize()
-        .accessibilityIdentifier("packages-button")
+    /// Packages, the web preview, Git and sharing, each with its name, behind one button.
+    private var actionsButton: some View {
+        WorkspaceProjectMenu(
+            model: model,
+            onGit: { showingGit = true },
+            onPackages: { showingPackages = true },
+            onShareRoom: { showingRoom = true },
+            round: true
+        )
     }
 
     @ViewBuilder
@@ -279,10 +275,7 @@ struct WorkspaceView: View {
             VStack(spacing: 0) {
                 Color.clear.frame(height: 54)
                 if model.panel == .code {
-                    HStack(spacing: 0) {
-                        FileTabsBar(model: model)
-                        menu
-                    }
+                    FileTabsBar(model: model)
                     .frame(height: 42)
                     .background(AppTheme.rail, ignoresSafeAreaEdges: [])
                     hairline
@@ -300,7 +293,7 @@ struct WorkspaceView: View {
                 }
                 Spacer()
                 HStack(spacing: 4) {
-                    packagesButton
+                    actionsButton
                     if drawerSide == .right { filesButton } else { previewButton }
                     RunControl(model: model)
                 }
@@ -328,10 +321,7 @@ struct WorkspaceView: View {
             if onLeading { landscapeRail(height: size.height) }
             VStack(spacing: 0) {
                 if !keyboard.isVisible, !showsSideOutput, model.panel == .code {
-                    HStack(spacing: 0) {
-                        FileTabsBar(model: model)
-                        menu
-                    }
+                    FileTabsBar(model: model)
                     .frame(height: 36)
                     .background(AppTheme.rail, ignoresSafeAreaEdges: [])
                     hairline
@@ -352,7 +342,7 @@ struct WorkspaceView: View {
                     }
                     if !keyboard.isVisible {
                         HStack(spacing: 6) {
-                            packagesButton
+                            actionsButton
                             previewButton
                             RunControl(model: model, height: 48)
                         }
@@ -426,8 +416,7 @@ struct WorkspaceView: View {
             backButton
             filesButton
             FileTabsBar(model: model).frame(height: 44)
-            menu
-            packagesButton
+            actionsButton
             previewButton
             RunControl(model: model)
         }
@@ -496,8 +485,7 @@ struct WorkspaceView: View {
             VStack(spacing: 0) {
                 HStack(spacing: 6) {
                     FileTabsBar(model: model).frame(height: 44)
-                    menu
-                    packagesButton
+                    actionsButton
                     previewButton
                     RunControl(model: model)
                 }
@@ -531,8 +519,7 @@ struct WorkspaceView: View {
             VStack(spacing: 0) {
                 HStack(spacing: 6) {
                     FileTabsBar(model: model).frame(height: 44)
-                    menu
-                    packagesButton
+                    actionsButton
                     previewButton
                     RunControl(model: model)
                 }
@@ -592,7 +579,7 @@ struct WorkspaceView: View {
                         Color.clear.frame(height: 40)
                         HStack(spacing: 4) {
                             FileTabsBar(model: model)
-                            packagesButton
+                            actionsButton
                             previewButton
                             RunControl(model: model)
                         }
