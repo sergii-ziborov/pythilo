@@ -302,6 +302,27 @@ final class FeatureGateTests: XCTestCase {
         XCTAssertEqual(trace?.writes.count, 57)
     }
 
+    func testATerminalCommandWhileAServerRunsRestartsTheServerAroundIt() async throws {
+        let project = try project("serve")
+        try """
+        import http.server
+        server = http.server.HTTPServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler)
+        print("serving", flush=True)
+        server.serve_forever()
+        """.write(to: project.url.appending(path: "serve.py"), atomically: true, encoding: .utf8)
+        try "note\n".write(to: project.url.appending(path: "note.txt"), atomically: true, encoding: .utf8)
+        let model = WorkspaceModel(project: project)
+        model.runTerminal("python serve.py")
+        try await waitUntil(timeout: 30) { self.session.listening != nil }
+        model.runTerminal("cat note.txt")
+        let text = { self.session.terminalOutput.map(\.text).joined() }
+        try await waitUntil(timeout: 30) { text().contains("Stopping the server") && text().contains("note\n") }
+        try await waitUntil(timeout: 30) { self.session.listening != nil && text().components(separatedBy: "serving").count == 3 }
+        XCTAssertFalse(text().contains("Python is busy"), text())
+        session.stop()
+        try await waitUntil(timeout: 30) { !self.session.isBusy }
+    }
+
     func testEachWebTemplateOffersItsFrameworksCommands() throws {
         let store = ProjectStore(root: root.appending(path: "library"))
         let expected: [(ProjectTemplate, ProjectCommands.Framework, String)] = [

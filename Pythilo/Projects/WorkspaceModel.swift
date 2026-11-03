@@ -541,6 +541,14 @@ final class WorkspaceModel {
             return
         }
         guard session.phase == .idle || session.phase == .starting else {
+            // Python runs one program at a time. A server started here is stopped,
+            // the command runs, and the server starts again, as after a migration.
+            if session.listening != nil, session.activeChannel == .terminal, let server = serverLine {
+                session.noteTerminal("Stopping the server to run this; it starts again afterwards.\n")
+                queuedLines = trimmed == server ? [server] : [trimmed, server]
+                session.stop()
+                return
+            }
             session.noteTerminal("Python is busy. Stop the running program first.\n", kind: .stderr)
             return
         }

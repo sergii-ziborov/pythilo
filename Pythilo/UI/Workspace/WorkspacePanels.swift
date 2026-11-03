@@ -192,7 +192,14 @@ struct TerminalPanel: View {
 
     private var session: RunSession { model.session }
     private var inProgram: Bool { session.isBusy && session.activeChannel == .terminal }
-    private var acceptsInput: Bool { !session.isBusy || session.phase == .waitingForInput }
+    /// A running server takes commands too: the model restarts it around them.
+    private var acceptsInput: Bool { !session.isBusy || session.phase == .waitingForInput || session.listening != nil }
+
+    private var placeholder: String {
+        if session.phase == .waitingForInput { return "" }
+        if session.listening != nil { return "Command (restarts the server)" }
+        return session.isBusy ? "Running. Ctrl-C stops it" : ""
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -223,7 +230,7 @@ struct TerminalPanel: View {
                 Text(session.phase == .waitingForInput ? ">" : "$")
                     .font(.system(size: 14, design: .monospaced))
                     .foregroundStyle(AppTheme.blue)
-                TextField(acceptsInput ? "" : "The program is running", text: $line)
+                TextField(placeholder, text: $line)
                     .font(.system(size: 14, design: .monospaced))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
