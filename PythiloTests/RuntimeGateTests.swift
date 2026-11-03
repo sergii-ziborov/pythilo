@@ -340,6 +340,19 @@ final class RuntimeGateTests: XCTestCase {
         XCTAssertEqual(problems?.count, 2, "\(problems ?? [])")
     }
 
+    func testCompletionKnowsTheProjectsOwnModules() async throws {
+        _ = try write("shapes.py", "def area_of_circle(r):\n    return 3.14 * r * r\n\ndef area_of_square(side):\n    return side * side\n")
+        let source = "import shapes\nimport collections\nshapes.area_\ncollections.Ord"
+        var found: [String: [PythonCompletion]] = [:]
+        session.onCompletions = { token, items in found[token] = items }
+        defer { session.onCompletions = nil }
+        session.analyze(["action": "complete", "token": "module", "root": root.path, "path": root.appending(path: "main.py").path, "source": source, "line": 3, "column": 12])
+        session.analyze(["action": "complete", "token": "stdlib", "root": root.path, "path": root.appending(path: "main.py").path, "source": source, "line": 4, "column": 15])
+        try await waitUntil(timeout: 60) { found.count == 2 }
+        XCTAssertEqual(Set(found["module"]?.map(\.label) ?? []), ["area_of_circle", "area_of_square"])
+        XCTAssertTrue(found["stdlib"]?.contains { $0.label == "OrderedDict" } == true, "\(found["stdlib"] ?? [])")
+    }
+
     private func assertStopsWhile(_ source: String, marker: String, _ body: @escaping () async throws -> Void) async throws {
         try await run(source) {
             try await self.waitUntil(timeout: 30) { self.outputText().contains(marker) }

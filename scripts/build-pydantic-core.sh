@@ -5,7 +5,10 @@
 # where scripts/vendor-packages.py picks them up.
 #
 # The extension links Python.framework like BeeWare's own iOS wheels do, so PyO3 is
-# told through a config file to add no link flags of its own.
+# told through a config file to add no link flags of its own. It targets the same
+# minimum iOS as BeeWare's support package (13.0; the arm64 simulator starts at
+# 14.0), because App Store Connect rejects a framework whose binary needs a newer iOS
+# than its Info.plist says.
 set -euo pipefail
 
 VERSION="${1:-2.50.2}"
@@ -13,7 +16,6 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$ROOT/build/native"
 SOURCE="$WORK/pydantic_core-$VERSION"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
-export IPHONEOS_DEPLOYMENT_TARGET=18.0
 export CARGO_TARGET_DIR="$WORK/target"
 
 mkdir -p "$WORK/wheels" "$WORK/support"
@@ -27,21 +29,22 @@ if [[ ! -d "$WORK/support/Python.xcframework/ios-arm64" ]]; then
 fi
 
 build() {
-  local triple="$1" slice="$2" platform="$3"
+  local triple="$1" slice="$2" platform="$3" minimum="$4"
   local framework="$WORK/support/Python.xcframework/$slice"
   printf 'implementation=CPython\nversion=3.14\nshared=true\nabi3=false\nlib_name=python3.14\npointer_width=64\nsuppress_build_script_link_lines=true\n' > "$WORK/pyo3-$platform.cfg"
   (
     cd "$SOURCE"
+    IPHONEOS_DEPLOYMENT_TARGET="$minimum" \
     PYO3_CONFIG_FILE="$WORK/pyo3-$platform.cfg" \
     RUSTFLAGS="-C link-arg=-F$framework -C link-arg=-framework -C link-arg=Python -C link-arg=-Wl,-install_name,@rpath/_pydantic_core.so" \
       cargo build --release --lib --target "$triple" --quiet
   )
-  python3 - "$SOURCE" "$CARGO_TARGET_DIR/$triple/release/lib_pydantic_core.dylib" "$platform" "$VERSION" "$WORK/wheels" <<'PYTHON'
+  python3 - "$SOURCE" "$CARGO_TARGET_DIR/$triple/release/lib_pydantic_core.dylib" "$platform" "$VERSION" "$WORK/wheels" "$minimum" <<'PYTHON'
 import base64, hashlib, pathlib, sys, zipfile
 
-source, library, platform, version, out = sys.argv[1:]
+source, library, platform, version, out, minimum = sys.argv[1:]
 package = pathlib.Path(source) / "python" / "pydantic_core"
-tag = f"cp314-cp314-ios_18_0_arm64_{platform}"
+tag = f"cp314-cp314-ios_{minimum.replace('.', '_')}_arm64_{platform}"
 info = f"pydantic_core-{version}.dist-info"
 files = {}
 for path in sorted(package.rglob("*")):
@@ -66,7 +69,10 @@ with zipfile.ZipFile(wheel, "w", zipfile.ZIP_DEFLATED) as archive:
     archive.writestr(f"{info}/RECORD", record)
 print(wheel)
 PYTHON
+  # A target's build tree is about 600 MB; the wheel is all that is needed.
+  rm -rf "${CARGO_TARGET_DIR:?}/$triple"
 }
 
-build aarch64-apple-ios ios-arm64 iphoneos
-build aarch64-apple-ios-sim ios-arm64_x86_64-simulator iphonesimulator
+rm -f "$WORK"/wheels/pydantic_core-"$VERSION"-*.whl
+build aarch64-apple-ios ios-arm64 iphoneos 13.0
+build aarch64-apple-ios-sim ios-arm64_x86_64-simulator iphonesimulator 14.0

@@ -43,7 +43,7 @@ boundary, and the app says so.
 | Fetch, fast-forward pull, push, Keychain tokens | Written. Not run against a real remote |
 | `git merge` (fast-forward, merge commit, conflicts with markers, `--abort`) and `git rebase` | Checked by the package's own tests on macOS, the same libgit2 code. Rebase is all or nothing: at a conflict it is undone |
 | SSH, submodules, LFS | Not done, and refused rather than faked |
-| Pyflakes problems and Jedi completion on their own thread | Problems checked. Completion not exercised |
+| Pyflakes problems and Jedi completion on their own thread | Checked, completion included: the project's own modules and the standard library |
 
 ## Learning (sections 16 and 17)
 
@@ -106,4 +106,4 @@ Core ML route are in `docs/research/ml-on-ios.md`. The Core ML bridge is not bui
 
 ## Not started
 
-- StoreKit purchase and App Review materials (section 4, P6)
+- StoreKit purchase (section 4, P6): waits for the choice between a free download with one unlock and a paid app. A first App Store listing is drafted in `docs/app-store/listing.md`, holding only checked claims
