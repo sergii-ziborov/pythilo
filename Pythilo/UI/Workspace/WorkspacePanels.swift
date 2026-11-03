@@ -206,10 +206,10 @@ struct TerminalPanel: View {
                 OutputTextView(chunks: session.terminalOutput, revision: session.terminalRevision, fontSize: fontSize)
             }
             .frame(maxHeight: .infinity)
-            if !model.commands.featured.isEmpty { ProjectCommandBar(model: model) }
+            if !model.commands.featured.isEmpty || !model.commands.npm.isEmpty { ProjectCommandBar(model: model) }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    ForEach(["python", "pip", "pytest", "git", "ls"], id: \.self) { word in
+                    ForEach(["python", "pip", "npm", "pytest", "git", "ls"], id: \.self) { word in
                         key(word) { insert(word + " ") }
                     }
                     key("Ctrl-C") { session.stop() }

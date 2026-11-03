@@ -340,6 +340,47 @@ final class RuntimeGateTests: XCTestCase {
         XCTAssertEqual(problems?.count, 2, "\(problems ?? [])")
     }
 
+    func testReactAndFastAPIInstallBuildAndServe() async throws {
+        for (path, text) in ProjectTemplate.reactFastAPI.files {
+            let url = root.appending(path: path)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try text.write(to: url, atomically: true, encoding: .utf8)
+        }
+        let installed = try await shell("npm install", timeout: 240)
+        XCTAssertEqual(installed.code, 0, outputText())
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "node_modules/react-dom/package.json").path), outputText())
+        XCTAssertTrue(outputText().contains("Integrity checked"), outputText())
+
+        let model = WorkspaceModel(project: Project(url: root), session: session)
+        await NpmScripts.run("npm run build", in: model)
+        let bundle = root.appending(path: "static/assets/main.js")
+        let size = (try? FileManager.default.attributesOfItem(atPath: bundle.path)[.size] as? Int) ?? 0
+        XCTAssertGreaterThan(size, 100_000, "React and the app, minified: \(session.terminalOutput.map(\.text).joined())")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "static/assets/main.css").path))
+
+        var page = "", script = "", api = ""
+        _ = try await shell("uvicorn main:app --port 18090", timeout: 60) {
+            page = try await self.fetchWhenReady("http://127.0.0.1:18090/")
+            script = try await self.fetchWhenReady("http://127.0.0.1:18090/assets/main.js")
+            api = try await self.fetchWhenReady("http://127.0.0.1:18090/api/tasks")
+            self.session.stop()
+        }
+        XCTAssertTrue(page.contains("<div id=\"root\">"), page)
+        XCTAssertTrue(script.contains("createRoot") || script.count > 100_000, "the built bundle is what the site serves")
+        XCTAssertTrue(api.contains("Try the React page"), api)
+    }
+
+    func testAnEsbuildScriptIsRunAndANodeToolIsExplained() throws {
+        let build = try NpmScripts.parse(["src/main.jsx", "--bundle", "--minify", "--outdir=static/assets", "--loader:.svg=file", "--target=es2020"])
+        XCTAssertEqual(build.entryPoints, ["src/main.jsx"])
+        XCTAssertEqual(build.outdir, "static/assets")
+        XCTAssertTrue(build.minify)
+        XCTAssertEqual(build.loader, [".svg": "file"])
+        XCTAssertEqual(build.options["mode"] as? String, "production")
+        XCTAssertEqual(try NpmScripts.parse(["src/main.jsx", "--watch"]).options["mode"] as? String, "development")
+        XCTAssertThrowsError(try NpmScripts.parse(["--bundle"]))
+    }
+
     func testAServerSaysWhereItListens() async throws {
         let source = """
         from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler

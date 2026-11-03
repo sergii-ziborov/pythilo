@@ -49,13 +49,20 @@ struct WorkspaceView: View {
         .sheet(isPresented: $model.previewOpen) { PreviewSheet(model: model) }
         // Several chunks can land between two updates, so the recent tail is read,
         // not only the last chunk.
-        .onChange(of: session.terminalRevision) { noticeOutput(session.terminalOutput) }
-        .onChange(of: session.outputRevision) { noticeOutput(session.output) }
+        .onChange(of: session.terminalRevision) { noticeOutput(session.terminalOutput, terminal: true) }
+        .onChange(of: session.outputRevision) { noticeOutput(session.output, terminal: false) }
         .onChange(of: session.listening) { _, server in model.serverStarted(server) }
         #if DEBUG
         // For screenshots: -openSite YES opens the preview once the server listens.
         .onChange(of: model.previewURL) { _, url in
             if url != nil, UserDefaults.standard.bool(forKey: "openSite") { model.previewOpen = true }
+        }
+        // -migrateRestart YES taps Migrate & restart as soon as it appears.
+        .onChange(of: model.unappliedMigrations) { _, count in
+            if count > 0, UserDefaults.standard.bool(forKey: "migrateRestart"), !Self.tappedMigrate {
+                Self.tappedMigrate = true
+                model.migrateAndRestart()
+            }
         }
         #endif
         .onChange(of: session.phase) { _, phase in
@@ -66,9 +73,16 @@ struct WorkspaceView: View {
         .background { shortcuts }
     }
 
-    private func noticeOutput(_ chunks: [OutputChunk]) {
+    #if DEBUG
+    private static var tappedMigrate = false
+    #endif
+
+    private func noticeOutput(_ chunks: [OutputChunk], terminal: Bool) {
         let tail = chunks.suffix(12).map(\.text).joined()
         model.updatePreview(from: tail)
+        if terminal, session.isBusy, chunks.count > model.commandOutputStart {
+            model.noticeMigrationWarning(in: chunks[model.commandOutputStart...].suffix(40).map(\.text).joined())
+        }
         if !session.isBusy { model.noticeCommandList(in: tail) }
     }
 
@@ -81,7 +95,9 @@ struct WorkspaceView: View {
             ServerBanner(
                 url: url,
                 framework: model.commands.framework?.rawValue,
-                onOpen: { model.previewOpen = true }
+                unappliedMigrations: model.unappliedMigrations,
+                onOpen: { model.previewOpen = true },
+                onMigrate: { model.migrateAndRestart() }
             )
             .frame(maxWidth: 520)
             .padding(.horizontal, 12)
@@ -205,6 +221,12 @@ struct WorkspaceView: View {
         .accessibilityIdentifier("files-button")
     }
 
+    /// pip lives in the terminal too; this keeps the project's packages one tap away.
+    private var packagesButton: some View {
+        RoundIconButton(systemImage: "shippingbox", label: "Packages") { showingPackages = true }
+            .accessibilityIdentifier("packages-button")
+    }
+
     @ViewBuilder
     private var previewButton: some View {
         if model.previewURL != nil {
@@ -269,6 +291,7 @@ struct WorkspaceView: View {
                 }
                 Spacer()
                 HStack(spacing: 4) {
+                    packagesButton
                     if drawerSide == .right { filesButton } else { previewButton }
                     RunControl(model: model)
                 }
@@ -320,6 +343,7 @@ struct WorkspaceView: View {
                     }
                     if !keyboard.isVisible {
                         HStack(spacing: 6) {
+                            packagesButton
                             previewButton
                             RunControl(model: model, height: 48)
                         }
@@ -394,6 +418,7 @@ struct WorkspaceView: View {
             filesButton
             FileTabsBar(model: model).frame(height: 44)
             menu
+            packagesButton
             previewButton
             RunControl(model: model)
         }
@@ -463,6 +488,7 @@ struct WorkspaceView: View {
                 HStack(spacing: 6) {
                     FileTabsBar(model: model).frame(height: 44)
                     menu
+                    packagesButton
                     previewButton
                     RunControl(model: model)
                 }
@@ -497,6 +523,7 @@ struct WorkspaceView: View {
                 HStack(spacing: 6) {
                     FileTabsBar(model: model).frame(height: 44)
                     menu
+                    packagesButton
                     previewButton
                     RunControl(model: model)
                 }
@@ -556,6 +583,7 @@ struct WorkspaceView: View {
                         Color.clear.frame(height: 40)
                         HStack(spacing: 4) {
                             FileTabsBar(model: model)
+                            packagesButton
                             previewButton
                             RunControl(model: model)
                         }

@@ -24,6 +24,8 @@ struct ProjectCommands: Equatable, Sendable {
     var framework: Framework?
     var featured: [Command] = []
     var all: [Command] = []
+    /// npm install and the package's scripts, when the project has a package.json.
+    var npm: [Command] = []
 
     static let none = ProjectCommands()
 
@@ -68,6 +70,14 @@ struct ProjectCommands: Equatable, Sendable {
             result.featured.append(Command(title: "pytest", line: "pytest -q"))
         }
         if result.all.isEmpty { result.all = result.featured }
+        if let data = try? Data(contentsOf: root.appending(path: "package.json")),
+           let manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            result.npm = [Command(title: "install", line: "npm install")]
+            let scripts = (manifest["scripts"] as? [String: String] ?? [:]).keys
+            for name in ["build", "dev", "start"] where scripts.contains(name) {
+                result.npm.append(Command(title: name, line: name == "start" ? "npm start" : "npm run \(name)"))
+            }
+        }
         return result
     }
 

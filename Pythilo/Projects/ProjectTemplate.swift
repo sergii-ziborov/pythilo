@@ -9,7 +9,7 @@ struct ProjectTemplate: Identifiable, Sendable {
 
     private static let ignore = ".pythilo/\n__pycache__/\n*.sqlite3\n"
 
-    static let all: [ProjectTemplate] = [blank, csvCleaner, djangoNotes, flaskAPI, fastAPI, asgiAPI, notebook]
+    static let all: [ProjectTemplate] = [blank, csvCleaner, djangoNotes, flaskAPI, fastAPI, reactFastAPI, asgiAPI, notebook]
 
     static let blank = ProjectTemplate(
         id: "blank",
@@ -337,6 +337,147 @@ struct ProjectTemplate: Identifiable, Sendable {
             """,
             "README.md": "# Task API\n\nIn the Terminal: `uvicorn main:app`, then open the preview. `pytest` runs the tests.\n\n`/openapi.json` works offline. `/docs` loads Swagger UI from a CDN, so it needs the network.\n",
             ".gitignore": ignore,
+        ]
+    )
+
+    static let reactFastAPI = ProjectTemplate(
+        id: "react",
+        title: "React and FastAPI",
+        summary: "npm, esbuild and an API, one site",
+        systemImage: "atom",
+        files: [
+            "main.py": """
+            from fastapi import FastAPI
+            from fastapi.staticfiles import StaticFiles
+            from pydantic import BaseModel, Field
+
+            app = FastAPI(title="Tasks")
+            tasks = [{"id": 1, "title": "Try the React page", "done": False}]
+
+
+            class TaskIn(BaseModel):
+                title: str = Field(min_length=1, max_length=80)
+
+
+            @app.get("/api/tasks")
+            async def list_tasks() -> list[dict]:
+                return tasks
+
+
+            @app.post("/api/tasks", status_code=201)
+            async def add_task(task: TaskIn) -> dict:
+                created = {"id": len(tasks) + 1, "title": task.title, "done": False}
+                tasks.append(created)
+                return created
+
+
+            # The React app, built by npm run build into static/assets.
+            app.mount("/", StaticFiles(directory="static", html=True), name="site")
+
+            """,
+            "package.json": """
+            {
+              "name": "tasks",
+              "private": true,
+              "scripts": {
+                "build": "esbuild src/main.jsx --bundle --minify --outdir=static/assets",
+                "dev": "esbuild src/main.jsx --bundle --outdir=static/assets --watch"
+              },
+              "dependencies": {
+                "react": "^19.3.1",
+                "react-dom": "^19.3.1"
+              },
+              "devDependencies": {
+                "esbuild": "^0.28.2"
+              }
+            }
+
+            """,
+            "src/main.jsx": """
+            import { createRoot } from "react-dom/client";
+            import { useEffect, useState } from "react";
+            import "./style.css";
+
+            function App() {
+              const [tasks, setTasks] = useState([]);
+              const [title, setTitle] = useState("");
+              const [error, setError] = useState("");
+
+              useEffect(() => {
+                fetch("/api/tasks")
+                  .then((response) => response.json())
+                  .then(setTasks, () => setError("The API did not answer."));
+              }, []);
+
+              async function add(event) {
+                event.preventDefault();
+                const response = await fetch("/api/tasks", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ title }),
+                });
+                if (!response.ok) {
+                  setError("A task needs a title.");
+                  return;
+                }
+                setTasks([...tasks, await response.json()]);
+                setTitle("");
+                setError("");
+              }
+
+              return (
+                <main>
+                  <h1>Tasks</h1>
+                  <p className="note">React, built by esbuild in Pythilo, served by FastAPI on this device.</p>
+                  <form onSubmit={add}>
+                    <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Write a task" aria-label="Task title" />
+                    <button>Add</button>
+                  </form>
+                  {error && <p className="error">{error}</p>}
+                  <ul>
+                    {tasks.map((task) => (
+                      <li key={task.id}>{task.title}</li>
+                    ))}
+                  </ul>
+                </main>
+              );
+            }
+
+            createRoot(document.getElementById("root")).render(<App />);
+
+            """,
+            "src/style.css": """
+            body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #f5f7fa; color: #141a22; }
+            main { max-width: 34rem; margin: 0 auto; padding: 2rem 1.25rem; }
+            h1 { margin: 0 0 0.25rem; }
+            .note { color: #55606e; margin: 0 0 1.25rem; }
+            form { display: flex; gap: 0.5rem; }
+            input { flex: 1; font: inherit; padding: 0.7rem 0.8rem; border: 1px solid #d5dce5; border-radius: 0.6rem; }
+            button { font: inherit; font-weight: 600; padding: 0 1.1rem; border: 0; border-radius: 0.6rem; background: #0b62c4; color: white; }
+            .error { color: #a3201a; }
+            li { padding: 0.75rem 0; border-bottom: 1px solid #e8edf3; }
+
+            """,
+            "static/index.html": """
+            <!doctype html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>Tasks</title>
+              <link rel="stylesheet" href="/assets/main.css">
+            </head>
+            <body>
+              <div id="root">
+                <p style="font-family: system-ui; padding: 1.5rem">Not built yet. In the Terminal: <code>npm install</code>, then <code>npm run build</code>, then reload this page.</p>
+              </div>
+              <script src="/assets/main.js"></script>
+            </body>
+            </html>
+
+            """,
+            "README.md": "# Tasks: React and FastAPI\n\nIn the Terminal, one at a time:\n\n    npm install\n    npm run build\n    uvicorn main:app\n\nnpm install fetches React from the npm registry. npm run build bundles src/ with esbuild, which runs inside Pythilo. npm run dev rebuilds on every save. FastAPI serves the API at /api/tasks and the built site at /.\n",
+            ".gitignore": ignore + "node_modules/\nstatic/assets/\n",
         ]
     )
 

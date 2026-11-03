@@ -40,7 +40,15 @@ targets:
           - PythonRuntime
           - Resources/Info.plist
           - Resources/Courses
+          - Resources/Bundler
       - path: Pythilo/Resources/Courses
+        type: folder
+        buildPhase: resources
+      - path: Pythilo/Resources/Bundler
+        type: folder
+        buildPhase: resources
+      # esbuild-wasm, fetched by scripts/vendor-packages.py
+      - path: build/esbuild
         type: folder
         buildPhase: resources
     dependencies:

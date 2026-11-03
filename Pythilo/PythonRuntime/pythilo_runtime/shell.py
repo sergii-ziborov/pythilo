@@ -459,6 +459,12 @@ def _pip(args):
     return packages.pip(args, _project_site())
 
 
+def _npm(args):
+    from . import npm
+
+    return npm.main(args, os.getcwd())
+
+
 def _pytest(args):
     import pytest
 
@@ -552,6 +558,7 @@ _COMMANDS = {
     "pip": _pip,
     "pip3": _pip,
     "pytest": _pytest,
+    "npm": _npm,
     "django-admin": _django_admin,
     "uvicorn": _uvicorn,
     "flask": _flask,

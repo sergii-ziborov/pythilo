@@ -41,6 +41,24 @@ struct ProjectCommandBar: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("all-commands")
                 }
+                if !commands.npm.isEmpty {
+                    Text("NPM")
+                        .font(.system(size: 11, weight: .heavy))
+                        .kerning(0.6)
+                        .foregroundStyle(AppTheme.amber)
+                        .padding(.leading, commands.featured.isEmpty ? 0 : 6)
+                        .padding(.trailing, 2)
+                    ForEach(commands.npm) { command in
+                        Button(command.title) { model.use(command) }
+                            .font(.system(size: 13, design: .monospaced))
+                            .padding(.horizontal, 12)
+                            .frame(height: 40)
+                            .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 9))
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(command.line)
+                            .accessibilityIdentifier("npm-\(command.title)")
+                    }
+                }
             }
             .padding(.horizontal, 10)
         }
@@ -90,9 +108,54 @@ struct ProjectCommandsSheet: View {
 struct ServerBanner: View {
     let url: URL
     let framework: String?
+    var unappliedMigrations = 0
     let onOpen: () -> Void
+    var onMigrate: () -> Void = {}
 
     var body: some View {
+        VStack(spacing: 8) {
+            running
+            if unappliedMigrations > 0 { migrations }
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .padding(.vertical, 8)
+        .background {
+            ZStack {
+                RoundedRectangle(cornerRadius: 18, style: .continuous).fill(AppTheme.panel)
+                RoundedRectangle(cornerRadius: 18, style: .continuous).fill((unappliedMigrations > 0 ? AppTheme.amber : AppTheme.mint).opacity(0.12))
+            }
+        }
+        .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke((unappliedMigrations > 0 ? AppTheme.amber : AppTheme.mint).opacity(0.45), lineWidth: 1) }
+        .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Django starts with unapplied migrations, then fails on the first page that
+    /// touches a table. Said here, where it is seen, with the fix one tap away.
+    private var migrations: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(AppTheme.amber).accessibilityHidden(true)
+            Text("\(unappliedMigrations) migration\(unappliedMigrations == 1 ? " is" : "s are") not applied. Pages that use the database will fail.")
+                .font(.system(size: 13.5))
+                .foregroundStyle(AppTheme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            Button(action: onMigrate) {
+                Text("Migrate & restart")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(AppTheme.onRun)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 40)
+                    .background(AppTheme.run, in: Capsule())
+                    .fixedSize()
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("migrate-restart")
+        }
+    }
+
+    private var running: some View {
         HStack(spacing: 10) {
             Circle().fill(AppTheme.mint).frame(width: 10, height: 10)
                 .background(Circle().fill(AppTheme.mint.opacity(0.22)).frame(width: 18, height: 18))
@@ -117,17 +180,6 @@ struct ServerBanner: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("open-site")
         }
-        .padding(.leading, 14)
-        .padding(.trailing, 8)
-        .padding(.vertical, 8)
-        .background {
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous).fill(AppTheme.panel)
-                RoundedRectangle(cornerRadius: 18, style: .continuous).fill(AppTheme.mint.opacity(0.12))
-            }
-        }
-        .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(AppTheme.mint.opacity(0.45), lineWidth: 1) }
-        .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Site is running at \(url.absoluteString)")
     }

@@ -75,6 +75,13 @@ final class WorkspaceModel {
     /// Text a chip puts into the terminal's input for the user to finish.
     var terminalDraft: String?
     private var djangoNames: [(group: String, name: String)] = []
+    /// Django said "You have N unapplied migration(s)" while starting the server.
+    private(set) var unappliedMigrations = 0
+    private var serverLine: String?
+    /// Where the current command's output begins in the terminal.
+    private(set) var commandOutputStart = 0
+    /// Commands to run one after another once the current one ends.
+    private var queuedLines: [String] = []
     private(set) var completions: [PythonCompletion] = []
     private(set) var runLabel = ""
 
@@ -146,7 +153,8 @@ final class WorkspaceModel {
     /// command needs a name typed after it.
     func use(_ command: ProjectCommands.Command) {
         panel = .terminal
-        if command.needsArgument || session.isBusy {
+        // A build runs beside a busy Python; anything else waits in the input.
+        if command.needsArgument || (session.isBusy && !NpmScripts.handles(command.line)) {
             terminalDraft = command.line
         } else {
             runTerminal(command.line)
@@ -332,8 +340,25 @@ final class WorkspaceModel {
         do {
             try text.write(to: fileURL(path), atomically: true, encoding: .utf8)
             savedText[path] = text
+            if bundleWatch != nil, ["js", "jsx", "ts", "tsx", "mjs", "css", "json"].contains((path as NSString).pathExtension) {
+                scheduleRebuild()
+            }
         } catch {
             session.note("Could not save \(path): \(error.localizedDescription)\n")
+        }
+    }
+
+    /// `npm run dev` leaves this set: every save of a script or stylesheet rebuilds.
+    var bundleWatch: NpmScripts.Build?
+    private var rebuild: Task<Void, Never>?
+
+    private func scheduleRebuild() {
+        rebuild?.cancel()
+        rebuild = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard let self, !Task.isCancelled, let build = self.bundleWatch else { return }
+            self.session.noteTerminal("Rebuilding after a save…\n", kind: .stdout)
+            await NpmScripts.bundle(build, in: self)
         }
     }
 
@@ -510,10 +535,18 @@ final class WorkspaceModel {
             Task { await GitTerminal.run(trimmed, in: self) }
             return
         }
+        // Builds run in a web view, not in Python, so they work beside a running server.
+        if NpmScripts.handles(trimmed) {
+            Task { await NpmScripts.run(trimmed, in: self) }
+            return
+        }
         guard session.phase == .idle || session.phase == .starting else {
             session.noteTerminal("Python is busy. Stop the running program first.\n", kind: .stderr)
             return
         }
+        unappliedMigrations = 0
+        serverLine = trimmed
+        commandOutputStart = session.terminalOutput.count
         session.submit(
             ["kind": "shell", "line": trimmed, "root": project.url.path, "cwd": terminalDirectory.path],
             label: trimmed,
@@ -525,7 +558,24 @@ final class WorkspaceModel {
         runTerminal("python")
     }
 
+    /// Stops the server, applies the migrations Django listed, then starts the
+    /// same command again.
+    func migrateAndRestart() {
+        guard let line = serverLine else { return }
+        queuedLines = ["python manage.py migrate", line]
+        session.stop()
+    }
+
     private func runEnded(_ outcome: RunOutcome) {
+        if !queuedLines.isEmpty {
+            let next = queuedLines.removeFirst()
+            // The stopped server ends as cancelled; any other failure, such as a
+            // migrate that fails, stays on screen instead of going on.
+            let failed = outcome.code != 0 && outcome.status != "cancelled"
+            if failed { queuedLines = [] } else {
+                Task { @MainActor [weak self] in self?.runTerminal(next) }
+            }
+        }
         if session.activeChannel == .terminal, let cwd = outcome.cwd {
             let url = URL(fileURLWithPath: cwd)
             if url.path.hasPrefix(project.url.resolvingSymlinksInPath().path) || url.path.hasPrefix(project.url.path) {
@@ -583,6 +633,11 @@ final class WorkspaceModel {
         guard let match = text.firstMatch(of: /http:\/\/(?:127\.0\.0\.1|localhost|0\.0\.0\.0|\[::\]):\d+[^\s"']*/) else { return }
         let address = String(match.0).replacingOccurrences(of: "0.0.0.0", with: "127.0.0.1").replacingOccurrences(of: "[::]", with: "127.0.0.1")
         previewURL = URL(string: address)
+    }
+
+    func noticeMigrationWarning(in text: String) {
+        guard serverLine?.contains("runserver") == true, unappliedMigrations == 0, let match = text.firstMatch(of: /You have (\d+) unapplied migration/), let count = Int(match.1) else { return }
+        unappliedMigrations = count
     }
 
     func serverStarted(_ server: ListeningServer?) {

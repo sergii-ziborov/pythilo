@@ -786,7 +786,8 @@ struct LessonView: View {
                     ForEach(LessonMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .frame(maxWidth: mode == .code ? 150 : .infinity)
+                .frame(maxWidth: mode == .code ? 140 : .infinity)
+                .layoutPriority(-1)
                 .accessibilityIdentifier("lesson-mode")
             }
             if mode == .code || !showsModes {
@@ -817,7 +818,9 @@ struct LessonView: View {
                         Label(isInterview ? "Test" : "Check", systemImage: "checkmark")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(AppTheme.onRun)
-                            .padding(.horizontal, 20)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .padding(.horizontal, 18)
                             .frame(minHeight: 46)
                             .background(AppTheme.run, in: Capsule())
                     }
