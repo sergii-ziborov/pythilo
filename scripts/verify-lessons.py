@@ -36,8 +36,9 @@ EXPECTED_COURSES = {
     "4-web": ("web", "path", 5),
     "5-data": ("data", "path", 4),
     "6-ml": ("ml", "path", 10),
-    "7-ai": ("ai", "path", 3),
-    "8-interview": ("interview", "interview", 20),
+    "7-llm": ("llm", "path", 9),
+    "8-ai": ("ai", "path", 3),
+    "9-interview": ("interview", "interview", 20),
 }
 INTERVIEW_LEVELS = {"Easy": 7, "Medium": 9, "Hard": 4}
 REQUIRED_TEXT_FIELDS = ("id", "title", "body", "task", "starter", "solution", "explanation")

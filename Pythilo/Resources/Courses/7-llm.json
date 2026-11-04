@@ -1,0 +1,268 @@
+{
+  "id": "llm",
+  "title": "AI: language models from the inside",
+  "summary": "Tokens, embeddings, retrieval, sampling, attention and transformer blocks, then a tiny GPT trained on the device, LoRA fine-tuning and perplexity.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "tokens",
+      "title": "Tokens",
+      "body": "# Tokens\n\nA language model does not read letters or words. It reads tokens: numbers for pieces of text that appear often. Byte pair encoding builds them. Start from the bytes of the text, find the pair of neighbours that occurs most, give that pair a new number, replace it everywhere, and repeat.\n\n```python\ntext = \"aaab\"\nids = list(text.encode(\"utf-8\"))\nprint(ids)        # [97, 97, 97, 98]\n# (97, 97) is the commonest pair:\n# merge it into 256\nprint([256, 97, 98])\n```\n\nEach merge makes the sequence shorter, so the model sees more text in the same window. Common words end up as a single token; rare words stay split into pieces, so nothing is ever unknown.\n",
+      "task": "Write `pair_counts(ids)` returning a dict from each adjacent pair to how often it occurs. Write `merge(ids, pair, new_id)` replacing every occurrence of `pair`, left to right without overlaps. Write `train_bpe(text, merges)`: start from the UTF-8 bytes, and `merges` times merge the most frequent pair (the first one found on a tie) into the next id from 256. Return `(ids, learned)`, where `learned` lists the merged pairs in order.",
+      "starter": "def pair_counts(ids):\n    return {}\n\n\ndef merge(ids, pair, new_id):\n    return ids\n\n\ndef train_bpe(text, merges):\n    return list(text.encode(\"utf-8\")), []\n",
+      "solution": "def pair_counts(ids):\n    counts = {}\n    for pair in zip(ids, ids[1:]):\n        counts[pair] = counts.get(pair, 0) + 1\n    return counts\n\n\ndef merge(ids, pair, new_id):\n    out, i = [], 0\n    while i < len(ids):\n        if i + 1 < len(ids) and (ids[i], ids[i + 1]) == pair:\n            out.append(new_id)\n            i += 2\n        else:\n            out.append(ids[i])\n            i += 1\n    return out\n\n\ndef train_bpe(text, merges):\n    ids = list(text.encode(\"utf-8\"))\n    learned = []\n    for step in range(merges):\n        counts = pair_counts(ids)\n        if not counts:\n            break\n        pair = max(counts, key=counts.get)\n        ids = merge(ids, pair, 256 + step)\n        learned.append(pair)\n    return ids, learned\n",
+      "checks": [
+        {
+          "name": "counts pairs",
+          "code": "got = pair_counts([1, 2, 1, 2, 3])\nassert got == {(1, 2): 2, (2, 1): 1, (2, 3): 1}, got"
+        },
+        {
+          "name": "merges without overlap",
+          "code": "assert merge([1, 2, 1, 2, 3], (1, 2), 9) == [9, 9, 3], merge([1, 2, 1, 2, 3], (1, 2), 9)\nassert merge([1, 1, 1], (1, 1), 5) == [5, 1], merge([1, 1, 1], (1, 1), 5)"
+        },
+        {
+          "name": "one merge",
+          "code": "ids, learned = train_bpe('aaab', 1)\nassert learned == [(97, 97)], learned\nassert ids == [256, 97, 98], ids"
+        },
+        {
+          "name": "merges shorten text",
+          "code": "text = 'hello hello hello'\nids, learned = train_bpe(text, 4)\nassert len(learned) == 4, learned\nassert len(ids) < len(text.encode()) - 6, len(ids)"
+        }
+      ],
+      "hints": [
+        "`zip(ids, ids[1:])` walks every adjacent pair; count them in a dict.",
+        "In `merge`, walk with an index: when the pair starts at `i`, append `new_id` and jump by 2, otherwise copy `ids[i]` and move by 1.",
+        "`max(counts, key=counts.get)` is the most frequent pair (the first on a tie); the k-th merge gets id `256 + k`."
+      ],
+      "explanation": "Bytes give 256 starting tokens, so every text can be encoded, whatever its language. Each merge adds one new token for a frequent pair, and real tokenizers learn tens of thousands of them from huge corpora.\n\nSkipping two positions after a match is what prevents overlaps: in `[1, 1, 1]` the pair `(1, 1)` is replaced once, leaving the last `1`."
+    },
+    {
+      "id": "embeddings",
+      "title": "Embeddings",
+      "body": "# Embeddings\n\nInside a model every token becomes a vector, an embedding. Training places tokens used in similar ways close together, so meaning becomes direction.\n\nThe usual way to compare two vectors is cosine similarity: the cosine of the angle between them. It is 1 for the same direction, 0 for unrelated, -1 for opposite, and it ignores length.\n\n```python\nimport torch\nimport torch.nn.functional as F\n\na = torch.tensor([1.0, 2.0])\nb = torch.tensor([2.0, 4.0])\nprint(F.cosine_similarity(a, b, dim=0))\n# tensor(1.): same direction\n```\n\nSearch engines, recommendation and the retrieval in chat assistants all start here: turn things into vectors, then find the nearest ones.\n",
+      "task": "Write `cosine(a, b)` returning the cosine similarity of two 1-D tensors as a float. Write `nearest(query, matrix, k)` returning the indices of the `k` rows of `matrix` most similar to `query`, best first, as a list of ints.",
+      "starter": "import torch\n\n\ndef cosine(a, b):\n    return float(a @ b)\n\n\ndef nearest(query, matrix, k):\n    return list(range(k))\n",
+      "solution": "import torch\n\n\ndef cosine(a, b):\n    return float(a @ b / (a.norm() * b.norm()))\n\n\ndef nearest(query, matrix, k):\n    scores = matrix @ query / (matrix.norm(dim=1) * query.norm())\n    return scores.topk(k).indices.tolist()\n",
+      "checks": [
+        {
+          "name": "same direction is 1",
+          "code": "import torch\ngot = cosine(torch.tensor([1.0, 1.0]), torch.tensor([3.0, 3.0]))\nassert abs(got - 1) < 1e-6, got"
+        },
+        {
+          "name": "right angle is 0, opposite is -1",
+          "code": "import torch\nassert abs(cosine(torch.tensor([1.0, 0.0]), torch.tensor([0.0, 2.0]))) < 1e-6\nassert abs(cosine(torch.tensor([1.0, 2.0]), torch.tensor([-1.0, -2.0])) + 1) < 1e-6"
+        },
+        {
+          "name": "nearest rows, best first",
+          "code": "import torch\nmatrix = torch.tensor([[0.0, 1.0], [10.0, 0.5], [1.0, 1.0], [-1.0, 0.0]])\ngot = nearest(torch.tensor([1.0, 0.0]), matrix, 2)\nassert got == [1, 2], got"
+        }
+      ],
+      "hints": [
+        "Cosine similarity is the dot product divided by both lengths: `a @ b / (a.norm() * b.norm())`.",
+        "For many rows at once, `matrix @ query` gives every dot product and `matrix.norm(dim=1)` every row length.",
+        "`scores.topk(k).indices.tolist()` gives the best `k` positions, highest first."
+      ],
+      "explanation": "A plain dot product grows with the vectors' lengths, so the long row `[10, 0.5]` and the short `[1, 1]` were ranked by size rather than direction. Dividing by both lengths leaves only the angle.\n\n`topk` returns the indices sorted by score, which is exactly the order a search result should have."
+    },
+    {
+      "id": "retrieval",
+      "title": "Retrieval",
+      "body": "# Retrieval\n\nA model only knows what it was trained on. To answer from your own notes, a system first retrieves the passages that fit the question, then gives them to the model with the question. This is retrieval-augmented generation, RAG.\n\nReal systems use learned embeddings. The idea works with the simplest vectors too: count each word.\n\n```python\nimport re\n\ntext = \"Cats sleep. Cats purr.\"\nwords = re.findall(r\"[a-z]+\", text.lower())\nprint(words)\n# ['cats', 'sleep', 'cats', 'purr']\n```\n\nGive every word in the documents a position, turn each text into a vector of counts, and rank the documents by cosine similarity to the question. The best match goes into the prompt.\n",
+      "task": "Write `words(text)` returning the lowercase words (runs of letters a to z). Write `vectorize(text, vocab)` returning a float tensor with the count of each vocabulary word in the text, in `vocab`'s order. Write `retrieve(question, docs, k=1)` that builds the vocabulary from all the documents' words (sorted), and returns the `k` documents most similar to the question by cosine similarity, best first.",
+      "starter": "import re\nimport torch\n\n\ndef words(text):\n    return text.split()\n\n\ndef vectorize(text, vocab):\n    return torch.zeros(len(vocab))\n\n\ndef retrieve(question, docs, k=1):\n    return docs[:k]\n",
+      "solution": "import re\nimport torch\n\n\ndef words(text):\n    return re.findall(r\"[a-z]+\", text.lower())\n\n\ndef vectorize(text, vocab):\n    found = words(text)\n    return torch.tensor([float(found.count(word)) for word in vocab])\n\n\ndef retrieve(question, docs, k=1):\n    vocab = sorted({word for doc in docs for word in words(doc)})\n    matrix = torch.stack([vectorize(doc, vocab) for doc in docs])\n    query = vectorize(question, vocab)\n    scores = matrix @ query / (matrix.norm(dim=1) * query.norm() + 1e-9)\n    order = scores.argsort(descending=True)[:k]\n    return [docs[i] for i in order.tolist()]\n",
+      "checks": [
+        {
+          "name": "words",
+          "code": "got = words('Cats, cats; and DOGS!')\nassert got == ['cats', 'cats', 'and', 'dogs'], got"
+        },
+        {
+          "name": "counts",
+          "code": "import torch\ngot = vectorize('the cat and the hat', ['cat', 'dog', 'the'])\nassert torch.equal(got, torch.tensor([1.0, 0.0, 2.0])), got"
+        },
+        {
+          "name": "finds the right note",
+          "code": "docs = ['Python lists keep order and allow duplicates.', 'Cats sleep most of the day and purr.', 'Rain falls when clouds are heavy.']\nassert retrieve('Why do cats purr?', docs) == [docs[1]], retrieve('Why do cats purr?', docs)\nassert retrieve('do lists allow duplicates', docs, k=2)[0] == docs[0]"
+        }
+      ],
+      "hints": [
+        "`re.findall(r\"[a-z]+\", text.lower())` keeps letters only and drops punctuation.",
+        "For `vectorize`, count each vocabulary word in `words(text)`, in order, as floats.",
+        "In `retrieve`, stack the document vectors, score them against the question with cosine similarity, and take `argsort(descending=True)[:k]`."
+      ],
+      "explanation": "Splitting on spaces keeps punctuation and capitals, so `cats,` and `Cats` would be different words and nothing would match. Normalising the words is half of retrieval.\n\nCosine similarity favours documents that use the question's words in proportion, not just long documents. Learned embeddings go further, matching `purr` with `meow`, but the ranking step is the same."
+    },
+    {
+      "id": "sampling",
+      "title": "Sampling",
+      "body": "# Sampling\n\nA language model gives scores, logits, for every possible next token. How you pick from them changes the text.\n\n- Greedy: always the highest score. Safe, often repetitive.\n- Temperature: divide the logits before the softmax. Below 1 sharpens towards the top choice, above 1 flattens towards random.\n- Top-k: keep only the `k` best tokens and sample among them, so very unlikely words never appear.\n\n```python\nimport torch\n\nlogits = torch.tensor([2.0, 1.0, 0.1])\nfor t in (0.5, 1.0, 2.0):\n    p = torch.softmax(logits / t, dim=0)\n    print(t, p)\n```\n\n`torch.multinomial(p, 1)` draws an index with those probabilities. A seeded `torch.Generator` makes a draw repeatable.\n",
+      "task": "Write `probabilities(logits, temperature=1.0)` returning the softmax of `logits / temperature`. Write `top_k(logits, k)` returning a copy where every score but the `k` largest is minus infinity. Write `sample(logits, temperature=1.0, k=None, generator=None)` returning one drawn index as an int, applying top-k when `k` is given.",
+      "starter": "import torch\n\n\ndef probabilities(logits, temperature=1.0):\n    return torch.softmax(logits, dim=-1)\n\n\ndef top_k(logits, k):\n    return logits\n\n\ndef sample(logits, temperature=1.0, k=None, generator=None):\n    return int(logits.argmax())\n",
+      "solution": "import torch\n\n\ndef probabilities(logits, temperature=1.0):\n    return torch.softmax(logits / temperature, dim=-1)\n\n\ndef top_k(logits, k):\n    kept = logits.clone()\n    threshold = logits.topk(k).values[-1]\n    kept[logits < threshold] = float(\"-inf\")\n    return kept\n\n\ndef sample(logits, temperature=1.0, k=None, generator=None):\n    if k is not None:\n        logits = top_k(logits, k)\n    p = probabilities(logits, temperature)\n    return int(torch.multinomial(p, 1, generator=generator))\n",
+      "checks": [
+        {
+          "name": "temperature sharpens and flattens",
+          "code": "import torch\nlogits = torch.tensor([2.0, 1.0, 0.0])\ncold = probabilities(logits, 0.1)\nhot = probabilities(logits, 10.0)\nassert abs(float(cold.sum()) - 1) < 1e-6\nassert cold[0] > 0.99, cold\nassert hot.max() - hot.min() < 0.1, hot"
+        },
+        {
+          "name": "top-k keeps the best",
+          "code": "import torch\ngot = top_k(torch.tensor([0.5, 3.0, 1.0, 2.0]), 2)\nassert torch.isinf(got[0]) and torch.isinf(got[2]), got\nassert got[1] == 3.0 and got[3] == 2.0, got"
+        },
+        {
+          "name": "draws follow the probabilities",
+          "code": "import torch\nlogits = torch.log(torch.tensor([0.7, 0.2, 0.1]))\ng = torch.Generator().manual_seed(0)\ndraws = [sample(logits, generator=g) for _ in range(2000)]\nshares = [draws.count(i) / 2000 for i in range(3)]\nassert abs(shares[0] - 0.7) < 0.05 and abs(shares[2] - 0.1) < 0.05, shares"
+        },
+        {
+          "name": "top-1 is greedy",
+          "code": "import torch\ng = torch.Generator().manual_seed(1)\nlogits = torch.tensor([0.1, 0.3, 0.2])\nassert {sample(logits, k=1, generator=g) for _ in range(50)} == {1}"
+        }
+      ],
+      "hints": [
+        "Divide the logits by the temperature before `torch.softmax(..., dim=-1)`.",
+        "`logits.topk(k).values[-1]` is the k-th largest score; set everything below it to `float('-inf')` in a copy.",
+        "`torch.multinomial(p, 1, generator=generator)` draws an index; wrap it in `int(...)`."
+      ],
+      "explanation": "Always taking the argmax ignores the probabilities altogether, so the model would say the same thing every time. Sampling keeps variety; temperature and top-k decide how much.\n\nMinus infinity becomes exactly zero after the softmax, which is why masking is done on the logits, not the probabilities."
+    },
+    {
+      "id": "self-attention",
+      "title": "A self-attention layer",
+      "body": "# A self-attention layer\n\nIn a model, the queries, keys and values are not given: each is a learned linear map of the same input. That is self-attention: the sequence attends to itself.\n\n```python\nimport torch\nfrom torch import nn\n\nd = 8\nq = nn.Linear(d, d, bias=False)\n# batch, positions, d\nx = torch.randn(2, 5, d)\nprint(q(x).shape)\n# torch.Size([2, 5, 8])\n```\n\nThe layer applies three such maps, scores every query against every key, masks the future, and mixes the values. Shapes stay `(batch, positions, d)`, so layers can be stacked. With the causal mask, the output at a position depends only on that position and the ones before it, which is what lets a model learn to predict the next token from all of them at once.\n",
+      "task": "Write the class `SelfAttention(d)`, an `nn.Module` with three `nn.Linear(d, d, bias=False)` layers named `q`, `k` and `v`. Its `forward(x)` takes `(batch, positions, d)` and returns causal scaled dot-product attention of the three projections, of the same shape. You may compute it yourself or use `F.scaled_dot_product_attention`.",
+      "starter": "import torch\nfrom torch import nn\nimport torch.nn.functional as F\n\n\nclass SelfAttention(nn.Module):\n    def __init__(self, d):\n        super().__init__()\n        self.q = nn.Linear(d, d, bias=False)\n        self.k = nn.Linear(d, d, bias=False)\n        self.v = nn.Linear(d, d, bias=False)\n\n    def forward(self, x):\n        return x\n",
+      "solution": "import torch\nfrom torch import nn\nimport torch.nn.functional as F\n\n\nclass SelfAttention(nn.Module):\n    def __init__(self, d):\n        super().__init__()\n        self.q = nn.Linear(d, d, bias=False)\n        self.k = nn.Linear(d, d, bias=False)\n        self.v = nn.Linear(d, d, bias=False)\n\n    def forward(self, x):\n        return F.scaled_dot_product_attention(\n            self.q(x), self.k(x), self.v(x), is_causal=True)\n",
+      "checks": [
+        {
+          "name": "keeps the shape",
+          "code": "import torch\nlayer = SelfAttention(8)\nassert layer(torch.randn(2, 5, 8)).shape == (2, 5, 8)"
+        },
+        {
+          "name": "cannot see the future",
+          "code": "import torch\ntorch.manual_seed(0)\nlayer = SelfAttention(8)\nx = torch.randn(1, 6, 8)\ny = x.clone()\ny[0, -1] += 5\nwith torch.no_grad():\n    a, b = layer(x), layer(y)\nassert torch.allclose(a[0, :-1], b[0, :-1], atol=1e-6), 'earlier positions changed'\nassert not torch.allclose(a[0, -1], b[0, -1])"
+        },
+        {
+          "name": "is attention over the projections",
+          "code": "import math, torch\ntorch.manual_seed(1)\nlayer = SelfAttention(4)\nx = torch.randn(1, 3, 4)\nwith torch.no_grad():\n    q, k, v = layer.q(x)[0], layer.k(x)[0], layer.v(x)[0]\n    s = q @ k.T / math.sqrt(4)\n    s = s.masked_fill(torch.triu(torch.ones(3, 3, dtype=torch.bool), 1), float('-inf'))\n    want = torch.softmax(s, -1) @ v\n    assert torch.allclose(layer(x)[0], want, atol=1e-5)"
+        }
+      ],
+      "hints": [
+        "Project the input three times: `self.q(x)`, `self.k(x)`, `self.v(x)`.",
+        "`F.scaled_dot_product_attention(q, k, v, is_causal=True)` works on `(batch, positions, d)` directly.",
+        "Or by hand: `scores = q @ k.transpose(-2, -1) / math.sqrt(d)`, mask above the diagonal with minus infinity, softmax over the last dimension, multiply by `v`."
+      ],
+      "explanation": "Returning the input unchanged keeps the shape but lets no position learn from any other. The projections give the layer something to learn: what to look for (queries), what to offer (keys) and what to pass on (values).\n\nThe causal check changes only the last position: earlier outputs must not move, because at training time each of them predicts a token that the last one may already be."
+    },
+    {
+      "id": "transformer-block",
+      "title": "The transformer block",
+      "body": "# The transformer block\n\nA transformer is the same block stacked many times. Each block has two steps: attention mixes information between positions, then a small feed-forward network works on each position alone.\n\nTwo details make deep stacks trainable:\n\n- Residual connections: each step adds its result to its input, `x = x + step(x)`, so information and gradients pass straight through.\n- Layer normalisation before each step keeps the numbers in a steady range.\n\n```python\nimport torch\nfrom torch import nn\n\nln = nn.LayerNorm(8)\nx = torch.randn(4, 8) * 50 + 3\ny = ln(x)\nprint(y.mean(-1), y.std(-1))\n# about 0 and 1 for each row\n```\n\nThe feed-forward part widens to a hidden size, applies GELU, and narrows back.\n",
+      "task": "Write `Block(d, hidden)`: an `nn.Module` with `ln1` and `ln2` (`nn.LayerNorm(d)`), `attn` (the given `SelfAttention(d)`) and `mlp`, an `nn.Sequential` of `Linear(d, hidden)`, `GELU` and `Linear(hidden, d)`. `forward(x)` adds attention of `ln1(x)` to `x`, then adds the MLP of `ln2` of the result.",
+      "starter": "import torch\nfrom torch import nn\nimport torch.nn.functional as F\n\n\nclass SelfAttention(nn.Module):\n    def __init__(self, d):\n        super().__init__()\n        self.q = nn.Linear(d, d, bias=False)\n        self.k = nn.Linear(d, d, bias=False)\n        self.v = nn.Linear(d, d, bias=False)\n\n    def forward(self, x):\n        return F.scaled_dot_product_attention(\n            self.q(x), self.k(x), self.v(x), is_causal=True)\n\n\nclass Block(nn.Module):\n    def __init__(self, d, hidden):\n        super().__init__()\n        self.ln1 = nn.LayerNorm(d)\n        self.attn = SelfAttention(d)\n        self.ln2 = nn.LayerNorm(d)\n        self.mlp = nn.Sequential(\n            nn.Linear(d, hidden), nn.GELU(), nn.Linear(hidden, d))\n\n    def forward(self, x):\n        return self.mlp(self.attn(x))\n",
+      "solution": "import torch\nfrom torch import nn\nimport torch.nn.functional as F\n\n\nclass SelfAttention(nn.Module):\n    def __init__(self, d):\n        super().__init__()\n        self.q = nn.Linear(d, d, bias=False)\n        self.k = nn.Linear(d, d, bias=False)\n        self.v = nn.Linear(d, d, bias=False)\n\n    def forward(self, x):\n        return F.scaled_dot_product_attention(\n            self.q(x), self.k(x), self.v(x), is_causal=True)\n\n\nclass Block(nn.Module):\n    def __init__(self, d, hidden):\n        super().__init__()\n        self.ln1 = nn.LayerNorm(d)\n        self.attn = SelfAttention(d)\n        self.ln2 = nn.LayerNorm(d)\n        self.mlp = nn.Sequential(\n            nn.Linear(d, hidden), nn.GELU(), nn.Linear(hidden, d))\n\n    def forward(self, x):\n        x = x + self.attn(self.ln1(x))\n        return x + self.mlp(self.ln2(x))\n",
+      "checks": [
+        {
+          "name": "keeps the shape",
+          "code": "import torch\nassert Block(8, 32)(torch.randn(2, 5, 8)).shape == (2, 5, 8)"
+        },
+        {
+          "name": "residual: zero layers leave the input",
+          "code": "import torch\nblock = Block(8, 32)\nwith torch.no_grad():\n    block.attn.v.weight.zero_()\n    block.mlp[2].weight.zero_()\n    block.mlp[2].bias.zero_()\n    x = torch.randn(1, 4, 8)\n    assert torch.allclose(block(x), x), 'a residual block with silent layers must return its input'"
+        },
+        {
+          "name": "has the parts",
+          "code": "from torch import nn\nblock = Block(8, 32)\nassert isinstance(block.ln1, nn.LayerNorm) and isinstance(block.ln2, nn.LayerNorm)\nassert block.mlp[0].out_features == 32 and block.mlp[2].out_features == 8"
+        }
+      ],
+      "hints": [
+        "Each step is added back: `x = x + self.attn(self.ln1(x))`.",
+        "Then `x + self.mlp(self.ln2(x))`.",
+        "The normalisation goes inside the branch, on the way in, never on the residual path itself."
+      ],
+      "explanation": "Without the residual additions the block replaces its input instead of refining it, so a block with silent layers outputs zeros, and a stack of them loses the signal. With them, a freshly started block is close to the identity and each layer only has to learn a correction.\n\nNormalising inside the branch, the pre-norm layout used by GPT-style models, keeps the residual path clean from the first layer to the last."
+    },
+    {
+      "id": "tiny-gpt",
+      "title": "A tiny GPT",
+      "body": "# A tiny GPT\n\nPut the pieces together and you have a GPT: token embeddings plus position embeddings, a stack of blocks, a final normalisation, and a linear head that gives a score for every token in the vocabulary, at every position.\n\n```python\nimport torch\nfrom torch import nn\n\ntokens = nn.Embedding(20, 16)\npositions = nn.Embedding(8, 16)\nids = torch.tensor([[3, 1, 4, 1]])\nwhere = torch.arange(4)\nx = tokens(ids) + positions(where)\nprint(x.shape)  # torch.Size([1, 4, 16])\n```\n\nTraining shows it windows of text and asks, at every position, for the next token. Unlike the bigram model, it can use everything before, so after `the c` it knows `at` comes next even though `t` alone is ambiguous.\n",
+      "task": "Write `TinyGPT(vocab, d, context, blocks)`: `nn.Embedding(vocab, d)` named `tokens`, `nn.Embedding(context, d)` named `positions`, an `nn.Sequential` of `blocks` `Block(d, 4 * d)`, an `nn.LayerNorm(d)` named `norm` and an `nn.Linear(d, vocab)` named `head`. `forward(ids)` takes `(batch, T)` and returns logits `(batch, T, vocab)`. Write `train_gpt(model, ids, context, steps=300, lr=3e-3)`: each step, take 16 random windows of `context + 1` ids, train with Adam on cross-entropy of every next id, and return the list of losses as floats.",
+      "starter": "import torch\nfrom torch import nn\nimport torch.nn.functional as F\n\n\nclass SelfAttention(nn.Module):\n    def __init__(self, d):\n        super().__init__()\n        self.q = nn.Linear(d, d, bias=False)\n        self.k = nn.Linear(d, d, bias=False)\n        self.v = nn.Linear(d, d, bias=False)\n\n    def forward(self, x):\n        return F.scaled_dot_product_attention(\n            self.q(x), self.k(x), self.v(x), is_causal=True)\n\n\nclass Block(nn.Module):\n    def __init__(self, d, hidden):\n        super().__init__()\n        self.ln1 = nn.LayerNorm(d)\n        self.attn = SelfAttention(d)\n        self.ln2 = nn.LayerNorm(d)\n        self.mlp = nn.Sequential(\n            nn.Linear(d, hidden), nn.GELU(), nn.Linear(hidden, d))\n\n    def forward(self, x):\n        x = x + self.attn(self.ln1(x))\n        return x + self.mlp(self.ln2(x))\n\n\nclass TinyGPT(nn.Module):\n    def __init__(self, vocab, d, context, blocks):\n        super().__init__()\n        self.tokens = nn.Embedding(vocab, d)\n        self.blocks = nn.Sequential(*[Block(d, 4 * d) for _ in range(blocks)])\n        self.head = nn.Linear(d, vocab)\n\n    def forward(self, ids):\n        return self.head(self.blocks(self.tokens(ids)))\n\n\ndef train_gpt(model, ids, context, steps=300, lr=3e-3):\n    return []\n",
+      "solution": "import torch\nfrom torch import nn\nimport torch.nn.functional as F\n\n\nclass SelfAttention(nn.Module):\n    def __init__(self, d):\n        super().__init__()\n        self.q = nn.Linear(d, d, bias=False)\n        self.k = nn.Linear(d, d, bias=False)\n        self.v = nn.Linear(d, d, bias=False)\n\n    def forward(self, x):\n        return F.scaled_dot_product_attention(\n            self.q(x), self.k(x), self.v(x), is_causal=True)\n\n\nclass Block(nn.Module):\n    def __init__(self, d, hidden):\n        super().__init__()\n        self.ln1 = nn.LayerNorm(d)\n        self.attn = SelfAttention(d)\n        self.ln2 = nn.LayerNorm(d)\n        self.mlp = nn.Sequential(\n            nn.Linear(d, hidden), nn.GELU(), nn.Linear(hidden, d))\n\n    def forward(self, x):\n        x = x + self.attn(self.ln1(x))\n        return x + self.mlp(self.ln2(x))\n\n\nclass TinyGPT(nn.Module):\n    def __init__(self, vocab, d, context, blocks):\n        super().__init__()\n        self.tokens = nn.Embedding(vocab, d)\n        self.positions = nn.Embedding(context, d)\n        self.blocks = nn.Sequential(*[Block(d, 4 * d) for _ in range(blocks)])\n        self.norm = nn.LayerNorm(d)\n        self.head = nn.Linear(d, vocab)\n\n    def forward(self, ids):\n        where = torch.arange(ids.shape[1])\n        x = self.tokens(ids) + self.positions(where)\n        return self.head(self.norm(self.blocks(x)))\n\n\ndef train_gpt(model, ids, context, steps=300, lr=3e-3):\n    optimizer = torch.optim.Adam(model.parameters(), lr=lr)\n    losses = []\n    for step in range(steps):\n        starts = torch.randint(0, len(ids) - context - 1, (16,))\n        windows = torch.stack([ids[s:s + context + 1] for s in starts.tolist()])\n        x, y = windows[:, :-1], windows[:, 1:]\n        logits = model(x)\n        loss = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), y.reshape(-1))\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n        losses.append(loss.item())\n    return losses\n",
+      "checks": [
+        {
+          "name": "logits for every position",
+          "code": "import torch\nmodel = TinyGPT(30, 16, 8, 1)\nassert model(torch.zeros(2, 8, dtype=torch.long)).shape == (2, 8, 30)\nassert model(torch.zeros(1, 3, dtype=torch.long)).shape == (1, 3, 30)"
+        },
+        {
+          "name": "knows positions",
+          "code": "import torch\nmodel = TinyGPT(30, 16, 8, 1)\nassert hasattr(model, 'positions') and model.positions.num_embeddings == 8\nwith torch.no_grad():\n    out = model(torch.full((1, 4), 5))\nassert not torch.allclose(out[0, 0], out[0, 1]), 'the same token at two positions must look different'"
+        },
+        {
+          "name": "learns the text",
+          "code": "import torch\ntorch.manual_seed(0)\ntext = 'the cat sat on the mat. ' * 8\nchars = sorted(set(text))\nids = torch.tensor([chars.index(c) for c in text])\nmodel = TinyGPT(len(chars), 32, 16, 1)\nlosses = train_gpt(model, ids, 16)\nassert len(losses) == 300, len(losses)\nassert sum(losses[-20:]) / 20 < 0.5, losses[-20:]"
+        }
+      ],
+      "hints": [
+        "Add `self.positions = nn.Embedding(context, d)` and `self.norm = nn.LayerNorm(d)`; in `forward`, add `self.positions(torch.arange(T))` to the token embeddings, and normalise before the head.",
+        "A window of `context + 1` ids gives inputs `w[:, :-1]` and targets `w[:, 1:]`: every position predicts the next one.",
+        "Flatten for the loss: `F.cross_entropy(logits.reshape(-1, vocab), y.reshape(-1))`, then the usual zero_grad, backward, step."
+      ],
+      "explanation": "Attention on its own does not know order: shuffle the inputs and the outputs shuffle with them. The position embedding gives the same token a different vector at each place, which is what lets the model tell `the cat` from `cat the`.\n\nA bigram model cannot get below the uncertainty of a single character, since `t` is followed by `h`, ` ` or `.`. With a 16-character view the tiny GPT learns the whole sentence and its loss falls well under that."
+    },
+    {
+      "id": "lora",
+      "title": "Fine-tuning with LoRA",
+      "body": "# Fine-tuning with LoRA\n\nFine-tuning adapts a trained model to a new task. Updating every weight is costly, so LoRA freezes the original weights and learns a small correction beside each layer: two thin matrices whose product has the layer's shape.\n\n```python\nimport torch\n\nout_f, in_f, r = 6, 4, 2\nA = torch.randn(r, in_f) * 0.01\nB = torch.zeros(out_f, r)\nprint((B @ A).shape)  # torch.Size([6, 4])\nprint(r * (in_f + out_f), in_f * out_f)\n```\n\n`B` starts at zero, so at first the adapted layer behaves exactly like the original. Training changes only `A` and `B`, a fraction of the weights, and the frozen base can be shared by many adapters.\n",
+      "task": "Write `LoRALinear(base, rank, alpha=1.0)`: keep the `nn.Linear` `base` and freeze its parameters, add `A` (`rank` by `in_features`, random times 0.01) and `B` (`out_features` by `rank`, zeros) as `nn.Parameter`s. `forward(x)` returns `base(x) + (x @ A.T @ B.T) * (alpha / rank)`. Write `trainable(model)` returning how many parameter values require gradients.",
+      "starter": "import torch\nfrom torch import nn\n\n\nclass LoRALinear(nn.Module):\n    def __init__(self, base, rank, alpha=1.0):\n        super().__init__()\n        self.base = base\n\n    def forward(self, x):\n        return self.base(x)\n\n\ndef trainable(model):\n    return sum(p.numel() for p in model.parameters())\n",
+      "solution": "import torch\nfrom torch import nn\n\n\nclass LoRALinear(nn.Module):\n    def __init__(self, base, rank, alpha=1.0):\n        super().__init__()\n        self.base = base\n        for p in self.base.parameters():\n            p.requires_grad = False\n        self.A = nn.Parameter(torch.randn(rank, base.in_features) * 0.01)\n        self.B = nn.Parameter(torch.zeros(base.out_features, rank))\n        self.scale = alpha / rank\n\n    def forward(self, x):\n        return self.base(x) + (x @ self.A.T @ self.B.T) * self.scale\n\n\ndef trainable(model):\n    return sum(p.numel() for p in model.parameters() if p.requires_grad)\n",
+      "checks": [
+        {
+          "name": "starts as the original",
+          "code": "import torch\nfrom torch import nn\nbase = nn.Linear(4, 6)\nlayer = LoRALinear(base, 2)\nx = torch.randn(3, 4)\nassert torch.allclose(layer(x), base(x))"
+        },
+        {
+          "name": "only the adapter trains",
+          "code": "from torch import nn\nlayer = LoRALinear(nn.Linear(40, 60), 2)\nassert trainable(layer) == 2 * (40 + 60), trainable(layer)\nassert not layer.base.weight.requires_grad"
+        },
+        {
+          "name": "learns while the base stays",
+          "code": "import torch\nfrom torch import nn\ntorch.manual_seed(0)\nbase = nn.Linear(4, 4)\nbefore = base.weight.detach().clone()\nlayer = LoRALinear(base, 2, alpha=2.0)\nx = torch.randn(64, 4)\ntarget = base(x).detach() + x @ torch.ones(4, 4) * 0.5\nopt = torch.optim.Adam([p for p in layer.parameters() if p.requires_grad], lr=0.05)\nfirst = None\nfor _ in range(300):\n    opt.zero_grad()\n    loss = ((layer(x) - target) ** 2).mean()\n    loss.backward()\n    opt.step()\n    first = first if first is not None else loss.item()\nassert loss.item() < first / 10, (first, loss.item())\nassert torch.equal(base.weight, before), 'the base weights moved'"
+        }
+      ],
+      "hints": [
+        "Freeze with `p.requires_grad = False` for every parameter of `base`.",
+        "`A = nn.Parameter(torch.randn(rank, base.in_features) * 0.01)` and `B = nn.Parameter(torch.zeros(base.out_features, rank))`.",
+        "`trainable` sums `p.numel()` only for parameters with `p.requires_grad`."
+      ],
+      "explanation": "Starting `B` at zero means the adapter adds nothing until it has learnt something, so fine-tuning begins from the original model's behaviour. Freezing the base keeps its knowledge and makes training cheap.\n\nThe target here is the original layer plus a change of rank 1, so a rank-2 adapter can learn it fully while touching 16 numbers instead of the layer's 20."
+    },
+    {
+      "id": "perplexity",
+      "title": "Measuring a language model",
+      "body": "# Measuring a language model\n\nHow good is a language model? The standard number is perplexity: the exponential of the average cross-entropy on text it has not seen.\n\nIt reads as \"how many tokens the model is choosing between\". A model that guesses uniformly from a 50-token vocabulary has perplexity 50. A perfect one has perplexity 1.\n\n```python\nimport math\nimport torch\nimport torch.nn.functional as F\n\nlogits = torch.zeros(3, 50)  # no idea\ntargets = torch.tensor([4, 7, 1])\nloss = F.cross_entropy(logits, targets)\nprint(math.exp(loss.item()))  # 50.0\n```\n\nLower is better, but only between models with the same tokenizer: splitting text differently changes what one step means.\n",
+      "task": "Write `perplexity(logits, targets)` returning `exp` of the mean cross-entropy as a float, for logits `(n, vocab)` and target ids `(n,)`. Write `accuracy(logits, targets)` returning the share of positions where the highest-scoring token is the target, as a float.",
+      "starter": "import math\nimport torch\nimport torch.nn.functional as F\n\n\ndef perplexity(logits, targets):\n    return F.cross_entropy(logits, targets).item()\n\n\ndef accuracy(logits, targets):\n    return 0.0\n",
+      "solution": "import math\nimport torch\nimport torch.nn.functional as F\n\n\ndef perplexity(logits, targets):\n    return math.exp(F.cross_entropy(logits, targets).item())\n\n\ndef accuracy(logits, targets):\n    return (logits.argmax(dim=-1) == targets).float().mean().item()\n",
+      "checks": [
+        {
+          "name": "uniform guessing",
+          "code": "import torch\ngot = perplexity(torch.zeros(5, 50), torch.tensor([1, 2, 3, 4, 5]))\nassert abs(got - 50) < 1e-3, got"
+        },
+        {
+          "name": "sure and right is 1",
+          "code": "import torch\nlogits = torch.full((3, 10), -100.0)\ntargets = torch.tensor([2, 5, 7])\nlogits[torch.arange(3), targets] = 100.0\ngot = perplexity(logits, targets)\nassert abs(got - 1) < 1e-4, got"
+        },
+        {
+          "name": "accuracy",
+          "code": "import torch\nlogits = torch.tensor([[2.0, 1.0], [0.0, 3.0], [5.0, 0.0], [1.0, 2.0]])\ngot = accuracy(logits, torch.tensor([0, 1, 1, 1]))\nassert abs(got - 0.75) < 1e-6, got"
+        }
+      ],
+      "hints": [
+        "Perplexity is `math.exp` of the cross-entropy, not the cross-entropy itself.",
+        "`F.cross_entropy(logits, targets)` already averages over positions.",
+        "For accuracy, compare `logits.argmax(dim=-1)` with `targets`, convert to float and take the mean."
+      ],
+      "explanation": "Cross-entropy is measured in nats per token, which is hard to picture. Taking the exponential turns it back into an effective number of choices, which is why uniform guessing over 50 tokens comes out as exactly 50.\n\nAccuracy only checks the top guess; perplexity also rewards putting high probability on the right token when the guess is wrong, which is why it is the usual training metric."
+    }
+  ]
+}

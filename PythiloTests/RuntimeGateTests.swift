@@ -420,6 +420,8 @@ final class RuntimeGateTests: XCTestCase {
         m = torch.tensor([[4.0, 1.0], [2.0, 3.0]])
         print("solve", [round(v, 4) for v in torch.linalg.solve(m, torch.tensor([1.0, 2.0])).tolist()])
         print("conv", nn.Conv2d(3, 8, 3)(torch.randn(2, 3, 32, 32)).shape)
+        u, w = torch.tensor([1.0, 2.0, 3.0]), torch.tensor([4.0, 5.0, 6.0])
+        print("dot", torch.dot(u, w).item(), (u @ w).item(), torch.dot(u.double(), w.double()).item())
         buffer = io.BytesIO()
         torch.save(model.state_dict(), buffer)
         buffer.seek(0)
@@ -433,6 +435,7 @@ final class RuntimeGateTests: XCTestCase {
         XCTAssertTrue(outputText().contains("numpy 15.0 [[0.0, 2.0, 4.0], [6.0, 8.0, 10.0]]"), outputText())
         XCTAssertTrue(outputText().contains("solve [0.1, 0.6]"), outputText())
         XCTAssertTrue(outputText().contains("conv torch.Size([2, 8, 30, 30])"), outputText())
+        XCTAssertTrue(outputText().contains("dot 32.0 32.0 32.0"), outputText())
         XCTAssertTrue(outputText().contains("saved True"), outputText())
     }
 
