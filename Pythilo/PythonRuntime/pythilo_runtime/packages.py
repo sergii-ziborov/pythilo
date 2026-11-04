@@ -26,12 +26,12 @@ def _bundled_native_packages():
 
 
 def pip(args, site):
-    if not args or args[0] in ("-h", "--help", "help"):
-        print("pip install <package>...   pip uninstall <package>...   pip list   pip show <package>   pip freeze")
-        print(f"Packages for this project live in {site}.")
-        print("Pure-Python wheels install from PyPI. Compiled packages only work if Pythilo bundles them.")
+    if not args or args[0] in ("-h", "--help") or args == ["help"]:
+        print(HELP.format(site=site), end="")
         return 0
     command, *rest = args
+    if command == "help":
+        command, rest = rest[0], ["--help"]
     if command in ("-V", "-v", "--version"):
         import pip
 
@@ -42,10 +42,41 @@ def pip(args, site):
         return _install(rest, site)
     if command == "uninstall":
         return _uninstall(rest, site)
-    if command in ("list", "freeze", "show"):
+    if command in ("list", "freeze") and not rest:
         return _inspect(command, rest, site)
-    print(f"pip {command} is not available in Pythilo.", file=sys.stderr)
+    if command in ("list", "freeze"):
+        # pip's own list and freeze, for --outdated, --format=json and the rest,
+        # pointed at this project's folder.
+        return _call_pip([command, "--path", site, *rest])
+    if command == "show":
+        return _show(rest)
+    if command in ("check", "index", "inspect", "hash", "debug", "config", "cache"):
+        return _call_pip([command, *rest])
+    if command in ("download", "wheel"):
+        return _call_pip([command, "--only-binary", ":all:", "--progress-bar", "off", *rest])
+    if command == "search":
+        print("pip search no longer works anywhere: PyPI turned it off. Use pip index versions <package>, "
+              "or search pypi.org.", file=sys.stderr)
+        return 2
+    print(f"pip {command} is not a pip command. pip help lists them.", file=sys.stderr)
     return 2
+
+
+HELP = """usage: pip <command> [options]
+  install PACKAGE... | -r requirements.txt   install wheels into this project (-U, --pre, --no-deps, -i URL work)
+  uninstall [-y] PACKAGE... | -r FILE         remove packages from this project
+  list [-o | --outdated] [--format=json]     installed packages (project and bundled)
+  freeze                                     project packages as requirements
+  show [-f] PACKAGE...                       details, dependencies and files
+  check                                      look for broken dependencies
+  download PACKAGE [-d folder]               fetch wheels without installing
+  index versions PACKAGE                     versions available on PyPI
+  inspect | hash | config | cache | debug    as in pip
+  pip help COMMAND or pip COMMAND --help     all options of a command
+Packages for this project live in {site}.
+Pure-Python wheels install from PyPI. Compiled packages work only if Pythilo bundles them
+(numpy, torch, pydantic and others: pip list shows them as bundled).
+"""
 
 
 def _call_pip(arguments):
@@ -99,7 +130,14 @@ def _uninstall(args, site):
 
     from importlib import metadata
 
-    names = [arg for arg in args if not arg.startswith("-")]
+    names = []
+    iterator = iter(args)
+    for arg in iterator:
+        if arg in ("-r", "--requirement"):
+            with open(next(iterator, ""), encoding="utf-8") as handle:
+                names.extend(_requirement_name(line) for line in handle if _requirement_name(line))
+        elif not arg.startswith("-"):
+            names.append(_requirement_name(arg))
     if not names:
         print("pip uninstall needs a package.", file=sys.stderr)
         return 2
@@ -126,6 +164,54 @@ def _uninstall(args, site):
                 os.rmdir(directory)
         print(f"Removed {name}")
     _write_manifest(site, _bundled_native_packages())
+    return code
+
+
+def _requirement_name(line):
+    import re
+
+    line = line.split("#", 1)[0].strip()
+    if not line or line.startswith("-"):
+        return ""
+    return re.split(r"[\s\[<>=!~;@]", line, maxsplit=1)[0]
+
+
+def _show(args):
+    from importlib import metadata
+
+    files = "-f" in args or "--files" in args
+    names = [arg for arg in args if not arg.startswith("-")]
+    if not names:
+        print("pip show needs a package.", file=sys.stderr)
+        return 1
+    every = list(metadata.distributions())
+    code = 0
+    for index, name in enumerate(names):
+        try:
+            dist = metadata.distribution(name)
+        except metadata.PackageNotFoundError:
+            print(f"WARNING: Package(s) not found: {name}", file=sys.stderr)
+            code = 1
+            continue
+        if index:
+            print("---")
+        key = (dist.metadata["Name"] or "").lower().replace("_", "-")
+        requires = sorted({_requirement_name(r) for r in dist.requires or [] if "extra ==" not in r})
+        required_by = sorted(
+            other.metadata["Name"] for other in every
+            if any(_requirement_name(r).lower().replace("_", "-") == key and "extra ==" not in r for r in other.requires or [])
+        )
+        meta = dist.metadata
+        home = meta.get("Home-page") or next((u.split(",", 1)[1].strip() for u in meta.get_all("Project-URL") or [] if "," in u), "")
+        print(f"Name: {meta['Name']}\nVersion: {dist.version}\nSummary: {meta.get('Summary') or ''}\nHome-page: {home}")
+        author = meta.get("Author") or meta.get("Author-email") or ""
+        license_text = meta.get("License-Expression") or meta.get("License") or ""
+        print(f"Author: {author}\nLicense: {license_text}")
+        print(f"Location: {dist.locate_file('')}\nRequires: {', '.join(requires)}\nRequired-by: {', '.join(required_by)}")
+        if files:
+            print("Files:")
+            for file in dist.files or []:
+                print(f"  {file}")
     return code
 
 

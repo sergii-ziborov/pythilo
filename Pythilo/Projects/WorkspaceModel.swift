@@ -306,6 +306,15 @@ final class WorkspaceModel {
         path.lowercased().hasSuffix(".ipynb")
     }
 
+    /// A SQLite file, by its first bytes, so db.sqlite3, app.db and a database
+    /// with any other name all open in the database browser.
+    func isDatabase(_ path: String) -> Bool {
+        guard buffers[path] == nil, let handle = try? FileHandle(forReadingFrom: fileURL(path)) else { return false }
+        defer { try? handle.close() }
+        let start = (try? handle.read(upToCount: 16)) ?? Data()
+        return start == Data("SQLite format 3\u{0}".utf8)
+    }
+
     func isText(_ path: String) -> Bool {
         buffers[path] != nil
     }

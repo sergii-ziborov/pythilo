@@ -228,6 +228,9 @@ struct EditorPane: View {
             if let path = model.selectedPath {
                 if model.isNotebook(path) {
                     NotebookView(model: model, path: path)
+                } else if model.isDatabase(path) {
+                    DatabaseView(model: model, path: path)
+                        .id(path)
                 } else if model.isText(path) {
                     editor(path)
                 } else {

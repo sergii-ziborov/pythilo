@@ -76,16 +76,51 @@ final class RuntimeGateTests: XCTestCase {
     func testPythonAndPipAnswerHelpAndVersion() async throws {
         let cases = [
             ("python --version", "Python 3.14"), ("python -V", "Python 3.14"), ("python --help", "python -m module"),
-            ("pip --version", "pip 26"), ("pip -v", "pip 26"), ("pip --help", "pip install"),
+            ("pip --version", "pip 26"), ("pip -v", "pip 26"), ("pip --help", "install PACKAGE"),
             ("pytest --version", "pytest"), ("npm --version", "npm"), ("npm --help", "npm install"),
             ("django-admin --version", "6."), ("flask --version", "Flask"), ("uvicorn --version", "uvicorn"),
             ("ls --help", "usage: ls"), ("grep --help", "usage: grep"), ("cd --version", "built into Pythilo"),
+            ("python -VV", "Python 3.14"), ("pip help install", "--target"), ("pip check", "requirements"), ("sqlite3 -version", "3."),
         ]
         for (line, expected) in cases {
             let outcome = try await shell(line)
             XCTAssertEqual(outcome.status, "finished", "\(line): \(outputText())")
             XCTAssertTrue(outputText().contains(expected), "\(line): \(outputText())")
         }
+    }
+
+    func testTerminalPipesListsRedirectsAndUtilities() async throws {
+        try "b 2\na 10\nc 1\na 10\n".write(to: root.appending(path: "data.txt"), atomically: true, encoding: .utf8)
+        let cases: [(String, String)] = [
+            ("cat data.txt | sort | uniq -c | sort -rn | head -1", "2 a 10"),
+            ("grep -c a data.txt && echo found || echo none", "found"),
+            ("grep zzz data.txt && echo found || echo none", "none"),
+            ("X=5; echo \"$X\" '$X' ${X}x", "5 $X 5x"),
+            ("awk '$2>2 {print $1}' data.txt | sort -u | tr '\\n' ,", "a,"),
+            ("sed -n 's/a/A/p' data.txt | wc -l", "2"),
+            ("echo hi > out.txt; echo more >> out.txt; cat -n out.txt | tail -1", "2\tmore"),
+            ("ls *.txt | xargs echo files:", "files: data.txt out.txt"),
+            ("python -c \"import sys; print(sys.stdin.read().upper())\" < out.txt", "HI"),
+            ("echo 'print(6*7)' | python -", "42"),
+            ("cat missing.txt 2>&1 | grep -o 'No such'", "No such"),
+            ("zip -rq a.zip data.txt && unzip -l a.zip", "data.txt"),
+            ("seq -s, 3", "1,2,3"),
+            ("diff data.txt out.txt | head -1", "1,4c1,2"),
+            ("sqlite3 t.db \"create table t(id integer primary key, name text); insert into t(name) values ('ann'), ('bob');\"", ""),
+            ("sqlite3 -box t.db 'select name from t order by id'", "│ bob  │"),
+            ("echo .tables | sqlite3 t.db", "t"),
+            ("sqlite3 -json t.db 'select count(*) as n from t'", "\"n\": 2"),
+        ]
+        for (line, expected) in cases {
+            let outcome = try await shell(line)
+            if !expected.isEmpty {
+                XCTAssertTrue(outputText().contains(expected), "\(line) printed: \(outputText())")
+            }
+            XCTAssertNotEqual(outcome.status, "crashed", line)
+        }
+        let background = try await shell("echo a & echo b")
+        XCTAssertEqual(background.status, "failed")
+        XCTAssertTrue(outputText().contains("background jobs"), outputText())
     }
 
     func testPrintAndFileAndVersion() async throws {
