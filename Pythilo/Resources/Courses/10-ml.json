@@ -1,0 +1,580 @@
+{
+  "id": "ml",
+  "title": "Machine learning with PyTorch",
+  "summary": "Tensors, autograd and training loops, then classifiers, convolutions, attention and a tiny language model, trained on the device.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "tensors",
+      "title": "Tensors",
+      "body": "# Tensors\n\nA tensor is PyTorch's array: numbers of one type, in a shape. It works like a NumPy array, and it can also remember how it was computed, which is what lets a network learn.\n\n```python\nimport torch\n\nx = torch.tensor([[1.0, 2.0], [3.0, 4.0]])\nprint(x.shape)        # torch.Size([2, 2])\nprint(x.dtype)        # torch.float32\nprint(x.mean(dim=0))  # tensor([2., 3.])\nprint(x[:, 1])        # second column\n```\n\n`dim=0` runs down the rows, so the result has one value per column. Operations between a `(rows, cols)` tensor and a `(cols,)` tensor apply the second to every row: this is broadcasting.\n\nModels expect inputs on similar scales. Standardising each column, so it has mean 0 and standard deviation 1, is the usual first step.\n",
+      "task": "Write `standardize(x)` returning `x` with every column shifted to mean 0 and scaled to standard deviation 1 (use `unbiased=False`). Write `first_rows(x, n)` returning the first `n` rows.",
+      "starter": "import torch\n\n\ndef standardize(x):\n    return x - x.mean()\n\n\ndef first_rows(x, n):\n    return x[:, :n]\n",
+      "solution": "import torch\n\n\ndef standardize(x):\n    mean = x.mean(dim=0)\n    std = x.std(dim=0, unbiased=False)\n    return (x - mean) / std\n\n\ndef first_rows(x, n):\n    return x[:n]\n",
+      "checks": [
+        {
+          "name": "columns get mean 0",
+          "code": "import torch\nx = torch.tensor([[1.0, 10.0], [3.0, 30.0], [5.0, 50.0]])\ngot = standardize(x)\nassert torch.allclose(got.mean(dim=0), torch.zeros(2), atol=1e-6), got.mean(dim=0)"
+        },
+        {
+          "name": "columns get standard deviation 1",
+          "code": "import torch\nx = torch.tensor([[1.0, 10.0], [3.0, 30.0], [5.0, 50.0]])\ngot = standardize(x)\nassert torch.allclose(got.std(dim=0, unbiased=False), torch.ones(2), atol=1e-6), got.std(dim=0, unbiased=False)"
+        },
+        {
+          "name": "the shape stays",
+          "code": "import torch\nassert standardize(torch.rand(7, 3) + 1).shape == (7, 3)"
+        },
+        {
+          "name": "first rows",
+          "code": "import torch\nx = torch.arange(12.0).reshape(4, 3)\ngot = first_rows(x, 2)\nassert got.shape == (2, 3), got.shape\nassert torch.equal(got, torch.tensor([[0.0, 1.0, 2.0], [3.0, 4.0, 5.0]])), got"
+        }
+      ],
+      "hints": [
+        "`x.mean(dim=0)` gives one mean per column; `x.std(dim=0, unbiased=False)` one spread per column.",
+        "Subtract the column means and divide by the column spreads: broadcasting applies them to every row.",
+        "`(x - x.mean(dim=0)) / x.std(dim=0, unbiased=False)`, and rows are the first index: `x[:n]`."
+      ],
+      "explanation": "`x.mean()` with no `dim` averages every number in the tensor, so each column was shifted by the same amount and kept its own spread. With `dim=0` the mean is taken down each column, giving a `(cols,)` tensor that broadcasting subtracts from every row.\n\nThe first index of a 2-D tensor is the row, so `x[:n]` is the first `n` rows; `x[:, :n]` is the first `n` columns."
+    },
+    {
+      "id": "autograd",
+      "title": "Autograd",
+      "body": "# Autograd\n\nTraining means changing numbers so that a loss gets smaller, and for that you need the slope of the loss with respect to each number. PyTorch works the slopes out for you.\n\nMark a tensor with `requires_grad=True`, compute something from it, call `.backward()` on the result, and the slope lands in `.grad`:\n\n```python\nimport torch\n\nx = torch.tensor(3.0, requires_grad=True)\ny = x ** 2 + 2 * x\ny.backward()\nprint(x.grad)  # 2x + 2 at x = 3: tensor(8.)\n```\n\n`backward()` needs a single number. For a function of several inputs, every input that requires a gradient gets its own `.grad`.\n",
+      "task": "Write `slope(f, x)`: the derivative of the one-argument function `f` at the float `x`, as a float, computed with autograd. Write `gradients(w, b, x, y)`: for the loss `((w * x + b - y) ** 2).mean()` over tensors `x` and `y`, return the pair of floats `(dloss/dw, dloss/db)`.",
+      "starter": "import torch\n\n\ndef slope(f, x):\n    return f(x)\n\n\ndef gradients(w, b, x, y):\n    return 0.0, 0.0\n",
+      "solution": "import torch\n\n\ndef slope(f, x):\n    point = torch.tensor(float(x), requires_grad=True)\n    f(point).backward()\n    return point.grad.item()\n\n\ndef gradients(w, b, x, y):\n    w = torch.tensor(float(w), requires_grad=True)\n    b = torch.tensor(float(b), requires_grad=True)\n    loss = ((w * x + b - y) ** 2).mean()\n    loss.backward()\n    return w.grad.item(), b.grad.item()\n",
+      "checks": [
+        {
+          "name": "slope of a square",
+          "code": "got = slope(lambda v: v ** 2, 3.0)\nassert abs(got - 6.0) < 1e-5, got"
+        },
+        {
+          "name": "slope of a sine",
+          "code": "import math, torch\ngot = slope(torch.sin, 0.5)\nassert abs(got - math.cos(0.5)) < 1e-5, got"
+        },
+        {
+          "name": "loss gradients",
+          "code": "import torch\nx = torch.tensor([1.0, 2.0, 3.0])\ny = torch.tensor([2.0, 4.0, 6.0])\ndw, db = gradients(1.0, 0.0, x, y)\nassert abs(dw - (-28 / 3)) < 1e-4, dw\nassert abs(db - (-4.0)) < 1e-4, db"
+        },
+        {
+          "name": "a perfect fit has no slope",
+          "code": "import torch\nx = torch.tensor([1.0, 2.0])\ndw, db = gradients(2.0, 1.0, x, 2 * x + 1)\nassert abs(dw) < 1e-6 and abs(db) < 1e-6, (dw, db)"
+        }
+      ],
+      "hints": [
+        "Make a tensor from `x` with `requires_grad=True` before calling `f` on it.",
+        "Call `.backward()` on the result, then read `.grad` from the input tensor and turn it into a float with `.item()`.",
+        "For `gradients`, make `w` and `b` tensors with `requires_grad=True`, build the loss from them, call `loss.backward()`, and return `w.grad.item(), b.grad.item()`."
+      ],
+      "explanation": "Autograd records each operation on tensors that require gradients, then walks that record backwards with the chain rule. That is why `x` must be a tensor with `requires_grad=True` before `f` runs: a plain float leaves no record.\n\nFor the loss, the slopes are `2 * mean((w x + b - y) x)` for `w` and `2 * mean(w x + b - y)` for `b`; autograd gets the same numbers without you deriving them."
+    },
+    {
+      "id": "gradient-descent",
+      "title": "Gradient descent",
+      "body": "# Gradient descent\n\nWith slopes in hand, learning is a loop: compute the loss, get the gradients, step every parameter a little against its gradient, clear the gradients, repeat.\n\n```python\nimport torch\n\nx = torch.linspace(-1, 1, 20)\ny = 3 * x\nw = torch.zeros(1, requires_grad=True)\nfor step in range(200):\n    loss = ((w * x - y) ** 2).mean()\n    loss.backward()\n    with torch.no_grad():\n        w -= 0.1 * w.grad\n    w.grad.zero_()\nprint(w.item())  # close to 3\n```\n\nTwo details matter. The update happens inside `torch.no_grad()`, so it is not recorded as part of the model. And gradients add up across `backward()` calls, so they must be cleared every step.\n\nThe step size, the learning rate, decides everything: too small and nothing moves, too large and the loss explodes.\n",
+      "task": "Write `fit_line(x, y, lr=0.1, steps=500)` that learns `w` and `b` for `y ≈ w * x + b` by gradient descent on the mean squared error, starting from zero, and returns them as floats `(w, b)`.",
+      "starter": "import torch\n\n\ndef fit_line(x, y, lr=0.1, steps=500):\n    w = torch.zeros(1, requires_grad=True)\n    b = torch.zeros(1, requires_grad=True)\n    for step in range(steps):\n        loss = ((w * x + b - y) ** 2).mean()\n        loss.backward()\n    return w.item(), b.item()\n",
+      "solution": "import torch\n\n\ndef fit_line(x, y, lr=0.1, steps=500):\n    w = torch.zeros(1, requires_grad=True)\n    b = torch.zeros(1, requires_grad=True)\n    for step in range(steps):\n        loss = ((w * x + b - y) ** 2).mean()\n        loss.backward()\n        with torch.no_grad():\n            w -= lr * w.grad\n            b -= lr * b.grad\n        w.grad.zero_()\n        b.grad.zero_()\n    return w.item(), b.item()\n",
+      "checks": [
+        {
+          "name": "learns a line",
+          "code": "import torch\nx = torch.linspace(-1, 1, 50)\nw, b = fit_line(x, 3 * x - 0.5)\nassert abs(w - 3) < 0.01 and abs(b + 0.5) < 0.01, (w, b)"
+        },
+        {
+          "name": "copes with noise",
+          "code": "import torch\ntorch.manual_seed(0)\nx = torch.linspace(-1, 1, 200)\ny = -2 * x + 1 + 0.05 * torch.randn(200)\nw, b = fit_line(x, y)\nassert abs(w + 2) < 0.05 and abs(b - 1) < 0.05, (w, b)"
+        },
+        {
+          "name": "returns floats",
+          "code": "import torch\nx = torch.linspace(0, 1, 10)\nw, b = fit_line(x, x, steps=10)\nassert isinstance(w, float) and isinstance(b, float), (type(w), type(b))"
+        }
+      ],
+      "hints": [
+        "The loop computes gradients but never changes `w` or `b`.",
+        "Inside `with torch.no_grad():`, subtract `lr * w.grad` from `w` and `lr * b.grad` from `b`.",
+        "After the update, clear the gradients with `w.grad.zero_()` and `b.grad.zero_()`, or the next step adds to them."
+      ],
+      "explanation": "Each step moves the parameters downhill on the loss surface by `lr` times the slope. Doing it under `no_grad` keeps the update itself out of autograd's record; doing it in place (`-=`) keeps `w` the same leaf tensor that collects gradients.\n\nWithout `zero_()`, every `backward()` adds its gradient to the last one, so the steps grow until the fit overshoots."
+    },
+    {
+      "id": "modules-and-optimizers",
+      "title": "Modules and optimizers",
+      "body": "# Modules and optimizers\n\nWriting every parameter by hand stops scaling at once. `torch.nn` holds the layers, `torch.optim` the update rules:\n\n```python\nimport torch\nfrom torch import nn\n\nx = torch.randn(64, 3)\ny = x.sum(dim=1, keepdim=True)\n# y = x @ W.T + b, W and b inside\nmodel = nn.Linear(3, 1)\noptimizer = torch.optim.SGD(\n    model.parameters(), lr=0.1)\nloss_fn = nn.MSELoss()\n\nfor step in range(300):\n    optimizer.zero_grad()\n    loss = loss_fn(model(x), y)\n    loss.backward()\n    optimizer.step()\nprint(model.weight.data)  # near [1, 1, 1]\n```\n\n`model.parameters()` hands the optimizer every tensor it has to update, however many layers the model has. `optimizer.zero_grad()` and `optimizer.step()` replace the manual clearing and stepping from the last lesson.\n\nA model's learned numbers live in `model.state_dict()`, which `torch.save` writes to a file and `load_state_dict` reads back.\n",
+      "task": "Write `train_linear(x, y, steps=300)`: train an `nn.Linear` from the columns of `x` (shape `(n, k)`) to `y` (shape `(n, 1)`) with `torch.optim.SGD` at `lr=0.1` and `nn.MSELoss`, and return the trained model. Write `final_loss(model, x, y)` returning the mean squared error as a float, without recording gradients.",
+      "starter": "import torch\nfrom torch import nn\n\n\ndef train_linear(x, y, steps=300):\n    model = nn.Linear(x.shape[1], 1)\n    return model\n\n\ndef final_loss(model, x, y):\n    return nn.MSELoss()(model(x), y)\n",
+      "solution": "import torch\nfrom torch import nn\n\n\ndef train_linear(x, y, steps=300):\n    model = nn.Linear(x.shape[1], 1)\n    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)\n    loss_fn = nn.MSELoss()\n    for step in range(steps):\n        optimizer.zero_grad()\n        loss = loss_fn(model(x), y)\n        loss.backward()\n        optimizer.step()\n    return model\n\n\ndef final_loss(model, x, y):\n    with torch.no_grad():\n        return nn.MSELoss()(model(x), y).item()\n",
+      "checks": [
+        {
+          "name": "learns the weights",
+          "code": "import torch\ntorch.manual_seed(1)\nx = torch.randn(100, 2)\ny = (x @ torch.tensor([[2.0], [-1.0]])) + 0.5\nmodel = train_linear(x, y)\nassert torch.allclose(model.weight.detach(), torch.tensor([[2.0, -1.0]]), atol=0.02), model.weight\nassert abs(model.bias.item() - 0.5) < 0.02, model.bias"
+        },
+        {
+          "name": "the loss is small",
+          "code": "import torch\ntorch.manual_seed(2)\nx = torch.randn(80, 3)\ny = x.sum(dim=1, keepdim=True)\nmodel = train_linear(x, y)\nloss = final_loss(model, x, y)\nassert isinstance(loss, float), type(loss)\nassert loss < 1e-3, loss"
+        },
+        {
+          "name": "survives a save and load",
+          "code": "import io, torch\nfrom torch import nn\ntorch.manual_seed(3)\nx = torch.randn(50, 2)\ny = x[:, :1] * 4\nmodel = train_linear(x, y)\nbuffer = io.BytesIO()\ntorch.save(model.state_dict(), buffer)\nbuffer.seek(0)\ncopy = nn.Linear(2, 1)\ncopy.load_state_dict(torch.load(buffer))\nassert torch.equal(copy(x), model(x))"
+        }
+      ],
+      "hints": [
+        "Create `torch.optim.SGD(model.parameters(), lr=0.1)` and `nn.MSELoss()`, then loop `steps` times.",
+        "Each step: `optimizer.zero_grad()`, compute the loss, `loss.backward()`, `optimizer.step()`.",
+        "For `final_loss`, compute inside `with torch.no_grad():` and return `.item()` so the caller gets a float."
+      ],
+      "explanation": "The starter built a model and never trained it, so its weights stayed random. The optimizer does what the hand-written loop did: `zero_grad` clears, `step` moves each parameter against its gradient.\n\n`no_grad` in `final_loss` skips building the autograd record, which is cheaper when you only measure; `.item()` turns the one-number tensor into a Python float."
+    },
+    {
+      "id": "custom-modules",
+      "title": "Your own module",
+      "body": "# Your own module\n\n`nn.Sequential` runs layers one after another. A model that does anything else, such as adding its input back to its output, is a class of your own: subclass `nn.Module`, create the parts in `__init__`, and use them in `forward`.\n\n```python\nimport torch\nfrom torch import nn\n\nclass Affine(nn.Module):\n    def __init__(self, size):\n        super().__init__()\n        self.scale = nn.Parameter(\n            torch.ones(size))\n        self.shift = nn.Parameter(\n            torch.zeros(size))\n\n    def forward(self, x):\n        return x * self.scale + self.shift\n\nm = Affine(3)\nfor name, p in m.named_parameters():\n    print(name, p.shape)\nprint(m(torch.ones(2, 3)))\n```\n\nWrapping a tensor in `nn.Parameter` and assigning it to `self` registers it: it appears in `parameters()`, so the optimizer trains it, and in `state_dict()`, so it is saved. A layer assigned to `self` registers its own parameters the same way. A plain tensor stays invisible to both.\n\nLayers start from random values scaled to their size. `nn.init` replaces them in place, for example `nn.init.zeros_(layer.bias)` or `nn.init.xavier_uniform_(layer.weight)`.\n",
+      "task": "Write `ReZero(nn.Module)` taking `size`: it holds `self.linear = nn.Linear(size, size)`, with the weight set by `nn.init.xavier_uniform_` and the bias by `nn.init.zeros_`, and a learnable `self.alpha` of shape `(1,)` starting at 0. Its `forward(x)` returns `x + self.alpha * torch.tanh(self.linear(x))`.",
+      "starter": "import torch\nfrom torch import nn\n\n\nclass ReZero(nn.Module):\n    def __init__(self, size):\n        super().__init__()\n        self.linear = nn.Linear(size, size)\n        self.alpha = torch.zeros(1)\n\n    def forward(self, x):\n        return x + self.alpha * torch.tanh(self.linear(x))\n",
+      "solution": "import torch\nfrom torch import nn\n\n\nclass ReZero(nn.Module):\n    def __init__(self, size):\n        super().__init__()\n        self.linear = nn.Linear(size, size)\n        nn.init.xavier_uniform_(self.linear.weight)\n        nn.init.zeros_(self.linear.bias)\n        self.alpha = nn.Parameter(torch.zeros(1))\n\n    def forward(self, x):\n        return x + self.alpha * torch.tanh(self.linear(x))\n",
+      "checks": [
+        {
+          "name": "starts as the identity",
+          "code": "import torch\ntorch.manual_seed(0)\nblock = ReZero(3)\nx = torch.randn(5, 3)\ngot = block(x)\nassert got.shape == (5, 3), got.shape\nassert torch.equal(got, x), got"
+        },
+        {
+          "name": "alpha is a parameter",
+          "code": "block = ReZero(4)\nnames = sorted(name for name, _ in block.named_parameters())\nassert names == ['alpha', 'linear.bias', 'linear.weight'], names\nsaved = sorted(block.state_dict())\nassert saved == names, saved"
+        },
+        {
+          "name": "initialised as asked",
+          "code": "import math, torch\ntorch.manual_seed(1)\nblock = ReZero(64)\nassert torch.equal(block.linear.bias, torch.zeros(64)), 'the bias is not zero'\nstd = block.linear.weight.std().item()\nassert abs(std - math.sqrt(2 / 128)) < 0.01, std\nassert block.alpha.shape == (1,) and block.alpha.item() == 0.0, block.alpha"
+        },
+        {
+          "name": "trains alpha and the layer",
+          "code": "import torch\ntorch.manual_seed(2)\nblock = ReZero(4)\nx = torch.randn(64, 4)\ny = x + 0.3 * torch.tanh(x.flip(1))\noptimizer = torch.optim.Adam(block.parameters(), lr=0.05)\nlosses = []\nfor step in range(200):\n    optimizer.zero_grad()\n    loss = ((block(x) - y) ** 2).mean()\n    loss.backward()\n    optimizer.step()\n    losses.append(loss.item())\nassert losses[-1] < losses[0] / 100, (losses[0], losses[-1])"
+        }
+      ],
+      "hints": [
+        "A plain tensor attribute is neither trained nor saved. Wrap it: `nn.Parameter(torch.zeros(1))`.",
+        "Initialise right after creating the layer: `nn.init.xavier_uniform_(self.linear.weight)` and `nn.init.zeros_(self.linear.bias)`. The trailing underscore means in place.",
+        "`__init__` is `super().__init__()`, the layer, the two `nn.init` calls, then `self.alpha = nn.Parameter(torch.zeros(1))`."
+      ],
+      "explanation": "`self.alpha = torch.zeros(1)` gives the right output, so the first check passes, but `nn.Module` only tracks attributes that are parameters or modules. The optimizer never saw `alpha`, the layer's gradients were multiplied by a zero that never changed, and the block stayed the identity for ever.\n\nStarting a residual block as the identity is a real technique, called ReZero: a deep stack of such blocks begins as a harmless pass-through and learns, through `alpha`, how much each block should add."
+    },
+    {
+      "id": "classification",
+      "title": "Classification",
+      "body": "# Classification\n\nA straight line cannot separate every pattern. XOR is the classic case: points are class 1 when exactly one coordinate is positive. No single line splits them, but a small network with a hidden layer and a non-linearity can.\n\n```python\nimport torch\nfrom torch import nn\n\nx = torch.rand(8, 2) * 2 - 1\ny = (x[:, 0] > 0).long()\nmodel = nn.Sequential(\n    nn.Linear(2, 16), nn.Tanh(),\n    nn.Linear(16, 2),\n)\n# one score per class\nlogits = model(x)\n# y holds class numbers 0 and 1\nloss = nn.CrossEntropyLoss()(logits, y)\nprint(loss.item())\nprint(logits.argmax(dim=1))\n```\n\nThe network outputs one score, a logit, per class. `CrossEntropyLoss` turns them into probabilities and compares them with the true class; `argmax` picks the predicted class. `Adam` usually trains such models faster than plain SGD.\n",
+      "task": "Write `xor_data(n, seed)` returning `(x, y)`: `n` points uniform in the square from -1 to 1 (use `torch.manual_seed(seed)` then `torch.rand`), and labels `1` where exactly one coordinate is positive, else `0` (`long`). Write `train_classifier(x, y, steps=500)` returning a trained model, and `accuracy(model, x, y)` returning the share of correct predictions as a float.",
+      "starter": "import torch\nfrom torch import nn\n\n\ndef xor_data(n, seed):\n    torch.manual_seed(seed)\n    x = torch.rand(n, 2) * 2 - 1\n    y = (x[:, 0] > 0).long()\n    return x, y\n\n\ndef train_classifier(x, y, steps=500):\n    return nn.Linear(2, 2)\n\n\ndef accuracy(model, x, y):\n    return 0.0\n",
+      "solution": "import torch\nfrom torch import nn\n\n\ndef xor_data(n, seed):\n    torch.manual_seed(seed)\n    x = torch.rand(n, 2) * 2 - 1\n    y = ((x[:, 0] > 0) != (x[:, 1] > 0)).long()\n    return x, y\n\n\ndef train_classifier(x, y, steps=500):\n    model = nn.Sequential(nn.Linear(2, 16), nn.Tanh(), nn.Linear(16, 2))\n    optimizer = torch.optim.Adam(model.parameters(), lr=0.03)\n    loss_fn = nn.CrossEntropyLoss()\n    for step in range(steps):\n        optimizer.zero_grad()\n        loss_fn(model(x), y).backward()\n        optimizer.step()\n    return model\n\n\ndef accuracy(model, x, y):\n    with torch.no_grad():\n        return (model(x).argmax(dim=1) == y).float().mean().item()\n",
+      "checks": [
+        {
+          "name": "XOR labels",
+          "code": "import torch\nx, y = xor_data(200, 0)\nassert y.dtype == torch.long, y.dtype\nexpected = ((x[:, 0] > 0) != (x[:, 1] > 0)).long()\nassert torch.equal(y, expected)\nassert x.min() >= -1 and x.max() <= 1"
+        },
+        {
+          "name": "accuracy counts correct answers",
+          "code": "import torch\nclass Fixed(torch.nn.Module):\n    def forward(self, x):\n        return torch.tensor([[1.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 0.0]])\ngot = accuracy(Fixed(), torch.zeros(4, 2), torch.tensor([0, 1, 1, 1]))\nassert abs(got - 0.5) < 1e-6, got"
+        },
+        {
+          "name": "learns XOR",
+          "code": "import torch\ntorch.manual_seed(0)\nx, y = xor_data(400, 1)\nmodel = train_classifier(x, y)\ntest_x, test_y = xor_data(400, 2)\ngot = accuracy(model, test_x, test_y)\nassert got > 0.9, got"
+        }
+      ],
+      "hints": [
+        "XOR is 'not equal': `(x[:, 0] > 0) != (x[:, 1] > 0)`, then `.long()`.",
+        "A single `nn.Linear` cannot learn XOR. Use `nn.Sequential(nn.Linear(2, 16), nn.Tanh(), nn.Linear(16, 2))`, `Adam` with `lr=0.03` and `nn.CrossEntropyLoss()`.",
+        "For accuracy: under `no_grad`, compare `model(x).argmax(dim=1)` with `y`, turn the booleans into floats and take the mean."
+      ],
+      "explanation": "A linear layer draws one straight boundary, and XOR needs two. The hidden layer with `Tanh` bends the space so the last layer can separate it.\n\nAccuracy is measured on fresh points from another seed. A model that only memorised its training points would fail there; this one learnt the rule."
+    },
+    {
+      "id": "overfitting",
+      "title": "Training, test and overfitting",
+      "body": "# Training, test and overfitting\n\nA model is only useful on data it has not seen. So you hold some data back: train on one part, measure on the other.\n\n```python\nimport torch\n\nx = torch.arange(10.0)\nseed = torch.Generator().manual_seed(0)\norder = torch.randperm(\n    len(x), generator=seed)\ncut = int(len(x) * 0.8)\ntrain_x = x[order[:cut]]\ntest_x = x[order[cut:]]\nprint(train_x, test_x)\n```\n\nWhen the training loss keeps falling but the test loss starts rising, the model is overfitting: it is learning the noise of its training points. A big model on few points does this easily. Weight decay, more data or a smaller model pull it back.\n",
+      "task": "Write `split(x, y, fraction, seed)` returning `(train_x, train_y, test_x, test_y)`: shuffle with `torch.randperm` and a generator seeded with `seed`, and put the first `int(len(x) * fraction)` shuffled rows in training. Write `gap(train_loss, test_loss)` returning how much worse the test loss is, as `test_loss - train_loss`, and `is_overfitting(history)` which, for a list of `(train_loss, test_loss)` pairs, is true when the last test loss is above the lowest test loss seen by more than 10%.",
+      "starter": "import torch\n\n\ndef split(x, y, fraction, seed):\n    cut = int(len(x) * fraction)\n    return x[:cut], y[:cut], x[cut:], y[cut:]\n\n\ndef gap(train_loss, test_loss):\n    return train_loss - test_loss\n\n\ndef is_overfitting(history):\n    return False\n",
+      "solution": "import torch\n\n\ndef split(x, y, fraction, seed):\n    order = torch.randperm(len(x), generator=torch.Generator().manual_seed(seed))\n    cut = int(len(x) * fraction)\n    train, test = order[:cut], order[cut:]\n    return x[train], y[train], x[test], y[test]\n\n\ndef gap(train_loss, test_loss):\n    return test_loss - train_loss\n\n\ndef is_overfitting(history):\n    tests = [test for _, test in history]\n    return tests[-1] > min(tests) * 1.1\n",
+      "checks": [
+        {
+          "name": "sizes",
+          "code": "import torch\nx = torch.arange(10.0).unsqueeze(1)\ny = torch.arange(10)\ntx, ty, vx, vy = split(x, y, 0.8, 0)\nassert len(tx) == 8 and len(vx) == 2, (len(tx), len(vx))"
+        },
+        {
+          "name": "shuffled, nothing lost, pairs kept",
+          "code": "import torch\nx = torch.arange(20.0).unsqueeze(1)\ny = torch.arange(20)\ntx, ty, vx, vy = split(x, y, 0.5, 3)\nassert sorted(torch.cat([ty, vy]).tolist()) == list(range(20))\nassert ty.tolist() != list(range(10)), 'not shuffled'\nassert torch.equal(tx.squeeze(1).long(), ty)"
+        },
+        {
+          "name": "the seed repeats the split",
+          "code": "import torch\nx = torch.arange(20.0).unsqueeze(1)\ny = torch.arange(20)\nassert torch.equal(split(x, y, 0.5, 7)[1], split(x, y, 0.5, 7)[1])"
+        },
+        {
+          "name": "gap",
+          "code": "assert abs(gap(0.2, 0.5) - 0.3) < 1e-9, gap(0.2, 0.5)"
+        },
+        {
+          "name": "spots overfitting",
+          "code": "history = [(1.0, 1.0), (0.5, 0.6), (0.2, 0.5), (0.05, 0.7)]\nassert is_overfitting(history)\nassert not is_overfitting([(1.0, 1.0), (0.5, 0.6), (0.3, 0.4)])"
+        }
+      ],
+      "hints": [
+        "`torch.randperm(len(x), generator=torch.Generator().manual_seed(seed))` gives a shuffled order of row numbers.",
+        "Index both `x` and `y` with the same order, so each point keeps its label.",
+        "`gap` is test minus train. For `is_overfitting`, collect the test losses and compare the last with `min(...) * 1.1`."
+      ],
+      "explanation": "Taking the first rows without shuffling makes the split depend on how the data happened to be stored, often sorted by class or by time. A seeded shuffle gives an honest test set that is the same on every run.\n\nWatching the test loss, not the training loss, is what tells you to stop: the point where it is lowest is the model you want to keep."
+    },
+    {
+      "id": "dropout-and-weight-decay",
+      "title": "Dropout and weight decay",
+      "body": "# Dropout and weight decay\n\nTwo standard ways to fight overfitting change how training works, not the data.\n\nDropout sets a random share `p` of a layer's outputs to zero at every training step, so no unit can rely on one particular other. The survivors are divided by `1 - p`, so each output keeps the same average.\n\n```python\nimport torch\nfrom torch import nn\n\ntorch.manual_seed(0)\ndrop = nn.Dropout(p=0.5)\nx = torch.ones(8)\ndrop.train()\nprint(drop(x))  # zeros and twos\ndrop.eval()\nprint(drop(x))  # all ones\n```\n\nWhen you measure or predict, dropout must be off. `model.train()` and `model.eval()` switch every layer of a model between the two modes; a new model starts in training mode.\n\nWeight decay pulls every weight a little toward zero at each step, so the model keeps large weights only where they really lower the loss. Optimizers take it as an argument: `torch.optim.SGD(params, lr=0.1, weight_decay=0.01)`.\n",
+      "task": "Write `dropout(x, p, training)`: when `training` is true, zero each element with probability `p` (use `torch.rand_like`) and divide the rest by `1 - p`, otherwise return `x` unchanged. Write `fit(x, y, decay, steps=200)` training an `nn.Linear` with `torch.optim.SGD` at `lr=0.1` and `weight_decay=decay` on the mean squared error, and `predict(model, x)` that switches `model` to eval mode and returns its output without gradients.",
+      "starter": "import torch\nfrom torch import nn\n\n\ndef dropout(x, p, training):\n    if not training:\n        return x\n    return x * (torch.rand_like(x) >= p)\n\n\ndef fit(x, y, decay, steps=200):\n    model = nn.Linear(x.shape[1], y.shape[1])\n    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)\n    loss_fn = nn.MSELoss()\n    for step in range(steps):\n        optimizer.zero_grad()\n        loss_fn(model(x), y).backward()\n        optimizer.step()\n    return model\n\n\ndef predict(model, x):\n    return model(x)\n",
+      "solution": "import torch\nfrom torch import nn\n\n\ndef dropout(x, p, training):\n    if not training:\n        return x\n    keep = (torch.rand_like(x) >= p).float()\n    return x * keep / (1 - p)\n\n\ndef fit(x, y, decay, steps=200):\n    model = nn.Linear(x.shape[1], y.shape[1])\n    optimizer = torch.optim.SGD(model.parameters(), lr=0.1, weight_decay=decay)\n    loss_fn = nn.MSELoss()\n    for step in range(steps):\n        optimizer.zero_grad()\n        loss_fn(model(x), y).backward()\n        optimizer.step()\n    return model\n\n\ndef predict(model, x):\n    model.eval()\n    with torch.no_grad():\n        return model(x)\n",
+      "checks": [
+        {
+          "name": "off outside training",
+          "code": "import torch\nx = torch.rand(100)\nassert torch.equal(dropout(x, 0.5, False), x)"
+        },
+        {
+          "name": "drops about p",
+          "code": "import torch\ntorch.manual_seed(0)\nout = dropout(torch.ones(10000), 0.25, True)\nshare = (out == 0).float().mean().item()\nassert abs(share - 0.25) < 0.02, share"
+        },
+        {
+          "name": "rescales the survivors",
+          "code": "import torch\ntorch.manual_seed(1)\nout = dropout(torch.ones(10000), 0.25, True)\nkept = out[out != 0]\nassert torch.allclose(kept, torch.full_like(kept, 1 / 0.75)), kept[:5]\nassert abs(out.mean().item() - 1.0) < 0.03, out.mean().item()"
+        },
+        {
+          "name": "weight decay shrinks the weights",
+          "code": "import torch\ntorch.manual_seed(0)\nx = torch.randn(100, 5)\ny = x[:, :1] + 0.1 * torch.randn(100, 1)\nplain = fit(x, y, 0.0).weight.norm().item()\ndecayed = fit(x, y, 1.0).weight.norm().item()\nassert decayed < 0.8 * plain, (plain, decayed)"
+        },
+        {
+          "name": "predict switches dropout off",
+          "code": "import torch\nfrom torch import nn\ntorch.manual_seed(2)\nmodel = nn.Sequential(nn.Linear(4, 32), nn.Dropout(0.5), nn.Linear(32, 1))\nx = torch.randn(8, 4)\nfirst, second = predict(model, x), predict(model, x)\nassert torch.equal(first, second), 'dropout is still on'\nassert not model.training, 'the model is still in training mode'\nassert not first.requires_grad, 'gradients were recorded'"
+        }
+      ],
+      "hints": [
+        "`torch.rand_like(x) >= p` is true with probability `1 - p`: it is the mask of the values to keep.",
+        "Multiply by the mask and divide by `1 - p`. Weight decay is only an argument: `torch.optim.SGD(model.parameters(), lr=0.1, weight_decay=decay)`.",
+        "`predict` is `model.eval()`, then `with torch.no_grad(): return model(x)`."
+      ],
+      "explanation": "Without the division, a layer with dropout gives outputs about `1 - p` times smaller in training than at test time, when nothing is dropped, so the next layer sees a different scale in each mode. Dividing the survivors by `1 - p` during training, as `nn.Dropout` does, keeps the two the same.\n\nForgetting `model.eval()` is one of the most common bugs in PyTorch: predictions come out noisy and a little wrong, and nothing crashes. Weight decay is the opposite kind of tool: one argument to the optimizer, and the weights stay small."
+    },
+    {
+      "id": "mini-batches",
+      "title": "Mini-batches",
+      "body": "# Mini-batches\n\nReal datasets do not fit in one step. You train on small batches: each step sees a few dozen examples, and one pass over all of them is an epoch.\n\n```python\nimport torch\nfrom torch.utils.data import (\n    DataLoader, TensorDataset)\n\nx = torch.arange(10.0).unsqueeze(1)\ndata = TensorDataset(x, x * 2)\nloader = DataLoader(\n    data, batch_size=4, shuffle=True)\nfor epoch in range(2):\n    for batch_x, batch_y in loader:\n        print(epoch, batch_x.flatten())\n```\n\n`TensorDataset` pairs the rows of `x` and `y`; `DataLoader` cuts them into shuffled batches. On an iPhone or iPad keep the default `num_workers=0`: an app runs as one process.\n",
+      "task": "Write `batches(x, y, size)` returning a `DataLoader` over `x` and `y` with that batch size, shuffled. Write `train_epochs(model, loader, epochs, lr=0.05)` that trains with `torch.optim.Adam` and `nn.MSELoss` on every batch of every epoch, and returns the list of average losses per epoch.",
+      "starter": "import torch\nfrom torch import nn\nfrom torch.utils.data import DataLoader, TensorDataset\n\n\ndef batches(x, y, size):\n    return [(x, y)]\n\n\ndef train_epochs(model, loader, epochs, lr=0.05):\n    return []\n",
+      "solution": "import torch\nfrom torch import nn\nfrom torch.utils.data import DataLoader, TensorDataset\n\n\ndef batches(x, y, size):\n    return DataLoader(TensorDataset(x, y), batch_size=size, shuffle=True)\n\n\ndef train_epochs(model, loader, epochs, lr=0.05):\n    optimizer = torch.optim.Adam(model.parameters(), lr=lr)\n    loss_fn = nn.MSELoss()\n    history = []\n    for epoch in range(epochs):\n        total, count = 0.0, 0\n        for batch_x, batch_y in loader:\n            optimizer.zero_grad()\n            loss = loss_fn(model(batch_x), batch_y)\n            loss.backward()\n            optimizer.step()\n            total += loss.item() * len(batch_x)\n            count += len(batch_x)\n        history.append(total / count)\n    return history\n",
+      "checks": [
+        {
+          "name": "batch sizes",
+          "code": "import torch\nloader = batches(torch.zeros(70, 2), torch.zeros(70, 1), 32)\nsizes = [len(bx) for bx, by in loader]\nassert sorted(sizes) == [6, 32, 32], sizes"
+        },
+        {
+          "name": "every row, once per epoch",
+          "code": "import torch\nx = torch.arange(40.0).unsqueeze(1)\nloader = batches(x, x, 8)\nseen = sorted(int(v) for bx, by in loader for v in bx.squeeze(1))\nassert seen == list(range(40)), seen"
+        },
+        {
+          "name": "the loss falls",
+          "code": "import torch\nfrom torch import nn\ntorch.manual_seed(0)\nx = torch.randn(256, 3)\ny = x @ torch.tensor([[1.0], [-2.0], [0.5]])\nhistory = train_epochs(nn.Linear(3, 1), batches(x, y, 32), 15)\nassert len(history) == 15, len(history)\nassert history[-1] < history[0] / 20, history"
+        }
+      ],
+      "hints": [
+        "`DataLoader(TensorDataset(x, y), batch_size=size, shuffle=True)`.",
+        "Two loops: over epochs, and inside it over `for batch_x, batch_y in loader:` with the usual zero_grad, loss, backward, step.",
+        "To average per epoch, add `loss.item() * len(batch_x)` and the batch sizes, then divide at the end of the epoch."
+      ],
+      "explanation": "Small batches make each step cheap and a little noisy, and the noise helps more than it hurts. Weighting each batch's loss by its size gives the true average even when the last batch is short.\n\nThe DataLoader reshuffles at the start of every epoch, so the batches differ each time while every row is still seen once."
+    },
+    {
+      "id": "custom-datasets",
+      "title": "Your own Dataset",
+      "body": "# Your own Dataset\n\n`TensorDataset` needs every example ready as rows of tensors. When examples are cut from a longer series, read from files or built on demand, write a `Dataset` of your own. It needs two methods: `__len__`, the number of examples, and `__getitem__(i)`, example number `i`.\n\n```python\nimport torch\nfrom torch.utils.data import (\n    DataLoader, Dataset)\n\nclass Squares(Dataset):\n    def __len__(self):\n        return 10\n\n    def __getitem__(self, i):\n        x = torch.tensor([float(i)])\n        return x, x ** 2\n\ndata = Squares()\nprint(len(data), data[3])\nloader = DataLoader(data, batch_size=4)\nfor x, y in loader:\n    print(x.flatten(), y.flatten())\n```\n\nThe `DataLoader` asks for every index from 0 to `len(data) - 1`, calls `__getitem__` for each one in a batch, and stacks the results: a pair of tensors per example becomes a pair of batch tensors.\n\nExamples are only computed when asked for, so a dataset can describe far more data than would fit in memory.\n",
+      "task": "Write a `Dataset` subclass `Windows(series, size)` over a 1-D tensor: example `i` is the pair `(series[i:i + size], series[i + size])`, a window and the value after it, and its length is the number of complete pairs, 0 if the series is too short. Write `loader(series, size, batch)` returning a shuffled `DataLoader` over it with that batch size.",
+      "starter": "import torch\nfrom torch.utils.data import DataLoader, Dataset\n\n\nclass Windows(Dataset):\n    def __init__(self, series, size):\n        self.series = series\n        self.size = size\n\n    def __len__(self):\n        return len(self.series)\n\n    def __getitem__(self, i):\n        return self.series[i:i + self.size], self.series[i + self.size]\n\n\ndef loader(series, size, batch):\n    return DataLoader(Windows(series, size), batch_size=batch, shuffle=True)\n",
+      "solution": "import torch\nfrom torch.utils.data import DataLoader, Dataset\n\n\nclass Windows(Dataset):\n    def __init__(self, series, size):\n        self.series = series\n        self.size = size\n\n    def __len__(self):\n        return max(0, len(self.series) - self.size)\n\n    def __getitem__(self, i):\n        return self.series[i:i + self.size], self.series[i + self.size]\n\n\ndef loader(series, size, batch):\n    return DataLoader(Windows(series, size), batch_size=batch, shuffle=True)\n",
+      "checks": [
+        {
+          "name": "number of windows",
+          "code": "import torch\ngot = len(Windows(torch.arange(10.0), 3))\nassert got == 7, got\ngot = len(Windows(torch.arange(3.0), 5))\nassert got == 0, got"
+        },
+        {
+          "name": "first and last example",
+          "code": "import torch\ndata = Windows(torch.arange(10.0), 3)\nx, y = data[0]\nassert torch.equal(x, torch.tensor([0.0, 1.0, 2.0])) and y.item() == 3.0, (x, y)\nx, y = data[len(data) - 1]\nassert torch.equal(x, torch.tensor([6.0, 7.0, 8.0])) and y.item() == 9.0, (x, y)"
+        },
+        {
+          "name": "batches of windows",
+          "code": "import torch\nbatches = list(loader(torch.arange(20.0), 4, 5))\nshapes = sorted((tuple(bx.shape), tuple(by.shape)) for bx, by in batches)\nassert shapes == [((1, 4), (1,)), ((5, 4), (5,)), ((5, 4), (5,)), ((5, 4), (5,))], shapes"
+        },
+        {
+          "name": "shuffled, every window once",
+          "code": "import torch\ntorch.manual_seed(0)\nbatches = list(loader(torch.arange(30.0), 3, 4))\nstarts = [int(v) for bx, by in batches for v in bx[:, 0]]\nassert sorted(starts) == list(range(27)), sorted(starts)\nassert starts != list(range(27)), 'not shuffled'\nfor bx, by in batches:\n    assert torch.equal(by, bx[:, -1] + 1), (bx, by)"
+        }
+      ],
+      "hints": [
+        "The last window that still has a value after it starts at `len(series) - size - 1`, so how many windows are there?",
+        "`__len__` is `len(self.series) - self.size`, but never below 0: wrap it in `max(0, ...)`.",
+        "Keep `__getitem__` as it is and fix only `__len__`; `loader` is `DataLoader(Windows(series, size), batch_size=batch, shuffle=True)`."
+      ],
+      "explanation": "`len(series)` counts values, not windows. The DataLoader trusts `__len__` completely: it asks for every index below it, the last `size` of those reach past the end of the series, and the epoch stops with an `IndexError` partway through.\n\nGetting `__len__` and `__getitem__` to agree is the whole contract. Once they do, shuffling, batching and stacking come from the DataLoader for free, whatever your examples are made of."
+    },
+    {
+      "id": "batch-norm",
+      "title": "Batch normalisation",
+      "body": "# Batch normalisation\n\nInputs on wildly different scales make training slow or unstable, and inside a network the outputs of hidden layers drift in scale as the weights change. A batch normalisation layer standardises each feature over the batch, to mean 0 and standard deviation 1, then applies a learnable scale and shift.\n\n```python\nimport torch\nfrom torch import nn\n\nbn = nn.BatchNorm1d(2)\nx = torch.tensor([[1.0, 10.0],\n                  [3.0, 30.0]])\nprint(bn(x))  # each column: -1 and 1\nprint(bn.running_mean)  # [0.2, 2.0]\nbn.eval()\nprint(bn(x[:1]))  # one row is fine now\n```\n\nIn training mode the layer uses the statistics of the current batch, and moves running averages of them 10% of the way toward each batch. In eval mode it uses the running averages instead, so a prediction does not depend on what else is in the batch. A single row has nothing to be standardised against, so in training mode it raises an error.\n",
+      "task": "Write `make_model(features)` returning an `nn.Sequential` of `nn.BatchNorm1d(features)` and `nn.Linear(features, 1)`, and `train(model, x, y, steps=200)` that trains it in training mode with `torch.optim.SGD` at `lr=0.1` on the mean squared error and returns it. Write `predict_one(model, row)` returning the prediction for one 1-D row as a float.",
+      "starter": "import torch\nfrom torch import nn\n\n\ndef make_model(features):\n    return nn.Sequential(nn.Linear(features, 1))\n\n\ndef train(model, x, y, steps=200):\n    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)\n    loss_fn = nn.MSELoss()\n    for step in range(steps):\n        optimizer.zero_grad()\n        loss_fn(model(x), y).backward()\n        optimizer.step()\n    return model\n\n\ndef predict_one(model, row):\n    return model(row.unsqueeze(0)).item()\n",
+      "solution": "import torch\nfrom torch import nn\n\n\ndef make_model(features):\n    return nn.Sequential(nn.BatchNorm1d(features), nn.Linear(features, 1))\n\n\ndef train(model, x, y, steps=200):\n    model.train()\n    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)\n    loss_fn = nn.MSELoss()\n    for step in range(steps):\n        optimizer.zero_grad()\n        loss_fn(model(x), y).backward()\n        optimizer.step()\n    return model\n\n\ndef predict_one(model, row):\n    model.eval()\n    with torch.no_grad():\n        return model(row.unsqueeze(0)).item()\n",
+      "checks": [
+        {
+          "name": "trains on badly scaled inputs",
+          "code": "import torch\ntorch.manual_seed(0)\nx = torch.randn(256, 3) * torch.tensor([100.0, 1.0, 0.01])\ny = x @ torch.tensor([[0.02], [1.0], [50.0]]) + 3.0\nmodel = train(make_model(3), x, y)\ngot = sum((predict_one(model, row) - target.item()) ** 2 for row, target in zip(x[:20], y[:20])) / 20\nassert got < 0.01, got"
+        },
+        {
+          "name": "running statistics follow the data",
+          "code": "import torch\ntorch.manual_seed(1)\nx = torch.randn(128, 2) * torch.tensor([5.0, 0.5]) + torch.tensor([10.0, -2.0])\nmodel = train(make_model(2), x, x[:, :1])\nbn = model[0]\nassert torch.allclose(bn.running_mean, x.mean(dim=0), rtol=0.01), bn.running_mean\nassert torch.allclose(bn.running_var, x.var(dim=0), rtol=0.01), bn.running_var"
+        },
+        {
+          "name": "predicts one row",
+          "code": "import torch\nfrom torch import nn\ntorch.manual_seed(2)\nmodel = nn.Sequential(nn.BatchNorm1d(2), nn.Linear(2, 1))\nmodel.train()\ngot = predict_one(model, torch.tensor([1.0, 2.0]))\nassert isinstance(got, float), type(got)"
+        },
+        {
+          "name": "a row does not depend on its batch",
+          "code": "import torch\ntorch.manual_seed(3)\nx = torch.randn(64, 2)\nmodel = train(make_model(2), x, x.sum(dim=1, keepdim=True), steps=50)\nalone = predict_one(model, x[0])\nwith torch.no_grad():\n    together = model(x)[0].item()\nassert abs(alone - together) < 1e-5, (alone, together)"
+        },
+        {
+          "name": "trains again after predicting",
+          "code": "import torch\ntorch.manual_seed(4)\nx = torch.randn(64, 2)\nmodel = train(make_model(2), x, x[:, :1], steps=20)\npredict_one(model, x[0])\nshifted = x + 5.0\ntrain(model, shifted, shifted[:, :1], steps=50)\nassert model[0].running_mean.min().item() > 4.0, model[0].running_mean"
+        }
+      ],
+      "hints": [
+        "Put `nn.BatchNorm1d(features)` first in the `nn.Sequential`, before the linear layer: plain SGD at `lr=0.1` blows up on inputs this badly scaled.",
+        "One row cannot be standardised in training mode, so call `model.eval()` before predicting. Call `model.train()` at the start of `train`, since a prediction may have switched the mode.",
+        "`predict_one` is `model.eval()`, then under `torch.no_grad()` return `model(row.unsqueeze(0)).item()`."
+      ],
+      "explanation": "With one feature a hundred times larger than the others, a step that suits the small features throws the weight of the large one far past its target, and the loss becomes `nan`. Standardising inside the model makes every feature the same size, so one learning rate suits them all.\n\nThe two modes are the part to remember. Training uses batch statistics and updates the running ones; eval uses the running ones and changes nothing. Since `eval()` lasts until `train()` is called, a training function should set the mode itself."
+    },
+    {
+      "id": "learning-rate-schedules",
+      "title": "Learning-rate schedules",
+      "body": "# Learning-rate schedules\n\nOne learning rate is rarely right for a whole run. Early on, big steps cover ground fast; near the end, small steps settle into the minimum instead of bouncing around it. A scheduler changes the optimizer's rate as training goes on.\n\n```python\nimport torch\n\nw = torch.zeros(1, requires_grad=True)\nopt = torch.optim.SGD([w], lr=1.0)\nsched = torch.optim.lr_scheduler.StepLR(\n    opt, step_size=2, gamma=0.5)\nfor epoch in range(6):\n    opt.step()  # after loss.backward()\n    sched.step()\n    print(epoch, sched.get_last_lr())\n```\n\nCall `sched.step()` once per epoch, or once per batch if the schedule counts batches, always after `opt.step()`. The current rate is `opt.param_groups[0][\"lr\"]`.\n\nA common recipe for bigger models is warm-up then cosine decay: the rate rises from 0 over the first steps, while early gradients are still chaotic, then falls along half a cosine to 0. `LambdaLR` builds any schedule from a function of the step number, whose value multiplies the rate the optimizer started with.\n",
+      "task": "Write `warmup_cosine(step, total, warmup, peak)`: the rate rises linearly from 0 at step 0 to `peak` at step `warmup`, then falls along half a cosine, `peak * 0.5 * (1 + cos(pi * progress))`, to 0 at step `total`, and stays 0 after it. Write `make_scheduler(optimizer, total, warmup)` returning a `LambdaLR` with this shape, the optimizer's own rate as the peak.",
+      "starter": "import math\nimport torch\n\n\ndef warmup_cosine(step, total, warmup, peak):\n    if step < warmup:\n        return peak * step / warmup\n    progress = (step - warmup) / (total - warmup)\n    return peak * 0.5 * (1 + math.cos(math.pi * progress))\n\n\ndef make_scheduler(optimizer, total, warmup):\n    return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total)\n",
+      "solution": "import math\nimport torch\n\n\ndef warmup_cosine(step, total, warmup, peak):\n    if step < warmup:\n        return peak * step / warmup\n    progress = min(1.0, (step - warmup) / (total - warmup))\n    return peak * 0.5 * (1 + math.cos(math.pi * progress))\n\n\ndef make_scheduler(optimizer, total, warmup):\n    return torch.optim.lr_scheduler.LambdaLR(\n        optimizer, lambda step: warmup_cosine(step, total, warmup, 1.0)\n    )\n",
+      "checks": [
+        {
+          "name": "warms up linearly",
+          "code": "got = [warmup_cosine(s, 100, 10, 0.5) for s in (0, 5, 10)]\nassert all(abs(a - b) < 1e-9 for a, b in zip(got, [0.0, 0.25, 0.5])), got"
+        },
+        {
+          "name": "half a cosine down to 0",
+          "code": "got = [warmup_cosine(s, 100, 10, 1.0) for s in (55, 100)]\nassert abs(got[0] - 0.5) < 1e-9 and abs(got[1]) < 1e-9, got"
+        },
+        {
+          "name": "stays at 0 after the end",
+          "code": "got = [warmup_cosine(s, 100, 10, 1.0) for s in (101, 150, 190)]\nassert all(abs(v) < 1e-9 for v in got), got"
+        },
+        {
+          "name": "falls at every step",
+          "code": "values = [warmup_cosine(s, 50, 5, 1.0) for s in range(5, 51)]\nassert all(a > b for a, b in zip(values, values[1:])), values"
+        },
+        {
+          "name": "drives an optimizer",
+          "code": "import math, torch\nw = torch.zeros(1, requires_grad=True)\noptimizer = torch.optim.SGD([w], lr=0.2)\nscheduler = make_scheduler(optimizer, 20, 5)\ngot = []\nfor step in range(25):\n    got.append(optimizer.param_groups[0]['lr'])\n    optimizer.step()\n    scheduler.step()\nwant = [0.2 * (s / 5 if s < 5 else 0.5 * (1 + math.cos(math.pi * min(1, (s - 5) / 15)))) for s in range(25)]\nassert all(abs(a - b) < 1e-9 for a, b in zip(got, want)), [round(v, 4) for v in got]"
+        }
+      ],
+      "hints": [
+        "During warm-up the rate is `peak * step / warmup`. After it, `progress = (step - warmup) / (total - warmup)` runs from 0 to 1.",
+        "Cap the progress with `min(1.0, ...)`, so steps past `total` stay at 0 instead of climbing back up the cosine.",
+        "`LambdaLR(optimizer, lambda step: warmup_cosine(step, total, warmup, 1.0))`: with a peak of 1.0 the function gives the factor that multiplies the optimizer's own rate."
+      ],
+      "explanation": "`CosineAnnealingLR` has the right second half but no warm-up, and a cosine left to run past its end climbs back up, the opposite of what the last steps need. Writing the schedule as a plain function makes it easy to test at a few chosen steps before any training runs.\n\n`LambdaLR` multiplies the optimizer's starting rate by your function's value, so a shape with a peak of 1.0 can be reused at any learning rate."
+    },
+    {
+      "id": "gradient-clipping",
+      "title": "Gradient clipping",
+      "body": "# Gradient clipping\n\nOne unusual batch, with an outlier or a long sequence, can produce a gradient thousands of times larger than usual. A single step along it throws the weights far away, and the loss can turn into `nan`.\n\nClipping caps the size of the step. All the gradients are treated as one long vector; if its length, the norm, is above a limit, every gradient is scaled down by the same factor. The direction stays, only the length shrinks.\n\n```python\nimport torch\nfrom torch import nn\n\nmodel = nn.Linear(2, 1)\nx = torch.tensor([[100.0, -50.0]])\nmodel(x).pow(2).sum().backward()\nnorm = nn.utils.clip_grad_norm_(\n    model.parameters(), max_norm=1.0)\nprint(norm)  # the norm before clipping\ngrads = [p.grad.flatten()\n         for p in model.parameters()]\nprint(torch.cat(grads).norm())  # 1.0\n```\n\nClip between `loss.backward()` and `optimizer.step()`. `clip_grad_norm_` returns the norm before clipping, which is worth logging: a norm that keeps hitting the limit suggests the learning rate is too high.\n",
+      "task": "Write `clip_gradients(parameters, max_norm)` without `clip_grad_norm_`: treat the gradients of all `parameters` that have one as a single vector, scale them all in place by `max_norm / norm` when its norm is above `max_norm`, and return the norm before clipping as a float. Write `train_step(model, optimizer, x, y, max_norm)` doing one clipped step on the mean squared error and returning the loss as a float.",
+      "starter": "import torch\nfrom torch import nn\n\n\ndef clip_gradients(parameters, max_norm):\n    total = 0.0\n    for p in parameters:\n        norm = p.grad.norm().item()\n        if norm > max_norm:\n            p.grad *= max_norm / norm\n        total += norm\n    return total\n\n\ndef train_step(model, optimizer, x, y, max_norm):\n    optimizer.zero_grad()\n    loss = nn.MSELoss()(model(x), y)\n    loss.backward()\n    optimizer.step()\n    return loss.item()\n",
+      "solution": "import math\nimport torch\nfrom torch import nn\n\n\ndef clip_gradients(parameters, max_norm):\n    grads = [p.grad for p in parameters if p.grad is not None]\n    norm = math.sqrt(sum((g ** 2).sum().item() for g in grads))\n    if norm > max_norm:\n        for g in grads:\n            g.mul_(max_norm / norm)\n    return norm\n\n\ndef train_step(model, optimizer, x, y, max_norm):\n    optimizer.zero_grad()\n    loss = nn.MSELoss()(model(x), y)\n    loss.backward()\n    clip_gradients(model.parameters(), max_norm)\n    optimizer.step()\n    return loss.item()\n",
+      "checks": [
+        {
+          "name": "clips the whole vector",
+          "code": "import torch\na = torch.zeros(1, requires_grad=True)\nb = torch.zeros(1, requires_grad=True)\na.grad, b.grad = torch.tensor([3.0]), torch.tensor([4.0])\ngot = clip_gradients([a, b], 1.0)\nassert abs(got - 5.0) < 1e-6, got\nassert torch.allclose(torch.cat([a.grad, b.grad]), torch.tensor([0.6, 0.8])), (a.grad, b.grad)"
+        },
+        {
+          "name": "leaves small gradients alone",
+          "code": "import torch\na = torch.zeros(2, requires_grad=True)\na.grad = torch.tensor([0.3, 0.4])\ngot = clip_gradients([a], 1.0)\nassert abs(got - 0.5) < 1e-6, got\nassert torch.equal(a.grad, torch.tensor([0.3, 0.4])), a.grad"
+        },
+        {
+          "name": "skips parameters without a gradient",
+          "code": "import torch\na = torch.zeros(1, requires_grad=True)\nb = torch.zeros(1, requires_grad=True)\na.grad = torch.tensor([2.0])\ngot = clip_gradients([a, b], 1.0)\nassert abs(got - 2.0) < 1e-6, got\nassert b.grad is None, b.grad"
+        },
+        {
+          "name": "matches PyTorch on a model",
+          "code": "import torch\nfrom torch import nn\ntorch.manual_seed(0)\nmodel = nn.Sequential(nn.Linear(3, 8), nn.Tanh(), nn.Linear(8, 1))\ncopy = nn.Sequential(nn.Linear(3, 8), nn.Tanh(), nn.Linear(8, 1))\ncopy.load_state_dict(model.state_dict())\nx = torch.randn(16, 3) * 10\nfor m in (model, copy):\n    m(x).pow(2).mean().backward()\ngot = clip_gradients(model.parameters(), 0.5)\nwant = nn.utils.clip_grad_norm_(copy.parameters(), 0.5).item()\nassert abs(got - want) < 1e-3 * want, (got, want)\nfor p, q in zip(model.parameters(), copy.parameters()):\n    assert torch.allclose(p.grad, q.grad, atol=1e-6), (p.grad, q.grad)"
+        },
+        {
+          "name": "a step moves at most lr times max_norm",
+          "code": "import torch\nfrom torch import nn\ntorch.manual_seed(1)\nmodel = nn.Linear(3, 1)\nbefore = [p.detach().clone() for p in model.parameters()]\noptimizer = torch.optim.SGD(model.parameters(), lr=0.1)\nx = torch.randn(8, 3)\ny = torch.randn(8, 1)\ny[0] = 1000.0\nloss = train_step(model, optimizer, x, y, 1.0)\nmoved = sum(((p.detach() - b) ** 2).sum() for p, b in zip(model.parameters(), before)).sqrt().item()\nassert isinstance(loss, float) and loss > 1000, loss\nassert moved <= 0.1 + 1e-5, moved"
+        }
+      ],
+      "hints": [
+        "`parameters` may be a generator, which can be read only once: collect the gradients in a list first, skipping any `p.grad` that is `None`.",
+        "The norm of everything together is the square root of the sum, over all gradients `g`, of `(g ** 2).sum()`.",
+        "If that norm is above `max_norm`, scale each gradient in place with `g.mul_(max_norm / norm)`. In `train_step`, clip between `loss.backward()` and `optimizer.step()`."
+      ],
+      "explanation": "Clipping each tensor on its own changes the direction of the step: a big gradient in one layer is cut down while a small one elsewhere stays as it was, so the step no longer points where the gradient did. Scaling everything by one factor keeps the direction and only limits how far the step goes.\n\nWith plain SGD a clipped step moves the weights by at most the learning rate times `max_norm`, however wild the batch was. That bound is why clipping is standard for recurrent networks and language models, whose gradients spike now and then."
+    },
+    {
+      "id": "checkpoints-and-early-stopping",
+      "title": "Checkpoints and early stopping",
+      "body": "# Checkpoints and early stopping\n\nThe model to keep is the one from the epoch with the lowest validation loss, not the last one. Early stopping watches that loss, remembers the best weights, and stops once `patience` epochs in a row have not beaten it.\n\nRemembering needs a real copy. `state_dict()` returns the live parameter tensors, which the next optimizer step changes in place:\n\n```python\nimport copy\nimport torch\nfrom torch import nn\n\nmodel = nn.Linear(2, 1)\nalias = model.state_dict()\nbest = copy.deepcopy(model.state_dict())\nwith torch.no_grad():\n    model.weight.fill_(5.0)\nprint(alias[\"weight\"])  # 5s: it moved\nprint(best[\"weight\"])  # the old values\nmodel.load_state_dict(best)\n```\n\nTo resume training later, save a checkpoint: one dictionary with the model's state, the optimizer's state, which for Adam holds running averages a restart would lose, and the epoch number.\n\n```python\nimport torch\nfrom torch import nn\n\nmodel = nn.Linear(2, 1)\nopt = torch.optim.Adam(model.parameters())\ntorch.save({\"model\": model.state_dict(),\n            \"optimizer\": opt.state_dict(),\n            \"epoch\": 7}, \"checkpoint.pt\")\nsaved = torch.load(\"checkpoint.pt\")\nopt.load_state_dict(saved[\"optimizer\"])\nprint(saved[\"epoch\"])\n```\n",
+      "task": "Write `early_stopping(model, step, val_loss, patience, max_epochs=100)`: each epoch call `step()` then `val_loss()`, stop after `patience` epochs in a row without a new lowest loss, load the best epoch's weights back into `model`, and return that epoch's number, counting from 0. Write `save_checkpoint(path, model, optimizer, epoch)` and `load_checkpoint(path, model, optimizer)`, which restores both states and returns the epoch.",
+      "starter": "import torch\n\n\ndef early_stopping(model, step, val_loss, patience, max_epochs=100):\n    best_loss, best_epoch, best_state = float(\"inf\"), 0, None\n    for epoch in range(max_epochs):\n        step()\n        loss = val_loss()\n        if loss < best_loss:\n            best_loss, best_epoch = loss, epoch\n            best_state = model.state_dict()\n        elif epoch - best_epoch >= patience:\n            break\n    model.load_state_dict(best_state)\n    return best_epoch\n\n\ndef save_checkpoint(path, model, optimizer, epoch):\n    torch.save({\"model\": model.state_dict(), \"epoch\": epoch}, path)\n\n\ndef load_checkpoint(path, model, optimizer):\n    saved = torch.load(path)\n    model.load_state_dict(saved[\"model\"])\n    return saved[\"epoch\"]\n",
+      "solution": "import copy\nimport torch\n\n\ndef early_stopping(model, step, val_loss, patience, max_epochs=100):\n    best_loss, best_epoch, best_state = float(\"inf\"), 0, None\n    for epoch in range(max_epochs):\n        step()\n        loss = val_loss()\n        if loss < best_loss:\n            best_loss, best_epoch = loss, epoch\n            best_state = copy.deepcopy(model.state_dict())\n        elif epoch - best_epoch >= patience:\n            break\n    model.load_state_dict(best_state)\n    return best_epoch\n\n\ndef save_checkpoint(path, model, optimizer, epoch):\n    torch.save({\n        \"model\": model.state_dict(),\n        \"optimizer\": optimizer.state_dict(),\n        \"epoch\": epoch,\n    }, path)\n\n\ndef load_checkpoint(path, model, optimizer):\n    saved = torch.load(path)\n    model.load_state_dict(saved[\"model\"])\n    optimizer.load_state_dict(saved[\"optimizer\"])\n    return saved[\"epoch\"]\n",
+      "checks": [
+        {
+          "name": "stops after patience epochs",
+          "code": "import torch\nfrom torch import nn\nmodel = nn.Linear(1, 1)\nlosses = [5.0, 3.0, 2.0, 2.5, 2.4, 2.6, 1.0, 0.5]\ncalls = []\ndef step():\n    with torch.no_grad():\n        model.weight.fill_(float(len(calls)))\n    calls.append(1)\ndef val_loss():\n    return losses[len(calls) - 1]\ngot = early_stopping(model, step, val_loss, patience=3)\nassert got == 2, got\nassert len(calls) == 6, len(calls)"
+        },
+        {
+          "name": "brings back the best weights",
+          "code": "import torch\nfrom torch import nn\nmodel = nn.Linear(1, 1)\nlosses = [5.0, 3.0, 2.0, 2.5, 2.4, 2.6, 1.0, 0.5]\ncalls = []\ndef step():\n    with torch.no_grad():\n        model.weight.fill_(float(len(calls)))\n    calls.append(1)\ndef val_loss():\n    return losses[len(calls) - 1]\nearly_stopping(model, step, val_loss, patience=3)\ngot = model.weight.item()\nassert got == 2.0, got"
+        },
+        {
+          "name": "runs to max_epochs while it improves",
+          "code": "from torch import nn\nmodel = nn.Linear(1, 1)\ncalls = []\ndef step():\n    calls.append(1)\ndef val_loss():\n    return 1.0 / len(calls)\ngot = early_stopping(model, step, val_loss, patience=2, max_epochs=10)\nassert (got, len(calls)) == (9, 10), (got, len(calls))"
+        },
+        {
+          "name": "a checkpoint restores the model",
+          "code": "import torch\nfrom torch import nn\ntorch.manual_seed(0)\nmodel = nn.Linear(3, 1)\noptimizer = torch.optim.Adam(model.parameters(), lr=0.1)\nmodel(torch.randn(4, 3)).sum().backward()\noptimizer.step()\nsave_checkpoint('checkpoint.pt', model, optimizer, 12)\nfresh = nn.Linear(3, 1)\nfresh_optimizer = torch.optim.Adam(fresh.parameters(), lr=0.1)\ngot = load_checkpoint('checkpoint.pt', fresh, fresh_optimizer)\nassert got == 12, got\nassert torch.equal(fresh.weight, model.weight), fresh.weight"
+        },
+        {
+          "name": "and the optimizer",
+          "code": "import torch\nfrom torch import nn\ntorch.manual_seed(1)\nmodel = nn.Linear(3, 1)\noptimizer = torch.optim.Adam(model.parameters(), lr=0.1)\nmodel(torch.randn(4, 3)).sum().backward()\noptimizer.step()\nsave_checkpoint('resume.pt', model, optimizer, 3)\nfresh = nn.Linear(3, 1)\nfresh_optimizer = torch.optim.Adam(fresh.parameters(), lr=0.1)\nload_checkpoint('resume.pt', fresh, fresh_optimizer)\nstate = fresh_optimizer.state_dict()['state']\nassert len(state) == 2, 'the optimizer state was not restored'\nassert torch.equal(state[0]['exp_avg'], optimizer.state_dict()['state'][0]['exp_avg'])"
+        }
+      ],
+      "hints": [
+        "Keep `best_loss`, `best_epoch` and `best_state`. After each `val_loss()`, either record a new best or stop if `epoch - best_epoch >= patience`.",
+        "`model.state_dict()` holds the live tensors, so a best state kept that way changes with the model. Store `copy.deepcopy(model.state_dict())` and `load_state_dict` it at the end.",
+        "A checkpoint is one dict: `{'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'epoch': epoch}`. Loading calls `load_state_dict` on both and returns `saved['epoch']`."
+      ],
+      "explanation": "The starter remembers `model.state_dict()`, and that dictionary holds the very tensors the optimizer goes on changing, so at the end it restores the last weights while claiming they are the best. A deep copy is a snapshot. The same trap waits for any mutable object kept as a record of the past.\n\nA checkpoint without the optimizer looks fine until training resumes: Adam starts its running averages again from zero and takes some clumsy steps. Saving everything a run needs in one file is what makes stopping and resuming safe."
+    },
+    {
+      "id": "convolutions",
+      "title": "Convolutions",
+      "body": "# Convolutions\n\nImages have structure: a pixel means most next to its neighbours. A convolution slides a small filter over the image and responds where its pattern appears, with the same few weights everywhere.\n\n```python\nimport torch\nfrom torch import nn\n\nconv = nn.Conv2d(1, 4, kernel_size=3)\n# batch, channels, height, width\nimages = torch.zeros(8, 1, 12, 12)\nprint(conv(images).shape)\n# torch.Size([8, 4, 10, 10])\n```\n\nWithout padding a 3×3 filter loses one pixel on each side: the size becomes `(size - kernel + 2 * padding) // stride + 1`. A pooling layer then shrinks the map, and a final linear layer turns it into class scores.\n",
+      "task": "Write `conv_size(size, kernel, padding=0, stride=1)` giving a convolution's output size. Write `stripes(n, seed)` returning `(images, labels)`: `n` images of shape `(1, 12, 12)` with a random-noise background (`0.1 * torch.rand`) and one bright line of 1.0 at a random position, horizontal for label 0 and vertical for label 1. Write `train_cnn(images, labels, steps=150)` returning a trained small CNN that tells them apart.",
+      "starter": "import torch\nfrom torch import nn\n\n\ndef conv_size(size, kernel, padding=0, stride=1):\n    return size - kernel\n\n\ndef stripes(n, seed):\n    torch.manual_seed(seed)\n    return torch.zeros(n, 1, 12, 12), torch.zeros(n, dtype=torch.long)\n\n\ndef train_cnn(images, labels, steps=150):\n    return nn.Sequential(nn.Flatten(), nn.Linear(144, 2))\n",
+      "solution": "import torch\nfrom torch import nn\n\n\ndef conv_size(size, kernel, padding=0, stride=1):\n    return (size - kernel + 2 * padding) // stride + 1\n\n\ndef stripes(n, seed):\n    torch.manual_seed(seed)\n    images = 0.1 * torch.rand(n, 1, 12, 12)\n    labels = torch.randint(0, 2, (n,))\n    where = torch.randint(0, 12, (n,))\n    for i in range(n):\n        if labels[i] == 0:\n            images[i, 0, where[i], :] = 1.0\n        else:\n            images[i, 0, :, where[i]] = 1.0\n    return images, labels\n\n\ndef train_cnn(images, labels, steps=150):\n    model = nn.Sequential(\n        nn.Conv2d(1, 4, kernel_size=3, padding=1), nn.ReLU(),\n        nn.AdaptiveMaxPool2d(1), nn.Flatten(),\n        nn.Linear(4, 2),\n    )\n    optimizer = torch.optim.Adam(model.parameters(), lr=0.05)\n    loss_fn = nn.CrossEntropyLoss()\n    for step in range(steps):\n        optimizer.zero_grad()\n        loss_fn(model(images), labels).backward()\n        optimizer.step()\n    return model\n",
+      "checks": [
+        {
+          "name": "output sizes",
+          "code": "assert conv_size(12, 3) == 10, conv_size(12, 3)\nassert conv_size(12, 3, padding=1) == 12, conv_size(12, 3, padding=1)\nassert conv_size(28, 5, stride=2) == 12, conv_size(28, 5, stride=2)"
+        },
+        {
+          "name": "stripe images",
+          "code": "import torch\nimages, labels = stripes(50, 0)\nassert images.shape == (50, 1, 12, 12), images.shape\nassert labels.dtype == torch.long and set(labels.tolist()) <= {0, 1}\nfor image, label in zip(images, labels):\n    rows = (image[0] == 1.0).all(dim=1).sum().item()\n    cols = (image[0] == 1.0).all(dim=0).sum().item()\n    assert (rows, cols) == ((1, 0) if label == 0 else (0, 1)), (rows, cols, int(label))"
+        },
+        {
+          "name": "tells lines apart",
+          "code": "import torch\ntorch.manual_seed(0)\nimages, labels = stripes(200, 1)\nmodel = train_cnn(images, labels)\ntest_x, test_y = stripes(200, 2)\nwith torch.no_grad():\n    got = (model(test_x).argmax(dim=1) == test_y).float().mean().item()\nassert got > 0.95, got"
+        }
+      ],
+      "hints": [
+        "The size formula is `(size - kernel + 2 * padding) // stride + 1`.",
+        "Start from `0.1 * torch.rand(n, 1, 12, 12)`, draw labels with `torch.randint(0, 2, (n,))` and positions with `torch.randint(0, 12, (n,))`, then set a whole row (`images[i, 0, r, :]`) or column (`images[i, 0, :, c]`) to 1.0.",
+        "A tiny CNN is enough: `Conv2d(1, 4, 3, padding=1)`, `ReLU`, `AdaptiveMaxPool2d(1)`, `Flatten`, `Linear(4, 2)`, trained with Adam and cross-entropy."
+      ],
+      "explanation": "The line can be anywhere, so a model that looks at fixed pixels has to learn every position separately. A convolution learns one small horizontal detector and one vertical, slides them everywhere, and max pooling keeps the strongest response wherever it was.\n\nThat is why four filters and a dozen weights beat a 144-input linear model here: the structure of the problem is built into the layer."
+    },
+    {
+      "id": "recurrent-networks",
+      "title": "Recurrent networks",
+      "body": "# Recurrent networks\n\nA recurrent network reads a sequence one step at a time and carries a hidden state forward, a summary of everything it has seen so far. The same weights handle every step, so one model works for sequences of any length.\n\n```python\nimport torch\nfrom torch import nn\n\ngru = nn.GRU(input_size=1, hidden_size=8,\n             batch_first=True)\n# 4 sequences, 10 steps, 1 feature each\nx = torch.randn(4, 10, 1)\nout, h = gru(x)\nprint(out.shape)  # state after each step\nprint(h.shape)  # only the last state\n```\n\nWith `batch_first=True` the input is `(batch, steps, features)`; without it PyTorch expects the steps first. `out` holds the hidden state after every step and `h` only the last one, shaped `(layers, batch, hidden)`, so `h[-1]` is one summary per sequence. A linear layer on it classifies the whole sequence.\n\n`nn.GRU` and `nn.LSTM` have gates that decide what to keep and what to forget, which lets them remember over far more steps than a plain `nn.RNN`.\n",
+      "task": "Write `sign_data(n, length, seed)` returning `(x, y)`: after `torch.manual_seed(seed)`, `n` sequences of shape `(length, 1)` uniform from -1 to 1, labelled `1` (`long`) when their sum is positive, else `0`. Write `SignClassifier(nn.Module)`, an `nn.GRU(1, 16)` with an `nn.Linear(16, 2)` on its last hidden state, taking `(batch, steps, 1)` input, and `train_rnn(x, y, steps=100)` returning one trained with Adam at `lr=0.03` and cross-entropy.",
+      "starter": "import torch\nfrom torch import nn\n\n\ndef sign_data(n, length, seed):\n    torch.manual_seed(seed)\n    x = torch.rand(n, length, 1) * 2 - 1\n    y = (x.sum(dim=(1, 2)) > 0).long()\n    return x, y\n\n\nclass SignClassifier(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.gru = nn.GRU(1, 16)\n        self.head = nn.Linear(16, 2)\n\n    def forward(self, x):\n        out, h = self.gru(x)\n        return self.head(h[-1])\n\n\ndef train_rnn(x, y, steps=100):\n    model = SignClassifier()\n    optimizer = torch.optim.Adam(model.parameters(), lr=0.03)\n    loss_fn = nn.CrossEntropyLoss()\n    for step in range(steps):\n        optimizer.zero_grad()\n        loss_fn(model(x), y).backward()\n        optimizer.step()\n    return model\n",
+      "solution": "import torch\nfrom torch import nn\n\n\ndef sign_data(n, length, seed):\n    torch.manual_seed(seed)\n    x = torch.rand(n, length, 1) * 2 - 1\n    y = (x.sum(dim=(1, 2)) > 0).long()\n    return x, y\n\n\nclass SignClassifier(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.gru = nn.GRU(1, 16, batch_first=True)\n        self.head = nn.Linear(16, 2)\n\n    def forward(self, x):\n        out, h = self.gru(x)\n        return self.head(h[-1])\n\n\ndef train_rnn(x, y, steps=100):\n    model = SignClassifier()\n    optimizer = torch.optim.Adam(model.parameters(), lr=0.03)\n    loss_fn = nn.CrossEntropyLoss()\n    for step in range(steps):\n        optimizer.zero_grad()\n        loss_fn(model(x), y).backward()\n        optimizer.step()\n    return model\n",
+      "checks": [
+        {
+          "name": "sign labels",
+          "code": "import torch\nx, y = sign_data(100, 10, 0)\nassert x.shape == (100, 10, 1), x.shape\nassert y.dtype == torch.long, y.dtype\nassert torch.equal(y, (x.sum(dim=(1, 2)) > 0).long())\nassert x.min() >= -1 and x.max() <= 1"
+        },
+        {
+          "name": "one score pair per sequence",
+          "code": "import torch\ngot = SignClassifier()(torch.zeros(5, 7, 1)).shape\nassert got == (5, 2), got"
+        },
+        {
+          "name": "a sequence ignores its neighbours",
+          "code": "import torch\ntorch.manual_seed(0)\nmodel = SignClassifier()\nx = torch.randn(6, 9, 1)\nwith torch.no_grad():\n    together = model(x)\n    alone = model(x[2:3])\nassert together.shape == (6, 2), together.shape\nassert torch.allclose(together[2], alone[0], atol=1e-6), (together[2], alone[0])\nassert model(torch.randn(3, 30, 1)).shape == (3, 2)"
+        },
+        {
+          "name": "learns the sign of the sum",
+          "code": "import torch\ntorch.manual_seed(0)\nx, y = sign_data(256, 10, 1)\nmodel = train_rnn(x, y)\ntest_x, test_y = sign_data(512, 10, 2)\nwith torch.no_grad():\n    got = (model(test_x).argmax(dim=1) == test_y).float().mean().item()\nassert got > 0.9, got"
+        }
+      ],
+      "hints": [
+        "Without `batch_first=True`, `nn.GRU` reads `(steps, batch, features)`, so your batch of sequences is taken as time and the time steps as the batch.",
+        "`out, h = self.gru(x)`: `h` has shape `(1, batch, 16)`, and `h[-1]` is the last hidden state of each sequence.",
+        "Create the layer as `nn.GRU(1, 16, batch_first=True)` and return `self.head(h[-1])` from `forward`; training is the usual loop with `Adam(lr=0.03)` and `nn.CrossEntropyLoss()`."
+      ],
+      "explanation": "Without `batch_first=True` nothing complains at first: the GRU reads the batch as time and the time steps as separate sequences, each mixing values from different examples. The output has one row per time step instead of one per sequence, and only the loss finally notices the mismatch.\n\nThe task needs memory: the label depends on every value, so the network has to keep a running total in its hidden state. Attention, in the next lesson, takes the other route: instead of squeezing the past into one state, every position looks back at all the others directly."
+    },
+    {
+      "id": "attention",
+      "title": "Attention",
+      "body": "# Attention\n\nAttention is the core of transformers, the models behind today's language AI. Each position asks a question (a query), every position offers a key and a value, and each position gets back a mix of the values, weighted by how well its query matches each key.\n\n```python\nimport math\nimport torch\n\nq, k, v = torch.randn(3, 4, 8)\nd = q.shape[-1]\nscores = q @ k.T / math.sqrt(d)\n# positions x positions, rows sum to 1\nweights = torch.softmax(scores, dim=-1)\noutput = weights @ v\nprint(weights.sum(dim=-1))\nprint(output.shape)\n```\n\nDividing by `sqrt(d)`, where `d` is the query size, keeps the scores from growing with the size and the softmax from becoming too sharp. A causal mask stops a position from looking at later ones: their scores are set to minus infinity before the softmax, so their weights become 0. That is how a model that predicts the next word is kept from seeing it.\n\nPyTorch has this built in as `F.scaled_dot_product_attention`, with `import torch.nn.functional as F`.\n",
+      "task": "Write `attention(q, k, v, causal=False)` for tensors of shape `(positions, d)`: compute scaled dot-product attention yourself, with `torch.softmax`, applying a causal mask when asked. Return the pair `(output, weights)`.",
+      "starter": "import torch\n\n\ndef attention(q, k, v, causal=False):\n    weights = q @ k.T\n    return weights @ v, weights\n",
+      "solution": "import math\nimport torch\n\n\ndef attention(q, k, v, causal=False):\n    scores = q @ k.T / math.sqrt(q.shape[-1])\n    if causal:\n        n = scores.shape[0]\n        mask = torch.triu(torch.ones(n, n, dtype=torch.bool), diagonal=1)\n        scores = scores.masked_fill(mask, float(\"-inf\"))\n    weights = torch.softmax(scores, dim=-1)\n    return weights @ v, weights\n",
+      "checks": [
+        {
+          "name": "weights are probabilities",
+          "code": "import torch\ntorch.manual_seed(0)\nq, k, v = torch.randn(3, 5, 4)\nout, weights = attention(q, k, v)\nassert weights.shape == (5, 5), weights.shape\nassert torch.allclose(weights.sum(dim=-1), torch.ones(5)), weights.sum(dim=-1)\nassert (weights >= 0).all()"
+        },
+        {
+          "name": "matches PyTorch",
+          "code": "import torch\nimport torch.nn.functional as F\ntorch.manual_seed(1)\nq, k, v = torch.randn(3, 6, 8)\nout, _ = attention(q, k, v)\nassert torch.allclose(out, F.scaled_dot_product_attention(q, k, v), atol=1e-5)"
+        },
+        {
+          "name": "causal attention cannot see ahead",
+          "code": "import torch\nimport torch.nn.functional as F\ntorch.manual_seed(2)\nq, k, v = torch.randn(3, 6, 8)\nout, weights = attention(q, k, v, causal=True)\nassert torch.all(torch.triu(weights, diagonal=1) == 0), weights\nassert torch.allclose(out, F.scaled_dot_product_attention(q, k, v, is_causal=True), atol=1e-5)"
+        }
+      ],
+      "hints": [
+        "Scores are `q @ k.T / math.sqrt(d)` where `d = q.shape[-1]`; the weights are `torch.softmax(scores, dim=-1)`.",
+        "For the causal case, build `torch.triu(torch.ones(n, n, dtype=torch.bool), diagonal=1)`: true above the diagonal, the future.",
+        "`scores.masked_fill(mask, float('-inf'))` before the softmax turns those weights into exact zeros."
+      ],
+      "explanation": "Without the softmax the weights are raw similarities: unbounded, possibly negative, and the output is not a mix of values. Without the `sqrt(d)` scale, bigger vectors give bigger scores and the softmax collapses onto one position.\n\nMasking with minus infinity rather than zeroing the weights afterwards keeps each row a proper distribution over the positions it may see."
+    },
+    {
+      "id": "language-model",
+      "title": "A tiny language model",
+      "body": "# A tiny language model\n\nA language model predicts the next token from the ones before it. The smallest version uses characters and looks one character back: a bigram model. It is a table of scores, one row per current character, which training turns into next-character probabilities.\n\n```python\nimport torch\nfrom torch import nn\n\nvocab = 5\ncurrent = torch.tensor([0, 1, 2])\nfollowing = torch.tensor([1, 2, 3])\n# row c: scores for what follows c\nmodel = nn.Embedding(vocab, vocab)\nlogits = model(current)\nloss_fn = nn.CrossEntropyLoss()\nloss = loss_fn(logits, following)\nprint(logits.shape, loss.item())\n```\n\nGeneration repeats one step: look up the scores for the last character, turn them into probabilities, pick the next character, append it. Picking the most likely character every time gives the same text on each run; sampling with `torch.multinomial` gives variety.\n\nEverything here, from encoding text to sampling, is what large models do too; they just look much further back, with attention.\n",
+      "task": "Write `encode(text)` returning `(ids, chars)`: `chars` is the sorted list of distinct characters, `ids` a `long` tensor of each character's index. Write `train_bigram(ids, vocab, steps=300)` returning an `nn.Embedding(vocab, vocab)` trained with Adam (`lr=0.1`) to predict each next id. Write `generate(model, chars, start, length)` that greedily appends the most likely next character `length` times and returns the whole string.",
+      "starter": "import torch\nfrom torch import nn\n\n\ndef encode(text):\n    chars = list(text)\n    return torch.tensor([chars.index(c) for c in text]), chars\n\n\ndef train_bigram(ids, vocab, steps=300):\n    return nn.Embedding(vocab, vocab)\n\n\ndef generate(model, chars, start, length):\n    return start\n",
+      "solution": "import torch\nfrom torch import nn\n\n\ndef encode(text):\n    chars = sorted(set(text))\n    index = {c: i for i, c in enumerate(chars)}\n    return torch.tensor([index[c] for c in text], dtype=torch.long), chars\n\n\ndef train_bigram(ids, vocab, steps=300):\n    model = nn.Embedding(vocab, vocab)\n    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)\n    loss_fn = nn.CrossEntropyLoss()\n    for step in range(steps):\n        optimizer.zero_grad()\n        loss_fn(model(ids[:-1]), ids[1:]).backward()\n        optimizer.step()\n    return model\n\n\ndef generate(model, chars, start, length):\n    text = start\n    index = {c: i for i, c in enumerate(chars)}\n    with torch.no_grad():\n        for _ in range(length):\n            scores = model(torch.tensor([index[text[-1]]]))\n            text += chars[scores.argmax(dim=-1).item()]\n    return text\n",
+      "checks": [
+        {
+          "name": "encoding",
+          "code": "import torch\nids, chars = encode('banana')\nassert chars == ['a', 'b', 'n'], chars\nassert ids.dtype == torch.long, ids.dtype\nassert ids.tolist() == [1, 0, 2, 0, 2, 0], ids.tolist()"
+        },
+        {
+          "name": "learns what follows what",
+          "code": "import torch\ntorch.manual_seed(0)\nids, chars = encode('abcabcabcabcabc')\nmodel = train_bigram(ids, len(chars))\nwith torch.no_grad():\n    nxt = model(torch.arange(len(chars))).argmax(dim=-1).tolist()\nassert nxt == [1, 2, 0], nxt"
+        },
+        {
+          "name": "generates",
+          "code": "import torch\ntorch.manual_seed(0)\nids, chars = encode('pythilo ' * 4)\nmodel = train_bigram(ids, len(chars))\ngot = generate(model, chars, 'p', 6)\nassert got == 'pythilo', got"
+        }
+      ],
+      "hints": [
+        "`sorted(set(text))` gives the vocabulary; a dict from character to index makes encoding fast. Pass `dtype=torch.long`.",
+        "Inputs are every id but the last, targets every id but the first: `model(ids[:-1])` against `ids[1:]` with cross-entropy.",
+        "To generate, look up the scores for the last character of the text, take `argmax`, append `chars[...]`, and repeat `length` times under `no_grad`."
+      ],
+      "explanation": "`list(text)` keeps duplicates and the original order, so the same character could get different indices. A sorted set gives each character exactly one.\n\nShifting by one is the whole trick of language modelling: every position is a training example whose answer is the next token. The embedding row for a character becomes its next-character scores, and greedy decoding follows the most likely path: in `'pythilo ' * 4`, `p` always continues `ythilo`."
+    }
+  ]
+}

@@ -1,0 +1,532 @@
+{
+  "id": "tools",
+  "title": "Tools you work with",
+  "summary": "Tests, tracebacks, debugging, linting and profiling, then command lines, files, regexes, settings, SQLite and packages.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "writing-tests",
+      "title": "Writing tests",
+      "body": "# Writing tests\n\nA test is a function that sets something up, calls your code, and asserts on the result. pytest finds functions named `test_*` and runs them. When an `assert` fails, it shows the values involved.\n\n```python\ndef add(a, b):\n    return a + b\n\ndef test_add_negative():\n    assert add(2, -3) == -1\n```\n\n## What to test\n\n- One behaviour per test, named after that behaviour.\n- Boundaries: empty input, one item, the largest allowed value.\n- Each bug you fix, so it stays fixed.\n\n## Testing for errors\n\n```python\nimport pytest\n\ndef test_bad_input():\n    with pytest.raises(ValueError):\n        int(\"nope\")\n```\n\nA good test fails when the code is wrong. A test that passes no matter what gives false comfort, so break the code on purpose once and watch the test catch it.",
+      "task": "`slugify` is written for you. Write `test_lowercases`, `test_spaces_become_dashes` and `test_empty_string`, each using a plain `assert` on a `slugify` call. Each test must fail if that behaviour breaks.",
+      "starter": "def slugify(text):\n    return \"-\".join(text.lower().split())\n\n\ndef test_lowercases():\n    pass\n\n\ndef test_spaces_become_dashes():\n    pass\n\n\ndef test_empty_string():\n    pass\n",
+      "solution": "def slugify(text):\n    return \"-\".join(text.lower().split())\n\n\ndef test_lowercases():\n    assert slugify(\"Hello\") == \"hello\"\n\n\ndef test_spaces_become_dashes():\n    assert slugify(\"a b c\") == \"a-b-c\"\n\n\ndef test_empty_string():\n    assert slugify(\"\") == \"\"\n",
+      "checks": [
+        {
+          "name": "tests pass on correct code",
+          "code": "test_lowercases()\ntest_spaces_become_dashes()\ntest_empty_string()\nassert slugify(\"My Big Day\") == \"my-big-day\", \"keep slugify as it was given\""
+        },
+        {
+          "name": "catches a missing lower()",
+          "code": "real_slugify = slugify\nslugify = lambda text: \"-\".join(text.split())\ntry:\n    test_lowercases()\nexcept AssertionError:\n    caught = True\nelse:\n    caught = False\nfinally:\n    slugify = real_slugify\nassert caught, \"test_lowercases should fail when case is not lowered\""
+        },
+        {
+          "name": "catches missing dashes",
+          "code": "real_slugify = slugify\nslugify = lambda text: text.lower()\ntry:\n    test_spaces_become_dashes()\nexcept AssertionError:\n    caught = True\nelse:\n    caught = False\nfinally:\n    slugify = real_slugify\nassert caught, \"test_spaces_become_dashes should fail when spaces stay\""
+        },
+        {
+          "name": "catches a wrong empty result",
+          "code": "real_slugify = slugify\nslugify = lambda text: \"-\".join(text.lower().split()) or \"untitled\"\ntry:\n    test_empty_string()\nexcept AssertionError:\n    caught = True\nelse:\n    caught = False\nfinally:\n    slugify = real_slugify\nassert caught, \"test_empty_string should fail when empty input changes\""
+        }
+      ],
+      "hints": [
+        "Each test is one line: `assert slugify(some_input) == expected_output`.",
+        "Pick an input that shows the behaviour. A lowercase input cannot prove lowercasing, and a single word cannot prove dashes.",
+        "`assert slugify(\"Hello\") == \"hello\"`, `assert slugify(\"a b c\") == \"a-b-c\"`, and `assert slugify(\"\") == \"\"`."
+      ],
+      "explanation": "The checks replaced `slugify` with broken versions and confirmed that your tests noticed. That technique is called mutation testing, and it measures whether a test has any power.\n\nPlain `assert` works because pytest rewrites it to report both sides of the comparison when it fails. There is no special assertion method to learn."
+    },
+    {
+      "id": "reading-a-traceback",
+      "title": "Reading a traceback",
+      "body": "# Reading a traceback\n\nA traceback is the call stack at the moment an error escaped. Read it from the bottom.\n\n```python\nTraceback (most recent call last):\n  File \"shop.py\", line 9, in <module>\n    main()\n  File \"shop.py\", line 6, in main\n    print(total([]))\n  File \"shop.py\", line 3, in total\n    return sum(xs) / len(xs)\n           ~~~~~~~^~~~~~~~~\nZeroDivisionError: division by zero\n```\n\n- The last line names the error type and message.\n- The `File` line just above it is where the error happened.\n- Lines further up show who called whom, oldest first.\n- Marker lines of `~` and `^` point at the failing part of the line.\n\nIf the bottom frame is inside a library, walk up to the last frame in your own code. Most often that is where the wrong value was passed in. Fix the cause, which may be several frames above the crash, rather than only the line that raised.",
+      "task": "Write `read_traceback(text)` returning `(error_type, message, function, line)` from a traceback's text: the last line's type and message (message `\"\"` if there is none), and the function name and line number (as an int) of the deepest `File` line.",
+      "starter": "def read_traceback(text):\n    lines = text.splitlines()\n    return lines[0], \"\", \"\", 0\n",
+      "solution": "def read_traceback(text):\n    lines = text.strip().splitlines()\n    error_type, _, message = lines[-1].partition(\":\")\n    frames = [\n        line for line in lines\n        if line.startswith(\"  File \")\n    ]\n    location = frames[-1]\n    function = location.rsplit(\", in \", 1)[1]\n    number = location.split(\", line \")[1]\n    line_no = int(number.split(\",\")[0])\n    return error_type, message.strip(), function, line_no\n",
+      "checks": [
+        {
+          "name": "reads the sample",
+          "code": "sample = '''Traceback (most recent call last):\n  File \"shop.py\", line 9, in <module>\n    main()\n  File \"shop.py\", line 6, in main\n    print(total([]))\n  File \"shop.py\", line 3, in total\n    return sum(xs) / len(xs)\n           ~~~~~~~^~~~~~~~~\nZeroDivisionError: division by zero\n'''\ngot = read_traceback(sample)\nassert got == (\"ZeroDivisionError\", \"division by zero\", \"total\", 3), got"
+        },
+        {
+          "name": "error with no message",
+          "code": "sample = '''Traceback (most recent call last):\n  File \"a.py\", line 2, in <module>\n    next(it)\nStopIteration\n'''\ngot = read_traceback(sample)\nassert got == (\"StopIteration\", \"\", \"<module>\", 2), got"
+        },
+        {
+          "name": "message with colons and dotted type",
+          "code": "sample = '''Traceback (most recent call last):\n  File \"/app/a b.py\", line 40, in load\n    return json.loads(text)\njson.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)\n'''\ngot = read_traceback(sample)\nwant = (\"json.decoder.JSONDecodeError\", \"Expecting value: line 1 column 1 (char 0)\", \"load\", 40)\nassert got == want, got"
+        },
+        {
+          "name": "reads a real traceback",
+          "code": "import traceback\ndef inner():\n    return {}[\"missing\"]\ndef outer():\n    return inner()\ntry:\n    outer()\nexcept KeyError:\n    text = traceback.format_exc()\nerror_type, message, function, line = read_traceback(text)\nassert error_type == \"KeyError\", error_type\nassert message == \"'missing'\", message\nassert function == \"inner\", function\nassert isinstance(line, int), type(line)"
+        }
+      ],
+      "hints": [
+        "Split the text into lines. The last non-empty line holds the error, and the last line starting with `  File ` holds the location.",
+        "`partition(\":\")` splits at the first colon only, so colons inside the message survive. It also gives an empty message when there is no colon.",
+        "`error_type, _, message = lines[-1].partition(\":\")`. From the last `File` line take `rsplit(\", in \", 1)[1]` for the function, and `split(\", line \")[1]` then `int(...split(\",\")[0])` for the number."
+      ],
+      "explanation": "This is the order to read a traceback in by hand: the last line tells you what went wrong, and the deepest `File` line tells you where.\n\n`rsplit` matters for the function name, because the file path could contain the text `, in `. Tracebacks print the type with its module path for most non-builtin exceptions, which is why the third sample has dots."
+    },
+    {
+      "id": "using-the-debugger",
+      "title": "Using the debugger",
+      "body": "# Using the debugger\n\nA debugger pauses your program at a line so you can read its variables, instead of guessing and adding prints.\n\n## The moves\n\n- Breakpoint: pause when execution reaches this line.\n- Step over: run this line, then pause on the next.\n- Step into: follow a call into the function.\n- Continue: run until the next breakpoint.\n\nIn Pythilo's debug panel, tap a line number to set a breakpoint. On a desktop, `python -m pdb file.py` gives the same moves with `n`, `s`, `c` and `p name`, and a `breakpoint()` call in your code pauses at that spot.\n\n## A way to work\n\nChoose an input that fails. Say what you expect each variable to hold, step, and compare. The bug is at the first line where reality differs from your expectation.\n\n```python\ndef mean(xs):\n    total = 0\n    for x in xs:\n        total = x  # pause here\n    return total / len(xs)\n```\n\nWatching `total` here shows the bug on the second pass.",
+      "task": "`moving_average(values, window)` should return the mean of every consecutive run of `window` values. It has two bugs. Find them by stepping through `moving_average([1, 2, 3, 4], 2)`, then fix them.",
+      "starter": "def moving_average(values, window):\n    averages = []\n    total = 0\n    for start in range(len(values) - window):\n        for value in values[start:start + window]:\n            total += value\n        averages.append(total / window)\n    return averages\n",
+      "solution": "def moving_average(values, window):\n    averages = []\n    for start in range(len(values) - window + 1):\n        total = 0\n        for value in values[start:start + window]:\n            total += value\n        averages.append(total / window)\n    return averages\n",
+      "checks": [
+        {
+          "name": "every window is included",
+          "code": "got = moving_average([1, 2, 3, 4], 2)\nassert len(got) == 3, got"
+        },
+        {
+          "name": "each average is right",
+          "code": "got = moving_average([1, 2, 3, 4], 2)\nassert got == [1.5, 2.5, 3.5], got"
+        },
+        {
+          "name": "window equals the list length",
+          "code": "got = moving_average([2, 4, 6], 3)\nassert got == [4.0], got"
+        },
+        {
+          "name": "window of one",
+          "code": "got = moving_average([5, 7], 1)\nassert got == [5.0, 7.0], got"
+        },
+        {
+          "name": "window longer than the list",
+          "code": "assert moving_average([1, 2], 3) == [], moving_average([1, 2], 3)\nassert moving_average([], 2) == [], moving_average([], 2)"
+        }
+      ],
+      "hints": [
+        "Set a breakpoint on the `averages.append` line. How many times does it pause for four values and a window of 2?",
+        "Watch `total` when `start` becomes 1. It should begin again from zero, but does it?",
+        "Change the range to `range(len(values) - window + 1)`, and move `total = 0` inside the outer loop."
+      ],
+      "explanation": "Four values and a window of 2 give three windows, so the last valid start is `len(values) - window`. `range` stops before its argument, hence the `+ 1`.\n\nThe second bug was state left over between passes. Bugs like that are slow to find by reading and fast to find by stepping, since you can see the wrong starting value on the second pass.\n\nA sliding sum would make this `O(n)`, compared with `O(n * window)` here."
+    },
+    {
+      "id": "logging",
+      "title": "Logging",
+      "body": "# Logging\n\n`print` is for your program's output. `logging` is for messages about what the program is doing, with levels that can be filtered without editing the code.\n\n```python\nimport logging\n\nlog = logging.getLogger(\"orders\")\n\ndef charge(amount):\n    log.info(\"charging %s\", amount)\n    if amount > 1000:\n        log.warning(\"large: %s\", amount)\n```\n\n- Levels rise from `DEBUG` through `INFO`, `WARNING` and `ERROR` to `CRITICAL`.\n- A logger has a dotted name, and messages travel up to its parents.\n- Handlers decide where messages go. Applications configure them, libraries do not.\n\n## Format lazily\n\nPass values as arguments rather than building an f-string. The text is only assembled if a handler will actually use the record.\n\nSet up once at program start:\n\n```python\nlogging.basicConfig(level=logging.INFO)\n```\n\nInside an `except` block, `log.exception(\"failed\")` records the message along with the traceback.",
+      "task": "Write `parse_quantities(rows)` converting strings to ints and returning the list of good values. Using a logger named `\"orders\"`, log a `WARNING` containing the text of each bad row, then one `INFO` at the end containing the count of good rows. Print nothing.",
+      "starter": "def parse_quantities(rows):\n    good = []\n    for row in rows:\n        try:\n            good.append(int(row))\n        except ValueError:\n            print(\"bad row\", row)\n    return good\n",
+      "solution": "import logging\n\nlog = logging.getLogger(\"orders\")\n\n\ndef parse_quantities(rows):\n    good = []\n    for row in rows:\n        try:\n            good.append(int(row))\n        except ValueError:\n            log.warning(\"bad row: %r\", row)\n    log.info(\"parsed %d rows\", len(good))\n    return good\n",
+      "checks": [
+        {
+          "name": "returns the good values",
+          "code": "import logging\nlogging.getLogger(\"orders\").setLevel(logging.CRITICAL)\ngot = parse_quantities([\"1\", \"x\", \"3\"])\nassert got == [1, 3], got\nassert parse_quantities([]) == [], parse_quantities([])"
+        },
+        {
+          "name": "warns about each bad row",
+          "code": "import logging\nrecords = []\nclass Keep(logging.Handler):\n    def emit(self, record):\n        records.append(record)\nlogger = logging.getLogger(\"orders\")\nkeep = Keep()\nlogger.addHandler(keep)\nlogger.setLevel(logging.DEBUG)\nlogger.propagate = False\ntry:\n    parse_quantities([\"1\", \"oops\", \"nope\"])\nfinally:\n    logger.removeHandler(keep)\n    logger.propagate = True\nwarnings = [r.getMessage() for r in records if r.levelno == logging.WARNING]\nassert len(warnings) == 2, warnings\nassert \"oops\" in warnings[0] and \"nope\" in warnings[1], warnings"
+        },
+        {
+          "name": "reports the count at INFO",
+          "code": "import logging\nrecords = []\nclass Keep(logging.Handler):\n    def emit(self, record):\n        records.append(record)\nlogger = logging.getLogger(\"orders\")\nkeep = Keep()\nlogger.addHandler(keep)\nlogger.setLevel(logging.DEBUG)\nlogger.propagate = False\ntry:\n    parse_quantities([\"1\", \"2\", \"x\"])\nfinally:\n    logger.removeHandler(keep)\n    logger.propagate = True\ninfos = [r.getMessage() for r in records if r.levelno == logging.INFO]\nassert len(infos) == 1, infos\nassert \"2\" in infos[0], infos\nassert records[-1].levelno == logging.INFO, \"the summary should come last\""
+        },
+        {
+          "name": "clean input logs no warnings",
+          "code": "import logging\nrecords = []\nclass Keep(logging.Handler):\n    def emit(self, record):\n        records.append(record)\nlogger = logging.getLogger(\"orders\")\nkeep = Keep()\nlogger.addHandler(keep)\nlogger.setLevel(logging.DEBUG)\nlogger.propagate = False\ntry:\n    parse_quantities([\"1\"])\nfinally:\n    logger.removeHandler(keep)\n    logger.propagate = True\nassert not [r for r in records if r.levelno >= logging.WARNING], \"nothing went wrong\""
+        },
+        {
+          "name": "prints nothing",
+          "code": "import contextlib, io, logging\nlogger = logging.getLogger(\"orders\")\nlogger.setLevel(logging.CRITICAL)\nout = io.StringIO()\nwith contextlib.redirect_stdout(out):\n    parse_quantities([\"x\"])\nassert out.getvalue() == \"\", out.getvalue()"
+        }
+      ],
+      "hints": [
+        "Create the logger at module level with `logging.getLogger(\"orders\")`, then replace the `print`.",
+        "`log.warning` goes in the `except` block. `log.info` goes after the loop, so it can report the final count.",
+        "`log.warning(\"bad row: %r\", row)` inside `except`, and `log.info(\"parsed %d rows\", len(good))` before `return good`."
+      ],
+      "explanation": "Your function only emits messages. Whoever runs the program decides what to keep, which is why the checks could attach their own handler without any change to your code.\n\n`%r` shows the bad value with quotes, so an empty string or a stray space is visible in the log. Passing it as an argument leaves formatting to the logging system."
+    },
+    {
+      "id": "linting-with-pyflakes",
+      "title": "Linting with pyflakes",
+      "body": "# Linting with pyflakes\n\nA linter reads your code without running it and reports mistakes that are almost always bugs or clutter: names that were never defined, imports nobody uses, variables assigned and then ignored. It finds them before a test or a user does.\n\n```python\nimport ast\nfrom pyflakes.checker import Checker\n\nsource = (\n    \"import os\\n\"\n    \"def area(r):\\n\"\n    \"    unused = 1\\n\"\n    \"    return pi * r * r\\n\"\n)\ntree = ast.parse(source)\nfor m in Checker(tree, \"demo.py\").messages:\n    print(m)\n```\n\n## Reading the messages\n\n- Each message has a `lineno` and a `col`. Its class names the problem: `UndefinedName`, `UnusedImport`, `UnusedVariable`.\n- `m.message % m.message_args` is the text without the file name.\n- A linter cannot tell whether your logic is right. It complements tests rather than replacing them.\n\nOn a desktop you would run `pyflakes .` over a project, or `flake8` or `ruff`, which add style rules on top. Editors run one as you type.\n",
+      "task": "Write `lint(source)` returning a sorted list of `(line, kind)` pairs, where `kind` is the pyflakes message class name such as `\"UnusedImport\"`. If the source does not parse, return `[(line, \"SyntaxError\")]` with the line number from the error.",
+      "starter": "import ast\nfrom pyflakes.checker import Checker\n\n\ndef lint(source):\n    tree = ast.parse(source)\n    checker = Checker(tree)\n    return [m.message for m in checker.messages]\n",
+      "solution": "import ast\nfrom pyflakes.checker import Checker\n\n\ndef lint(source):\n    try:\n        tree = ast.parse(source)\n    except SyntaxError as error:\n        return [(error.lineno, \"SyntaxError\")]\n    checker = Checker(tree, \"<lint>\")\n    return sorted(\n        (m.lineno, type(m).__name__)\n        for m in checker.messages\n    )\n",
+      "checks": [
+        {
+          "name": "finds the classic three",
+          "code": "source = \"import os\\n\\ndef area(r):\\n    unused = 1\\n    return pi * r * r\\n\"\ngot = lint(source)\nwant = [(1, \"UnusedImport\"), (4, \"UnusedVariable\"), (5, \"UndefinedName\")]\nassert got == want, got"
+        },
+        {
+          "name": "clean code has no messages",
+          "code": "got = lint(\"import math\\n\\nprint(math.pi)\\n\")\nassert got == [], got"
+        },
+        {
+          "name": "sees a branch that never runs",
+          "code": "got = lint(\"def f():\\n    if False:\\n        return missing\\n\")\nassert got == [(3, \"UndefinedName\")], got"
+        },
+        {
+          "name": "reports a syntax error",
+          "code": "got = lint(\"x = 1\\ny = (\\n\")\nassert got == [(2, \"SyntaxError\")], got\ngot = lint(\"def f(:\\n    pass\\n\")\nassert got == [(1, \"SyntaxError\")], got"
+        },
+        {
+          "name": "does not run the code",
+          "code": "got = lint(\"import sys\\nsys.exit(3)\\n\")\nassert got == [], got"
+        }
+      ],
+      "hints": [
+        "`ast.parse(source)` builds the tree that `Checker` walks, and the checker's `messages` list holds what it found.",
+        "Each message has a `lineno`, and `type(m).__name__` is its kind. `ast.parse` raises `SyntaxError` for code that does not parse, with the line in `error.lineno`.",
+        "Wrap `ast.parse` in `try` with `except SyntaxError as error: return [(error.lineno, \"SyntaxError\")]`, then `return sorted((m.lineno, type(m).__name__) for m in Checker(tree).messages)`."
+      ],
+      "explanation": "pyflakes reports problems in the order it meets them, and it checks function bodies after the rest of the module, so its raw list is not in line order. Sorting gives a report a reader can follow from the top.\n\nThe linter never runs your code, which is how it found the undefined name in a branch that never executes, and why `sys.exit` did nothing. Tests only see the paths they exercise. A linter sees every line."
+    },
+    {
+      "id": "timing-with-timeit",
+      "title": "Timing with timeit",
+      "body": "# Timing with timeit\n\nTo compare two ways of doing something, time each one many times. A single run is too short to measure and too noisy to trust. `timeit` runs code in a loop and returns the total seconds.\n\n```python\nimport timeit\n\nsetup = \"xs = list(range(1000))\"\nsetup += \"; s = set(xs)\"\nfor stmt in [\"-1 in xs\", \"-1 in s\"]:\n    total = timeit.timeit(\n        stmt, setup, number=10_000)\n    print(stmt, f\"{total:.4f}s\")\n```\n\n## Read the numbers right\n\n- `number` is how many runs make one measurement. Divide by it to get the time per call.\n- `timeit.repeat` takes several measurements. Keep the minimum: other work on the machine can only add time, never take it away.\n- The clock is the `timer` argument, `time.perf_counter` unless you pass another.\n- Time realistic sizes. On tiny inputs the slower algorithm can win.\n\nOn a desktop, `python -m timeit \"sorted(range(100))\"` does the same and picks `number` for you.\n",
+      "task": "Write `per_call(func, number, repeat, timer=time.perf_counter)` that measures `func` with `timeit.repeat` and returns the best time for one call: the smallest measurement divided by `number`. Pass `timer` through, so a test can supply its own clock.",
+      "starter": "import time\nimport timeit\n\n\ndef per_call(func, number, repeat, timer=time.perf_counter):\n    times = timeit.repeat(func, number=number, repeat=repeat)\n    return sum(times) / len(times)\n",
+      "solution": "import time\nimport timeit\n\n\ndef per_call(func, number, repeat, timer=time.perf_counter):\n    times = timeit.repeat(\n        func, number=number, repeat=repeat, timer=timer\n    )\n    return min(times) / number\n",
+      "checks": [
+        {
+          "name": "reports the fastest measurement",
+          "code": "ticks = iter([0.0, 2.0, 10.0, 11.0, 20.0, 23.0])\ngot = per_call(lambda: None, 1, 3, timer=lambda: next(ticks))\nassert got == 1.0, got"
+        },
+        {
+          "name": "divides by number",
+          "code": "ticks = iter([0.0, 50.0, 100.0, 140.0])\ngot = per_call(lambda: None, 10, 2, timer=lambda: next(ticks))\nassert got == 4.0, got"
+        },
+        {
+          "name": "accepts keyword arguments",
+          "code": "ticks = iter([0.0, 8.0, 10.0, 14.0])\ngot = per_call(lambda: None, repeat=2, number=4, timer=lambda: next(ticks))\nassert got == 1.0, got"
+        },
+        {
+          "name": "calls the function number times per repeat",
+          "code": "calls = []\ngot = per_call(lambda: calls.append(1), 5, 3)\nassert len(calls) == 15, len(calls)\nassert isinstance(got, float) and got >= 0, got"
+        }
+      ],
+      "hints": [
+        "`timeit.repeat(func, number=..., repeat=..., timer=...)` returns a list with one total per repeat, each covering `number` calls.",
+        "Noise only adds time, so the smallest total is the best estimate. It still covers `number` calls, so divide.",
+        "`return min(timeit.repeat(func, number=number, repeat=repeat, timer=timer)) / number`."
+      ],
+      "explanation": "An average folds in every pause the machine took for other work, so it drifts from run to run. The fastest measurement is the closest to what the code costs on its own, which is why `python -m timeit` reports the best of its repeats.\n\nTaking the clock as an argument is a habit worth keeping. The checks replaced it with a list of fake ticks, so a function about time could be tested with exact numbers."
+    },
+    {
+      "id": "profiling-with-cprofile",
+      "title": "Profiling with cProfile",
+      "body": "# Profiling with cProfile\n\nTiming says how slow a program is. A profiler says where the time goes: it records every function call, how often each function ran, and the time spent in it.\n\n```python\nimport cProfile\nimport pstats\n\ndef fib(n):\n    if n < 2:\n        return n\n    return fib(n - 1) + fib(n - 2)\n\nprof = cProfile.Profile()\nprof.runcall(fib, 20)\nstats = pstats.Stats(prof)\nstats.sort_stats(\"cumulative\")\nstats.print_stats(3)\n```\n\n## Reading the table\n\n- `ncalls` is how many times a function ran. `21891/1` means 21891 calls in all, only one of them from outside, because `fib` is recursive.\n- `tottime` is time inside the function itself. `cumtime` adds the functions it called.\n- Sort by `cumulative` to follow the slow path, and by `tottime` to find the hot spot.\n\nA call count that grows much faster than the input often tells you more than any timing. Here 21891 calls for `fib(20)` reveal repeated work that a cache removes. On a desktop, `python -m cProfile -s cumtime app.py` profiles a whole script.\n",
+      "task": "Write `count_calls(func, *args)` that runs `func(*args)` under a `cProfile.Profile` and returns `(result, calls)`, where `calls` maps the name of each Python function that ran to its total number of calls as an int. Leave out built-ins, whose `file_name` in `get_stats_profile()` is `\"~\"`.",
+      "starter": "import cProfile\nimport pstats\n\n\ndef count_calls(func, *args):\n    profiler = cProfile.Profile()\n    result = profiler.runcall(func, *args)\n    profile = pstats.Stats(profiler).get_stats_profile()\n    calls = {\n        name: info.ncalls\n        for name, info in profile.func_profiles.items()\n    }\n    return result, calls\n",
+      "solution": "import cProfile\nimport pstats\n\n\ndef count_calls(func, *args):\n    profiler = cProfile.Profile()\n    result = profiler.runcall(func, *args)\n    profile = pstats.Stats(profiler).get_stats_profile()\n    calls = {}\n    for name, info in profile.func_profiles.items():\n        if info.file_name != \"~\":\n            calls[name] = int(info.ncalls.split(\"/\")[0])\n    return result, calls\n",
+      "checks": [
+        {
+          "name": "returns the result and one call",
+          "code": "def double(x):\n    return x * 2\ngot, calls = count_calls(double, 21)\nassert got == 42, got\nassert calls == {\"double\": 1}, calls"
+        },
+        {
+          "name": "counts recursive calls in total",
+          "code": "def fib(n):\n    return n if n < 2 else fib(n - 1) + fib(n - 2)\ngot, calls = count_calls(fib, 10)\nassert got == 55, got\nassert calls == {\"fib\": 177}, calls"
+        },
+        {
+          "name": "counts helpers separately",
+          "code": "def is_even(n):\n    return n % 2 == 0\ndef evens(n):\n    return [i for i in range(n) if is_even(i)]\ngot, calls = count_calls(evens, 6)\nassert got == [0, 2, 4], got\nassert calls.get(\"is_even\") == 6, calls\nassert calls.get(\"evens\") == 1, calls"
+        },
+        {
+          "name": "leaves out built-ins",
+          "code": "def shout(words):\n    return [w.upper() for w in words]\ngot, calls = count_calls(shout, [\"a\", \"b\"])\nassert got == [\"A\", \"B\"], got\nassert calls == {\"shout\": 1}, calls"
+        },
+        {
+          "name": "a cache cuts the calls",
+          "code": "import functools\n@functools.cache\ndef fast_fib(n):\n    return n if n < 2 else fast_fib(n - 1) + fast_fib(n - 2)\ngot, calls = count_calls(fast_fib, 30)\nassert got == 832040, got\nassert calls == {\"fast_fib\": 31}, calls"
+        }
+      ],
+      "hints": [
+        "`profiler.runcall(func, *args)` runs the call with profiling on and returns its result. `pstats.Stats(profiler).get_stats_profile().func_profiles` maps each function name to its details.",
+        "`info.ncalls` is text: `\"177/1\"` for a recursive function, `\"6\"` for others. The number before the slash is the total.",
+        "Skip entries whose `info.file_name` is `\"~\"`, and store `int(info.ncalls.split(\"/\")[0])` for the rest."
+      ],
+      "explanation": "The profile also lists every built-in that ran, down to the method that switches profiling off, and its counts are text because recursive functions get the `total/primitive` form. Filtering and converting turn it into numbers a program can act on.\n\nCall counts are exact, while timings change from run to run. That is why the checks compared counts: 177 calls for `fib(10)`, but only 31 for a cached `fib(30)`, is the whole story of that speed-up."
+    },
+    {
+      "id": "command-line-arguments",
+      "title": "Command-line programs",
+      "body": "# Command-line programs\n\nA script becomes a tool when it takes arguments instead of values edited into its code. `argparse` reads them, converts their types, writes the `--help` text, and rejects bad input with a clear message.\n\n```python\nimport argparse\n\nparser = argparse.ArgumentParser(\n    prog=\"backup\")\nparser.add_argument(\"source\")\nparser.add_argument(\"--keep\", type=int,\n                    default=3)\nparser.add_argument(\"--dry-run\",\n                    action=\"store_true\")\n\nargs = parser.parse_args(\n    [\"docs\", \"--keep\", \"5\"])\nprint(args.source, args.keep, args.dry_run)\n```\n\n- A bare name is a required positional argument. A name starting with `--` is an option.\n- `type` is called on the text. A function that raises `argparse.ArgumentTypeError` adds your own validation.\n- `action=\"store_true\"` makes a flag that takes no value. `--dry-run` is read back as `args.dry_run`.\n- Bad input prints the usage and raises `SystemExit` with status 2.\n\n## Keep argv a parameter\n\nWrite `main(argv=None)` and call `parser.parse_args(argv)` inside it. With `None` it reads `sys.argv`, and a test can pass a list instead.\n",
+      "task": "Write `build_parser()` returning an `ArgumentParser` with `prog=\"backup\"`, a positional `source`, `--dest` defaulting to `\"backups\"`, `--keep` defaulting to 3, and a `--dry-run` flag. `--keep` accepts only whole numbers of at least 1: write `positive_int(text)` for its `type`, raising `argparse.ArgumentTypeError` otherwise.",
+      "starter": "import argparse\n\n\ndef positive_int(text):\n    return int(text)\n\n\ndef build_parser():\n    parser = argparse.ArgumentParser(prog=\"backup\")\n    parser.add_argument(\"source\")\n    parser.add_argument(\"--keep\", default=3)\n    parser.add_argument(\"--dry-run\")\n    return parser\n",
+      "solution": "import argparse\n\n\ndef positive_int(text):\n    try:\n        value = int(text)\n    except ValueError:\n        raise argparse.ArgumentTypeError(\n            f\"{text!r} is not a whole number\"\n        ) from None\n    if value < 1:\n        raise argparse.ArgumentTypeError(\"must be at least 1\")\n    return value\n\n\ndef build_parser():\n    parser = argparse.ArgumentParser(prog=\"backup\")\n    parser.add_argument(\"source\")\n    parser.add_argument(\"--dest\", default=\"backups\")\n    parser.add_argument(\"--keep\", type=positive_int, default=3)\n    parser.add_argument(\"--dry-run\", action=\"store_true\")\n    return parser\n",
+      "checks": [
+        {
+          "name": "defaults",
+          "code": "args = build_parser().parse_args([\"docs\"])\ngot = (args.source, args.dest, args.keep, args.dry_run)\nassert got == (\"docs\", \"backups\", 3, False), got"
+        },
+        {
+          "name": "options are converted",
+          "code": "argv = [\"docs\", \"--keep\", \"5\", \"--dry-run\", \"--dest\", \"old\"]\nargs = build_parser().parse_args(argv)\ngot = (args.keep, args.dry_run, args.dest)\nassert got == (5, True, \"old\"), got"
+        },
+        {
+          "name": "positive_int validates",
+          "code": "import argparse\nassert positive_int(\"4\") == 4, positive_int(\"4\")\nfor bad in [\"0\", \"-2\", \"x\", \"1.5\"]:\n    try:\n        positive_int(bad)\n    except argparse.ArgumentTypeError:\n        pass\n    else:\n        raise AssertionError(f\"positive_int({bad!r}) should raise ArgumentTypeError\")"
+        },
+        {
+          "name": "rejects bad command lines",
+          "code": "import contextlib, io\nfor argv in ([\"docs\", \"--keep\", \"0\"], [\"docs\", \"--keep\", \"many\"], []):\n    try:\n        with contextlib.redirect_stderr(io.StringIO()):\n            build_parser().parse_args(argv)\n    except SystemExit as stop:\n        assert stop.code == 2, stop.code\n    else:\n        raise AssertionError(f\"{argv} should be rejected\")"
+        },
+        {
+          "name": "usage names the program",
+          "code": "usage = build_parser().format_usage()\nassert usage.startswith(\"usage: backup\"), usage\nassert \"--dry-run\" in usage, usage"
+        }
+      ],
+      "hints": [
+        "`add_argument(\"source\")` is positional. Options take `default=`, and `action=\"store_true\"` makes a flag that needs no value.",
+        "`type=` is called on the text. In `positive_int`, convert with `int`, and raise `argparse.ArgumentTypeError` when that fails or the number is below 1.",
+        "`parser.add_argument(\"--keep\", type=positive_int, default=3)`, `parser.add_argument(\"--dry-run\", action=\"store_true\")` and `parser.add_argument(\"--dest\", default=\"backups\")`."
+      ],
+      "explanation": "Without `type`, every value arrives as a string, so `--keep 5` gave `\"5\"` and `--keep 0` slipped through. Validating in the `type` function stops bad input at the edge of the program, with a usage message, and the rest of the code can trust `args.keep`.\n\n`parse_args` raises `SystemExit` instead of returning an error, which is right for a command line and is why the checks caught it. Defaults skip validation unless they are strings: argparse would pass `default=\"3\"` through `positive_int`, but uses the integer 3 as it is."
+    },
+    {
+      "id": "pathlib-and-shutil",
+      "title": "Tidying files with pathlib",
+      "body": "# Tidying files with pathlib\n\nScripts that sort downloads, rename photos or clean build folders are some of the most common Python anyone writes. `pathlib` finds and names files, and `shutil` copies, moves and deletes them.\n\n```python\nimport shutil\nfrom pathlib import Path\n\nroot = Path(\"demo\")\nsrc = root / \"src\"\nsrc.mkdir(parents=True, exist_ok=True)\n(src / \"a.txt\").write_text(\"hi\")\n(src / \"b.md\").write_text(\"# b\")\nshutil.copytree(src, root / \"copy\",\n                dirs_exist_ok=True)\nfor p in sorted(root.rglob(\"*.txt\")):\n    print(p, p.stem, p.suffix)\n```\n\n- `/` joins paths. `.name`, `.stem`, `.suffix` and `.parent` take them apart.\n- `glob(\"*.txt\")` looks in one folder, and `rglob` in every folder below it.\n- `shutil.move` and `shutil.copy2` move or copy one file. `copytree` and `rmtree` handle whole folders.\n- `rmtree` deletes without asking. Print what a script would do before letting it do it.\n\n## Collect, then change\n\nTake a list of a folder's contents before moving anything. A folder that changes while you iterate over it can make the loop skip entries or see the new ones.\n",
+      "task": "Write `tidy(folder)`, taking a string or a `Path`, that moves each file directly inside `folder` into a subfolder named after its suffix, lowercased and without the dot (`photo.JPG` goes to `jpg`), and files with no suffix into `other`. Leave existing subfolders alone, and return a dict counting the files moved into each subfolder.",
+      "starter": "import shutil\nfrom pathlib import Path\n\n\ndef tidy(folder):\n    folder = Path(folder)\n    counts = {}\n    for path in list(folder.iterdir()):\n        group = path.suffix[1:]\n        (folder / group).mkdir(exist_ok=True)\n        shutil.move(path, folder / group / path.name)\n        counts[group] = counts.get(group, 0) + 1\n    return counts\n",
+      "solution": "import shutil\nfrom pathlib import Path\n\n\ndef tidy(folder):\n    folder = Path(folder)\n    files = [p for p in folder.iterdir() if p.is_file()]\n    counts = {}\n    for path in files:\n        group = path.suffix.lower().lstrip(\".\") or \"other\"\n        target = folder / group\n        target.mkdir(exist_ok=True)\n        shutil.move(path, target / path.name)\n        counts[group] = counts.get(group, 0) + 1\n    return counts\n",
+      "checks": [
+        {
+          "name": "counts by suffix",
+          "code": "from pathlib import Path\nroot = Path(\"t1\")\nroot.mkdir()\nfor name in [\"a.txt\", \"b.TXT\", \"c.jpg\", \"README\"]:\n    (root / name).write_text(name)\ngot = tidy(root)\nassert got == {\"txt\": 2, \"jpg\": 1, \"other\": 1}, got"
+        },
+        {
+          "name": "files land in place, unchanged",
+          "code": "from pathlib import Path\nroot = Path(\"t2\")\nroot.mkdir()\nfor name in [\"a.txt\", \"b.TXT\", \"c.jpg\", \"README\"]:\n    (root / name).write_text(name)\ntidy(root)\ngot = sorted(p.relative_to(root).as_posix() for p in root.rglob(\"*\") if p.is_file())\nassert got == [\"jpg/c.jpg\", \"other/README\", \"txt/a.txt\", \"txt/b.TXT\"], got\nassert (root / \"txt\" / \"b.TXT\").read_text() == \"b.TXT\", \"contents changed\""
+        },
+        {
+          "name": "subfolders are left alone",
+          "code": "from pathlib import Path\nroot = Path(\"t3\")\n(root / \"keep\").mkdir(parents=True)\n(root / \"keep\" / \"inside.txt\").write_text(\"x\")\n(root / \"top.txt\").write_text(\"y\")\ngot = tidy(root)\nassert got == {\"txt\": 1}, got\nassert (root / \"keep\" / \"inside.txt\").exists(), \"keep/ should not move\"\nassert (root / \"txt\" / \"top.txt\").exists(), \"top.txt should be in txt/\""
+        },
+        {
+          "name": "dotfiles and double suffixes",
+          "code": "from pathlib import Path\nroot = Path(\"t4\")\nroot.mkdir()\nfor name in [\".env\", \"backup.tar.gz\", \"notes.\"]:\n    (root / name).write_text(name)\ngot = tidy(str(root))\nassert got == {\"other\": 2, \"gz\": 1}, got\nassert (root / \"other\" / \".env\").exists(), \"where did .env go?\""
+        },
+        {
+          "name": "an empty folder",
+          "code": "from pathlib import Path\nPath(\"t5\").mkdir()\ngot = tidy(\"t5\")\nassert got == {}, got"
+        }
+      ],
+      "hints": [
+        "`Path(folder).iterdir()` lists what is inside, and `is_file()` tells files from folders. Make the list before moving anything.",
+        "`path.suffix` is `\".JPG\"` for `photo.JPG` and `\"\"` when there is none. `.lower().lstrip(\".\")`, followed by `or \"other\"`, gives the folder name.",
+        "For each file: `target = folder / group`, `target.mkdir(exist_ok=True)`, `shutil.move(path, target / path.name)`, and add one to `counts[group]`."
+      ],
+      "explanation": "A dotfile such as `.env` has no suffix as far as `pathlib` is concerned, and only the last suffix counts, so `backup.tar.gz` is a `gz` file. A name ending in a dot has the suffix `\".\"`, which `lstrip` turns into an empty string and so into `other`.\n\nListing the files first does two jobs: folders created during the loop are never mistaken for work, and the loop never reads a folder that is changing under it."
+    },
+    {
+      "id": "searching-text-with-re",
+      "title": "Searching text with re",
+      "body": "# Searching text with re\n\nA regular expression is a small pattern language for text. It is the tool behind `grep`, search and replace in editors, and most log analysis, and Python's `re` module runs the same patterns.\n\n```python\nimport re\n\nline = \"08:15:02 ERROR [db] timeout 30s\"\nentry = re.compile(\n    r\"(?P<time>\\d\\d:\\d\\d:\\d\\d) \"\n    r\"(?P<level>[A-Z]+) \"\n    r\"\\[(?P<part>[^\\]]+)\\]\")\nm = entry.match(line)\nprint(m[\"level\"], m[\"part\"])\nprint(re.findall(r\"\\d+\", line))\n```\n\n- `\\d` is a digit and `[A-Z]` one capital letter. `+` means one or more, and `[^\\]]` is any character except `]`.\n- Characters such as `[`, `.` and `(` have special meanings, so a backslash makes them literal: `\\[`.\n- Write patterns as raw strings, `r\"...\"`, so backslashes reach `re` untouched.\n- `match` anchors at the start, `search` looks anywhere, and `findall` returns every match.\n- `(?P<name>...)` names a group, and `m[\"name\"]` reads it back.\n\nWhen the text does not fit, `match` returns `None`, so test the result before using it.\n",
+      "task": "Write `error_counts(text)` that reads a log with one entry per line, in the form `HH:MM:SS LEVEL [component] message`, and returns a dict counting the `ERROR` entries for each component. Skip lines that are not in that form.",
+      "starter": "def error_counts(text):\n    counts = {}\n    for line in text.splitlines():\n        if \"ERROR\" in line:\n            part = line.split()[2].strip(\"[]\")\n            counts[part] = counts.get(part, 0) + 1\n    return counts\n",
+      "solution": "import re\n\nENTRY = re.compile(\n    r\"(?P<time>\\d\\d:\\d\\d:\\d\\d) (?P<level>[A-Z]+) \"\n    r\"\\[(?P<component>[^\\]]+)\\]\"\n)\n\n\ndef error_counts(text):\n    counts = {}\n    for line in text.splitlines():\n        m = ENTRY.match(line)\n        if m and m[\"level\"] == \"ERROR\":\n            part = m[\"component\"]\n            counts[part] = counts.get(part, 0) + 1\n    return counts\n",
+      "checks": [
+        {
+          "name": "counts errors by component",
+          "code": "log = \"\"\"08:15:02 ERROR [db] timeout after 30s\n08:15:03 INFO [api] request ok\n08:15:04 ERROR [db] timeout after 30s\n08:15:09 ERROR [auth.tokens] expired\n\"\"\"\ngot = error_counts(log)\nassert got == {\"db\": 2, \"auth.tokens\": 1}, got"
+        },
+        {
+          "name": "the level decides, not the message",
+          "code": "log = \"08:00:00 INFO [api] retried after ERROR\\n08:00:01 WARNING [api] ERROR rate rising\\n\"\ngot = error_counts(log)\nassert got == {}, got"
+        },
+        {
+          "name": "skips lines in other forms",
+          "code": "log = \"\"\"08:00:00 ERROR [db] lost connection\nTraceback (most recent call last):\nERROR without a time\n8:00:01 ERROR [db] short hour\n08:00:02 ERROR db no brackets\n\"\"\"\ngot = error_counts(log)\nassert got == {\"db\": 1}, got"
+        },
+        {
+          "name": "components with dashes and spaces",
+          "code": "log = \"09:00:00 ERROR [web-1] down\\n09:00:01 ERROR [job runner] stuck\\n09:00:02 ERROR [web-1] down\\n\"\ngot = error_counts(log)\nassert got == {\"web-1\": 2, \"job runner\": 1}, got"
+        },
+        {
+          "name": "empty text",
+          "code": "assert error_counts(\"\") == {}, error_counts(\"\")"
+        }
+      ],
+      "hints": [
+        "Write one pattern for the start of an entry: the time, a space, the level, a space, then the component in square brackets. The brackets need backslashes: `\\[` and `\\]`.",
+        "`(?P<level>[A-Z]+)` captures the level by name, and `[^\\]]+` matches everything up to the closing bracket. `pattern.match(line)` returns `None` for a line in another form.",
+        "`m = ENTRY.match(line)`, then `if m and m[\"level\"] == \"ERROR\":` add one to `counts[m[\"component\"]]`."
+      ],
+      "explanation": "Looking for the word `ERROR` anywhere in a line also counts messages that merely mention it, and splitting on spaces trusts every line to have the shape you expect. A pattern states the whole shape at once, so a line either matches all of it or is skipped.\n\nCompiling the pattern once, under a name at module level, documents the log format in one place. Named groups keep the code readable when that format changes."
+    },
+    {
+      "id": "settings-from-the-environment",
+      "title": "Settings from the environment",
+      "body": "# Settings from the environment\n\nPasswords, API keys and server addresses do not belong in code. Programs read them from environment variables, which a shell, a container or a hosting service sets. During development a `.env` file holds the same names, and it is kept out of version control.\n\n```python\nimport os\n\nos.environ[\"APP_PORT\"] = \"8080\"\nport = int(os.environ.get(\n    \"APP_PORT\", \"8000\"))\ndebug = os.environ.get(\"APP_DEBUG\") == \"1\"\nprint(port, debug)\n```\n\n- `os.environ` behaves like a dict of strings. Convert numbers and flags yourself.\n- `.get(name, default)` suits optional settings. For a required one, index with `[name]`, so a missing value fails at startup.\n- A real variable overrides the `.env` file, so a server can change one value without anyone editing files.\n\n## The .env format\n\nOne `NAME=value` per line, with `#` comments, optional quotes and sometimes an `export` prefix:\n\n```python\nenv = '''# local settings\nexport APP_NAME=\"Shop\"\nAPP_PORT=8000\n'''\nfor line in env.splitlines():\n    print(line.partition(\"=\"))\n```\n",
+      "task": "Write `load_settings(text, environ)` that parses `.env` text into a dict: skip blank lines and `#` comments, drop an `export ` prefix, split at the first `=`, strip spaces, and remove one pair of matching quotes around the value. A key that also appears in `environ` (a mapping such as `os.environ`) takes the value from there.",
+      "starter": "def load_settings(text, environ):\n    settings = {}\n    for line in text.splitlines():\n        if line and not line.startswith(\"#\"):\n            key, value = line.split(\"=\")\n            settings[key] = value\n    return settings\n",
+      "solution": "def load_settings(text, environ):\n    settings = {}\n    for raw in text.splitlines():\n        line = raw.strip()\n        if not line or line.startswith(\"#\"):\n            continue\n        line = line.removeprefix(\"export \")\n        key, _, value = line.partition(\"=\")\n        key, value = key.strip(), value.strip()\n        quoted = len(value) >= 2 and value[0] == value[-1]\n        if quoted and value[0] in \"\\\"'\":\n            value = value[1:-1]\n        settings[key] = environ.get(key, value)\n    return settings\n",
+      "checks": [
+        {
+          "name": "reads names and values",
+          "code": "got = load_settings(\"APP_NAME=Shop\\nAPP_PORT = 8000\\n\", {})\nassert got == {\"APP_NAME\": \"Shop\", \"APP_PORT\": \"8000\"}, got"
+        },
+        {
+          "name": "comments, blanks, export and quotes",
+          "code": "text = \"\"\"\n# local settings\nexport APP_NAME=\"My Shop\"\nGREETING='hi there'\n\nTOKEN=\"abc'\n\"\"\"\ngot = load_settings(text, {})\nwant = {\"APP_NAME\": \"My Shop\", \"GREETING\": \"hi there\", \"TOKEN\": \"\\\"abc'\"}\nassert got == want, got"
+        },
+        {
+          "name": "only the first = splits",
+          "code": "text = \"DATABASE_URL=postgres://u:p@db/shop?sslmode=require\\nEMPTY=\\n\"\ngot = load_settings(text, {})\nwant = {\"DATABASE_URL\": \"postgres://u:p@db/shop?sslmode=require\", \"EMPTY\": \"\"}\nassert got == want, got"
+        },
+        {
+          "name": "the environment wins",
+          "code": "got = load_settings(\"APP_PORT=8000\\nAPP_DEBUG=0\\n\", {\"APP_PORT\": \"9000\", \"OTHER\": \"x\"})\nassert got == {\"APP_PORT\": \"9000\", \"APP_DEBUG\": \"0\"}, got"
+        },
+        {
+          "name": "works with os.environ",
+          "code": "import os\nos.environ[\"PYTHILO_LESSON_MODE\"] = \"test\"\ngot = load_settings(\"PYTHILO_LESSON_MODE=dev\\n\", os.environ)\nassert got == {\"PYTHILO_LESSON_MODE\": \"test\"}, got"
+        }
+      ],
+      "hints": [
+        "Strip each line first. Skip it if it is empty or starts with `#`, and use `removeprefix(\"export \")`.",
+        "`line.partition(\"=\")` splits at the first `=` only. A value is quoted when it has at least two characters and starts and ends with the same quote character.",
+        "After stripping the key and value and removing matching quotes, store `environ.get(key, value)`, so a real variable replaces the file's value."
+      ],
+      "explanation": "`split(\"=\")` breaks on a URL or a key that contains `=`, and it leaves spaces and quotes in place. `partition` splits once and always returns three parts, so even `EMPTY=` works.\n\nLetting the environment win is what makes the pattern useful: the same code and the same `.env` file run on your machine, in tests and on a server, and each place overrides only what differs. The python-dotenv library follows the same rule by default."
+    },
+    {
+      "id": "sqlite-databases",
+      "title": "SQLite for everyday data",
+      "body": "# SQLite for everyday data\n\n`sqlite3` is a complete SQL database in the standard library. A database is a single file, or lives in memory, and there is no server to run. Reach for it when data outgrows a JSON file: app state, caches, results you want to query.\n\n```python\nimport sqlite3\n\ndb = sqlite3.connect(\":memory:\")\ndb.execute(\"CREATE TABLE notes (text TEXT)\")\nadd = \"INSERT INTO notes VALUES (?)\"\nwith db:\n    db.execute(add, (\"it's done\",))\n    db.executemany(add, [(\"a\",), (\"b\",)])\nrows = db.execute(\"SELECT text FROM notes\")\nprint(rows.fetchall())\n```\n\n- Pass values through `?` placeholders, never by formatting them into the SQL text. Then a quote inside a value cannot break the statement or inject SQL of its own.\n- `with db:` commits at the end of the block, or rolls back if it raises.\n- `executemany` runs one statement for each row in a list.\n- `sqlite3.connect(\"app.db\")` uses a file, created if it does not exist.\n\n## Let SQL do the work\n\n`GROUP BY`, `SUM` and `ORDER BY` run inside SQLite, next to the data, so a report is one query rather than a Python loop.\n",
+      "task": "Write `load_orders(orders)` that creates an in-memory database with a table `orders(customer TEXT, amount REAL)`, inserts the `(customer, amount)` pairs with `executemany` and placeholders, and returns the connection. Write `totals(db)` returning `(customer, total)` tuples from one query, largest total first and ties in name order.",
+      "starter": "import sqlite3\n\n\ndef load_orders(orders):\n    db = sqlite3.connect(\":memory:\")\n    db.execute(\"CREATE TABLE orders (customer TEXT, amount REAL)\")\n    for customer, amount in orders:\n        db.execute(f\"INSERT INTO orders VALUES ('{customer}', {amount})\")\n    return db\n\n\ndef totals(db):\n    return db.execute(\"SELECT customer, amount FROM orders\").fetchall()\n",
+      "solution": "import sqlite3\n\n\ndef load_orders(orders):\n    db = sqlite3.connect(\":memory:\")\n    db.execute(\"CREATE TABLE orders (customer TEXT, amount REAL)\")\n    with db:\n        db.executemany(\"INSERT INTO orders VALUES (?, ?)\", orders)\n    return db\n\n\ndef totals(db):\n    rows = db.execute(\n        \"SELECT customer, SUM(amount) AS total FROM orders\"\n        \" GROUP BY customer ORDER BY total DESC, customer\"\n    )\n    return rows.fetchall()\n",
+      "checks": [
+        {
+          "name": "stores every order",
+          "code": "db = load_orders([(\"ann\", 5.0), (\"bob\", 2.5)])\ngot = db.execute(\"SELECT customer, amount FROM orders ORDER BY customer\").fetchall()\nassert got == [(\"ann\", 5.0), (\"bob\", 2.5)], got"
+        },
+        {
+          "name": "quotes in names are safe",
+          "code": "names = [\"O'Brien\", \"x'); DROP TABLE orders; --\"]\ndb = load_orders([(names[0], 3.0), (names[1], 1.0)])\ngot = db.execute(\"SELECT customer FROM orders ORDER BY amount DESC\").fetchall()\nassert got == [(names[0],), (names[1],)], got"
+        },
+        {
+          "name": "totals are grouped and sorted",
+          "code": "orders = [(\"bob\", 2.5), (\"ann\", 5.0), (\"cy\", 3.0), (\"bob\", 4.0), (\"ann\", 1.5), (\"dan\", 10.0)]\ngot = totals(load_orders(orders))\nassert got == [(\"dan\", 10.0), (\"ann\", 6.5), (\"bob\", 6.5), (\"cy\", 3.0)], got"
+        },
+        {
+          "name": "queries the connection it is given",
+          "code": "import sqlite3\ndb = sqlite3.connect(\":memory:\")\ndb.execute(\"CREATE TABLE orders (customer TEXT, amount REAL)\")\ndb.executemany(\"INSERT INTO orders VALUES (?, ?)\", [(\"z\", 1.0), (\"a\", 1.0), (\"m\", 2.0)])\ngot = totals(db)\nassert got == [(\"m\", 2.0), (\"a\", 1.0), (\"z\", 1.0)], got"
+        },
+        {
+          "name": "no orders",
+          "code": "got = totals(load_orders([]))\nassert got == [], got"
+        }
+      ],
+      "hints": [
+        "`sqlite3.connect(\":memory:\")` gives a fresh database. `db.executemany(sql, orders)` runs the insert once per pair, filling the `?` marks in order.",
+        "Formatting a name like `O'Brien` into the SQL text breaks the statement. Placeholders send the values separately from the SQL.",
+        "`SELECT customer, SUM(amount) AS total FROM orders GROUP BY customer ORDER BY total DESC, customer`, then `.fetchall()`."
+      ],
+      "explanation": "With an f-string, the apostrophe in `O'Brien` ended the SQL string early, and a name written for the purpose could run a command of its own. That is SQL injection, and placeholders prevent it by never mixing values into the SQL text.\n\n`GROUP BY` with `SUM` does the totalling inside SQLite, and the second `ORDER BY` key makes the order of ties part of the contract instead of an accident."
+    },
+    {
+      "id": "virtual-environments",
+      "title": "Virtual environments",
+      "body": "# Virtual environments\n\nEach project needs its own versions of its packages. A virtual environment is a folder with its own `site-packages`, sharing the interpreter and standard library of a base installation. `python -m venv .venv` creates one, and activating it puts `.venv/bin` first on your `PATH`.\n\n```python\nimport sys\nimport sysconfig\n\nprint(sys.prefix)\nprint(sys.base_prefix)\nprint(\"in a venv:\",\n      sys.prefix != sys.base_prefix)\nprint(sysconfig.get_path(\"purelib\"))\n```\n\n## How Python knows\n\n- At startup Python looks for a `pyvenv.cfg` file next to its executable or one folder up. If it finds one, `sys.prefix` becomes the environment's folder, while `sys.base_prefix` keeps pointing at the base installation.\n- `pip install` writes into the active environment's `site-packages`, the `purelib` path above.\n- An environment is disposable. Delete the folder and recreate it from your dependency list rather than copying it.\n\n\"I installed it but cannot import it\" usually means two Pythons are involved. Compare `sys.executable` with the Python your `pip` belongs to.\n",
+      "task": "Write `venv_info(folder)` returning `None` when `folder` has no `pyvenv.cfg` file, and otherwise a dict with the file's `\"home\"` and `\"version\"` values and `\"system_site_packages\"`, a bool that is `True` only when `include-system-site-packages` is `true`, ignoring letter case. Lines look like `key = value`.",
+      "starter": "from pathlib import Path\n\n\ndef venv_info(folder):\n    cfg = Path(folder) / \"pyvenv.cfg\"\n    values = {}\n    for line in cfg.read_text().splitlines():\n        key, value = line.split(\" = \")\n        values[key] = value\n    return {\n        \"home\": values[\"home\"],\n        \"version\": values[\"version\"],\n        \"system_site_packages\": values[\"include-system-site-packages\"],\n    }\n",
+      "solution": "from pathlib import Path\n\n\ndef venv_info(folder):\n    cfg = Path(folder) / \"pyvenv.cfg\"\n    if not cfg.is_file():\n        return None\n    values = {}\n    for line in cfg.read_text(encoding=\"utf-8\").splitlines():\n        key, sep, value = line.partition(\"=\")\n        if sep:\n            values[key.strip().lower()] = value.strip()\n    flag = values.get(\"include-system-site-packages\", \"false\")\n    return {\n        \"home\": values.get(\"home\"),\n        \"version\": values.get(\"version\"),\n        \"system_site_packages\": flag.lower() == \"true\",\n    }\n",
+      "checks": [
+        {
+          "name": "reads a standard pyvenv.cfg",
+          "code": "from pathlib import Path\nenv = Path(\"env1\")\nenv.mkdir()\n(env / \"pyvenv.cfg\").write_text(\n    \"home = /usr/local/bin\\n\"\n    \"include-system-site-packages = false\\n\"\n    \"version = 3.14.0\\n\"\n    \"executable = /usr/local/bin/python3.14\\n\"\n    \"command = /usr/local/bin/python3 -m venv /work/env1\\n\",\n    encoding=\"utf-8\",\n)\ngot = venv_info(env)\nwant = {\"home\": \"/usr/local/bin\", \"version\": \"3.14.0\", \"system_site_packages\": False}\nassert got == want, got"
+        },
+        {
+          "name": "the flag is a real bool",
+          "code": "from pathlib import Path\nfor name, text in [(\"env2\", \"true\"), (\"env3\", \"True\")]:\n    Path(name).mkdir()\n    Path(name, \"pyvenv.cfg\").write_text(\n        f\"home = /opt/py/bin\\ninclude-system-site-packages = {text}\\nversion = 3.13.5\\n\",\n        encoding=\"utf-8\",\n    )\n    got = venv_info(name)\n    assert got[\"system_site_packages\"] is True, got"
+        },
+        {
+          "name": "a folder that is not an environment",
+          "code": "from pathlib import Path\nPath(\"plain\").mkdir()\nassert venv_info(\"plain\") is None, venv_info(\"plain\")\nassert venv_info(\"no-such-folder\") is None, venv_info(\"no-such-folder\")"
+        },
+        {
+          "name": "tolerant of spacing and blank lines",
+          "code": "from pathlib import Path\nPath(\"env4\").mkdir()\nPath(\"env4\", \"pyvenv.cfg\").write_text(\n    \"home=/opt/py/bin\\n\\nversion =3.12.8\\nprompt = 'web'\\n\",\n    encoding=\"utf-8\",\n)\ngot = venv_info(\"env4\")\nwant = {\"home\": \"/opt/py/bin\", \"version\": \"3.12.8\", \"system_site_packages\": False}\nassert got == want, got"
+        }
+      ],
+      "hints": [
+        "Build the path with `Path(folder) / \"pyvenv.cfg\"` and return `None` when `is_file()` is false.",
+        "Split each line with `partition(\"=\")`, skip lines without an `=`, and strip both sides. Python itself lowercases the keys when it reads this file.",
+        "Collect the pairs in a dict, then return `home`, `version`, and `values.get(\"include-system-site-packages\", \"false\").lower() == \"true\"`."
+      ],
+      "explanation": "The file is plain text, so `\"false\"` arrives as a non-empty string, which counts as true in an `if`. Turning it into a real `bool` where it is read stops that mistake from spreading.\n\nThis is the same check Python makes at startup. A `pyvenv.cfg` file is what turns a folder into an environment, and `home` points at the installation it borrows its interpreter and standard library from."
+    },
+    {
+      "id": "packaging-and-pyproject",
+      "title": "Packaging and pyproject",
+      "body": "# Packaging and pyproject\n\n`pyproject.toml` describes a Python project in one file. Installers and build tools read it.\n\n```python\n# pyproject.toml, shown as text\n[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[project]\nname = \"shop\"\nversion = \"1.2.0\"\nrequires-python = \">=3.12\"\ndependencies = [\"requests>=2.30\"]\n\n[project.scripts]\nshop = \"shop.cli:main\"\n```\n\n- `[build-system]` names the tool that builds your package.\n- `[project]` holds the metadata. `name` is required, and `version` is too unless the build tool supplies it.\n- `dependencies` are installed along with your package.\n- `[project.scripts]` creates command-line entry points.\n\nA build produces a wheel, a ready-to-install archive, and usually a source archive. Code commonly lives in `src/shop/`, which stops tests from importing the folder by accident instead of the installed package.\n\nThe standard library's `tomllib` reads TOML, so tools can inspect this file with no extra packages.",
+      "task": "Write `summarize(text)` that parses pyproject text with `tomllib` and returns `{\"name\", \"version\", \"dependencies\", \"scripts\"}`, where dependencies is a list of package names only (for `requests>=2.30` that is `requests`). Missing lists or tables become `[]` and `{}`. Raise `ValueError` if `[project]`, `name` or `version` is missing.",
+      "starter": "import tomllib\n\n\ndef summarize(text):\n    return tomllib.loads(text)\n",
+      "solution": "import re\nimport tomllib\n\n\ndef summarize(text):\n    project = tomllib.loads(text).get(\"project\")\n    if not project:\n        raise ValueError(\"missing [project]\")\n    for key in (\"name\", \"version\"):\n        if key not in project:\n            raise ValueError(f\"missing {key}\")\n    names = [\n        re.match(r\"[A-Za-z0-9._-]+\", dep).group()\n        for dep in project.get(\"dependencies\", [])\n    ]\n    return {\n        \"name\": project[\"name\"],\n        \"version\": project[\"version\"],\n        \"dependencies\": names,\n        \"scripts\": project.get(\"scripts\", {}),\n    }\n",
+      "checks": [
+        {
+          "name": "reads a full project",
+          "code": "text = '''\n[project]\nname = \"shop\"\nversion = \"1.2.0\"\ndependencies = [\"requests>=2.30\", \"flask\"]\n\n[project.scripts]\nshop = \"shop.cli:main\"\n'''\ngot = summarize(text)\nwant = {\"name\": \"shop\", \"version\": \"1.2.0\", \"dependencies\": [\"requests\", \"flask\"], \"scripts\": {\"shop\": \"shop.cli:main\"}}\nassert got == want, got"
+        },
+        {
+          "name": "optional parts default to empty",
+          "code": "got = summarize('[project]\\nname = \"a\"\\nversion = \"1\"\\n')\nassert got == {\"name\": \"a\", \"version\": \"1\", \"dependencies\": [], \"scripts\": {}}, got"
+        },
+        {
+          "name": "strips every kind of version spec",
+          "code": "text = '''\n[project]\nname = \"a\"\nversion = \"1\"\ndependencies = [\"one==1.0\", \"two~=2.1\", \"three[extra]>=3\", \"four ; python_version<'3.14'\", \"fi-ve_6.x<7\"]\n'''\ngot = summarize(text)[\"dependencies\"]\nassert got == [\"one\", \"two\", \"three\", \"four\", \"fi-ve_6.x\"], got"
+        },
+        {
+          "name": "missing fields raise ValueError",
+          "code": "for text in ['[build-system]\\nrequires = []\\n', '[project]\\nversion = \"1\"\\n', '[project]\\nname = \"a\"\\n']:\n    raised = False\n    try:\n        summarize(text)\n    except ValueError:\n        raised = True\n    assert raised, f\"{text!r} should raise ValueError\""
+        }
+      ],
+      "hints": [
+        "`tomllib.loads(text)` returns nested dicts. The fields you want live under the `\"project\"` key.",
+        "`.get(\"dependencies\", [])` and `.get(\"scripts\", {})` handle missing parts. A package name is the run of letters, digits, dots, dashes and underscores at the start of the string.",
+        "`re.match(r\"[A-Za-z0-9._-]+\", dep).group()` extracts the name. Before that, raise `ValueError` if `project` is missing or lacks `name` or `version`."
+      ],
+      "explanation": "`tomllib` has been in the standard library since Python 3.11, and it only reads TOML. It raises `tomllib.TOMLDecodeError` on bad input, which is a subclass of `ValueError`, so syntax errors meet the same contract.\n\nReal tools use the `packaging` library to parse dependency strings. Matching the leading name is enough here because every specifier follows the name."
+    },
+    {
+      "id": "version-specifiers",
+      "title": "Requirements and versions",
+      "body": "# Requirements and versions\n\nA dependency line such as `requests>=2.30,<3` is a requirement: a project name, an optional version specifier, and sometimes extras in brackets and an environment marker after `;`. The `packaging` library parses them with the same rules pip uses.\n\n```python\nfrom packaging import requirements\nfrom packaging.version import Version\n\nprint(\"1.10\" > \"1.9\")\nprint(Version(\"1.10\") > Version(\"1.9\"))\nreq = requirements.Requirement(\n    \"rich[jupyter]>=13,<15\")\nprint(req.name, req.extras, req.specifier)\nprint(req.specifier.contains(\"14.2\"))\n```\n\n- `==2.*` allows any 2.x release, `~=2.1` means at least 2.1 but below 3, and `!=` excludes one version.\n- Versions compare by their numbers. As text, `\"1.10\"` sorts before `\"1.9\"`.\n- Pre-releases such as `2.0rc1` are left out of ranges unless you ask for them.\n- A marker such as `sys_platform == \"win32\"` limits a requirement to some machines, and `req.marker.evaluate()` tests it on this one.\n- Names compare after `canonicalize_name` from `packaging.utils`, so `Typing_Extensions` and `typing-extensions` are the same project.\n",
+      "task": "Write `unmet(requirements, installed)` taking requirement strings and a dict of installed names to versions, and returning a sorted list of the requirement names, as written, that are missing or out of range (an installed pre-release counts when in range). Compare names with `canonicalize_name`, and skip requirements whose marker does not apply here.",
+      "starter": "def unmet(requirements, installed):\n    problems = []\n    for line in requirements:\n        name = line.split(\">\")[0].split(\"=\")[0]\n        if name not in installed:\n            problems.append(name)\n    return problems\n",
+      "solution": "from packaging.requirements import Requirement\nfrom packaging.utils import canonicalize_name\n\n\ndef unmet(requirements, installed):\n    versions = {\n        canonicalize_name(name): version\n        for name, version in installed.items()\n    }\n    problems = []\n    for line in requirements:\n        req = Requirement(line)\n        if req.marker and not req.marker.evaluate():\n            continue\n        version = versions.get(canonicalize_name(req.name))\n        if version is None or not req.specifier.contains(\n            version, prereleases=True\n        ):\n            problems.append(req.name)\n    return sorted(problems)\n",
+      "checks": [
+        {
+          "name": "finds missing packages",
+          "code": "got = unmet([\"requests>=2.30\", \"rich\"], {\"requests\": \"2.32.3\"})\nassert got == [\"rich\"], got"
+        },
+        {
+          "name": "checks the version ranges",
+          "code": "reqs = [\"requests>=2.30,<3\", \"numpy==2.*\", \"attrs~=23.1\"]\ninstalled = {\"requests\": \"3.0.0\", \"numpy\": \"2.5.2\", \"attrs\": \"24.1\"}\ngot = unmet(reqs, installed)\nassert got == [\"attrs\", \"requests\"], got"
+        },
+        {
+          "name": "versions compare as numbers",
+          "code": "got = unmet([\"django>=4.10\"], {\"django\": \"4.9\"})\nassert got == [\"django\"], got\ngot = unmet([\"django>=4.9\"], {\"django\": \"4.10\"})\nassert got == [], got"
+        },
+        {
+          "name": "names are normalized",
+          "code": "got = unmet([\"Typing_Extensions>=4\"], {\"typing-extensions\": \"4.12.2\"})\nassert got == [], got\ngot = unmet([\"Flask>=3\"], {\"flask\": \"2.3.3\"})\nassert got == [\"Flask\"], got"
+        },
+        {
+          "name": "markers that do not apply are skipped",
+          "code": "reqs = ['pywin32>=300; sys_platform == \"win32\"', 'tomli; python_version < \"3.0\"']\ngot = unmet(reqs, {})\nassert got == [], got"
+        },
+        {
+          "name": "an installed pre-release can satisfy",
+          "code": "got = unmet([\"httpx>=0.27\"], {\"httpx\": \"0.28.0rc1\"})\nassert got == [], got"
+        }
+      ],
+      "hints": [
+        "`Requirement(line)` gives `.name`, `.specifier` and `.marker`, and `req.specifier.contains(version)` says whether a version fits.",
+        "Build a dict from `installed` keyed by `canonicalize_name(name)`, and look each requirement up the same way. `req.marker` is `None` when there is no marker.",
+        "Skip when `req.marker and not req.marker.evaluate()`. A name is unmet when its version is missing or `not req.specifier.contains(version, prereleases=True)`. Return `sorted(problems)`."
+      ],
+      "explanation": "Version strings are neither numbers nor plain text: as strings `\"4.10\"` sorts before `\"4.9\"`, and `2.0rc1` comes before `2.0`. Parsing them with `packaging` applies the same rules as pip, so your answer agrees with what an installer would decide.\n\nRanges leave out pre-releases so that `>=0.27` never pulls in a test build, but one that is already installed still sits inside the range, which is how `pip check` judges it. Fed from `importlib.metadata.distributions()`, this function would audit a real environment."
+    }
+  ]
+}

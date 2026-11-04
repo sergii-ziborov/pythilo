@@ -1,0 +1,500 @@
+{
+  "id": "clean-code",
+  "title": "Clean code in Python",
+  "summary": "Names, small functions, guard clauses, value objects and clear errors: refactor working code so others can read and change it.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "names-that-say-what-they-mean",
+      "title": "Names that say what they mean",
+      "body": "# Names that say what they mean\n\nCode is read far more often than it is written, and names carry most of its meaning. A good name says what a value is or what a function does, in the words of the problem, so the reader does not have to decode it.\n\n```python\ndef calc(l, t):\n    r = []\n    for x in l:\n        if x[1] >= t:\n            r.append(x[0])\n    return r\n\ndef passing_names(results, pass_mark):\n    return [name for name, score in results\n            if score >= pass_mark]\n\ndata = [(\"Ada\", 81), (\"Bo\", 47)]\nprint(calc(data, 50))\nprint(passing_names(data, 50))\n```\n\nBoth functions do the same thing. Only the second can be understood without running it.\n\n- Functions do something, so name them after the action or the result: `send_invoice`, `total_price`.\n- Booleans read as yes or no questions: `is_active`, `has_stock`.\n- Collections are plural: `users`, `prices_by_item`.\n- Avoid one-letter names and abbreviations only you know.\n",
+      "task": "Rename `f` to `top_scorers(scores, count)` and give every local a real name: it returns the names of the `count` highest values in the dict `scores`, highest first, ties in alphabetical order. Rename `chk` to `is_passing(score, pass_mark=50)`, returning a bool.",
+      "starter": "def f(d, n):\n    l = sorted(d.items(), key=lambda x: (-x[1], x[0]))\n    r = []\n    for t in l[:n]:\n        r.append(t[0])\n    return r\n\n\ndef chk(s, p=50):\n    if s >= p:\n        return True\n    else:\n        return False\n",
+      "solution": "def top_scorers(scores, count):\n    ranked = sorted(scores, key=lambda name: (-scores[name], name))\n    return ranked[:count]\n\n\ndef is_passing(score, pass_mark=50):\n    return score >= pass_mark\n",
+      "checks": [
+        {
+          "name": "top_scorers keeps the behaviour",
+          "code": "scores = {\"cy\": 90, \"bo\": 75, \"ada\": 90, \"di\": 60}\nassert top_scorers(scores, 2) == [\"ada\", \"cy\"], top_scorers(scores, 2)\nassert top_scorers(scores, 9) == [\"ada\", \"cy\", \"bo\", \"di\"], top_scorers(scores, 9)\nassert top_scorers({}, 3) == [], top_scorers({}, 3)"
+        },
+        {
+          "name": "parameters say what they hold",
+          "code": "import inspect\ngot = list(inspect.signature(top_scorers).parameters)\nassert got == [\"scores\", \"count\"], got\ngot = list(inspect.signature(is_passing).parameters)\nassert got == [\"score\", \"pass_mark\"], got"
+        },
+        {
+          "name": "no one-letter local names",
+          "code": "local_names = top_scorers.__code__.co_varnames\nshort = [name for name in local_names if len(name) == 1 and name != \"_\"]\nassert short == [], f\"give these locals real names: {short}\""
+        },
+        {
+          "name": "is_passing returns a bool",
+          "code": "assert is_passing(50) is True, is_passing(50)\nassert is_passing(49) is False, is_passing(49)\nassert is_passing(70, pass_mark=80) is False, is_passing(70, pass_mark=80)"
+        }
+      ],
+      "hints": [
+        "Work out what each name holds before renaming it: `d` is the scores, `n` is how many to return, and each `t` is one name and score pair.",
+        "`sorted` on a dict gives its keys, and the `key` function can look each score up: `-scores[name]` puts high scores first and `name` breaks ties.",
+        "`return sorted(scores, key=lambda name: (-scores[name], name))[:count]`, and `is_passing` is just `return score >= pass_mark`."
+      ],
+      "explanation": "The starter was correct, but every name had to be decoded from how it was used. `scores` and `count` tell a caller what to pass, and sorting the keys with a key function removes the index juggling of `x[1]` and `t[0]`.\n\n`if condition: return True else: return False` says the condition twice. A comparison already is a bool, so return it, and let the name `is_passing` say what the bool means."
+    },
+    {
+      "id": "small-functions-one-job",
+      "title": "Small functions with one job",
+      "body": "# Small functions with one job\n\nA long function usually does several jobs in a row: it parses input, checks it, computes something and formats the result. To change one job you have to read all of them, and you cannot test them apart.\n\nSplit it so that each function does one job and is named after it. The top function then reads as a summary of the steps.\n\n```python\ndef parse_prices(text):\n    parts = text.split(\",\")\n    return [float(part) for part in parts]\n\ndef format_money(amount):\n    return f\"${amount:.2f}\"\n\ndef receipt(text):\n    total = sum(parse_prices(text))\n    return format_money(total)\n\nprint(receipt(\"1.5, 2.25,3\"))\n```\n\n## Signs a function wants splitting\n\n- comments that announce sections, such as `# parse` or `# totals`\n- blank lines between paragraphs of code\n- a name with \"and\" in it, or no good name at all\n- a loop that builds a value only the next block uses\n",
+      "task": "Split `report(text)` into `parse_scores(text)`, returning `(name, score)` pairs with int scores and blank lines skipped, `average(scores)`, and `best_student(scores)`, returning the first pair with the highest score. `report` must call all three and return exactly the same text as before.",
+      "starter": "def report(text):\n    # parse\n    rows = []\n    for line in text.splitlines():\n        if line.strip() == \"\":\n            continue\n        parts = line.split(\",\")\n        rows.append((parts[0].strip(), int(parts[1])))\n    if len(rows) == 0:\n        return \"no students\"\n    # average\n    total = 0\n    for row in rows:\n        total = total + row[1]\n    avg = total / len(rows)\n    # best\n    best = rows[0]\n    for row in rows:\n        if row[1] > best[1]:\n            best = row\n    # format\n    return f\"{len(rows)} students, average {avg:.1f}, best {best[0]} ({best[1]})\"\n",
+      "solution": "def parse_scores(text):\n    scores = []\n    for line in text.splitlines():\n        if line.strip():\n            name, score = line.split(\",\")\n            scores.append((name.strip(), int(score)))\n    return scores\n\n\ndef average(scores):\n    return sum(score for _, score in scores) / len(scores)\n\n\ndef best_student(scores):\n    return max(scores, key=lambda pair: pair[1])\n\n\ndef report(text):\n    scores = parse_scores(text)\n    if not scores:\n        return \"no students\"\n    name, score = best_student(scores)\n    return (\n        f\"{len(scores)} students, \"\n        f\"average {average(scores):.1f}, \"\n        f\"best {name} ({score})\"\n    )\n",
+      "checks": [
+        {
+          "name": "report is unchanged",
+          "code": "got = report(\"Ada,90\\nBo, 70\\n\\nCy,85\\n\")\nassert got == \"3 students, average 81.7, best Ada (90)\", got\nassert report(\"\") == \"no students\", report(\"\")"
+        },
+        {
+          "name": "parse_scores",
+          "code": "got = parse_scores(\"Ada, 90\\n\\n Bo ,70\\n\")\nassert got == [(\"Ada\", 90), (\"Bo\", 70)], got\nassert parse_scores(\"\") == [], parse_scores(\"\")"
+        },
+        {
+          "name": "average and best_student",
+          "code": "scores = [(\"Ada\", 70), (\"Bo\", 90), (\"Cy\", 90)]\nassert average(scores) == 250 / 3, average(scores)\nassert best_student(scores) == (\"Bo\", 90), best_student(scores)"
+        },
+        {
+          "name": "report is built from the helpers",
+          "code": "used = set(report.__code__.co_names)\nmissing = {\"parse_scores\", \"average\", \"best_student\"} - used\nassert not missing, f\"report should call {sorted(missing)}\""
+        }
+      ],
+      "hints": [
+        "Start with the comments in `report`: each one marks a job that can become a function.",
+        "Move the parsing loop into `parse_scores` and call it from `report`, then do the same for the average and the best row. Run the checks after each move.",
+        "`average` is `sum(score for _, score in scores) / len(scores)`, and `best_student` is `max(scores, key=lambda pair: pair[1])`, which keeps the first of equal scores."
+      ],
+      "explanation": "Each helper can now be tested and reused on its own, and `report` shows the whole plan in a few lines. The section comments disappeared because the function names say the same thing, and a name cannot drift out of date as quietly as a comment.\n\nMove code in small steps and check after each one. A split that changes behaviour by accident, such as picking a different student on a tie, is much easier to spot one step at a time."
+    },
+    {
+      "id": "one-level-of-abstraction",
+      "title": "One level of abstraction",
+      "body": "# One level of abstraction\n\nInside a function, every line should sit at the same level of detail. A function that calls `charge(card)` and then slices a postcode by hand mixes the plan with its details, and the reader has to keep changing zoom.\n\nWrite the top function as the steps of the plan, each one a call to a well-named helper, and push the details down into those helpers. Read from the top, the file then goes from overview to detail.\n\n```python\ndef make_slug(title):\n    words = clean_words(title)\n    return \"-\".join(words)\n\ndef clean_words(title):\n    words = title.lower().split()\n    return [word for word in words\n            if word.isalnum()]\n\nprint(make_slug(\"Clean Code in Python\"))\n```\n\n`make_slug` says what happens and `clean_words` says how. Python looks a helper up when the caller runs, so helpers can sit below the function that uses them.\n\nIf a step needs a comment to explain it, it is usually a helper waiting for a name.\n",
+      "task": "Rewrite `signup(form)` as three calls: `clean_email(text)` (stripped, lower case, `ValueError` unless there is text on both sides of an `@`), `clean_name(text)` (capitalized words, `ValueError` if empty) and `greeting(name)`. `signup` itself must not call string methods, and it returns the same dict as before.",
+      "starter": "def signup(form):\n    email = form[\"email\"].strip().lower()\n    if \"@\" not in email or email.startswith(\"@\") or email.endswith(\"@\"):\n        raise ValueError(\"bad email\")\n    name = \" \".join(part.capitalize() for part in form[\"name\"].split())\n    if not name:\n        raise ValueError(\"name is required\")\n    return {\"email\": email, \"name\": name, \"greeting\": f\"Welcome, {name}!\"}\n",
+      "solution": "def signup(form):\n    email = clean_email(form[\"email\"])\n    name = clean_name(form[\"name\"])\n    return {\"email\": email, \"name\": name, \"greeting\": greeting(name)}\n\n\ndef clean_email(text):\n    email = text.strip().lower()\n    local, at, domain = email.partition(\"@\")\n    if not (local and at and domain):\n        raise ValueError(f\"bad email: {text!r}\")\n    return email\n\n\ndef clean_name(text):\n    name = \" \".join(word.capitalize() for word in text.split())\n    if not name:\n        raise ValueError(\"name is required\")\n    return name\n\n\ndef greeting(name):\n    return f\"Welcome, {name}!\"\n",
+      "checks": [
+        {
+          "name": "signup returns the same record",
+          "code": "form = {\"email\": \" Ada@Example.COM \", \"name\": \"ada  lovelace\"}\nwant = {\"email\": \"ada@example.com\", \"name\": \"Ada Lovelace\", \"greeting\": \"Welcome, Ada Lovelace!\"}\nassert signup(form) == want, signup(form)"
+        },
+        {
+          "name": "bad input raises ValueError",
+          "code": "cases = [(\"ada\", \"Ada\"), (\"@x.org\", \"Ada\"), (\"ada@\", \"Ada\"), (\"a@x.org\", \"  \")]\nfor email, name in cases:\n    raised = False\n    try:\n        signup({\"email\": email, \"name\": name})\n    except ValueError:\n        raised = True\n    assert raised, f\"email {email!r} with name {name!r} should raise ValueError\""
+        },
+        {
+          "name": "the helpers",
+          "code": "assert clean_email(\" A@B.org \") == \"a@b.org\", clean_email(\" A@B.org \")\nassert clean_name(\"bo  DIDDLEY\") == \"Bo Diddley\", clean_name(\"bo  DIDDLEY\")\nassert greeting(\"Bo\") == \"Welcome, Bo!\", greeting(\"Bo\")"
+        },
+        {
+          "name": "signup reads as the plan",
+          "code": "used = set(signup.__code__.co_names)\nmissing = {\"clean_email\", \"clean_name\", \"greeting\"} - used\nassert not missing, f\"signup should call {sorted(missing)}\"\nstring_methods = {\"strip\", \"lower\", \"split\", \"join\", \"capitalize\", \"startswith\", \"endswith\", \"partition\"}\nleaked = sorted(used & string_methods)\nassert not leaked, f\"move {leaked} down into the helpers\""
+        }
+      ],
+      "hints": [
+        "Say the steps of `signup` in plain words: clean the email, clean the name, greet. Each step becomes a helper, and `signup` keeps only the calls.",
+        "Move the email lines into `clean_email(text)` and the name lines into `clean_name(text)`, each returning the cleaned value or raising `ValueError`.",
+        "`signup` becomes `email = clean_email(form[\"email\"])`, `name = clean_name(form[\"name\"])`, and a dict that uses `greeting(name)`."
+      ],
+      "explanation": "The starter worked, but to see what `signup` does you had to read string slicing and capitalization rules first. Now it is three lines that state the plan, and each rule lives in a function whose name says which rule it is. A change to email validation touches `clean_email` and nothing else.\n\nThe last check looks at the names `signup` uses: helper calls are what the top level should contain, and a string method there means a detail has leaked back up."
+    },
+    {
+      "id": "guard-clauses-and-early-return",
+      "title": "Guard clauses and early return",
+      "body": "# Guard clauses and early return\n\nNested `if` statements push the real work to the right, and an `else` can end up a screen away from its condition. Handle the special cases first, each with its own `return` or `raise`, and the main path runs unindented at the end.\n\n```python\ndef shipping(order):\n    if not order[\"items\"]:\n        return 0\n    if order[\"country\"] != \"UK\":\n        return 20\n    if order[\"total\"] >= 50:\n        return 0\n    return 5\n\norder = {\"items\": [\"mug\"],\n         \"country\": \"UK\", \"total\": 30}\nprint(shipping(order))\n```\n\nEach guard answers one question and gets out of the way. By the last line, the reader knows every special case has been dealt with.\n\n- Invalid input goes first, and raises.\n- Then the cases with a fixed answer.\n- Then the general rule.\n\nGuards also make a new rule easy to add: it is one more guard, not another level of nesting.\n",
+      "task": "Rewrite `ticket_price(age, day, member)` with guard clauses, keeping every price and error. Then add a new rule: children under 3 get in free (price 0).",
+      "starter": "def ticket_price(age, day, member):\n    if age >= 0:\n        if age < 120:\n            if day in (\"sat\", \"sun\"):\n                if member:\n                    price = 12\n                else:\n                    price = 15\n            else:\n                if member:\n                    price = 8\n                else:\n                    price = 10\n            if age >= 65:\n                price = price / 2\n            return price\n        else:\n            raise ValueError(\"age too high\")\n    else:\n        raise ValueError(\"age below zero\")\n",
+      "solution": "WEEKEND = {\"sat\", \"sun\"}\n\n\ndef ticket_price(age, day, member):\n    if age < 0:\n        raise ValueError(\"age below zero\")\n    if age >= 120:\n        raise ValueError(\"age too high\")\n    if age < 3:\n        return 0\n    if day in WEEKEND:\n        price = 12 if member else 15\n    else:\n        price = 8 if member else 10\n    if age >= 65:\n        return price / 2\n    return price\n",
+      "checks": [
+        {
+          "name": "adult prices",
+          "code": "cases = {(30, \"mon\", False): 10, (30, \"mon\", True): 8, (30, \"sat\", False): 15, (30, \"sun\", True): 12}\nfor args, want in cases.items():\n    got = ticket_price(*args)\n    assert got == want, f\"ticket_price{args} returned {got}, expected {want}\""
+        },
+        {
+          "name": "seniors pay half",
+          "code": "assert ticket_price(70, \"sat\", False) == 7.5, ticket_price(70, \"sat\", False)\nassert ticket_price(65, \"tue\", True) == 4, ticket_price(65, \"tue\", True)\nassert ticket_price(64, \"tue\", True) == 8, ticket_price(64, \"tue\", True)"
+        },
+        {
+          "name": "impossible ages raise ValueError",
+          "code": "for age in (-1, 120, 200):\n    raised = False\n    try:\n        ticket_price(age, \"mon\", False)\n    except ValueError:\n        raised = True\n    assert raised, f\"ticket_price({age}, 'mon', False) should raise ValueError\""
+        },
+        {
+          "name": "under 3 is free",
+          "code": "assert ticket_price(0, \"sat\", False) == 0, ticket_price(0, \"sat\", False)\nassert ticket_price(2, \"mon\", True) == 0, ticket_price(2, \"mon\", True)\nassert ticket_price(3, \"mon\", False) == 10, ticket_price(3, \"mon\", False)"
+        }
+      ],
+      "hints": [
+        "Turn the two outer conditions around: `if age < 0: raise ...` and `if age >= 120: raise ...` go first, and the rest of the function loses two levels of indentation.",
+        "The free rule is one more guard, right after the errors: `if age < 3: return 0`.",
+        "After the guards, pick `price = 12 if member else 15` on weekends and `8 if member else 10` otherwise, then return `price / 2` for ages 65 and over."
+      ],
+      "explanation": "The nested version was correct, but each `else` sat far below its condition, and a new rule had no obvious home. With guards, each special case is handled and finished in two lines, so adding the free rule did not touch any other branch.\n\nOrder matters: errors first, so no price is ever computed for an impossible age, then the fixed answers, then the general rule."
+    },
+    {
+      "id": "replacing-flag-arguments",
+      "title": "Replacing flag arguments",
+      "body": "# Replacing flag arguments\n\nWhat does `format_name(\"Ada\", \"Lovelace\", True)` do? The caller cannot tell without opening the function. A boolean argument hides its meaning at the call site, and it often means the function does two different things.\n\nThere are two fixes.\n\n- If the flag picks between two behaviours, write two functions whose names say which: `paid_orders(orders)` and `unpaid_orders(orders)`.\n- If it is a genuine option, make it keyword-only by putting `*` before it. Callers then have to write its name.\n\n```python\ndef format_name(first, last, *,\n                last_first=False):\n    if last_first:\n        return f\"{last}, {first}\"\n    return f\"{first} {last}\"\n\nprint(format_name(\"Ada\", \"Lovelace\"))\nprint(format_name(\"Ada\", \"Lovelace\",\n                  last_first=True))\n```\n\nNow the call explains itself, and `format_name(\"Ada\", \"Lovelace\", True)` raises `TypeError` instead of guessing.\n",
+      "task": "Make `format_amount(amount, *, currency=False, estimate=False)` take both options by keyword only. Replace `order_ids(orders, flag)` with `paid_ids(orders)` and `unpaid_ids(orders)`.",
+      "starter": "def format_amount(amount, flag, flag2):\n    text = f\"{amount:,.2f}\"\n    if flag:\n        text = \"$\" + text\n    if flag2:\n        text += \" (estimate)\"\n    return text\n\n\ndef order_ids(orders, flag):\n    if flag:\n        result = [o[\"id\"] for o in orders if o[\"paid\"]]\n    else:\n        result = [o[\"id\"] for o in orders if not o[\"paid\"]]\n    return result\n",
+      "solution": "def format_amount(amount, *, currency=False, estimate=False):\n    text = f\"{amount:,.2f}\"\n    if currency:\n        text = \"$\" + text\n    if estimate:\n        text += \" (estimate)\"\n    return text\n\n\ndef paid_ids(orders):\n    return [order[\"id\"] for order in orders if order[\"paid\"]]\n\n\ndef unpaid_ids(orders):\n    return [order[\"id\"] for order in orders if not order[\"paid\"]]\n",
+      "checks": [
+        {
+          "name": "formats amounts",
+          "code": "assert format_amount(1234.5) == \"1,234.50\", format_amount(1234.5)\nassert format_amount(1234.5, currency=True) == \"$1,234.50\", format_amount(1234.5, currency=True)\nassert format_amount(3, estimate=True) == \"3.00 (estimate)\", format_amount(3, estimate=True)\ngot = format_amount(3, currency=True, estimate=True)\nassert got == \"$3.00 (estimate)\", got"
+        },
+        {
+          "name": "options are keyword-only",
+          "code": "import inspect\nparams = inspect.signature(format_amount).parameters\nfor name in (\"currency\", \"estimate\"):\n    assert name in params, f\"format_amount needs a {name} parameter\"\n    assert params[name].kind is inspect.Parameter.KEYWORD_ONLY, f\"{name} should come after *\"\n    assert params[name].default is False, f\"{name} should default to False\"\nraised = False\ntry:\n    format_amount(5, True)\nexcept TypeError:\n    raised = True\nassert raised, \"format_amount(5, True) should raise TypeError\""
+        },
+        {
+          "name": "paid and unpaid ids",
+          "code": "orders = [{\"id\": 1, \"paid\": True}, {\"id\": 2, \"paid\": False}, {\"id\": 3, \"paid\": True}]\nassert paid_ids(orders) == [1, 3], paid_ids(orders)\nassert unpaid_ids(orders) == [2], unpaid_ids(orders)\nassert paid_ids([]) == [], paid_ids([])"
+        },
+        {
+          "name": "no flag left",
+          "code": "import inspect\nfor func in (paid_ids, unpaid_ids):\n    got = list(inspect.signature(func).parameters)\n    assert got == [\"orders\"], f\"{func.__name__} takes {got}, expected ['orders']\""
+        }
+      ],
+      "hints": [
+        "A bare `*` in a parameter list means that every parameter after it must be passed by name.",
+        "Rename the flags after what they switch on, `currency` and `estimate`, give them defaults of `False`, and put `*` before them. `order_ids` becomes two functions, one for each branch of its `if`.",
+        "`def format_amount(amount, *, currency=False, estimate=False):`, and `paid_ids` is `return [order[\"id\"] for order in orders if order[\"paid\"]]`."
+      ],
+      "explanation": "`format_amount(5, True, False)` worked, but nobody reading it knew what `True` switched on. Keyword-only options make the call say `currency=True`, and a third option added later cannot shift the meaning of calls that already exist.\n\n`order_ids` with a flag was really two functions sharing a name. Two small functions, each named after what it returns, read better at the call site and need no `if` to work out what the caller meant."
+    },
+    {
+      "id": "constants-and-enums",
+      "title": "Constants and enums",
+      "body": "# Constants and enums\n\nA bare `50` or `\"gold\"` in the middle of a function is a magic value. The reader has to guess what it means, and changing it means finding every copy, including the one that is 50 for a different reason.\n\nGive a number a name as a module-level constant, in capitals. For a fixed set of choices, use an `Enum`: a typo becomes an `AttributeError` instead of a silent mismatch, and editors can list the options.\n\n```python\nfrom enum import Enum\n\nVAT_RATE = 0.2\n\nclass Tier(Enum):\n    BASIC = \"basic\"\n    GOLD = \"gold\"\n\ndef with_vat(net):\n    return round(net * (1 + VAT_RATE), 2)\n\nprint(with_vat(10))\nprint(Tier(\"gold\"), Tier.GOLD.value)\n```\n\n`Tier(\"gold\")` turns stored text back into a member. Compare members with `is`, since each one exists exactly once.\n\nNot every number is magic: `0`, `1` and `len(items) - 1` usually explain themselves.\n",
+      "task": "Name the numbers `FREE_DELIVERY_FROM = 50`, `STANDARD_FEE = 4.99` and `SILVER_FEE = 2.5`, add an `Enum` called `Tier` with `BASIC`, `SILVER` and `GOLD` (values `\"basic\"`, `\"silver\"` and `\"gold\"`), and make `delivery_fee(total, tier)` take a `Tier` and use the constants.",
+      "starter": "def delivery_fee(total, tier):\n    if tier == \"gold\":\n        return 0\n    if total >= 50:\n        return 0\n    if tier == \"silver\":\n        return 2.5\n    return 4.99\n",
+      "solution": "from enum import Enum\n\nFREE_DELIVERY_FROM = 50\nSTANDARD_FEE = 4.99\nSILVER_FEE = 2.5\n\n\nclass Tier(Enum):\n    BASIC = \"basic\"\n    SILVER = \"silver\"\n    GOLD = \"gold\"\n\n\ndef delivery_fee(total, tier):\n    if tier is Tier.GOLD or total >= FREE_DELIVERY_FROM:\n        return 0\n    if tier is Tier.SILVER:\n        return SILVER_FEE\n    return STANDARD_FEE\n",
+      "checks": [
+        {
+          "name": "Tier is an enum",
+          "code": "import enum\nassert issubclass(Tier, enum.Enum), \"Tier should subclass Enum\"\ngot = [(member.name, member.value) for member in Tier]\nassert got == [(\"BASIC\", \"basic\"), (\"SILVER\", \"silver\"), (\"GOLD\", \"gold\")], got"
+        },
+        {
+          "name": "fees as before",
+          "code": "cases = [(10, Tier.GOLD, 0), (60, Tier.BASIC, 0), (50, Tier.SILVER, 0), (10, Tier.SILVER, 2.5), (49.99, Tier.BASIC, 4.99)]\nfor total, tier, want in cases:\n    got = delivery_fee(total, tier)\n    assert got == want, f\"delivery_fee({total}, {tier}) returned {got}, expected {want}\""
+        },
+        {
+          "name": "the constants",
+          "code": "got = (FREE_DELIVERY_FROM, STANDARD_FEE, SILVER_FEE)\nassert got == (50, 4.99, 2.5), got"
+        },
+        {
+          "name": "delivery_fee reads the constants",
+          "code": "saved = FREE_DELIVERY_FROM, STANDARD_FEE, SILVER_FEE\nFREE_DELIVERY_FROM, STANDARD_FEE, SILVER_FEE = 100, 7, 3\ntry:\n    got = (delivery_fee(60, Tier.BASIC), delivery_fee(60, Tier.SILVER))\nfinally:\n    FREE_DELIVERY_FROM, STANDARD_FEE, SILVER_FEE = saved\nassert got == (7, 3), f\"with the constants changed, delivery_fee returned {got}\""
+        }
+      ],
+      "hints": [
+        "Put the three constants at the top of the file, and write `class Tier(Enum):` with one line per member.",
+        "Inside `delivery_fee`, compare with `tier is Tier.GOLD` and use a constant's name wherever a number was.",
+        "`if tier is Tier.GOLD or total >= FREE_DELIVERY_FROM: return 0`, then `if tier is Tier.SILVER: return SILVER_FEE`, then `return STANDARD_FEE`."
+      ],
+      "explanation": "With names, the rule reads as a sentence: gold members and orders over the threshold pay nothing. When a fee changes there is one line to edit, and the last check proves that `delivery_fee` follows it.\n\nThe enum makes the set of tiers explicit. With strings, `\"Gold\"` or `\"gld\"` would quietly fall through to the standard fee; with `Tier`, a misspelt member fails the moment its line runs."
+    },
+    {
+      "id": "comments-versus-clear-code",
+      "title": "Comments versus clear code",
+      "body": "# Comments versus clear code\n\nA comment that says what the code does is often a sign that the code could say it itself. Comments are never run or tested, so they drift: after a few edits, the comment says 30 days while the code says 45.\n\nBefore writing a comment that explains what, try:\n\n- renaming a variable so the comment is not needed\n- naming a condition, as in `is_adult = age >= 18`\n- extracting a function named after the comment\n\nKeep comments for what the code cannot say: why a choice was made, where a rule comes from, what a workaround works around. Docstrings tell callers what a function promises.\n\n```python\nADULT_AGE = 18\n\ndef can_vote(person):\n    \"\"\"True for registered adults.\"\"\"\n    is_adult = person[\"age\"] >= ADULT_AGE\n    return is_adult and person[\"registered\"]\n\nada = {\"age\": 36, \"registered\": True}\nprint(can_vote(ada))\n```\n",
+      "task": "Rename `process` to `amount_due(order)` with a one-line docstring, and turn its comments into code: extract `is_overdue(order)` and `with_late_fee(amount)`, and make `amount_due` call both.",
+      "starter": "def process(o):\n    # overdue: older than 30 days and not paid yet\n    if o[\"age_days\"] > 30 and not o[\"paid\"]:\n        # add the 5% late fee, rounded to cents\n        return round(o[\"amount\"] * 1.05, 2)\n    # otherwise the amount stays the same\n    return o[\"amount\"]\n",
+      "solution": "# Both numbers come from the payment terms printed on every invoice.\nPAYMENT_TERM_DAYS = 30\nLATE_FEE_RATE = 0.05\n\n\ndef is_overdue(order):\n    return order[\"age_days\"] > PAYMENT_TERM_DAYS and not order[\"paid\"]\n\n\ndef with_late_fee(amount):\n    return round(amount * (1 + LATE_FEE_RATE), 2)\n\n\ndef amount_due(order):\n    \"\"\"Return what the customer owes today, late fee included.\"\"\"\n    if is_overdue(order):\n        return with_late_fee(order[\"amount\"])\n    return order[\"amount\"]\n",
+      "checks": [
+        {
+          "name": "amount_due behaves like process",
+          "code": "cases = [\n    ({\"amount\": 40, \"age_days\": 31, \"paid\": False}, 42.0),\n    ({\"amount\": 40, \"age_days\": 30, \"paid\": False}, 40),\n    ({\"amount\": 40, \"age_days\": 90, \"paid\": True}, 40),\n]\nfor order, want in cases:\n    got = amount_due(order)\n    assert got == want, f\"amount_due({order}) returned {got}, expected {want}\""
+        },
+        {
+          "name": "is_overdue",
+          "code": "assert is_overdue({\"amount\": 1, \"age_days\": 31, \"paid\": False}) is True, \"31 days and unpaid is overdue\"\nassert is_overdue({\"amount\": 1, \"age_days\": 30, \"paid\": False}) is False, \"30 days is not overdue yet\"\nassert is_overdue({\"amount\": 1, \"age_days\": 31, \"paid\": True}) is False, \"a paid order is never overdue\""
+        },
+        {
+          "name": "with_late_fee",
+          "code": "assert with_late_fee(40) == 42.0, with_late_fee(40)\nassert with_late_fee(10.01) == 10.51, with_late_fee(10.01)"
+        },
+        {
+          "name": "amount_due uses the helpers",
+          "code": "used = set(amount_due.__code__.co_names)\nmissing = {\"is_overdue\", \"with_late_fee\"} - used\nassert not missing, f\"amount_due should call {sorted(missing)}\""
+        },
+        {
+          "name": "amount_due has a docstring",
+          "code": "doc = (amount_due.__doc__ or \"\").strip()\nassert doc, \"give amount_due a one-line docstring\""
+        }
+      ],
+      "hints": [
+        "Each comment names something: the first is a question about the order, the second a calculation. Those are the two helpers.",
+        "`is_overdue(order)` returns the condition from the `if`; `with_late_fee(amount)` returns the amount with 5% added, rounded to cents.",
+        "`amount_due` becomes `if is_overdue(order): return with_late_fee(order[\"amount\"])` and `return order[\"amount\"]`, under a docstring such as `\"\"\"Return what the customer owes today.\"\"\"`."
+      ],
+      "explanation": "Every comment in the starter repeated the line below it. Now the names carry that meaning, and unlike comments they are tested: if `is_overdue` stops doing what its name says, a check fails.\n\nThe constants in the solution keep the 30 and the 5% in one place each. The one comment left explains where they come from, which is something the code cannot say."
+    },
+    {
+      "id": "removing-duplication",
+      "title": "Duplication and when to remove it",
+      "body": "# Duplication and when to remove it\n\nWhen the same rule is copied into three functions, every fix has to be made three times, and one copy always gets missed. Write the rule once and pass in what varies.\n\n```python\ndef labelled(items, label):\n    names = \", \".join(sorted(items))\n    return f\"{label}: {names or 'none'}\"\n\nprint(labelled({\"tea\", \"jam\"}, \"Bought\"))\nprint(labelled(set(), \"Returned\"))\n```\n\nNot all similar code is duplication, though. Two functions that look alike today but change for different reasons, say a tax rule and a shipping rule that both happen to multiply by 1.2, should stay apart. Merging them means that changing one breaks the other.\n\nA useful habit is the rule of three: tolerate a second copy, and extract when the third arrives, because by then you can see which parts vary. Name the shared function after the rule it expresses, not after the code it happens to contain.\n",
+      "task": "Extract `bulk_price(price, qty, min_qty, discount)`: `price` times `qty`, less the fraction `discount` when `qty` is at least `min_qty`, rounded to cents. Make `book_price`, `pen_price` and `paper_price` one-line calls to it, which also fixes the copy that forgot to round.",
+      "starter": "def book_price(price, qty):\n    total = price * qty\n    if qty >= 10:\n        total = total * 0.9\n    return round(total, 2)\n\n\ndef pen_price(price, qty):\n    total = price * qty\n    if qty >= 20:\n        total = total * 0.9\n    return round(total, 2)\n\n\ndef paper_price(price, qty):\n    total = price * qty\n    if qty >= 50:\n        total = total * 0.85\n    return total\n",
+      "solution": "def bulk_price(price, qty, min_qty, discount):\n    total = price * qty\n    if qty >= min_qty:\n        total *= 1 - discount\n    return round(total, 2)\n\n\ndef book_price(price, qty):\n    return bulk_price(price, qty, min_qty=10, discount=0.1)\n\n\ndef pen_price(price, qty):\n    return bulk_price(price, qty, min_qty=20, discount=0.1)\n\n\ndef paper_price(price, qty):\n    return bulk_price(price, qty, min_qty=50, discount=0.15)\n",
+      "checks": [
+        {
+          "name": "bulk_price",
+          "code": "assert bulk_price(2.5, 10, 10, 0.1) == 22.5, bulk_price(2.5, 10, 10, 0.1)\nassert bulk_price(2.5, 9, 10, 0.1) == 22.5, bulk_price(2.5, 9, 10, 0.1)\nassert bulk_price(1.99, 3, 50, 0.15) == 5.97, bulk_price(1.99, 3, 50, 0.15)"
+        },
+        {
+          "name": "same prices as before",
+          "code": "assert book_price(12, 10) == 108, book_price(12, 10)\nassert book_price(12, 9) == 108, book_price(12, 9)\nassert pen_price(1.2, 19) == 22.8, pen_price(1.2, 19)\nassert pen_price(1.2, 20) == 21.6, pen_price(1.2, 20)"
+        },
+        {
+          "name": "every price is rounded to cents",
+          "code": "assert paper_price(0.33, 60) == 16.83, paper_price(0.33, 60)\nassert paper_price(0.07, 3) == 0.21, paper_price(0.07, 3)"
+        },
+        {
+          "name": "the three call bulk_price",
+          "code": "for func in (book_price, pen_price, paper_price):\n    assert \"bulk_price\" in func.__code__.co_names, f\"{func.__name__} should call bulk_price\""
+        }
+      ],
+      "hints": [
+        "Put the three functions side by side: only the minimum quantity and the discount differ, apart from one missing `round`.",
+        "Write `bulk_price` from one copy, replacing those two numbers with the parameters `min_qty` and `discount`, and keep the rounding.",
+        "`total = price * qty`, then `if qty >= min_qty: total *= 1 - discount`, then `return round(total, 2)`. `book_price` is `return bulk_price(price, qty, min_qty=10, discount=0.1)`."
+      ],
+      "explanation": "The bug in `paper_price` is the real cost of copies: rounding was there in two places and missing in the third. With one `bulk_price`, the rule exists once, and each product function only states its numbers.\n\nThese three merged well because they are one rule with different settings. If paper later got a completely different pricing scheme, it should stop calling `bulk_price` rather than add a flag to it."
+    },
+    {
+      "id": "primitives-to-value-objects",
+      "title": "From primitives to value objects",
+      "body": "# From primitives to value objects\n\nPassing money around as a bare float, or as a tuple of amount and currency, spreads its rules everywhere: every caller must remember the unit, check the currency, and format it the same way. This habit has a name, primitive obsession.\n\nA small frozen dataclass gives the idea a name and one home for its rules. It checks itself when created, so an invalid value never exists, and its behaviour lives in methods next to the data.\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass Money:\n    cents: int\n    currency: str\n\n    def __add__(self, other):\n        if other.currency != self.currency:\n            message = \"mixed currency\"\n            raise ValueError(message)\n        total = self.cents + other.cents\n        return Money(total, self.currency)\n\nprint(Money(150, \"EUR\") + Money(75, \"EUR\"))\n```\n\nStoring whole cents as an `int` avoids float rounding: `0.1 + 0.2` is not `0.3`, but `10 + 20` is `30`. Two values with the same fields compare equal, which is exactly how a value should behave.\n",
+      "task": "Replace the tuples with a frozen dataclass `Money(cents, currency)`. It raises `ValueError` unless the currency is three capital letters, `+` adds amounts of the same currency and raises `ValueError` for different ones, and `str()` gives text like `12.50 EUR`.",
+      "starter": "def make_money(cents, currency):\n    return (cents, currency)\n\n\ndef add_money(a, b):\n    if a[1] != b[1]:\n        return None\n    return (a[0] + b[0], a[1])\n\n\ndef show_money(m):\n    return str(m[0] / 100) + \" \" + m[1]\n",
+      "solution": "from dataclasses import dataclass\n\n\n@dataclass(frozen=True)\nclass Money:\n    cents: int\n    currency: str\n\n    def __post_init__(self):\n        code = self.currency\n        if not (len(code) == 3 and code.isalpha() and code.isupper()):\n            raise ValueError(f\"bad currency code: {code!r}\")\n\n    def __add__(self, other):\n        if other.currency != self.currency:\n            raise ValueError(\"cannot add different currencies\")\n        return Money(self.cents + other.cents, self.currency)\n\n    def __str__(self):\n        return f\"{self.cents / 100:.2f} {self.currency}\"\n",
+      "checks": [
+        {
+          "name": "Money is a frozen dataclass",
+          "code": "import dataclasses\nassert dataclasses.is_dataclass(Money), \"use @dataclass(frozen=True)\"\nnames = [field.name for field in dataclasses.fields(Money)]\nassert names == [\"cents\", \"currency\"], names\nmoney = Money(100, \"EUR\")\nraised = False\ntry:\n    money.cents = 5\nexcept dataclasses.FrozenInstanceError:\n    raised = True\nassert raised, \"Money should be frozen\""
+        },
+        {
+          "name": "adds the same currency",
+          "code": "got = Money(150, \"EUR\") + Money(75, \"EUR\")\nassert got == Money(225, \"EUR\"), got"
+        },
+        {
+          "name": "refuses to mix currencies",
+          "code": "raised = False\ntry:\n    Money(150, \"EUR\") + Money(75, \"USD\")\nexcept ValueError:\n    raised = True\nassert raised, \"adding EUR to USD should raise ValueError\""
+        },
+        {
+          "name": "checks the currency code",
+          "code": "for code in (\"eur\", \"EURO\", \"E1R\", \"\"):\n    raised = False\n    try:\n        Money(1, code)\n    except ValueError:\n        raised = True\n    assert raised, f\"Money(1, {code!r}) should raise ValueError\"\nassert Money(1, \"USD\").currency == \"USD\", Money(1, \"USD\")"
+        },
+        {
+          "name": "prints as an amount",
+          "code": "assert str(Money(1250, \"EUR\")) == \"12.50 EUR\", str(Money(1250, \"EUR\"))\nassert str(Money(5, \"USD\")) == \"0.05 USD\", str(Money(5, \"USD\"))"
+        }
+      ],
+      "hints": [
+        "Start from the example: `@dataclass(frozen=True)` with the fields `cents: int` and `currency: str`.",
+        "Checks on creation go in `__post_init__`, and `len(code) == 3 and code.isalpha() and code.isupper()` tests for three capital letters. `__str__` formats `self.cents / 100` with `:.2f`.",
+        "`__add__` raises `ValueError` when `other.currency != self.currency` and otherwise returns `Money(self.cents + other.cents, self.currency)`."
+      ],
+      "explanation": "The tuple version scattered its rules: `add_money` returned `None` on a mismatch, which callers could forget to check, and `show_money` printed `12.5 EUR`. Now `Money` refuses a bad currency when it is created and raises when currencies are mixed, so every `Money` in the program is a valid one.\n\nBecause it is frozen, a `Money` can be shared freely and used as a dict key: nobody can change the amount behind your back."
+    },
+    {
+      "id": "prefer-immutable-values",
+      "title": "Prefer immutable values",
+      "body": "# Prefer immutable values\n\nA function that changes the list or dict it was given surprises its caller, who may still be using it. Code that changes shared objects can only be understood by following it in time order.\n\nPrefer to return new values:\n\n- `sorted(items)` instead of `items.sort()`\n- `{**prices, \"tea\": 3}` instead of `prices[\"tea\"] = 3`\n- tuples and frozensets for collections that should not change\n- frozen dataclasses with `dataclasses.replace` for records\n\n```python\nfrom dataclasses import dataclass, replace\n\n@dataclass(frozen=True)\nclass Settings:\n    theme: str = \"light\"\n    size: int = 14\n\nbase = Settings()\nbig = replace(base, size=18)\nprint(base)\nprint(big)\n```\n\n`replace` builds a copy with some fields changed. `base` is untouched, so anything holding it still sees what it saw before.\n\nChanging an object your function created itself is fine. The rule is about values that other code can see.\n",
+      "task": "Make `add_item(cart, name, qty=1)` return a new dict and `normalized(names)` return a new sorted list of stripped, lower-case names, both leaving their arguments untouched. Turn `Config` into a frozen dataclass with `host` and `port`, and add `with_port(port)` returning a changed copy.",
+      "starter": "def add_item(cart, name, qty=1):\n    cart[name] = cart.get(name, 0) + qty\n    return cart\n\n\ndef normalized(names):\n    names.sort()\n    for i in range(len(names)):\n        names[i] = names[i].strip().lower()\n    return names\n\n\nclass Config:\n    def __init__(self, host, port):\n        self.host = host\n        self.port = port\n",
+      "solution": "from dataclasses import dataclass, replace\n\n\ndef add_item(cart, name, qty=1):\n    return {**cart, name: cart.get(name, 0) + qty}\n\n\ndef normalized(names):\n    return sorted(name.strip().lower() for name in names)\n\n\n@dataclass(frozen=True)\nclass Config:\n    host: str\n    port: int\n\n    def with_port(self, port):\n        return replace(self, port=port)\n",
+      "checks": [
+        {
+          "name": "add_item returns a new cart",
+          "code": "cart = {\"tea\": 1}\ngot = add_item(cart, \"tea\", 2)\nassert got == {\"tea\": 3}, got\nassert cart == {\"tea\": 1}, f\"the original cart changed to {cart}\"\nassert add_item(cart, \"jam\") == {\"tea\": 1, \"jam\": 1}, add_item(cart, \"jam\")"
+        },
+        {
+          "name": "normalized leaves its input alone",
+          "code": "names = [\"  Bo\", \"al \", \"Cy\"]\ngot = normalized(names)\nassert got == [\"al\", \"bo\", \"cy\"], got\nassert names == [\"  Bo\", \"al \", \"Cy\"], f\"the input list changed to {names}\""
+        },
+        {
+          "name": "Config cannot be changed",
+          "code": "config = Config(\"db\", 5432)\nassert (config.host, config.port) == (\"db\", 5432), (config.host, config.port)\nraised = False\ntry:\n    config.port = 1\nexcept AttributeError:\n    raised = True\nassert raised, \"assigning to config.port should raise\"\nassert config.port == 5432, config.port"
+        },
+        {
+          "name": "with_port returns a copy",
+          "code": "config = Config(\"db\", 5432)\nmoved = config.with_port(6543)\nassert (moved.host, moved.port) == (\"db\", 6543), (moved.host, moved.port)\nassert config.port == 5432, f\"the original port changed to {config.port}\"\nassert Config(\"db\", 1) == Config(\"db\", 1), \"equal configs should compare equal\""
+        }
+      ],
+      "hints": [
+        "Build new values instead of changing the arguments: a dict display that starts with `**cart`, and `sorted` over a generator.",
+        "`{**cart, name: cart.get(name, 0) + qty}` copies the cart and sets one key, and `sorted(...)` always returns a new list.",
+        "Decorate `Config` with `@dataclass(frozen=True)`, declare `host: str` and `port: int`, and return `replace(self, port=port)` from `with_port`."
+      ],
+      "explanation": "The starter's `add_item` returned the very dict it received, so the caller's cart changed too, and `normalized` sorted before cleaning, which put `\"  Bo\"` first. Returning new values removes both surprises, and the caller decides whether to keep the old value.\n\nA frozen `Config` can be passed to any function without wondering whether it comes back changed. `with_port` makes a change explicit and visible at the call site."
+    },
+    {
+      "id": "pure-core-effects-at-edges",
+      "title": "Pure functions, effects at the edges",
+      "body": "# Pure functions, effects at the edges\n\nA pure function returns a result that depends only on its arguments, and changes nothing else: it does not print, write files, update globals or modify its inputs. Pure functions are easy to test, because a test is just a call and a comparison, and they are safe to reuse.\n\nPrograms still need effects. Keep them at the edges: a thin outer function reads the input, hands it to the pure core, and writes out the result.\n\n```python\ndef count_words(lines):\n    return sum(len(line.split())\n               for line in lines)\n\ndef main(path):\n    with open(path) as file:\n        lines = file.read().splitlines()\n    print(count_words(lines), \"words\")\n\nwith open(\"notes.txt\", \"w\") as file:\n    file.write(\"one two\\nthree\\n\")\nmain(\"notes.txt\")\n```\n\n`count_words` can be tested with a list and no file at all, and `main` is so thin it hardly needs a test.\n",
+      "task": "Write a pure `order_price(order)` and a pure `summarize(orders)` returning `(lines, total)`, with lines like `\"order 1: 20\"`. Make `print_summary(orders)` the only function that prints: each line, then `total: 25`. Use no globals and do not change the orders.",
+      "starter": "total = 0\nlog = []\n\n\ndef add_order(order):\n    global total\n    price = order[\"qty\"] * order[\"unit_price\"]\n    if order.get(\"coupon\") == \"TENOFF\":\n        price = max(price - 10, 0)\n    order[\"price\"] = price\n    total += price\n    log.append(f\"order {order['id']}: {price}\")\n    return price\n\n\ndef print_summary(orders):\n    for order in orders:\n        add_order(order)\n    for line in log:\n        print(line)\n    print(f\"total: {total}\")\n",
+      "solution": "def order_price(order):\n    price = order[\"qty\"] * order[\"unit_price\"]\n    if order.get(\"coupon\") == \"TENOFF\":\n        price = max(price - 10, 0)\n    return price\n\n\ndef summarize(orders):\n    lines = []\n    total = 0\n    for order in orders:\n        price = order_price(order)\n        lines.append(f\"order {order['id']}: {price}\")\n        total += price\n    return lines, total\n\n\ndef print_summary(orders):\n    lines, total = summarize(orders)\n    for line in lines:\n        print(line)\n    print(f\"total: {total}\")\n",
+      "checks": [
+        {
+          "name": "order_price",
+          "code": "assert order_price({\"id\": 1, \"qty\": 2, \"unit_price\": 10}) == 20, order_price({\"id\": 1, \"qty\": 2, \"unit_price\": 10})\nassert order_price({\"id\": 2, \"qty\": 1, \"unit_price\": 15, \"coupon\": \"TENOFF\"}) == 5, order_price({\"id\": 2, \"qty\": 1, \"unit_price\": 15, \"coupon\": \"TENOFF\"})\nassert order_price({\"id\": 3, \"qty\": 1, \"unit_price\": 4, \"coupon\": \"TENOFF\"}) == 0, order_price({\"id\": 3, \"qty\": 1, \"unit_price\": 4, \"coupon\": \"TENOFF\"})"
+        },
+        {
+          "name": "order_price changes and prints nothing",
+          "code": "import contextlib, io\norder = {\"id\": 1, \"qty\": 2, \"unit_price\": 10, \"coupon\": \"TENOFF\"}\nbefore = dict(order)\nout = io.StringIO()\nwith contextlib.redirect_stdout(out):\n    first = order_price(order)\n    second = order_price(order)\nassert order == before, f\"the order changed to {order}\"\nassert first == second == 10, (first, second)\nassert out.getvalue() == \"\", \"order_price should not print\""
+        },
+        {
+          "name": "summarize",
+          "code": "orders = [{\"id\": 1, \"qty\": 2, \"unit_price\": 10}, {\"id\": 2, \"qty\": 1, \"unit_price\": 15, \"coupon\": \"TENOFF\"}]\nwant = ([\"order 1: 20\", \"order 2: 5\"], 25)\nassert summarize(orders) == want, summarize(orders)\nassert summarize(orders) == want, \"a second call gave a different answer\"\nassert summarize([]) == ([], 0), summarize([])"
+        },
+        {
+          "name": "print_summary prints the same every time",
+          "code": "import contextlib, io\norders = [{\"id\": 1, \"qty\": 2, \"unit_price\": 10}, {\"id\": 2, \"qty\": 1, \"unit_price\": 15, \"coupon\": \"TENOFF\"}]\nfor attempt in range(2):\n    out = io.StringIO()\n    with contextlib.redirect_stdout(out):\n        print_summary(orders)\n    got = out.getvalue()\n    assert got == \"order 1: 20\\norder 2: 5\\ntotal: 25\\n\", repr(got)"
+        }
+      ],
+      "hints": [
+        "Copy the price calculation from `add_order` into `order_price`, leaving out every line that stores or prints something.",
+        "`summarize` builds a fresh list and total on every call, as local variables, and returns them as a pair.",
+        "`print_summary` becomes `lines, total = summarize(orders)`, a loop that prints each line, and `print(f\"total: {total}\")`. Then delete the globals and `add_order`."
+      ],
+      "explanation": "The starter kept its running total in a global, so a second `print_summary` added to the first, and it wrote a `price` key into every order it was given. Those effects were mixed into the arithmetic, so nothing could be tested without them.\n\nNow the arithmetic lives in two pure functions that a test can call any number of times, and the only effect, printing, sits in a three-line function at the edge."
+    },
+    {
+      "id": "exceptions-instead-of-error-codes",
+      "title": "Exceptions instead of error codes",
+      "body": "# Exceptions instead of error codes\n\nReturning `-1`, `None` or `\"error\"` when something fails makes every caller check the result, and a forgotten check lets the failure flow on as if it were data: `-1` happily joins a sum.\n\nRaise an exception instead. Callers that can handle the failure catch it, everyone else lets it propagate, and nobody can mistake it for a result.\n\n```python\nclass OutOfStock(Exception):\n    pass\n\ndef take(have, qty):\n    if qty > have:\n        message = f\"want {qty}, have {have}\"\n        raise OutOfStock(message)\n    return have - qty\n\ntry:\n    take(2, 5)\nexcept OutOfStock as error:\n    print(\"cannot ship:\", error)\n```\n\nGive a module its own exception classes when callers need to tell its failures apart, with one base class so that they can also catch them all at once. Put the details in the message, and in attributes when callers need the values.\n",
+      "task": "Define `BankError(Exception)` with subclasses `InvalidAmount` and `InsufficientFunds`. `withdraw(balance, amount)` raises `InvalidAmount` for an amount of 0 or less and `InsufficientFunds` for an amount over the balance, instead of returning -1 and -2. `InsufficientFunds` keeps `balance` and `amount` as attributes.",
+      "starter": "def withdraw(balance, amount):\n    if amount <= 0:\n        return -1\n    if amount > balance:\n        return -2\n    return balance - amount\n",
+      "solution": "class BankError(Exception):\n    \"\"\"Base class for every error this module raises.\"\"\"\n\n\nclass InvalidAmount(BankError):\n    pass\n\n\nclass InsufficientFunds(BankError):\n    def __init__(self, balance, amount):\n        super().__init__(f\"cannot take {amount} from {balance}\")\n        self.balance = balance\n        self.amount = amount\n\n\ndef withdraw(balance, amount):\n    if amount <= 0:\n        raise InvalidAmount(f\"amount must be positive, got {amount}\")\n    if amount > balance:\n        raise InsufficientFunds(balance, amount)\n    return balance - amount\n",
+      "checks": [
+        {
+          "name": "normal withdrawals",
+          "code": "assert withdraw(10, 3) == 7, withdraw(10, 3)\nassert withdraw(5, 5) == 0, withdraw(5, 5)"
+        },
+        {
+          "name": "bad amounts raise InvalidAmount",
+          "code": "for amount in (0, -5):\n    raised = False\n    try:\n        withdraw(10, amount)\n    except InvalidAmount:\n        raised = True\n    assert raised, f\"withdraw(10, {amount}) should raise InvalidAmount\""
+        },
+        {
+          "name": "overdrafts raise InsufficientFunds",
+          "code": "caught = None\ntry:\n    withdraw(10, 15)\nexcept InsufficientFunds as error:\n    caught = error\nassert caught is not None, \"withdraw(10, 15) should raise InsufficientFunds\"\nassert (caught.balance, caught.amount) == (10, 15), (caught.balance, caught.amount)"
+        },
+        {
+          "name": "one base class for both",
+          "code": "assert issubclass(BankError, Exception), \"BankError should subclass Exception\"\nassert issubclass(InvalidAmount, BankError), \"InvalidAmount should subclass BankError\"\nassert issubclass(InsufficientFunds, BankError), \"InsufficientFunds should subclass BankError\"\nfor amount in (0, 99):\n    raised = False\n    try:\n        withdraw(10, amount)\n    except BankError:\n        raised = True\n    assert raised, f\"withdraw(10, {amount}) should raise a BankError\""
+        }
+      ],
+      "hints": [
+        "Three small classes: `class BankError(Exception)` and two subclasses of it. A body of `pass` is enough for `InvalidAmount`.",
+        "Give `InsufficientFunds` an `__init__(self, balance, amount)` that calls `super().__init__(message)` and stores both values on `self`.",
+        "In `withdraw`, replace `return -1` with `raise InvalidAmount(...)` and `return -2` with `raise InsufficientFunds(balance, amount)`."
+      ],
+      "explanation": "With codes, `balance = withdraw(balance, 15)` quietly set the balance to `-2`. With exceptions, that line cannot complete: either a caller handles `InsufficientFunds`, with the numbers it needs on the error, or the program stops at the real problem.\n\nThe shared `BankError` base lets each caller choose its level: catch `InsufficientFunds` to offer a smaller amount, or `BankError` to report any banking failure."
+    },
+    {
+      "id": "one-reason-to-change",
+      "title": "One reason to change",
+      "body": "# One reason to change\n\nA class or module should have one responsibility, which in practice means one reason to change. A report class that parses a file, applies business rules and formats text has to change whenever any of the three does, and testing its rules means building a file first.\n\n```python\nclass Invoice:\n    def __init__(self, lines):\n        self.lines = lines\n\n    def total(self):\n        total = 0\n        for qty, price in self.lines:\n            total += qty * price\n        return total\n\ndef render(invoice):\n    return f\"Total: {invoice.total():.2f}\"\n\nprint(render(Invoice([(2, 1.5), (1, 4.0)])))\n```\n\n`Invoice` knows the rules and `render` knows the layout. A new layout leaves `Invoice` alone.\n\n## Refactoring in small steps\n\nPin the current behaviour with tests, move one piece out, run the tests, and repeat. Every step leaves working code, so you can stop at any point.\n",
+      "task": "Split `SalesReport` into `parse_sales(csv_text)` returning `(region, amount)` pairs, a class `SalesTotals(rows)` whose `by_region()` returns a dict of sums, and `render_totals(totals)` producing the old text. `sales_report(csv_text)` connects them and returns what `SalesReport(csv_text).text()` did.",
+      "starter": "class SalesReport:\n    def __init__(self, csv_text):\n        self.rows = []\n        for line in csv_text.strip().splitlines()[1:]:\n            region, amount = line.split(\",\")\n            self.rows.append((region, float(amount)))\n\n    def text(self):\n        totals = {}\n        for region, amount in self.rows:\n            totals[region] = totals.get(region, 0) + amount\n        out = []\n        for region in sorted(totals):\n            out.append(f\"{region}: {totals[region]:.2f}\")\n        return \"\\n\".join(out)\n",
+      "solution": "def parse_sales(csv_text):\n    rows = []\n    for line in csv_text.strip().splitlines()[1:]:\n        region, amount = line.split(\",\")\n        rows.append((region, float(amount)))\n    return rows\n\n\nclass SalesTotals:\n    def __init__(self, rows):\n        self.rows = rows\n\n    def by_region(self):\n        totals = {}\n        for region, amount in self.rows:\n            totals[region] = totals.get(region, 0) + amount\n        return totals\n\n\ndef render_totals(totals):\n    return \"\\n\".join(f\"{region}: {totals[region]:.2f}\" for region in sorted(totals))\n\n\ndef sales_report(csv_text):\n    totals = SalesTotals(parse_sales(csv_text)).by_region()\n    return render_totals(totals)\n",
+      "checks": [
+        {
+          "name": "parse_sales",
+          "code": "text = \"region,amount\\nnorth,10\\nsouth,2.5\\nnorth,1\\n\"\ngot = parse_sales(text)\nassert got == [(\"north\", 10.0), (\"south\", 2.5), (\"north\", 1.0)], got\nassert parse_sales(\"region,amount\\n\") == [], parse_sales(\"region,amount\\n\")"
+        },
+        {
+          "name": "SalesTotals sums by region",
+          "code": "totals = SalesTotals([(\"n\", 1.0), (\"s\", 2.0), (\"n\", 3.0)])\nassert totals.by_region() == {\"n\": 4.0, \"s\": 2.0}, totals.by_region()\nassert SalesTotals([]).by_region() == {}, SalesTotals([]).by_region()"
+        },
+        {
+          "name": "render_totals",
+          "code": "got = render_totals({\"south\": 2.5, \"north\": 11.0})\nassert got == \"north: 11.00\\nsouth: 2.50\", repr(got)"
+        },
+        {
+          "name": "sales_report gives the old text",
+          "code": "got = sales_report(\"region,amount\\nnorth,10\\nsouth,2.5\\nnorth,1\\n\")\nassert got == \"north: 11.00\\nsouth: 2.50\", repr(got)\nused = set(sales_report.__code__.co_names)\nmissing = {\"parse_sales\", \"SalesTotals\", \"render_totals\"} - used\nassert not missing, f\"sales_report should use {sorted(missing)}\""
+        }
+      ],
+      "hints": [
+        "Look for what could change independently: the input format, the summing rule and the output layout. Each gets its own home.",
+        "Move the parsing loop from `__init__` into `parse_sales`, the summing loop into `SalesTotals.by_region`, and the formatting loop into `render_totals`.",
+        "`sales_report` is `render_totals(SalesTotals(parse_sales(csv_text)).by_region())`, split over two lines if you like."
+      ],
+      "explanation": "In the starter, testing the sums meant writing CSV text, and switching the input to JSON would have meant editing the class that also formats the output. After the split, each piece has one reason to change and can be tested with plain Python values.\n\n`SalesTotals` is a class because it is the part most likely to grow: averages, the best region, filters. Parsing and rendering are single functions, and that is fine: a responsibility does not need a class."
+    },
+    {
+      "id": "open-for-extension",
+      "title": "Open for extension",
+      "body": "# Open for extension\n\nAn `if`/`elif` chain on a kind, such as `if fmt == \"csv\": ... elif fmt == \"json\": ...`, has to be edited for every new kind, and the same chain tends to appear in several places. The open/closed principle says code should be open to extension but closed to modification: adding a case should mean adding code, not editing code that works.\n\nPut the varying behaviour behind one interface. Classes that share a method name do it, and so does a registry: a dict from name to function, filled by a decorator.\n\n```python\nEXPORTERS = {}\n\ndef exporter(name):\n    def register(func):\n        EXPORTERS[name] = func\n        return func\n    return register\n\n@exporter(\"csv\")\ndef to_csv(rows):\n    lines = [\",\".join(row) for row in rows]\n    return \"\\n\".join(lines)\n\nrows = [[\"a\", \"b\"], [\"c\", \"d\"]]\nprint(EXPORTERS[\"csv\"](rows))\n```\n\nA new format is now a new decorated function, possibly in another module, and nothing else changes.\n",
+      "task": "Replace the chain with a registry: a dict `DISCOUNTS`, a decorator `discount_rule(name)` that stores a function in it and returns the function unchanged, one function per kind, and `apply_discount(kind, total)` that looks the rule up, raising `ValueError` for an unknown kind. Then add `\"fifth_off\"`, which takes 20% off.",
+      "starter": "def apply_discount(kind, total):\n    if kind == \"none\":\n        return total\n    elif kind == \"half\":\n        return total / 2\n    elif kind == \"ten_off\":\n        return max(total - 10, 0)\n    else:\n        raise ValueError(f\"unknown discount: {kind}\")\n",
+      "solution": "DISCOUNTS = {}\n\n\ndef discount_rule(name):\n    def register(rule):\n        DISCOUNTS[name] = rule\n        return rule\n    return register\n\n\n@discount_rule(\"none\")\ndef no_discount(total):\n    return total\n\n\n@discount_rule(\"half\")\ndef half_price(total):\n    return total / 2\n\n\n@discount_rule(\"ten_off\")\ndef ten_off(total):\n    return max(total - 10, 0)\n\n\n@discount_rule(\"fifth_off\")\ndef fifth_off(total):\n    return total * 0.8\n\n\ndef apply_discount(kind, total):\n    try:\n        rule = DISCOUNTS[kind]\n    except KeyError:\n        raise ValueError(f\"unknown discount: {kind!r}\") from None\n    return rule(total)\n",
+      "checks": [
+        {
+          "name": "existing discounts",
+          "code": "cases = [(\"none\", 40, 40), (\"half\", 40, 20), (\"ten_off\", 40, 30), (\"ten_off\", 5, 0)]\nfor kind, total, want in cases:\n    got = apply_discount(kind, total)\n    assert got == want, f\"apply_discount({kind!r}, {total}) returned {got}, expected {want}\""
+        },
+        {
+          "name": "the new fifth_off rule",
+          "code": "assert apply_discount(\"fifth_off\", 50) == 40, apply_discount(\"fifth_off\", 50)"
+        },
+        {
+          "name": "unknown kinds raise ValueError",
+          "code": "raised = False\ntry:\n    apply_discount(\"bogus\", 10)\nexcept ValueError:\n    raised = True\nassert raised, \"apply_discount('bogus', 10) should raise ValueError\""
+        },
+        {
+          "name": "rules live in DISCOUNTS",
+          "code": "want = {\"none\", \"half\", \"ten_off\", \"fifth_off\"}\nassert want <= set(DISCOUNTS), sorted(DISCOUNTS)\nassert DISCOUNTS[\"half\"](10) == 5, DISCOUNTS[\"half\"](10)"
+        },
+        {
+          "name": "a new rule needs no edits",
+          "code": "@discount_rule(\"free\")\ndef free(total):\n    return 0\n\ntry:\n    assert callable(free), \"discount_rule should return the function it registers\"\n    assert apply_discount(\"free\", 99) == 0, apply_discount(\"free\", 99)\nfinally:\n    DISCOUNTS.pop(\"free\", None)"
+        }
+      ],
+      "hints": [
+        "Copy the registry from the example and rename it: `DISCOUNTS = {}` and a `discount_rule(name)` decorator whose inner function stores the rule and returns it.",
+        "Give each branch of the chain its own decorated function taking `total`. `apply_discount` then only looks up `DISCOUNTS[kind]` and calls it.",
+        "Turn the `KeyError` from a missing kind into `raise ValueError(...) from None`, and add `@discount_rule(\"fifth_off\")` above a function that returns `total * 0.8`."
+      ],
+      "explanation": "In the chain, every new discount meant editing `apply_discount` and risking the branches next to it. With the registry, `apply_discount` is finished: the last check registered a `free` rule from outside your code, and it worked without changing anything.\n\nThe decorator must return the function, or the decorated name becomes `None`. Classes give the same shape: each kind is a class with an `apply` method, and the caller calls `rule.apply(total)` without asking which kind it has."
+    },
+    {
+      "id": "type-hints-as-documentation",
+      "title": "Type hints as documentation",
+      "body": "# Type hints as documentation\n\nA signature is the first thing a reader sees. `def find(users, key)` leaves every question open. With hints, the signature answers them: what to pass, what comes back, and whether it can be missing.\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass\nclass User:\n    email: str\n    name: str\n\ndef find_user(users: list[User],\n              email: str) -> User | None:\n    for user in users:\n        if user.email == email:\n            return user\n    return None\n\nada = User(\"ada@x.org\", \"Ada\")\nprint(find_user([ada], \"ada@x.org\"))\n```\n\n`-> User | None` warns every caller to handle the missing case, and a type checker flags one that does not.\n\nHints are not checked when the code runs, but unlike comments they are read by editors and checkers, so a stale hint gets noticed. Make them precise: `dict[int, list[str]]` says far more than `dict`. And let them steer the design: returning an empty list instead of `None` removes the `| None`, and every check that came with it.\n",
+      "task": "Move the comments into the signatures: `tags_for(tags_by_user: dict[int, list[str]], user_id: int) -> list[str]`, returning an empty list for an unknown user, and `most_tagged(tags_by_user: dict[int, list[str]]) -> int | None`.",
+      "starter": "def tags_for(db, uid):\n    # db maps a user id (int) to a list of tag strings\n    # returns the user's tags, or None if unknown\n    return db.get(uid)\n\n\ndef most_tagged(db):\n    # returns the user id with the most tags,\n    # or None when db is empty\n    if not db:\n        return None\n    return max(db, key=lambda uid: len(db[uid]))\n",
+      "solution": "def tags_for(tags_by_user: dict[int, list[str]], user_id: int) -> list[str]:\n    return tags_by_user.get(user_id, [])\n\n\ndef most_tagged(tags_by_user: dict[int, list[str]]) -> int | None:\n    if not tags_by_user:\n        return None\n    return max(tags_by_user, key=lambda user_id: len(tags_by_user[user_id]))\n",
+      "checks": [
+        {
+          "name": "tags_for has exact hints",
+          "code": "import typing\nhints = typing.get_type_hints(tags_for)\nwant = {\"tags_by_user\": dict[int, list[str]], \"user_id\": int, \"return\": list[str]}\nassert hints == want, hints"
+        },
+        {
+          "name": "tags_for always returns a list",
+          "code": "index = {1: [\"admin\", \"beta\"], 2: []}\nassert tags_for(index, 1) == [\"admin\", \"beta\"], tags_for(index, 1)\nassert tags_for(index, 2) == [], tags_for(index, 2)\nassert tags_for(index, 3) == [], tags_for(index, 3)"
+        },
+        {
+          "name": "most_tagged has exact hints",
+          "code": "import typing\nhints = typing.get_type_hints(most_tagged)\nwant = {\"tags_by_user\": dict[int, list[str]], \"return\": int | None}\nassert hints == want, hints"
+        },
+        {
+          "name": "most_tagged behaviour",
+          "code": "assert most_tagged({1: [\"a\"], 2: [\"a\", \"b\"]}) == 2, most_tagged({1: [\"a\"], 2: [\"a\", \"b\"]})\nassert most_tagged({5: [\"a\"], 7: [\"b\"]}) == 5, most_tagged({5: [\"a\"], 7: [\"b\"]})\nassert most_tagged({}) is None, most_tagged({})"
+        }
+      ],
+      "hints": [
+        "Turn each comment into a hint: a dict from `int` to a list of strings is written `dict[int, list[str]]`.",
+        "Rename `db` and `uid` to `tags_by_user` and `user_id` as you go. The names and the hints together replace the comments.",
+        "`tags_for` returns `tags_by_user.get(user_id, [])`, so its return hint is plain `list[str]`; `most_tagged` keeps its `None` case and returns `int | None`."
+      ],
+      "explanation": "The comments said what the hints now say, but nothing read them. An editor shows the hints whenever you call `tags_for`, and a checker warns if someone passes a user name instead of an id.\n\nChanging the unknown-user result from `None` to `[]` let the hint say `list[str]`, so callers can loop over the result directly. `most_tagged` has no sensible answer for an empty dict, so its `int | None` is honest, and the hint makes every caller deal with it."
+    }
+  ]
+}

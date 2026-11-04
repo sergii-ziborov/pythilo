@@ -448,6 +448,26 @@ final class RuntimeGateTests: XCTestCase {
         XCTAssertTrue(outputText().contains("Saved the weights to spirals.pt"), outputText())
     }
 
+    /// torch-ios's conformance suite, run here and compared with the same suite on the
+    /// Mac (`build/torch-conformance-mac.json`, made with the Mac's torch of the same
+    /// version). The simulator reads and writes the Mac's files directly.
+    func testPyTorchMatchesTheReferenceBuild() async throws {
+        let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let suite = repository.appending(path: "build/torch-ios/tests")
+        let reference = repository.appending(path: "build/torch-conformance-mac.json")
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: reference.path), "Make the Mac reference first")
+        let candidate = repository.appending(path: "build/torch-conformance-ios.json")
+        let outcome = try await run("""
+        import runpy, sys
+        sys.path.insert(0, \(String(reflecting: suite.path)))
+        suite = runpy.run_path(\(String(reflecting: suite.appending(path: "conformance.py").path)))
+        suite["main"](\(String(reflecting: candidate.path)))
+        compare = runpy.run_path(\(String(reflecting: suite.appending(path: "compare.py").path)))
+        sys.exit(compare["main"](\(String(reflecting: reference.path)), \(String(reflecting: candidate.path))))
+        """, timeout: 600)
+        XCTAssertEqual(outcome.code, 0, outputText())
+    }
+
     func testPyTorchCoversTheRestOfTheLibrary() async throws {
         let outcome = try await run("""
         import torch
@@ -642,5 +662,9 @@ final class RuntimeGateTests: XCTestCase {
         XCTAssertEqual(run.status, "finished", outputText())
         XCTAssertTrue(outputText().contains("a = 1"))
         XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: ".pythilo/environment.json").path))
+        // pip runs in the same interpreter: nothing it set up may police later imports.
+        let later = try await self.run("import email.mime.text, jedi, pyflakes.api\nprint('imported')\n")
+        XCTAssertEqual(later.status, "finished", outputText())
+        XCTAssertFalse(outputText().contains("after pip install started"), outputText())
     }
 }

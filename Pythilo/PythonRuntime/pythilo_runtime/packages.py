@@ -45,7 +45,14 @@ def pip(args, site):
 
 def _call_pip(arguments):
     from pip._internal.cli.main import main
+    from pip._internal.commands import install
 
+    # pip install guards against importing what it just installed with an audit
+    # hook, and an audit hook can never be removed. Here pip shares the one
+    # interpreter with everything the user runs later, so the hook would flag
+    # (and from pip 26.3 refuse) every later import. Marking it as already
+    # installed keeps pip from adding it.
+    install._IMPORT_AUDIT_HOOK_INSTALLED = True
     return main(["--no-input", "--disable-pip-version-check", "--no-color", *arguments])
 
 

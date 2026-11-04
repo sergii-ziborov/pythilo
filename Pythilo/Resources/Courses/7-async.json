@@ -1,0 +1,420 @@
+{
+  "id": "async",
+  "title": "Concurrency and async",
+  "summary": "Threads, pools, locks and queues, then asyncio: tasks, timeouts, task groups, rate limits, async iterators and to_thread.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "threads-and-join",
+      "title": "Threads and join",
+      "body": "# Threads and join\n\nMost programs spend their time waiting: for a disk, a network, a database. Concurrency lets those waits overlap, so three downloads that each wait a second can finish in about one second instead of three.\n\nComputing is different. In the standard build of Python, a global interpreter lock, the GIL, lets only one thread run Python code at a time. A thread that sleeps or waits for I/O releases it, so threads speed up waiting, not arithmetic.\n\n```python\nimport threading\nimport time\n\nresults = {}\n\ndef download(name):\n    time.sleep(0.01)  # waiting for I/O\n    results[name] = len(name)\n\nthreads = [\n    threading.Thread(target=download,\n                     args=(name,))\n    for name in [\"a.txt\", \"notes.md\"]\n]\nfor t in threads:\n    t.start()\nfor t in threads:\n    t.join()\nprint(sorted(results.items()))\n```\n\n`start()` launches a thread and returns at once. `join()` waits until it finishes. Start them all, then join them all: joining right after each start runs them one at a time.\n\nA thread cannot hand back a return value, so its function stores the result somewhere you read after `join()`.\n",
+      "task": "Write `run_all(jobs)`, where `jobs` is a list of functions that take no arguments. Run every job in its own thread, all at the same time, wait for all of them, and return their results as a list in the order of `jobs`.",
+      "starter": "import threading\n\n\ndef run_all(jobs):\n    results = []\n    for job in jobs:\n        thread = threading.Thread(\n            target=lambda: results.append(job())\n        )\n        thread.start()\n        thread.join()\n    return results\n",
+      "solution": "import threading\n\n\ndef run_all(jobs):\n    results = [None] * len(jobs)\n\n    def run(index, job):\n        results[index] = job()\n\n    threads = [\n        threading.Thread(target=run, args=(index, job))\n        for index, job in enumerate(jobs)\n    ]\n    for thread in threads:\n        thread.start()\n    for thread in threads:\n        thread.join()\n    return results\n",
+      "checks": [
+        {
+          "name": "returns results in order",
+          "code": "got = run_all([lambda: 1, lambda: \"two\", lambda: [3]])\nassert got == [1, \"two\", [3]], got"
+        },
+        {
+          "name": "runs the jobs at the same time",
+          "code": "import threading\nbarrier = threading.Barrier(3, timeout=0.5)\ndef job(value):\n    def run():\n        barrier.wait()\n        return value\n    return run\ntry:\n    got = run_all([job(\"a\"), job(\"b\"), job(\"c\")])\nexcept threading.BrokenBarrierError:\n    got = None\nassert got == [\"a\", \"b\", \"c\"], \"the three jobs should all be running at once\""
+        },
+        {
+          "name": "waits for every job",
+          "code": "import threading\ndef slow():\n    threading.Event().wait(0.01)\n    return \"done\"\ngot = run_all([slow, slow])\nassert got == [\"done\", \"done\"], got"
+        },
+        {
+          "name": "no jobs",
+          "code": "got = run_all([])\nassert got == [], got"
+        }
+      ],
+      "hints": [
+        "A `threading.Thread(target=...)` runs a function but throws its return value away. Give each thread a small function that stores the result.",
+        "Make `results = [None] * len(jobs)` and let thread number `i` write `results[i]`. Start every thread in one loop, then join them in a second loop.",
+        "`def run(index, job): results[index] = job()`, a `threading.Thread(target=run, args=(index, job))` for each pair from `enumerate(jobs)`, then `start()` them all and `join()` them all."
+      ],
+      "explanation": "Joining a thread straight after starting it makes the caller wait for that job before it starts the next one, so the jobs run one after another with extra steps. Start every thread first, then join each one.\n\nEach thread writes into its own slot of a list made in advance, so the results follow the order of `jobs`, not the order in which the threads happened to finish."
+    },
+    {
+      "id": "thread-pools-and-futures",
+      "title": "Thread pools and futures",
+      "body": "# Thread pools and futures\n\nA thread per job does not scale to a thousand jobs. A `ThreadPoolExecutor` keeps a fixed number of worker threads and feeds them your jobs.\n\n```python\nfrom concurrent.futures import (\n    ThreadPoolExecutor,\n)\n\ndef square(n):\n    return n * n\n\npool = ThreadPoolExecutor(max_workers=4)\nwith pool:\n    future = pool.submit(square, 7)\n    print(future.result())  # 49\n    squares = pool.map(square, [1, 2, 3])\n    print(list(squares))  # [1, 4, 9]\n```\n\n`submit` returns a `Future`, a placeholder for a result that may not exist yet. `result()` waits for it. If the function raised, `result()` raises the same exception in your thread. Leaving the `with` block waits for every job and shuts the pool down.\n\n## Failures\n\n`map` returns results in input order, but it raises the first exception it meets, and the results after it are lost. To keep going past failures, submit each job and inspect each future yourself. `future.exception()` returns the error instead of raising it, and `as_completed(futures)` yields futures in the order they finish.\n",
+      "task": "Write `fetch_all(keys, fetch, workers=4)` that calls `fetch(key)` for every key on a pool of `workers` threads and returns two dicts, `(results, errors)`: each key that succeeded mapped to its value, and each key that failed mapped to the exception it raised.",
+      "starter": "from concurrent.futures import ThreadPoolExecutor\n\n\ndef fetch_all(keys, fetch, workers=4):\n    with ThreadPoolExecutor(max_workers=workers) as pool:\n        values = list(pool.map(fetch, keys))\n    return dict(zip(keys, values)), {}\n",
+      "solution": "from concurrent.futures import ThreadPoolExecutor\n\n\ndef fetch_all(keys, fetch, workers=4):\n    results, errors = {}, {}\n    with ThreadPoolExecutor(max_workers=workers) as pool:\n        futures = {key: pool.submit(fetch, key) for key in keys}\n    for key, future in futures.items():\n        try:\n            results[key] = future.result()\n        except Exception as error:\n            errors[key] = error\n    return results, errors\n",
+      "checks": [
+        {
+          "name": "collects every result",
+          "code": "got = fetch_all([\"a\", \"b\"], str.upper)\nassert got == ({\"a\": \"A\", \"b\": \"B\"}, {}), got"
+        },
+        {
+          "name": "keeps failures apart",
+          "code": "def fetch(key):\n    if key == \"bad\":\n        raise ValueError(\"no such page\")\n    return len(key)\nresults, errors = fetch_all([\"ok\", \"bad\", \"fine\"], fetch)\nassert results == {\"ok\": 2, \"fine\": 4}, results\nassert list(errors) == [\"bad\"], errors\nassert isinstance(errors[\"bad\"], ValueError), errors[\"bad\"]"
+        },
+        {
+          "name": "uses several threads",
+          "code": "import threading\nbarrier = threading.Barrier(3, timeout=0.5)\ndef fetch(key):\n    barrier.wait()\n    return key\nresults, errors = fetch_all([1, 2, 3], fetch, workers=3)\nassert errors == {}, \"the three calls should all be running at once\"\nassert results == {1: 1, 2: 2, 3: 3}, results"
+        },
+        {
+          "name": "never more than workers at once",
+          "code": "import threading\nlock = threading.Lock()\nrunning = peak = 0\ndef fetch(key):\n    global running, peak\n    with lock:\n        running += 1\n        peak = max(peak, running)\n    threading.Event().wait(0.005)\n    with lock:\n        running -= 1\n    return key\nresults, errors = fetch_all(list(range(8)), fetch, workers=2)\nassert peak <= 2, f\"{peak} calls ran at once with workers=2\"\nassert len(results) == 8, results"
+        },
+        {
+          "name": "no keys",
+          "code": "got = fetch_all([], str.upper)\nassert got == ({}, {}), got"
+        }
+      ],
+      "hints": [
+        "`pool.submit(fetch, key)` returns a future for one call. Keep the futures in a dict keyed by `key`.",
+        "`future.result()` returns the value or raises that call's exception, so wrap it in `try`/`except Exception`.",
+        "`futures = {key: pool.submit(fetch, key) for key in keys}`, then for each `key, future`: `results[key] = future.result()` inside `try`, and `errors[key] = error` in `except Exception as error`."
+      ],
+      "explanation": "`pool.map` is fine while everything succeeds, but the first exception surfaces as you read the results, and the rest are lost with it. Submitting each call gives you one future per key, and asking each future for its result inside `try` sorts the successes from the failures.\n\nThe pool still caps how many calls run at once, so a long list of keys never turns into a long list of threads."
+    },
+    {
+      "id": "race-conditions-and-locks",
+      "title": "Race conditions and locks",
+      "body": "# Race conditions and locks\n\nThreads share memory. When two of them read, decide and write the same data, their steps can interleave, and one update overwrites the other. That is a race condition.\n\n```python\nimport threading\n\nclass Counter:\n    def __init__(self):\n        self.value = 0\n        self.lock = threading.Lock()\n\n    def add(self):\n        with self.lock:\n            self.value += 1\n\nc = Counter()\nthreads = [threading.Thread(target=c.add)\n           for _ in range(50)]\nfor t in threads:\n    t.start()\nfor t in threads:\n    t.join()\nprint(c.value)  # 50\n```\n\nEven `self.value += 1` is several steps: read, add, store, and a thread can be paused between them. A `Lock` lets one thread at a time into the block. `with self.lock:` acquires it and always releases it, even after an exception.\n\n## Check, then act\n\nThe worst races hide between a check and the action it guards: two threads both see enough money, then both take it. Hold the lock across the check and the change together, so no other thread can slip in between.\n",
+      "task": "Fix `Account` so that `deposit(amount)` and `withdraw(amount)` are safe to call from many threads at once, using `self.lock`, and keep the pause in `withdraw`, which stands in for a slow database call. `withdraw` subtracts and returns `True` only if the balance covers `amount`; otherwise it returns `False`.",
+      "starter": "import threading\nimport time\n\n\nclass Account:\n    def __init__(self, balance):\n        self.balance = balance\n        self.lock = threading.Lock()\n\n    def deposit(self, amount):\n        self.balance += amount\n\n    def withdraw(self, amount):\n        if self.balance < amount:\n            return False\n        time.sleep(0.005)  # a slow database call\n        with self.lock:\n            self.balance -= amount\n        return True\n",
+      "solution": "import threading\nimport time\n\n\nclass Account:\n    def __init__(self, balance):\n        self.balance = balance\n        self.lock = threading.Lock()\n\n    def deposit(self, amount):\n        with self.lock:\n            self.balance += amount\n\n    def withdraw(self, amount):\n        with self.lock:\n            if self.balance < amount:\n                return False\n            time.sleep(0.005)  # a slow database call\n            self.balance -= amount\n            return True\n",
+      "checks": [
+        {
+          "name": "withdraws when the money is there",
+          "code": "account = Account(100)\ngot = account.withdraw(30)\nassert got is True, got\nassert account.balance == 70, account.balance"
+        },
+        {
+          "name": "refuses to overdraw",
+          "code": "account = Account(20)\ngot = account.withdraw(30)\nassert got is False, got\nassert account.balance == 20, account.balance"
+        },
+        {
+          "name": "never overdraws under contention",
+          "code": "import threading\naccount = Account(100)\nstart = threading.Barrier(10, timeout=1)\noutcomes = []\ndef attempt():\n    start.wait()\n    outcomes.append(account.withdraw(30))\nthreads = [threading.Thread(target=attempt) for _ in range(10)]\nfor thread in threads:\n    thread.start()\nfor thread in threads:\n    thread.join()\nassert account.balance == 10, f\"ten threads each took 30 from 100, and the balance ended at {account.balance}\"\nassert outcomes.count(True) == 3, outcomes"
+        },
+        {
+          "name": "deposit waits for the lock",
+          "code": "import threading\naccount = Account(0)\naccount.lock.acquire()\nthread = threading.Thread(target=account.deposit, args=(5,))\nthread.start()\nthread.join(0.02)\nblocked = account.balance == 0\naccount.lock.release()\nthread.join()\nassert blocked, \"deposit changed the balance while another thread held the lock\"\nassert account.balance == 5, account.balance"
+        }
+      ],
+      "hints": [
+        "Imagine two threads both reaching `if self.balance < amount` while the balance is 100. What does each one decide?",
+        "The lock has to cover the test and the subtraction together, pause included. `deposit` changes the same balance, so it needs the lock too.",
+        "In `withdraw`, put the whole body inside `with self.lock:`. In `deposit`, write `with self.lock:` and then `self.balance += amount`."
+      ],
+      "explanation": "Locking only the subtraction still lets ten threads pass the balance check before any of them subtracts: each saw 100, so each withdraws. The check and the change must sit under the same lock, so the check is still true when the change happens.\n\n`deposit` needs the lock as well. A lock protects data only if every piece of code that touches that data takes it."
+    },
+    {
+      "id": "queues-for-producers-and-consumers",
+      "title": "Queues for producers and consumers",
+      "body": "# Queues for producers and consumers\n\nA `queue.Queue` is a thread-safe pipe. Producers `put` items in, consumers `get` them out, and the queue does all the locking. `get()` blocks until an item arrives, so idle workers simply wait.\n\n```python\nimport queue\nimport threading\n\njobs = queue.Queue()\ndone = []\n\ndef worker():\n    while True:\n        item = jobs.get()\n        if item is None:  # the stop signal\n            break\n        done.append(item * 10)\n\nt = threading.Thread(target=worker)\nt.start()\nfor n in [1, 2, 3]:\n    jobs.put(n)\njobs.put(None)\nt.join()\nprint(done)  # [10, 20, 30]\n```\n\nA worker cannot tell \"nothing yet\" from \"nothing ever\", so the producer sends a sentinel, here `None`, when it has finished. With several workers, send one sentinel per worker: each sentinel stops exactly one of them.\n\n`Queue(maxsize=10)` makes `put` block while the queue is full, which keeps a fast producer from running far ahead of slow consumers.\n",
+      "task": "Write `process(items, handle, workers=3)`: start `workers` threads that take items from a `queue.Queue` and call `handle(item)`. Return the results in the order of `items`, and make sure every worker thread has stopped before you return.",
+      "starter": "import queue\nimport threading\n\n\ndef process(items, handle, workers=3):\n    jobs = queue.Queue()\n    results = [None] * len(items)\n\n    def worker():\n        while True:\n            index, item = jobs.get()\n            results[index] = handle(item)\n            jobs.task_done()\n\n    for _ in range(workers):\n        threading.Thread(target=worker, daemon=True).start()\n    for job in enumerate(items):\n        jobs.put(job)\n    jobs.join()\n    return results\n",
+      "solution": "import queue\nimport threading\n\n\ndef process(items, handle, workers=3):\n    jobs = queue.Queue()\n    results = [None] * len(items)\n\n    def worker():\n        while True:\n            job = jobs.get()\n            if job is None:\n                break\n            index, item = job\n            results[index] = handle(item)\n\n    threads = [\n        threading.Thread(target=worker)\n        for _ in range(workers)\n    ]\n    for thread in threads:\n        thread.start()\n    for job in enumerate(items):\n        jobs.put(job)\n    for _ in threads:\n        jobs.put(None)\n    for thread in threads:\n        thread.join()\n    return results\n",
+      "checks": [
+        {
+          "name": "results in order",
+          "code": "got = process([1, 2, 3, 4], lambda x: x * x)\nassert got == [1, 4, 9, 16], got"
+        },
+        {
+          "name": "workers run side by side",
+          "code": "import threading\nbarrier = threading.Barrier(3, timeout=0.5)\ndef handle(item):\n    barrier.wait()\n    return item\ngot = process([\"a\", \"b\", \"c\"], handle, workers=3)\nassert got == [\"a\", \"b\", \"c\"], \"three workers should handle three items at once\""
+        },
+        {
+          "name": "more items than workers",
+          "code": "got = process(list(range(20)), lambda x: x + 1, workers=2)\nassert got == list(range(1, 21)), got"
+        },
+        {
+          "name": "every worker stops",
+          "code": "import threading\nbefore = set(threading.enumerate())\nprocess(list(range(10)), str, workers=4)\nleft = [t for t in threading.enumerate() if t not in before]\nassert not left, f\"{len(left)} worker threads are still running after process returned\""
+        },
+        {
+          "name": "no items",
+          "code": "import threading\nbefore = set(threading.enumerate())\ngot = process([], str)\nassert got == [], got\nleft = [t for t in threading.enumerate() if t not in before]\nassert not left, \"the workers should stop even with nothing to do\""
+        }
+      ],
+      "hints": [
+        "A worker blocked in `jobs.get()` waits forever unless something arrives. Send it something that means stop.",
+        "Put each `(index, item)` pair on the queue, then one `None` per worker. A worker that gets `None` breaks out of its loop.",
+        "Keep the threads in a list and `start()` them, put the pairs and then `workers` sentinels, `join()` every thread, and return `results`."
+      ],
+      "explanation": "The `task_done` and `join` pattern waits for the work to finish, but the workers stay alive, blocked in `get()` forever. Daemon threads hide this until the program exits; in a long-running program, every call leaks more threads.\n\nOne sentinel per worker stops each of them cleanly, and joining the threads proves they have stopped. Tagging each item with its index lets results land in input order, whichever worker handled them."
+    },
+    {
+      "id": "async-and-await",
+      "title": "async and await",
+      "body": "# async and await\n\nThreads let the operating system switch between them at any moment. `asyncio` takes another route: one thread, and tasks that hand over control only at the points you mark with `await`.\n\n```python\nimport asyncio\n\nasync def size_of(name):\n    await asyncio.sleep(0.01)  # pretend I/O\n    return len(name)\n\nasync def main():\n    a = await size_of(\"notes.txt\")\n    b = await size_of(\"todo.md\")\n    return a + b\n\nprint(asyncio.run(main()))  # 16\n```\n\n- `async def` defines a coroutine function. Calling it runs nothing: it returns a coroutine object.\n- `await` runs a coroutine to its result. While it waits, the event loop can run other work.\n- `asyncio.run(main())` starts an event loop, runs `main` to the end and closes the loop. Call it once, from ordinary code.\n\n`await` only works inside `async def`. Forgetting it is the classic mistake: you get a coroutine object instead of a value, and Python warns that the coroutine was never awaited.\n",
+      "task": "Write `async def total_size(names, size_of)` that awaits `size_of(name)` for each name, in order, and returns the sum. Then write an ordinary function `report(names, size_of)` that runs it with `asyncio.run` and returns a string such as `\"16 bytes\"`.",
+      "starter": "import asyncio\n\n\nasync def total_size(names, size_of):\n    total = 0\n    for name in names:\n        total += size_of(name)\n    return total\n\n\ndef report(names, size_of):\n    return f\"{total_size(names, size_of)} bytes\"\n",
+      "solution": "import asyncio\n\n\nasync def total_size(names, size_of):\n    total = 0\n    for name in names:\n        total += await size_of(name)\n    return total\n\n\ndef report(names, size_of):\n    total = asyncio.run(total_size(names, size_of))\n    return f\"{total} bytes\"\n",
+      "checks": [
+        {
+          "name": "sums the sizes",
+          "code": "import asyncio\nasync def size_of(name):\n    await asyncio.sleep(0)\n    return len(name)\ngot = asyncio.run(total_size([\"ab\", \"cde\"], size_of))\nassert got == 5, got"
+        },
+        {
+          "name": "awaits each name in order",
+          "code": "import asyncio\nseen = []\nasync def size_of(name):\n    await asyncio.sleep(0)\n    seen.append(name)\n    return 1\nasyncio.run(total_size([\"x\", \"y\", \"z\"], size_of))\nassert seen == [\"x\", \"y\", \"z\"], seen"
+        },
+        {
+          "name": "total_size is a coroutine function",
+          "code": "import inspect\nassert inspect.iscoroutinefunction(total_size), \"define total_size with async def\""
+        },
+        {
+          "name": "report runs the event loop",
+          "code": "import asyncio\nasync def size_of(name):\n    await asyncio.sleep(0)\n    return len(name)\ngot = report([\"notes.txt\", \"todo.md\"], size_of)\nassert got == \"16 bytes\", got"
+        },
+        {
+          "name": "no names",
+          "code": "import asyncio\nasync def size_of(name):\n    return 1\ngot = asyncio.run(total_size([], size_of))\nassert got == 0, got"
+        }
+      ],
+      "hints": [
+        "Calling an `async def` function gives you a coroutine object, not its result.",
+        "Inside `total_size`, write `await size_of(name)`. Ordinary code cannot `await`, so `report` needs `asyncio.run(...)`.",
+        "`total += await size_of(name)` in the loop; in `report`, `total = asyncio.run(total_size(names, size_of))` and `return f\"{total} bytes\"`."
+      ],
+      "explanation": "Without `await`, `size_of(name)` is only a coroutine object, a paused piece of work that never ran, and adding it to a number raises `TypeError`. `await` runs it and gives back its value.\n\n`asyncio.run` is the bridge from ordinary code into async code. Call it once, at the edge of the program, and stay inside `async def` with `await` from there on."
+    },
+    {
+      "id": "tasks-and-gather",
+      "title": "Tasks and gather",
+      "body": "# Tasks and gather\n\nAwaiting coroutines one after another runs them one after another. To overlap their waiting, run them as tasks.\n\n```python\nimport asyncio\n\nasync def fetch(name, delay):\n    await asyncio.sleep(delay)\n    return name\n\nasync def main():\n    results = await asyncio.gather(\n        fetch(\"slow\", 0.01),\n        fetch(\"fast\", 0.0),\n    )\n    print(results)  # ['slow', 'fast']\n\nasyncio.run(main())\n```\n\n`gather` wraps each coroutine in a task, runs them all at once, and returns their results in the order you passed them, not the order they finished. `asyncio.create_task(coro)` starts a single task in the background; await it later for its result.\n\n## When one fails\n\nBy default, the first exception from any task propagates out of `gather`, and you lose the other results. With `return_exceptions=True`, exceptions come back as values in the list, in their place, and every task runs to the end. Test each item with `isinstance(item, Exception)`.\n",
+      "task": "Write `async def fetch_all(keys, fetch)` that runs `fetch(key)` for every key at the same time and returns a dict from each key to its result. Leave out the keys whose fetch raised an exception.",
+      "starter": "import asyncio\n\n\nasync def fetch_all(keys, fetch):\n    results = {}\n    for key in keys:\n        try:\n            results[key] = await fetch(key)\n        except Exception:\n            pass\n    return results\n",
+      "solution": "import asyncio\n\n\nasync def fetch_all(keys, fetch):\n    values = await asyncio.gather(\n        *(fetch(key) for key in keys),\n        return_exceptions=True,\n    )\n    return {\n        key: value\n        for key, value in zip(keys, values)\n        if not isinstance(value, Exception)\n    }\n",
+      "checks": [
+        {
+          "name": "collects every result",
+          "code": "import asyncio\nasync def fetch(key):\n    await asyncio.sleep(0)\n    return key * 2\ngot = asyncio.run(fetch_all([\"a\", \"b\"], fetch))\nassert got == {\"a\": \"aa\", \"b\": \"bb\"}, got"
+        },
+        {
+          "name": "runs the fetches at the same time",
+          "code": "import asyncio\nrunning = peak = 0\nasync def fetch(key):\n    global running, peak\n    running += 1\n    peak = max(peak, running)\n    await asyncio.sleep(0.001)\n    running -= 1\n    return key\nasyncio.run(fetch_all([\"a\", \"b\", \"c\", \"d\"], fetch))\nassert peak == 4, f\"at most {peak} fetches ran at once, expected 4\""
+        },
+        {
+          "name": "skips failures and keeps the rest",
+          "code": "import asyncio\nasync def fetch(key):\n    if key == \"bad\":\n        raise ValueError(\"no such page\")\n    await asyncio.sleep(0.001)\n    return len(key)\ngot = asyncio.run(fetch_all([\"bad\", \"slow\", \"ok\"], fetch))\nassert got == {\"slow\": 4, \"ok\": 2}, got"
+        },
+        {
+          "name": "no keys",
+          "code": "import asyncio\nasync def fetch(key):\n    return key\ngot = asyncio.run(fetch_all([], fetch))\nassert got == {}, got"
+        }
+      ],
+      "hints": [
+        "Awaiting inside a `for` loop runs one fetch at a time. Create all the coroutines first and hand them to a single call.",
+        "`asyncio.gather(*coroutines, return_exceptions=True)` returns a list in input order, with exceptions in place of the failed results.",
+        "`values = await asyncio.gather(*(fetch(k) for k in keys), return_exceptions=True)`, then build the dict from `zip(keys, values)`, skipping every value that `isinstance(value, Exception)`."
+      ],
+      "explanation": "Awaiting in a loop gives the right answer, but each fetch starts only when the previous one has finished, so the waits add up. `gather` starts every fetch first and then waits for all of them, so the total time is roughly that of the slowest one.\n\n`return_exceptions=True` keeps one failure from hiding the other results. The list still lines up with the input, so `zip(keys, values)` pairs each key with its own outcome."
+    },
+    {
+      "id": "timeouts-and-cancellation",
+      "title": "Timeouts and cancellation",
+      "body": "# Timeouts and cancellation\n\nNever wait forever on something outside your control. `asyncio.timeout` cancels the work inside it when time runs out and raises `TimeoutError`.\n\n```python\nimport asyncio\n\nasync def slow():\n    await asyncio.sleep(10)\n\nasync def main():\n    try:\n        async with asyncio.timeout(0.01):\n            await slow()\n    except TimeoutError:\n        print(\"gave up\")\n\nasyncio.run(main())\n```\n\n`asyncio.wait_for(aw, seconds)` does the same for a single awaitable.\n\n## How cancellation works\n\n`task.cancel()` raises `CancelledError` inside the task, at the `await` where it is waiting. The task may clean up in `finally` or in an `except` block, but it must let the error continue, so an `except` block ends with `raise`. A task that swallows `CancelledError` looks finished to whoever cancelled it, and timeouts built on cancellation stop working.\n\n`CancelledError` is a `BaseException`, so a plain `except Exception` does not catch it by accident.\n",
+      "task": "Write `async def with_timeout(aw, seconds, default)` that returns the result of awaiting `aw`, or `default` if that takes longer than `seconds`. Write `async def guarded(aw, log)` that returns the result of awaiting `aw`; if it is cancelled, it appends `\"cancelled\"` to `log` and lets the cancellation continue.",
+      "starter": "import asyncio\n\n\nasync def with_timeout(aw, seconds, default):\n    try:\n        return await asyncio.wait_for(aw, seconds)\n    except asyncio.CancelledError:\n        return default\n\n\nasync def guarded(aw, log):\n    try:\n        return await aw\n    except asyncio.CancelledError:\n        log.append(\"cancelled\")\n",
+      "solution": "import asyncio\n\n\nasync def with_timeout(aw, seconds, default):\n    try:\n        async with asyncio.timeout(seconds):\n            return await aw\n    except TimeoutError:\n        return default\n\n\nasync def guarded(aw, log):\n    try:\n        return await aw\n    except asyncio.CancelledError:\n        log.append(\"cancelled\")\n        raise\n",
+      "checks": [
+        {
+          "name": "fast work returns its result",
+          "code": "import asyncio\nasync def quick():\n    await asyncio.sleep(0)\n    return 42\ngot = asyncio.run(with_timeout(quick(), 1, None))\nassert got == 42, got"
+        },
+        {
+          "name": "slow work gives the default",
+          "code": "import asyncio\nwork = with_timeout(asyncio.sleep(10), 0.01, \"late\")\ngot = asyncio.run(asyncio.wait_for(work, 1))\nassert got == \"late\", got"
+        },
+        {
+          "name": "the slow work is cancelled",
+          "code": "import asyncio\nlog = []\nasync def slow():\n    try:\n        await asyncio.sleep(10)\n    finally:\n        log.append(\"stopped\")\nwork = with_timeout(slow(), 0.01, None)\nasyncio.run(asyncio.wait_for(work, 1))\nassert log == [\"stopped\"], log"
+        },
+        {
+          "name": "other errors still propagate",
+          "code": "import asyncio\nasync def broken():\n    await asyncio.sleep(0)\n    raise ValueError(\"bad data\")\nraised = False\ntry:\n    asyncio.run(with_timeout(broken(), 1, None))\nexcept ValueError:\n    raised = True\nassert raised, \"a ValueError should reach the caller, not turn into the default\""
+        },
+        {
+          "name": "guarded passes results through",
+          "code": "import asyncio\nasync def quick():\n    await asyncio.sleep(0)\n    return 7\nlog = []\ngot = asyncio.run(guarded(quick(), log))\nassert got == 7, got\nassert log == [], log"
+        },
+        {
+          "name": "guarded logs and lets cancellation continue",
+          "code": "import asyncio\nlog = []\nasync def main():\n    task = asyncio.create_task(guarded(asyncio.sleep(10), log))\n    await asyncio.sleep(0)\n    task.cancel()\n    try:\n        await task\n    except asyncio.CancelledError:\n        return \"cancelled\"\n    return \"finished\"\ngot = asyncio.run(main())\nassert log == [\"cancelled\"], log\nassert got == \"cancelled\", \"guarded swallowed the cancellation, so the task looked finished\""
+        }
+      ],
+      "hints": [
+        "When time runs out, `asyncio.timeout` and `asyncio.wait_for` raise `TimeoutError`. Which exception does the starter catch?",
+        "Put the await inside `async with asyncio.timeout(seconds):` and catch `TimeoutError` around it. In `guarded`, the `except` block must end by raising.",
+        "`try:` then `async with asyncio.timeout(seconds): return await aw`, and `except TimeoutError: return default`. In `guarded`, add a bare `raise` after `log.append(\"cancelled\")`."
+      ],
+      "explanation": "`wait_for` and `timeout` report running out of time with `TimeoutError`, not `CancelledError`: the cancellation happens inside, and they turn it into a timeout for you. Catching only `TimeoutError` also lets real errors, such as a `ValueError`, reach the caller.\n\nA task that catches `CancelledError` and returns normally has refused to stop, and whoever cancelled it cannot tell. Clean up, then `raise`."
+    },
+    {
+      "id": "task-groups",
+      "title": "TaskGroup and structured concurrency",
+      "body": "# TaskGroup and structured concurrency\n\nA task started with `create_task` can outlive the code that started it, and if nobody awaits it, its exception goes unnoticed. `asyncio.TaskGroup` ties tasks to a block: the block does not end until every task in it has finished.\n\n```python\nimport asyncio\n\nasync def double(n):\n    await asyncio.sleep(0.01)\n    return n * 2\n\nasync def main():\n    async with asyncio.TaskGroup() as tg:\n        a = tg.create_task(double(1))\n        b = tg.create_task(double(2))\n    print(a.result(), b.result())  # 2 4\n\nasyncio.run(main())\n```\n\nIf any task fails, the group cancels the others, waits for them, and raises an `ExceptionGroup` that holds every error. Handle it with `except*`, which matches error types inside the group:\n\n```python\nimport asyncio\n\nasync def fail():\n    raise ValueError(\"bad row\")\n\nasync def run():\n    async with asyncio.TaskGroup() as tg:\n        tg.create_task(fail())\n\ntry:\n    asyncio.run(run())\nexcept* ValueError as group:\n    print(group.exceptions)\n```\n",
+      "task": "Write `async def run_all(jobs)` that runs every job in `jobs`, a dict from names to async functions with no arguments, at once in an `asyncio.TaskGroup`, and returns a dict from each name to its result. If a job fails, the others must be cancelled and the group's `ExceptionGroup` must reach the caller.",
+      "starter": "import asyncio\n\n\nasync def run_all(jobs):\n    return {name: await job() for name, job in jobs.items()}\n",
+      "solution": "import asyncio\n\n\nasync def run_all(jobs):\n    async with asyncio.TaskGroup() as tg:\n        tasks = {\n            name: tg.create_task(job())\n            for name, job in jobs.items()\n        }\n    return {name: task.result() for name, task in tasks.items()}\n",
+      "checks": [
+        {
+          "name": "returns every result",
+          "code": "import asyncio\nasync def one():\n    await asyncio.sleep(0)\n    return 1\nasync def two():\n    return 2\ngot = asyncio.run(run_all({\"a\": one, \"b\": two}))\nassert got == {\"a\": 1, \"b\": 2}, got"
+        },
+        {
+          "name": "runs the jobs at the same time",
+          "code": "import asyncio\nrunning = peak = 0\nasync def job():\n    global running, peak\n    running += 1\n    peak = max(peak, running)\n    await asyncio.sleep(0.001)\n    running -= 1\nasyncio.run(run_all({\"a\": job, \"b\": job, \"c\": job}))\nassert peak == 3, f\"at most {peak} jobs ran at once, expected 3\""
+        },
+        {
+          "name": "a failure cancels the others",
+          "code": "import asyncio\nlog = []\nasync def bad():\n    await asyncio.sleep(0)\n    raise ValueError(\"broken\")\nasync def slow():\n    try:\n        await asyncio.sleep(10)\n    finally:\n        log.append(\"cancelled\")\ntry:\n    asyncio.run(asyncio.wait_for(run_all({\"bad\": bad, \"slow\": slow}), 1))\nexcept BaseException:\n    pass\nassert log == [\"cancelled\"], \"the slow job should have started and then been cancelled\""
+        },
+        {
+          "name": "errors arrive as an ExceptionGroup",
+          "code": "import asyncio\nasync def bad():\n    await asyncio.sleep(0)\n    raise ValueError(\"broken\")\nasync def fine():\n    return 1\ngot = None\ntry:\n    asyncio.run(run_all({\"bad\": bad, \"fine\": fine}))\nexcept BaseException as error:\n    got = error\nassert isinstance(got, ExceptionGroup), f\"expected an ExceptionGroup, got {type(got).__name__}\"\nmessages = [str(e) for e in got.exceptions]\nassert messages == [\"broken\"], messages"
+        },
+        {
+          "name": "no jobs",
+          "code": "import asyncio\ngot = asyncio.run(run_all({}))\nassert got == {}, got"
+        }
+      ],
+      "hints": [
+        "`async with asyncio.TaskGroup() as tg:` and then `tg.create_task(job())` for each job.",
+        "Keep the tasks in a dict by name. The `async with` block waits for all of them, so read the results after it ends.",
+        "Inside the block, `tasks = {name: tg.create_task(job()) for name, job in jobs.items()}`; after it, `return {name: task.result() for name, task in tasks.items()}`."
+      ],
+      "explanation": "Awaiting the jobs one by one is slow, and a failure simply stops the loop: later jobs never start. A `TaskGroup` starts them together, and when one fails it cancels the others and waits for them, so no task is left running after the block.\n\nErrors leave the group as an `ExceptionGroup`, because several tasks can fail at once. `except*` picks out the types you can handle and lets the rest continue."
+    },
+    {
+      "id": "semaphores-and-rate-limits",
+      "title": "Semaphores and rate limits",
+      "body": "# Semaphores and rate limits\n\n`gather` starts everything at once. Against a real server, a thousand simultaneous requests get you throttled or blocked. An `asyncio.Semaphore(n)` holds `n` permits: `async with sem:` takes one, waiting if none are left, and gives it back when the block ends.\n\n```python\nimport asyncio\n\nsem = asyncio.Semaphore(2)\n\nasync def fetch(n):\n    async with sem:\n        await asyncio.sleep(0.01)\n        return n * n\n\nasync def main():\n    jobs = [fetch(n) for n in range(5)]\n    print(await asyncio.gather(*jobs))\n\nasyncio.run(main())\n```\n\nAll five tasks start, but only two at a time get past `async with`. The rest wait their turn.\n\n## One limit per server\n\nA limit usually belongs to a resource, such as one host, not to the whole program. Keep one semaphore per resource in a dict, made the first time it is needed. Share it: a semaphore created inside each task limits nothing.\n",
+      "task": "Write `async def crawl(urls, fetch, per_host)` that calls `fetch(url)` for every URL at once, but never with more than `per_host` calls running for the same host, `urllib.parse.urlsplit(url).hostname`. Return the results as a list in the order of `urls`.",
+      "starter": "import asyncio\nfrom urllib.parse import urlsplit\n\n\nasync def crawl(urls, fetch, per_host):\n    async def limited(url):\n        async with asyncio.Semaphore(per_host):\n            return await fetch(url)\n\n    return await asyncio.gather(*(limited(url) for url in urls))\n",
+      "solution": "import asyncio\nfrom urllib.parse import urlsplit\n\n\nasync def crawl(urls, fetch, per_host):\n    limits = {}\n\n    async def limited(url):\n        host = urlsplit(url).hostname\n        if host not in limits:\n            limits[host] = asyncio.Semaphore(per_host)\n        async with limits[host]:\n            return await fetch(url)\n\n    return await asyncio.gather(*(limited(url) for url in urls))\n",
+      "checks": [
+        {
+          "name": "returns results in order",
+          "code": "import asyncio\nfrom urllib.parse import urlsplit\nasync def fetch(url):\n    await asyncio.sleep(0)\n    return urlsplit(url).path\nurls = [\"https://a.example/1\", \"https://b.example/2\", \"https://a.example/3\"]\ngot = asyncio.run(crawl(urls, fetch, 1))\nassert list(got) == [\"/1\", \"/2\", \"/3\"], got"
+        },
+        {
+          "name": "limits each host",
+          "code": "import asyncio\nfrom urllib.parse import urlsplit\nrunning, peak = {}, {}\nasync def fetch(url):\n    host = urlsplit(url).hostname\n    running[host] = running.get(host, 0) + 1\n    peak[host] = max(peak.get(host, 0), running[host])\n    await asyncio.sleep(0.001)\n    running[host] -= 1\n    return url\nurls = [f\"https://a.example/{i}\" for i in range(6)]\nasyncio.run(crawl(urls, fetch, 2))\nassert peak == {\"a.example\": 2}, f\"peak calls per host: {peak}, expected 2\""
+        },
+        {
+          "name": "hosts do not wait for each other",
+          "code": "import asyncio\nfrom urllib.parse import urlsplit\nrunning = peak = 0\nper_host_peak = {}\nrunning_by_host = {}\nasync def fetch(url):\n    global running, peak\n    host = urlsplit(url).hostname\n    running += 1\n    peak = max(peak, running)\n    running_by_host[host] = running_by_host.get(host, 0) + 1\n    per_host_peak[host] = max(per_host_peak.get(host, 0), running_by_host[host])\n    await asyncio.sleep(0.001)\n    running -= 1\n    running_by_host[host] -= 1\n    return url\nurls = [f\"https://{h}.example/{i}\" for i in range(3) for h in \"ab\"]\nasyncio.run(crawl(urls, fetch, 1))\nassert per_host_peak == {\"a.example\": 1, \"b.example\": 1}, per_host_peak\nassert peak == 2, f\"at most {peak} calls ran at once across two hosts, expected 2\""
+        },
+        {
+          "name": "no urls",
+          "code": "import asyncio\nasync def fetch(url):\n    return url\ngot = asyncio.run(crawl([], fetch, 3))\nassert list(got) == [], got"
+        }
+      ],
+      "hints": [
+        "Count the semaphores the starter creates. How many tasks does each one limit?",
+        "Keep a dict from host to `asyncio.Semaphore(per_host)`, and have every task for that host use the same one.",
+        "In `limited(url)`: `host = urlsplit(url).hostname`, create `limits[host]` if it is missing, then `async with limits[host]: return await fetch(url)`."
+      ],
+      "explanation": "A semaphore created inside each task has its own permits, so every task gets one and nothing ever waits. The limit only works when all the tasks for a host share the same semaphore object.\n\nOne semaphore per host, kept in a dict, lets different hosts run side by side, each politely limited, while `gather` still returns the results in input order."
+    },
+    {
+      "id": "async-generators",
+      "title": "Async generators and async for",
+      "body": "# Async generators and async for\n\nSome data arrives in pieces: pages from an API, lines from a stream. An async generator is an `async def` that uses `yield`. It can `await` between items, and the caller reads it with `async for`.\n\n```python\nimport asyncio\n\nasync def countdown(n):\n    while n > 0:\n        await asyncio.sleep(0.01)\n        yield n\n        n -= 1\n\nasync def main():\n    async for n in countdown(3):\n        print(n)\n    evens = [n async for n in countdown(6)\n             if n % 2 == 0]\n    print(evens)  # [6, 4, 2]\n\nasyncio.run(main())\n```\n\nLike an ordinary generator it is lazy: it runs only when the loop asks for the next item. If the loop stops early, the rest is never fetched.\n\nA plain `for` cannot read it, and neither can `list()`. Use `async for`, or an async comprehension as above, inside a coroutine.\n",
+      "task": "Write an async generator `paginate(get_page)` that awaits `get_page(1)`, `get_page(2)` and so on, yields every item of every page, and stops at the first empty page. Write `async def take(items, n)` that returns a list of the first `n` items of an async iterable, without reading any further.",
+      "starter": "import asyncio\n\n\nasync def paginate(get_page):\n    items = []\n    number = 1\n    while True:\n        page = await get_page(number)\n        if not page:\n            return items\n        items.extend(page)\n        number += 1\n\n\nasync def take(items, n):\n    return [item async for item in items][:n]\n",
+      "solution": "import asyncio\n\n\nasync def paginate(get_page):\n    number = 1\n    while True:\n        page = await get_page(number)\n        if not page:\n            return\n        for item in page:\n            yield item\n        number += 1\n\n\nasync def take(items, n):\n    taken = []\n    if n <= 0:\n        return taken\n    async for item in items:\n        taken.append(item)\n        if len(taken) == n:\n            break\n    return taken\n",
+      "checks": [
+        {
+          "name": "yields every item",
+          "code": "import asyncio\npages = {1: [1, 2], 2: [3], 3: []}\nasync def get_page(number):\n    await asyncio.sleep(0)\n    return pages.get(number, [])\nasync def collect():\n    return [item async for item in paginate(get_page)]\ngot = asyncio.run(collect())\nassert got == [1, 2, 3], got"
+        },
+        {
+          "name": "paginate is an async generator",
+          "code": "import inspect\nassert inspect.isasyncgenfunction(paginate), \"paginate should be an async def that uses yield\""
+        },
+        {
+          "name": "stops at the first empty page",
+          "code": "import asyncio\npages = {1: [\"a\"], 2: [], 3: [\"never\"]}\nrequested = []\nasync def get_page(number):\n    requested.append(number)\n    return pages.get(number, [])\nasync def collect():\n    return [item async for item in paginate(get_page)]\ngot = asyncio.run(collect())\nassert got == [\"a\"], got\nassert requested == [1, 2], requested"
+        },
+        {
+          "name": "take stops reading early",
+          "code": "import asyncio\npages = {1: [\"a\", \"b\"], 2: [\"c\", \"d\"], 3: [\"e\", \"f\"]}\nrequested = []\nasync def get_page(number):\n    requested.append(number)\n    return pages.get(number, [])\ngot = asyncio.run(take(paginate(get_page), 3))\nassert got == [\"a\", \"b\", \"c\"], got\nassert requested == [1, 2], f\"pages requested: {requested}, but only 1 and 2 were needed\""
+        },
+        {
+          "name": "take with fewer items than asked",
+          "code": "import asyncio\nasync def letters():\n    for letter in \"xyz\":\n        await asyncio.sleep(0)\n        yield letter\ngot = asyncio.run(take(letters(), 10))\nassert got == [\"x\", \"y\", \"z\"], got"
+        }
+      ],
+      "hints": [
+        "An `async def` that contains `yield` is an async generator. Yield each item instead of collecting them.",
+        "In `paginate`, loop: await the next page, stop when it is empty, otherwise yield its items. In `take`, `break` out of `async for` as soon as you hold `n` items.",
+        "`page = await get_page(number)`, `if not page: return`, `for item in page: yield item`, `number += 1`. In `take`, append inside `async for` and `break` when `len(taken) == n`."
+      ],
+      "explanation": "Collecting everything into a list makes `paginate` an ordinary coroutine: it fetches every page before the caller sees a single item, and `async for` cannot loop over its result. `yield` inside `async def` makes an async generator, which hands items over one at a time.\n\n`take` must stop asking once it has `n` items; breaking out of `async for` means later pages are never requested. `yield from` is not allowed in an async generator, so loop over each page and yield its items."
+    },
+    {
+      "id": "async-context-managers",
+      "title": "Async context managers",
+      "body": "# Async context managers\n\nOpening a network connection takes waiting, and so does closing it. `async with` is `with` for resources whose setup and cleanup need `await`. An object supports it by defining `async def __aenter__` and `async def __aexit__`.\n\nThe short form mirrors `contextmanager`:\n\n```python\nimport asyncio\nfrom contextlib import asynccontextmanager\n\n@asynccontextmanager\nasync def connection(name):\n    await asyncio.sleep(0.01)  # connect\n    print(\"open\", name)\n    try:\n        yield name.upper()\n    finally:\n        await asyncio.sleep(0.01)  # close\n        print(\"closed\", name)\n\nasync def main():\n    async with connection(\"db\") as conn:\n        print(\"using\", conn)\n\nasyncio.run(main())\n```\n\nCode before `yield` is the setup, and the yielded value is what `as` receives. An exception in the block, cancellation included, is raised at the `yield`, so a `try` around it decides which cleanup always happens.\n",
+      "task": "Write an async context manager `transaction(db)` that awaits `db.begin()` on entry and gives the block `db`. When the block finishes, await `db.commit()`; when it raises or is cancelled, await `db.rollback()` instead and let the exception continue.",
+      "starter": "from contextlib import asynccontextmanager\n\n\n@asynccontextmanager\nasync def transaction(db):\n    await db.begin()\n    yield db\n    await db.commit()\n",
+      "solution": "from contextlib import asynccontextmanager\n\n\n@asynccontextmanager\nasync def transaction(db):\n    await db.begin()\n    try:\n        yield db\n    except BaseException:\n        await db.rollback()\n        raise\n    else:\n        await db.commit()\n",
+      "checks": [
+        {
+          "name": "commits a block that succeeds",
+          "code": "import asyncio\nclass FakeDB:\n    def __init__(self):\n        self.log = []\n    async def step(self, name):\n        await asyncio.sleep(0)\n        self.log.append(name)\n    async def begin(self):\n        await self.step(\"begin\")\n    async def commit(self):\n        await self.step(\"commit\")\n    async def rollback(self):\n        await self.step(\"rollback\")\n\ndb = FakeDB()\nasync def main():\n    async with transaction(db):\n        db.log.append(\"work\")\nasyncio.run(main())\nassert db.log == [\"begin\", \"work\", \"commit\"], db.log"
+        },
+        {
+          "name": "gives the block the database",
+          "code": "import asyncio\nclass FakeDB:\n    def __init__(self):\n        self.log = []\n    async def step(self, name):\n        await asyncio.sleep(0)\n        self.log.append(name)\n    async def begin(self):\n        await self.step(\"begin\")\n    async def commit(self):\n        await self.step(\"commit\")\n    async def rollback(self):\n        await self.step(\"rollback\")\n\ndb = FakeDB()\nasync def main():\n    async with transaction(db) as conn:\n        return conn\ngot = asyncio.run(main())\nassert got is db, got"
+        },
+        {
+          "name": "rolls back on an error",
+          "code": "import asyncio\nclass FakeDB:\n    def __init__(self):\n        self.log = []\n    async def step(self, name):\n        await asyncio.sleep(0)\n        self.log.append(name)\n    async def begin(self):\n        await self.step(\"begin\")\n    async def commit(self):\n        await self.step(\"commit\")\n    async def rollback(self):\n        await self.step(\"rollback\")\n\ndb = FakeDB()\nasync def main():\n    async with transaction(db):\n        raise KeyError(\"missing row\")\nraised = False\ntry:\n    asyncio.run(main())\nexcept KeyError:\n    raised = True\nassert db.log == [\"begin\", \"rollback\"], db.log\nassert raised, \"the KeyError should reach the caller\""
+        },
+        {
+          "name": "rolls back when cancelled",
+          "code": "import asyncio\nclass FakeDB:\n    def __init__(self):\n        self.log = []\n    async def step(self, name):\n        await asyncio.sleep(0)\n        self.log.append(name)\n    async def begin(self):\n        await self.step(\"begin\")\n    async def commit(self):\n        await self.step(\"commit\")\n    async def rollback(self):\n        await self.step(\"rollback\")\n\ndb = FakeDB()\nentered = asyncio.Event()\nasync def work():\n    async with transaction(db):\n        entered.set()\n        await asyncio.sleep(10)\nasync def main():\n    task = asyncio.create_task(work())\n    await entered.wait()\n    task.cancel()\n    try:\n        await task\n    except asyncio.CancelledError:\n        return \"cancelled\"\n    return \"finished\"\ngot = asyncio.run(asyncio.wait_for(main(), 1))\nassert db.log == [\"begin\", \"rollback\"], db.log\nassert got == \"cancelled\", \"the cancellation should continue after the rollback\""
+        }
+      ],
+      "hints": [
+        "An error inside the `async with` block appears at your `yield`. What runs after that line?",
+        "Wrap the `yield` in `try`. Roll back in `except` and re-raise; commit in `else`. Cancellation is a `BaseException`, not an `Exception`.",
+        "`try: yield db`, then `except BaseException: await db.rollback()` followed by `raise`, then `else: await db.commit()`."
+      ],
+      "explanation": "Without `try`, an exception in the block is raised at the `yield` and the generator stops right there, so neither commit nor rollback runs and the transaction is left open.\n\n`except BaseException` also catches `CancelledError`, so a cancelled block rolls back too, and `else` runs only when the block finished cleanly. The bare `raise` keeps the caller informed."
+    },
+    {
+      "id": "blocking-code-and-to-thread",
+      "title": "Blocking code and to_thread",
+      "body": "# Blocking code and to_thread\n\nThe event loop runs on one thread. A coroutine that calls a blocking function, such as `time.sleep`, a big file read or a library without async support, freezes every other task until that function returns.\n\n`asyncio.to_thread(func, *args)` runs the function in a worker thread and gives you something to await. Meanwhile the loop keeps running other tasks.\n\n```python\nimport asyncio\nimport time\n\ndef read_sensor(n):\n    time.sleep(0.01)  # blocking\n    return n * 10\n\nasync def main():\n    values = await asyncio.gather(\n        asyncio.to_thread(read_sensor, 1),\n        asyncio.to_thread(read_sensor, 2),\n    )\n    print(values)  # [10, 20]\n\nasyncio.run(main())\n```\n\n## Waiting versus working\n\nThis helps with blocking calls that wait. Pure Python computation is different: threads take turns holding the GIL, so `to_thread` keeps the loop responsive but does not finish the work any sooner. Spreading computation over several cores takes separate processes, which a desktop Python offers through `ProcessPoolExecutor`.\n",
+      "task": "Write `async def read_all(paths, read)`, where `read(path)` is an ordinary blocking function. Run every read at the same time in worker threads, keep the event loop free while they run, and return the results as a list in the order of `paths`.",
+      "starter": "import asyncio\n\n\nasync def read_all(paths, read):\n    results = []\n    for path in paths:\n        results.append(await asyncio.to_thread(read, path))\n    return results\n",
+      "solution": "import asyncio\n\n\nasync def read_all(paths, read):\n    return await asyncio.gather(\n        *(asyncio.to_thread(read, path) for path in paths)\n    )\n",
+      "checks": [
+        {
+          "name": "returns results in order",
+          "code": "import asyncio\ngot = asyncio.run(read_all([\"a.txt\", \"b.txt\"], str.upper))\nassert list(got) == [\"A.TXT\", \"B.TXT\"], got"
+        },
+        {
+          "name": "reads at the same time",
+          "code": "import asyncio\nimport threading\nbarrier = threading.Barrier(3, timeout=0.5)\ndef read(path):\n    barrier.wait()\n    return path\ntry:\n    got = asyncio.run(read_all([\"x\", \"y\", \"z\"], read))\nexcept threading.BrokenBarrierError:\n    got = None\nassert got is not None and list(got) == [\"x\", \"y\", \"z\"], \"the three reads should all be running at once\""
+        },
+        {
+          "name": "the event loop keeps running",
+          "code": "import asyncio\nimport threading\nrelease = threading.Event()\ndef read(path):\n    return path if release.wait(0.5) else \"blocked\"\nasync def unblock():\n    await asyncio.sleep(0)\n    release.set()\nasync def main():\n    other = asyncio.create_task(unblock())\n    got = await read_all([\"x\"], read)\n    await other\n    return got\ngot = asyncio.run(main())\nassert list(got) == [\"x\"], \"read_all froze the event loop, so no other task could run\""
+        },
+        {
+          "name": "no paths",
+          "code": "import asyncio\ngot = asyncio.run(read_all([], str.upper))\nassert list(got) == [], got"
+        }
+      ],
+      "hints": [
+        "`asyncio.to_thread(read, path)` returns an awaitable that runs `read` in a worker thread.",
+        "Awaiting them one by one waits for each read before starting the next. Start them all together with `asyncio.gather`.",
+        "`return await asyncio.gather(*(asyncio.to_thread(read, path) for path in paths))`."
+      ],
+      "explanation": "Awaiting each `to_thread` in turn keeps the event loop free, but the reads still happen one after another. Calling `read` directly is worse: the whole loop stops until it returns. `gather` over `to_thread` calls runs every read in its own worker thread at once.\n\nReach for `to_thread` when a call blocks while waiting, as file and network I/O do. Because of the GIL, it will not make pure Python computation any faster."
+    }
+  ]
+}

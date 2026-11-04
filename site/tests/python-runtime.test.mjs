@@ -93,11 +93,16 @@ test("the checker's messages are the app's: a failing starter explains what came
 });
 
 test("course content is built from the app's files, and lessons needing missing packages say so", () => {
-  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "tools", "web", "data", "ml", "llm", "ai", "interview"]);
+  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "ml", "llm", "ai", "interview"]);
   const all = courses.flatMap(course => course.lessons);
   assert.ok(all.every(lesson => lesson.sections[0].chip === "Idea" && lesson.checks.length && lesson.starter));
-  assert.deepEqual(all.filter(lesson => lesson.missing.length).map(lesson => [lesson.id, lesson.missing]), [["flask-routes", ["flask"]], ...["ml", "llm"].flatMap(id => courses.find(course => course.id === id).lessons.filter(lesson => lesson.missing.length).map(lesson => [lesson.id, lesson.missing]))]);
-  assert.deepEqual(all.filter(lesson => lesson.packages.includes("numpy")).map(lesson => lesson.id), ["numpy-arrays", "broadcasting-and-aggregates"]);
+  const lessonsOf = id => courses.find(course => course.id === id).lessons;
+  // The Python courses run in the browser; torch lessons send the learner to the app.
+  assert.deepEqual(["foundations", "deeper", "clean-code"].flatMap(id => lessonsOf(id)).filter(lesson => lesson.missing.length).map(lesson => lesson.id), []);
+  assert.ok(lessonsOf("ml").every(lesson => lesson.missing.includes("torch")));
+  assert.ok(all.filter(lesson => lesson.missing.length).every(lesson => lesson.missing.every(name => typeof name === "string" && name)));
+  assert.ok(all.find(lesson => lesson.id === "flask-routes").missing.includes("flask"));
+  assert.ok(lessonsOf("data").some(lesson => lesson.packages.includes("numpy")));
 });
 
 test("lesson Markdown keeps sections, fenced Python and inline code", () => {

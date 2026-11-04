@@ -1,0 +1,564 @@
+{
+  "id": "architecture",
+  "title": "Architecture in Python",
+  "summary": "Layers, ports and adapters, repositories, services and events: structure an application so each part can be tested alone.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "layers-and-import-direction",
+      "title": "Layers and import direction",
+      "body": "# Layers and import direction\n\nAn application grows in layers. The domain holds the business rules, the service layer runs use cases, and adapters talk to databases, files and networks. One rule keeps them apart: outer layers may import inner ones, never the reverse.\n\nWhen the domain imports a database adapter, every test of a business rule needs that database, and a change of storage ripples into the rules. Keep the domain importing only the standard library and itself.\n\n## Checking the direction\n\nPython resolves imports while the code runs, so nothing stops a wrong one. A test can: parse each module with `ast`, collect what it imports, and compare the layers.\n\n```python\nimport ast\n\nsource = (\"import json\\n\"\n          \"from adapters.db import save\")\ntree = ast.parse(source)\nfor node in ast.walk(tree):\n    if isinstance(node, ast.Import):\n        print([a.name for a in node.names])\n    if isinstance(node, ast.ImportFrom):\n        print(node.module)\n```\n\nTools such as import-linter run the same kind of check in CI.\n",
+      "task": "Write `imported_modules(source)` returning the sorted, unique module names a source imports (`import a.b` and `from a.b import c` both give `\"a.b\"`; relative imports are ignored). Write `violations(modules, layers)`: `modules` maps names like `\"domain.orders\"` to source text, `layers` lists layer names from innermost to outermost, and the result is a sorted list of `(module, imported)` pairs where a module imports from a layer further out than its own.",
+      "starter": "import ast\n\n\ndef imported_modules(source):\n    names = []\n    for node in ast.walk(ast.parse(source)):\n        if isinstance(node, ast.Import):\n            names += [alias.name for alias in node.names]\n    return sorted(names)\n\n\ndef violations(modules, layers):\n    found = []\n    for name, source in modules.items():\n        for imported in imported_modules(source):\n            if imported.split(\".\")[0] in layers:\n                found.append((name, imported))\n    return sorted(found)\n",
+      "solution": "import ast\n\n\ndef imported_modules(source):\n    names = set()\n    for node in ast.walk(ast.parse(source)):\n        if isinstance(node, ast.Import):\n            names.update(alias.name for alias in node.names)\n        elif isinstance(node, ast.ImportFrom) and node.level == 0:\n            names.add(node.module)\n    return sorted(names)\n\n\ndef layer_of(module, layers):\n    top = module.split(\".\")[0]\n    return layers.index(top) if top in layers else None\n\n\ndef violations(modules, layers):\n    found = []\n    for name, source in modules.items():\n        own = layer_of(name, layers)\n        for imported in imported_modules(source):\n            other = layer_of(imported, layers)\n            if own is not None and other is not None and other > own:\n                found.append((name, imported))\n    return sorted(found)\n",
+      "checks": [
+        {
+          "name": "plain imports",
+          "code": "got = imported_modules(\"import json\\nimport domain.orders as orders\\nimport json\")\nassert got == [\"domain.orders\", \"json\"], got"
+        },
+        {
+          "name": "from imports",
+          "code": "got = imported_modules(\"from adapters.db import save\\nfrom . import helpers\\nfrom .models import X\")\nassert got == [\"adapters.db\"], got"
+        },
+        {
+          "name": "an outward import is flagged",
+          "code": "layers = [\"domain\", \"service\", \"adapters\"]\nmodules = {\n    \"domain.orders\": \"from adapters.db import save\",\n    \"adapters.db\": \"import domain.orders\",\n}\ngot = violations(modules, layers)\nassert got == [(\"domain.orders\", \"adapters.db\")], got"
+        },
+        {
+          "name": "inward and outside imports are fine",
+          "code": "layers = [\"domain\", \"service\", \"adapters\"]\nmodules = {\n    \"service.place_order\": \"import json\\nfrom domain.orders import Order\",\n    \"service.refund\": \"from service.place_order import place\",\n    \"domain.money\": \"from decimal import Decimal\",\n}\ngot = violations(modules, layers)\nassert got == [], got"
+        },
+        {
+          "name": "imports inside functions count",
+          "code": "layers = [\"domain\", \"service\", \"adapters\"]\nmodules = {\n    \"domain.stock\": \"def reorder():\\n    import service.mail\\n    from adapters.sms import send\\n\",\n}\ngot = violations(modules, layers)\nassert got == [(\"domain.stock\", \"adapters.sms\"), (\"domain.stock\", \"service.mail\")], got"
+        }
+      ],
+      "hints": [
+        "`ast.walk(ast.parse(source))` visits every node, including imports inside functions. There are two node types to handle: `ast.Import` and `ast.ImportFrom`.",
+        "`ast.Import` has `names`, aliases with a `.name`; `ast.ImportFrom` has `module` and `level`, which is above 0 for relative imports. A module's layer is the index of its first dotted part in `layers`.",
+        "Skip imports whose first part is not a layer. A pair is a violation when the imported layer's index is greater than the importer's: `other > own`."
+      ],
+      "explanation": "The starter flagged every import between layers, including the healthy ones that point inward, and it missed `from` imports, the most common kind. Direction is what matters: an adapter importing the domain is the design working, and the domain importing an adapter is the design leaking.\n\nRun a check like this as a test, and the rule survives the next refactor, when nobody remembers it. Because it works on source text, it costs nothing to run and needs no imports to succeed."
+    },
+    {
+      "id": "functional-core-imperative-shell",
+      "title": "Functional core, imperative shell",
+      "body": "# Functional core, imperative shell\n\nCode that decides and code that does are easier to test apart. Put the decisions in pure functions that take values and return values: the functional core. Put reading, writing and printing in a thin layer around it: the imperative shell.\n\n```python\nfrom pathlib import Path\n\ndef word_counts(text):\n    counts = {}\n    for w in text.lower().split():\n        counts[w] = counts.get(w, 0) + 1\n    return counts\n\ndef main(path):\n    text = Path(path).read_text()\n    for w, n in word_counts(text).items():\n        print(w, n)\n\ntext = \"to be or not to be\"\nPath(\"a.txt\").write_text(text)\nmain(\"a.txt\")\n```\n\n`word_counts` needs no files and no mocks: a test passes a string and compares a dict. The shell has almost no logic, so one end-to-end test covers it.\n\n## Plans instead of actions\n\nWhen the core has to cause effects, let it return a description of them, such as a list of `(\"copy\", name)` tuples, and let the shell carry them out. The decision becomes data you can assert on.\n",
+      "task": "Write a pure `plan_sync(source, target)`, where both map file names to contents, returning `(\"copy\", name)` for names only in `source`, `(\"update\", name)` where contents differ and `(\"delete\", name)` for names only in `target`, sorted by name. Write the shell `sync(src_dir, dst_dir)` that reads the files of both folders, carries out the plan in `dst_dir` and returns it.",
+      "starter": "from pathlib import Path\n\n\ndef plan_sync(source, target):\n    return [(\"copy\", name) for name in source if name not in target]\n\n\ndef sync(src_dir, dst_dir):\n    src, dst = Path(src_dir), Path(dst_dir)\n    for path in src.iterdir():\n        target = dst / path.name\n        if not target.exists() or target.read_text() != path.read_text():\n            target.write_text(path.read_text())\n",
+      "solution": "from pathlib import Path\n\n\ndef plan_sync(source, target):\n    actions = []\n    for name in sorted(source.keys() | target.keys()):\n        if name not in target:\n            actions.append((\"copy\", name))\n        elif name not in source:\n            actions.append((\"delete\", name))\n        elif source[name] != target[name]:\n            actions.append((\"update\", name))\n    return actions\n\n\ndef read_folder(folder):\n    return {p.name: p.read_text() for p in Path(folder).iterdir() if p.is_file()}\n\n\ndef sync(src_dir, dst_dir):\n    src, dst = Path(src_dir), Path(dst_dir)\n    actions = plan_sync(read_folder(src), read_folder(dst))\n    for action, name in actions:\n        if action == \"delete\":\n            (dst / name).unlink()\n        else:\n            (dst / name).write_text((src / name).read_text())\n    return actions\n",
+      "checks": [
+        {
+          "name": "copies and deletes",
+          "code": "got = plan_sync({\"a.txt\": \"1\"}, {\"b.txt\": \"2\"})\nassert got == [(\"copy\", \"a.txt\"), (\"delete\", \"b.txt\")], got"
+        },
+        {
+          "name": "updates only what changed",
+          "code": "got = plan_sync({\"a.txt\": \"1\", \"b.txt\": \"2\"}, {\"a.txt\": \"1\", \"b.txt\": \"3\"})\nassert got == [(\"update\", \"b.txt\")], got\nassert plan_sync({\"a.txt\": \"1\"}, {\"a.txt\": \"1\"}) == [], \"identical folders need no actions\""
+        },
+        {
+          "name": "the plan is sorted by name",
+          "code": "got = plan_sync({\"c\": \"\", \"a\": \"\"}, {\"b\": \"\"})\nassert got == [(\"copy\", \"a\"), (\"delete\", \"b\"), (\"copy\", \"c\")], got"
+        },
+        {
+          "name": "the shell syncs real folders",
+          "code": "from pathlib import Path\nsrc, dst = Path(\"shell_src\"), Path(\"shell_dst\")\nsrc.mkdir()\ndst.mkdir()\n(src / \"a.txt\").write_text(\"new\")\n(src / \"b.txt\").write_text(\"same\")\n(dst / \"b.txt\").write_text(\"same\")\n(dst / \"c.txt\").write_text(\"old\")\ngot = sync(\"shell_src\", \"shell_dst\")\nassert got == [(\"copy\", \"a.txt\"), (\"delete\", \"c.txt\")], got\nfiles = {p.name: p.read_text() for p in dst.iterdir()}\nassert files == {\"a.txt\": \"new\", \"b.txt\": \"same\"}, files"
+        },
+        {
+          "name": "a second sync has nothing to do",
+          "code": "from pathlib import Path\nsrc, dst = Path(\"again_src\"), Path(\"again_dst\")\nsrc.mkdir()\ndst.mkdir()\n(src / \"a.txt\").write_text(\"v2\")\n(dst / \"a.txt\").write_text(\"v1\")\ngot = sync(src, dst)\nassert got == [(\"update\", \"a.txt\")], got\nassert (dst / \"a.txt\").read_text() == \"v2\", (dst / \"a.txt\").read_text()\ngot = sync(src, dst)\nassert got == [], got"
+        }
+      ],
+      "hints": [
+        "Build the plan from the two dicts alone: no `Path`, no `open`. Walk over every name that appears in either dict, in sorted order.",
+        "`source.keys() | target.keys()` is the union of names. Missing from `target` means copy, missing from `source` means delete, and different contents mean update.",
+        "In `sync`, read each folder into `{p.name: p.read_text()}`, call `plan_sync`, then for each action either `unlink()` the file in `dst_dir` or write the source text into it, and return the actions."
+      ],
+      "explanation": "The tangled version was only as correct as someone had checked by hand with real folders, and it forgot deletions, which is easy to miss when every test needs files on disk. With the decisions in `plan_sync`, each rule is a one-line test on two dicts.\n\nThe shell is now so plain that a single folder-to-folder test covers it. The split works at every scale: a web handler parses a request, calls the core, and turns what comes back into a response."
+    },
+    {
+      "id": "inverting-dependencies",
+      "title": "Dependency inversion",
+      "body": "# Dependency inversion\n\nA sign-up service that builds its own SMTP client depends on email details, and every test of it sends mail. Invert that: the service declares the small interface it needs and receives any object that fits.\n\n```python\nfrom typing import Protocol\n\nclass Mailer(Protocol):\n    def send(self, to: str, text: str): ...\n\nclass Signup:\n    def __init__(self, mailer: Mailer):\n        self.mailer = mailer\n\n    def register(self, email):\n        self.mailer.send(email, \"Welcome\")\n\nclass PrintMailer:\n    def send(self, to, text):\n        print(f\"to {to}: {text}\")\n\nSignup(PrintMailer()).register(\"ada@x.io\")\n```\n\nThe protocol lives in the service's layer, written in the service's words. Adapters in the outer layer implement it simply by having the right methods, so the import arrow points from the adapter towards the service, against the direction of the calls. That reversal is the inversion.\n\nIn tests, pass a fake: a small working implementation that records what it was asked to do. Afterwards, assert on what it recorded.\n",
+      "task": "Write a protocol `Mailer` with `send(to, subject)`, a `FakeMailer` that appends `(to, subject)` tuples to its `.sent` list, and `Signup(mailer)` whose `register(email)` lowercases the email, raises `ValueError` if it is already registered, and otherwise stores it and sends it the subject `\"Welcome\"`.",
+      "starter": "from typing import Protocol\n\n\nclass Mailer(Protocol):\n    def send(self, to: str, subject: str) -> None: ...\n\n\nclass SmtpMailer:\n    def send(self, to, subject):\n        print(f\"SMTP to {to}: {subject}\")\n\n\nclass Signup:\n    def __init__(self):\n        self.mailer = SmtpMailer()\n        self.emails = set()\n\n    def register(self, email):\n        self.emails.add(email)\n        self.mailer.send(email, \"Welcome\")\n",
+      "solution": "from typing import Protocol\n\n\nclass Mailer(Protocol):\n    def send(self, to: str, subject: str) -> None: ...\n\n\nclass FakeMailer:\n    def __init__(self):\n        self.sent = []\n\n    def send(self, to, subject):\n        self.sent.append((to, subject))\n\n\nclass Signup:\n    def __init__(self, mailer: Mailer):\n        self.mailer = mailer\n        self.emails = set()\n\n    def register(self, email):\n        email = email.lower()\n        if email in self.emails:\n            raise ValueError(f\"already registered: {email}\")\n        self.emails.add(email)\n        self.mailer.send(email, \"Welcome\")\n",
+      "checks": [
+        {
+          "name": "Mailer is a protocol",
+          "code": "import typing\nassert typing.is_protocol(Mailer), \"Mailer should subclass typing.Protocol\"\nmembers = typing.get_protocol_members(Mailer)\nassert members == frozenset({\"send\"}), members"
+        },
+        {
+          "name": "the welcome goes through the mailer it was given",
+          "code": "mailer = FakeMailer()\nsignup = Signup(mailer)\nsignup.register(\"Ada@Example.org\")\nassert mailer.sent == [(\"ada@example.org\", \"Welcome\")], mailer.sent"
+        },
+        {
+          "name": "any object with send fits",
+          "code": "class Recorder:\n    def __init__(self):\n        self.calls = []\n\n    def send(self, to, subject):\n        self.calls.append(to)\n\nrecorder = Recorder()\nSignup(recorder).register(\"bo@example.org\")\nassert recorder.calls == [\"bo@example.org\"], recorder.calls"
+        },
+        {
+          "name": "duplicates are refused before sending",
+          "code": "mailer = FakeMailer()\nsignup = Signup(mailer)\nsignup.register(\"cy@example.org\")\nraised = False\ntry:\n    signup.register(\"CY@example.org\")\nexcept ValueError:\n    raised = True\nassert raised, \"a second registration of the same email should raise ValueError\"\nassert len(mailer.sent) == 1, mailer.sent"
+        },
+        {
+          "name": "services do not share state",
+          "code": "first, second = Signup(FakeMailer()), Signup(FakeMailer())\nfirst.register(\"di@example.org\")\nsecond.register(\"di@example.org\")\nassert second.mailer.sent == [(\"di@example.org\", \"Welcome\")], second.mailer.sent"
+        }
+      ],
+      "hints": [
+        "`Signup` should not create its mailer. Take it as an `__init__` argument and keep it on `self`.",
+        "`FakeMailer` needs only `self.sent = []` and a `send` that appends a tuple. It does not inherit from `Mailer`: having the method is the contract.",
+        "In `register`: `email = email.lower()`, `if email in self.emails: raise ValueError(...)`, then add it and call `self.mailer.send(email, \"Welcome\")`."
+      ],
+      "explanation": "With `SmtpMailer()` built inside `__init__`, no test could see what was sent without patching the class by name. Taking the mailer as an argument turns that hidden dependency into a parameter, and a test simply passes a fake and reads its `sent` list.\n\nThe protocol is written from the service's point of view: one method, in the words the service uses. Small interfaces owned by the caller are easy to fake and hard to misuse."
+    },
+    {
+      "id": "entities-and-value-objects",
+      "title": "Entities and value objects",
+      "body": "# Entities and value objects\n\nA value object is defined by its values: two amounts of 2.50 EUR are interchangeable. Make it immutable, validate it when it is created, and give it operations that return new values.\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass Money:\n    cents: int\n    currency: str\n\n    def __add__(self, other):\n        if other.currency != self.currency:\n            msg = \"currencies differ\"\n            raise ValueError(msg)\n        total = self.cents + other.cents\n        return Money(total, self.currency)\n\nprint(Money(250, \"EUR\") + Money(100, \"EUR\"))\n```\n\nAn entity is defined by identity: a customer who changes their name is still the same customer. Compare entities by their id alone, and let the other attributes change.\n\n```python\nclass Customer:\n    def __init__(self, cid, name):\n        self.cid, self.name = cid, name\n\n    def __eq__(self, other):\n        return (isinstance(other, Customer)\n                and other.cid == self.cid)\n\n    def __hash__(self):\n        return hash(self.cid)\n\na = Customer(7, \"Ada\")\nprint(a == Customer(7, \"Ada Lovelace\"))\n```\n\nKeep money in whole cents: floats cannot hold most decimal amounts exactly.\n",
+      "task": "Write a frozen dataclass `Money(cents, currency)` that raises `ValueError` for negative cents or a currency that is not three capital letters, adds only to the same currency (else `ValueError`), and has `split(n)` returning `n` amounts that add up to the original, differ by at most one cent, largest first. Write an entity `Account(number, owner)` whose `balance` starts at `Money(0, \"EUR\")`, with `deposit(money)` and equality and hashing by `number` only.",
+      "starter": "from dataclasses import dataclass, field\n\n\n@dataclass\nclass Money:\n    cents: int\n    currency: str\n\n    def __add__(self, other):\n        return Money(self.cents + other.cents, self.currency)\n\n    def split(self, n):\n        return [Money(self.cents // n, self.currency)] * n\n\n\n@dataclass\nclass Account:\n    number: str\n    owner: str\n    balance: Money = field(default_factory=lambda: Money(0, \"EUR\"))\n\n    def deposit(self, money):\n        self.balance = self.balance + money\n",
+      "solution": "import re\nfrom dataclasses import dataclass\n\n\n@dataclass(frozen=True)\nclass Money:\n    cents: int\n    currency: str\n\n    def __post_init__(self):\n        if self.cents < 0:\n            raise ValueError(f\"negative amount: {self.cents}\")\n        if not re.fullmatch(r\"[A-Z]{3}\", self.currency):\n            raise ValueError(f\"bad currency: {self.currency!r}\")\n\n    def __add__(self, other):\n        if other.currency != self.currency:\n            raise ValueError(f\"cannot add {other.currency} to {self.currency}\")\n        return Money(self.cents + other.cents, self.currency)\n\n    def split(self, n):\n        share, extra = divmod(self.cents, n)\n        return [Money(share + (1 if i < extra else 0), self.currency) for i in range(n)]\n\n\nclass Account:\n    def __init__(self, number, owner):\n        self.number = number\n        self.owner = owner\n        self.balance = Money(0, \"EUR\")\n\n    def deposit(self, money):\n        self.balance = self.balance + money\n\n    def __eq__(self, other):\n        return isinstance(other, Account) and other.number == self.number\n\n    def __hash__(self):\n        return hash(self.number)\n",
+      "checks": [
+        {
+          "name": "money is a value",
+          "code": "import dataclasses\nassert Money(5, \"EUR\") == Money(5, \"EUR\"), \"equal values should be equal\"\nassert len({Money(5, \"EUR\"), Money(5, \"EUR\")}) == 1, \"equal values should hash alike\"\nfrozen = False\ntry:\n    Money(5, \"EUR\").cents = 6\nexcept dataclasses.FrozenInstanceError:\n    frozen = True\nassert frozen, \"Money should be frozen\""
+        },
+        {
+          "name": "money validates itself",
+          "code": "for cents, currency in [(-1, \"EUR\"), (5, \"eur\"), (5, \"EURO\"), (5, \"E1R\")]:\n    raised = False\n    try:\n        Money(cents, currency)\n    except ValueError:\n        raised = True\n    assert raised, f\"Money({cents}, {currency!r}) should raise ValueError\""
+        },
+        {
+          "name": "adding money",
+          "code": "got = Money(250, \"EUR\") + Money(100, \"EUR\")\nassert got == Money(350, \"EUR\"), got\nraised = False\ntry:\n    Money(1, \"EUR\") + Money(1, \"USD\")\nexcept ValueError:\n    raised = True\nassert raised, \"adding EUR to USD should raise ValueError\""
+        },
+        {
+          "name": "split keeps every cent",
+          "code": "got = Money(100, \"EUR\").split(3)\nassert got == [Money(34, \"EUR\"), Money(33, \"EUR\"), Money(33, \"EUR\")], got\nassert Money(7, \"USD\").split(1) == [Money(7, \"USD\")], Money(7, \"USD\").split(1)\nparts = Money(1001, \"EUR\").split(4)\nassert sum(p.cents for p in parts) == 1001, parts"
+        },
+        {
+          "name": "accounts compare by number",
+          "code": "a = Account(\"A-1\", \"Ada\")\nb = Account(\"A-1\", \"Bo\")\na.deposit(Money(500, \"EUR\"))\nassert a == b, \"the same number means the same account\"\nassert len({a, b}) == 1, \"accounts should hash by number\"\nassert a != Account(\"A-2\", \"Ada\"), \"different numbers are different accounts\""
+        },
+        {
+          "name": "deposits change the balance",
+          "code": "account = Account(\"B-7\", \"Cy\")\nassert account.balance == Money(0, \"EUR\"), account.balance\naccount.deposit(Money(500, \"EUR\"))\naccount.deposit(Money(25, \"EUR\"))\nassert account.balance == Money(525, \"EUR\"), account.balance"
+        }
+      ],
+      "hints": [
+        "`@dataclass(frozen=True)` gives equality, hashing and immutability by value. Validation goes in `__post_init__`.",
+        "For `split`, `divmod(self.cents, n)` gives the share and the remainder; the first `remainder` parts get one extra cent.",
+        "`Account` is a plain class: `__eq__` returns `isinstance(other, Account) and other.number == self.number`, and `__hash__` returns `hash(self.number)`. Deposit by replacing `self.balance` with `self.balance + money`."
+      ],
+      "explanation": "A dataclass compares every field, so in the starter the same account with two different balances was two unequal objects, and a set of accounts could hold one account twice. Entities need identity equality, written by hand.\n\nValues are the opposite. Freezing them means a `Money` passed around can never change under someone's feet, and validating in `__post_init__` means an invalid one can never exist. Whole cents and `divmod` keep every cent accounted for, which floats cannot promise."
+    },
+    {
+      "id": "workflow-state-machine",
+      "title": "A state machine for a workflow",
+      "body": "# A state machine for a workflow\n\nAn order moves from draft to submitted to paid to shipped, and can be cancelled until it is paid. Status checks scattered through the code drift apart. Writing the allowed moves down in one table makes the workflow explicit, easy to test and easy to draw.\n\n```python\nMOVES = {\n    (\"draft\", \"submit\"): \"submitted\",\n    (\"submitted\", \"pay\"): \"paid\",\n    (\"paid\", \"ship\"): \"shipped\",\n}\n\ndef step(state, action):\n    if (state, action) not in MOVES:\n        msg = f\"no {action} from {state}\"\n        raise ValueError(msg)\n    return MOVES[(state, action)]\n\nstate = step(\"draft\", \"submit\")\nprint(state, step(state, \"pay\"))\n```\n\nThe order keeps its current state, and every change goes through one method that consults the table. A list of past states gives you an audit trail for free.\n\n## States as an Enum\n\nMake the states an `Enum`. A typo such as `Status.PAYED` then fails at once, where a misspelt string would quietly create a new state.\n",
+      "task": "Write an `Enum` `Status` with `DRAFT`, `SUBMITTED`, `PAID`, `SHIPPED` and `CANCELLED`, an exception `InvalidTransition`, and `Order` with `status` starting at `DRAFT`, `history` listing every status it has had, and `apply(action)` for `\"submit\"`, `\"pay\"`, `\"ship\"` and `\"cancel\"` (allowed from draft or submitted). Add `allowed_actions()` returning the sorted actions possible now.",
+      "starter": "from enum import Enum\n\n\nclass Status(Enum):\n    DRAFT = \"draft\"\n    SUBMITTED = \"submitted\"\n    PAID = \"paid\"\n    SHIPPED = \"shipped\"\n    CANCELLED = \"cancelled\"\n\n\nclass InvalidTransition(Exception):\n    pass\n\n\nclass Order:\n    def __init__(self):\n        self.status = Status.DRAFT\n        self.history = []\n\n    def apply(self, action):\n        if action == \"submit\":\n            self.status = Status.SUBMITTED\n        elif action == \"pay\":\n            self.status = Status.PAID\n        elif action == \"ship\":\n            self.status = Status.SHIPPED\n        elif action == \"cancel\":\n            self.status = Status.CANCELLED\n        self.history.append(self.status)\n\n    def allowed_actions(self):\n        return [\"cancel\", \"pay\", \"ship\", \"submit\"]\n",
+      "solution": "from enum import Enum\n\n\nclass Status(Enum):\n    DRAFT = \"draft\"\n    SUBMITTED = \"submitted\"\n    PAID = \"paid\"\n    SHIPPED = \"shipped\"\n    CANCELLED = \"cancelled\"\n\n\nclass InvalidTransition(Exception):\n    pass\n\n\nTRANSITIONS = {\n    (Status.DRAFT, \"submit\"): Status.SUBMITTED,\n    (Status.SUBMITTED, \"pay\"): Status.PAID,\n    (Status.PAID, \"ship\"): Status.SHIPPED,\n    (Status.DRAFT, \"cancel\"): Status.CANCELLED,\n    (Status.SUBMITTED, \"cancel\"): Status.CANCELLED,\n}\n\n\nclass Order:\n    def __init__(self):\n        self.status = Status.DRAFT\n        self.history = [Status.DRAFT]\n\n    def apply(self, action):\n        new = TRANSITIONS.get((self.status, action))\n        if new is None:\n            raise InvalidTransition(f\"cannot {action} a {self.status.value} order\")\n        self.status = new\n        self.history.append(new)\n\n    def allowed_actions(self):\n        return sorted(action for state, action in TRANSITIONS if state == self.status)\n",
+      "checks": [
+        {
+          "name": "the happy path",
+          "code": "order = Order()\nfor action in [\"submit\", \"pay\", \"ship\"]:\n    order.apply(action)\nassert order.status == Status.SHIPPED, order.status\nwant = [Status.DRAFT, Status.SUBMITTED, Status.PAID, Status.SHIPPED]\nassert order.history == want, order.history"
+        },
+        {
+          "name": "cancelling before payment",
+          "code": "draft = Order()\ndraft.apply(\"cancel\")\nassert draft.status == Status.CANCELLED, draft.status\nsubmitted = Order()\nsubmitted.apply(\"submit\")\nsubmitted.apply(\"cancel\")\nassert submitted.history == [Status.DRAFT, Status.SUBMITTED, Status.CANCELLED], submitted.history"
+        },
+        {
+          "name": "no cancelling after payment",
+          "code": "order = Order()\norder.apply(\"submit\")\norder.apply(\"pay\")\nraised = False\ntry:\n    order.apply(\"cancel\")\nexcept InvalidTransition:\n    raised = True\nassert raised, \"cancelling a paid order should raise InvalidTransition\"\nassert order.status == Status.PAID, order.status\nassert len(order.history) == 3, order.history"
+        },
+        {
+          "name": "skipped steps and unknown actions",
+          "code": "for action in [\"ship\", \"pay\", \"teleport\"]:\n    raised = False\n    try:\n        Order().apply(action)\n    except InvalidTransition:\n        raised = True\n    assert raised, f\"apply({action!r}) on a draft should raise InvalidTransition\""
+        },
+        {
+          "name": "allowed actions follow the state",
+          "code": "order = Order()\nassert order.allowed_actions() == [\"cancel\", \"submit\"], order.allowed_actions()\norder.apply(\"submit\")\nassert order.allowed_actions() == [\"cancel\", \"pay\"], order.allowed_actions()\norder.apply(\"pay\")\norder.apply(\"ship\")\nassert order.allowed_actions() == [], order.allowed_actions()"
+        }
+      ],
+      "hints": [
+        "Put the five allowed moves in one dict keyed by `(status, action)`. `apply` looks the pair up instead of branching on the action alone.",
+        "When the lookup finds nothing, raise `InvalidTransition` before touching `status` or `history`. Start `history` as `[Status.DRAFT]`.",
+        "`allowed_actions` is a query on the same table: `sorted(action for state, action in TRANSITIONS if state == self.status)`."
+      ],
+      "explanation": "The if-chain looked only at the action, so a paid order could be cancelled and a draft could be shipped. The rule is really about pairs of state and action, and a dict keyed by those pairs says exactly that.\n\nBecause `apply` and `allowed_actions` read the same table, the buttons a screen shows can never disagree with what the order accepts. Adding a state, such as refunded, is one more line in the table."
+    },
+    {
+      "id": "repository-pattern",
+      "title": "The repository pattern",
+      "body": "# The repository pattern\n\nThe domain should not care whether products live in a dict, a sqlite file or a remote service. A repository hides storage behind a small collection-like interface: add an object, get it back by key, list them all.\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass\nclass Product:\n    sku: str\n    stock: int\n\nclass MemoryRepo:\n    def __init__(self):\n        self._rows = {}\n\n    def add(self, product):\n        self._rows[product.sku] = product\n\n    def get(self, sku):\n        return self._rows.get(sku)\n\nrepo = MemoryRepo()\nrepo.add(Product(\"MUG\", 3))\nprint(repo.get(\"MUG\"))\n```\n\nServices receive a repository as an argument. Tests pass the in-memory one, and the application passes one backed by a database:\n\n```python\nimport sqlite3\n\ndb = sqlite3.connect(\":memory:\")\ndb.execute(\n    \"CREATE TABLE products (sku TEXT\"\n    \" PRIMARY KEY, stock INT)\")\ndb.execute(\n    \"INSERT INTO products VALUES (?, ?)\",\n    (\"MUG\", 3))\nrows = db.execute(\"SELECT * FROM products\")\nprint(rows.fetchall())\n```\n\nBoth must behave the same, so write one contract test and run it against every implementation.\n",
+      "task": "Write `SqliteProductRepository(conn)` matching `InMemoryProductRepository`: it creates a `products` table, `add(product)` inserts or replaces, `get(sku)` returns a new `Product` or `None`, and `list()` returns every product sorted by sku. Then fix the in-memory repository so that, like a database, it stores and returns copies.",
+      "starter": "from dataclasses import dataclass\n\n\n@dataclass\nclass Product:\n    sku: str\n    stock: int\n\n\nclass InMemoryProductRepository:\n    def __init__(self):\n        self._rows = {}\n\n    def add(self, product):\n        self._rows[product.sku] = product\n\n    def get(self, sku):\n        return self._rows.get(sku)\n\n    def list(self):\n        return [self._rows[sku] for sku in sorted(self._rows)]\n\n\nclass SqliteProductRepository:\n    def __init__(self, conn):\n        self.conn = conn\n        conn.execute(\"CREATE TABLE IF NOT EXISTS products (sku TEXT PRIMARY KEY, stock INTEGER)\")\n\n    def add(self, product):\n        self.conn.execute(\"INSERT INTO products VALUES (?, ?)\", (product.sku, product.stock))\n\n    def get(self, sku):\n        return self.conn.execute(\"SELECT sku, stock FROM products WHERE sku = ?\", (sku,)).fetchone()\n\n    def list(self):\n        return self.conn.execute(\"SELECT sku, stock FROM products\").fetchall()\n",
+      "solution": "from dataclasses import dataclass, replace\n\n\n@dataclass\nclass Product:\n    sku: str\n    stock: int\n\n\nclass InMemoryProductRepository:\n    def __init__(self):\n        self._rows = {}\n\n    def add(self, product):\n        self._rows[product.sku] = replace(product)\n\n    def get(self, sku):\n        row = self._rows.get(sku)\n        return replace(row) if row is not None else None\n\n    def list(self):\n        return [replace(self._rows[sku]) for sku in sorted(self._rows)]\n\n\nclass SqliteProductRepository:\n    def __init__(self, conn):\n        self.conn = conn\n        conn.execute(\n            \"CREATE TABLE IF NOT EXISTS products\"\n            \" (sku TEXT PRIMARY KEY, stock INTEGER NOT NULL)\"\n        )\n\n    def add(self, product):\n        self.conn.execute(\n            \"INSERT OR REPLACE INTO products (sku, stock) VALUES (?, ?)\",\n            (product.sku, product.stock),\n        )\n\n    def get(self, sku):\n        row = self.conn.execute(\n            \"SELECT sku, stock FROM products WHERE sku = ?\", (sku,)\n        ).fetchone()\n        return Product(*row) if row is not None else None\n\n    def list(self):\n        rows = self.conn.execute(\"SELECT sku, stock FROM products ORDER BY sku\")\n        return [Product(*row) for row in rows]\n",
+      "checks": [
+        {
+          "name": "contract: add and get",
+          "code": "import sqlite3\nfor repo in [InMemoryProductRepository(), SqliteProductRepository(sqlite3.connect(\":memory:\"))]:\n    kind = type(repo).__name__\n    repo.add(Product(\"MUG\", 3))\n    got = repo.get(\"MUG\")\n    assert got == Product(\"MUG\", 3), (kind, got)\n    assert repo.get(\"NOPE\") is None, (kind, repo.get(\"NOPE\"))"
+        },
+        {
+          "name": "contract: adding again replaces",
+          "code": "import sqlite3\nfor repo in [InMemoryProductRepository(), SqliteProductRepository(sqlite3.connect(\":memory:\"))]:\n    kind = type(repo).__name__\n    repo.add(Product(\"MUG\", 3))\n    repo.add(Product(\"MUG\", 1))\n    got = repo.get(\"MUG\")\n    assert got == Product(\"MUG\", 1), (kind, got)"
+        },
+        {
+          "name": "contract: list is sorted",
+          "code": "import sqlite3\nfor repo in [InMemoryProductRepository(), SqliteProductRepository(sqlite3.connect(\":memory:\"))]:\n    kind = type(repo).__name__\n    for sku in [\"PEN\", \"CUP\", \"MUG\"]:\n        repo.add(Product(sku, 1))\n    got = repo.list()\n    assert got == [Product(\"CUP\", 1), Product(\"MUG\", 1), Product(\"PEN\", 1)], (kind, got)"
+        },
+        {
+          "name": "contract: stored products are copies",
+          "code": "import sqlite3\nfor repo in [InMemoryProductRepository(), SqliteProductRepository(sqlite3.connect(\":memory:\"))]:\n    kind = type(repo).__name__\n    product = Product(\"MUG\", 3)\n    repo.add(product)\n    product.stock = 0\n    loaded = repo.get(\"MUG\")\n    loaded.stock = 99\n    got = repo.get(\"MUG\")\n    assert got == Product(\"MUG\", 3), (kind, \"changes without add() leaked in\", got)"
+        },
+        {
+          "name": "sqlite really stores rows",
+          "code": "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nSqliteProductRepository(conn).add(Product(\"MUG\", 2))\ncount = conn.execute(\"SELECT COUNT(*) FROM products\").fetchone()[0]\nassert count == 1, count\ngot = SqliteProductRepository(conn).get(\"MUG\")\nassert got == Product(\"MUG\", 2), got"
+        }
+      ],
+      "hints": [
+        "Run the same steps against both repositories in your head: what does each return after `add`, after a second `add` of the same sku, and after you change an object you added?",
+        "`INSERT OR REPLACE` handles a repeated sku, `Product(*row)` turns a `(sku, stock)` row back into an object, and `ORDER BY sku` sorts.",
+        "In the in-memory repository, store `dataclasses.replace(product)` and return `replace(row)`, so callers never hold the stored object itself."
+      ],
+      "explanation": "The in-memory repository handed out the very object it stored, so a service that changed a product and forgot to save it would pass every test and then lose the change against a real database. A fake that is more forgiving than the real thing hides bugs; copying on the way in and out makes it as strict as sqlite.\n\nRunning one contract against every implementation is how you keep a fake honest. When a new implementation arrives, it gets the same tests for free."
+    },
+    {
+      "id": "service-layer",
+      "title": "A service layer",
+      "body": "# A service layer\n\nA use case such as placing an order touches several things: it loads objects from a repository, asks the domain to change them, saves the result and reports back. A service function holds that orchestration, so web handlers, command-line tools and tests all call the same code.\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass\nclass Product:\n    sku: str\n    stock: int\n\n    def restock(self, qty):\n        if qty <= 0:\n            raise ValueError(qty)\n        self.stock += qty\n\ndef restock(repo, sku, qty):\n    product = repo[sku]\n    product.restock(qty)\n    repo[sku] = product\n    return product.stock\n\nrepo = {\"MUG\": Product(\"MUG\", 1)}\nprint(restock(repo, \"MUG\", 4))\n```\n\nThe service takes its repository as an argument and returns plain values. It does not parse requests, print or open connections; those belong to its callers. The rules live on the domain objects, so the service reads like a short list of steps.\n\nTest a service with a fake repository built in the test. If the service works with that, the seam is real.\n",
+      "task": "Write `Product.reserve(qty)` raising `OutOfStock` when `qty` is more than the stock. Write `place_order(repo, sku, qty)` that raises `ValueError` for a quantity below 1, `UnknownProduct` when `repo.get(sku)` is `None`, and otherwise reserves, saves with `repo.add(product)` and returns the remaining stock.",
+      "starter": "from dataclasses import dataclass\n\n\nclass UnknownProduct(Exception):\n    pass\n\n\nclass OutOfStock(Exception):\n    pass\n\n\n@dataclass\nclass Product:\n    sku: str\n    stock: int\n\n    def reserve(self, qty):\n        self.stock -= qty\n\n\ndef place_order(repo, sku, qty):\n    product = repo.get(sku)\n    if product.stock < qty:\n        raise OutOfStock(sku)\n    product.stock -= qty\n    return product.stock\n",
+      "solution": "from dataclasses import dataclass\n\n\nclass UnknownProduct(Exception):\n    pass\n\n\nclass OutOfStock(Exception):\n    pass\n\n\n@dataclass\nclass Product:\n    sku: str\n    stock: int\n\n    def reserve(self, qty):\n        if qty > self.stock:\n            raise OutOfStock(f\"{self.sku}: {self.stock} left, {qty} wanted\")\n        self.stock -= qty\n\n\ndef place_order(repo, sku, qty):\n    if qty < 1:\n        raise ValueError(f\"quantity must be at least 1, got {qty}\")\n    product = repo.get(sku)\n    if product is None:\n        raise UnknownProduct(sku)\n    product.reserve(qty)\n    repo.add(product)\n    return product.stock\n",
+      "checks": [
+        {
+          "name": "reserving is a domain rule",
+          "code": "product = Product(\"MUG\", 5)\nproduct.reserve(2)\nassert product.stock == 3, product.stock\nraised = False\ntry:\n    product.reserve(4)\nexcept OutOfStock:\n    raised = True\nassert raised, \"reserving more than the stock should raise OutOfStock\"\nassert product.stock == 3, product.stock"
+        },
+        {
+          "name": "the service saves through the repository it is given",
+          "code": "class FakeRepo:\n    def __init__(self, *products):\n        self.rows = {p.sku: p for p in products}\n        self.saved = []\n\n    def get(self, sku):\n        return self.rows.get(sku)\n\n    def add(self, product):\n        self.saved.append((product.sku, product.stock))\n\nrepo = FakeRepo(Product(\"MUG\", 5))\ngot = place_order(repo, \"MUG\", 2)\nassert got == 3, got\nassert repo.saved == [(\"MUG\", 3)], repo.saved"
+        },
+        {
+          "name": "unknown products",
+          "code": "class FakeRepo:\n    def __init__(self):\n        self.saved = []\n\n    def get(self, sku):\n        return None\n\n    def add(self, product):\n        self.saved.append(product)\n\nrepo = FakeRepo()\nraised = False\ntry:\n    place_order(repo, \"NOPE\", 1)\nexcept UnknownProduct:\n    raised = True\nassert raised, \"a missing product should raise UnknownProduct\"\nassert repo.saved == [], repo.saved"
+        },
+        {
+          "name": "out of stock saves nothing",
+          "code": "class FakeRepo:\n    def __init__(self, *products):\n        self.rows = {p.sku: p for p in products}\n        self.saved = []\n\n    def get(self, sku):\n        return self.rows.get(sku)\n\n    def add(self, product):\n        self.saved.append(product)\n\nrepo = FakeRepo(Product(\"MUG\", 1))\nraised = False\ntry:\n    place_order(repo, \"MUG\", 2)\nexcept OutOfStock:\n    raised = True\nassert raised, \"ordering more than the stock should raise OutOfStock\"\nassert repo.saved == [], repo.saved"
+        },
+        {
+          "name": "bad quantities are refused first",
+          "code": "class Untouchable:\n    def get(self, sku):\n        raise AssertionError(\"the repository should not be used for a bad quantity\")\n\n    def add(self, product):\n        raise AssertionError(\"the repository should not be used for a bad quantity\")\n\nfor qty in [0, -2]:\n    raised = False\n    try:\n        place_order(Untouchable(), \"MUG\", qty)\n    except ValueError:\n        raised = True\n    assert raised, f\"quantity {qty} should raise ValueError\""
+        }
+      ],
+      "hints": [
+        "Move the stock rule into `Product.reserve`, so it holds wherever a product is changed. The service only calls it.",
+        "The service's steps: validate `qty`, `repo.get(sku)`, raise `UnknownProduct` for `None`, `product.reserve(qty)`, `repo.add(product)`, return the stock.",
+        "`reserve` raises `OutOfStock` before subtracting, when `qty > self.stock`. Check `qty < 1` at the top of `place_order`, before touching the repository."
+      ],
+      "explanation": "The starter changed the product in memory and returned, which looks right in a test that reads the same object back, and saves nothing to a real database. Saving through the repository makes the write visible to the fake, so a test can prove it happened.\n\nKeeping the stock rule on `Product` means a second use case, such as a bulk import, cannot forget it. The service stays thin: it coordinates, and the domain decides."
+    },
+    {
+      "id": "unit-of-work",
+      "title": "Unit of work",
+      "body": "# Unit of work\n\nSome use cases change several things that must succeed or fail together. A unit of work groups those changes: the service makes them through it, and nothing is stored until `commit()`. Leaving the `with` block without committing throws the changes away.\n\n```python\nimport copy\n\nclass UnitOfWork:\n    def __init__(self, data):\n        self.data = data\n\n    def __enter__(self):\n        self.work = copy.deepcopy(self.data)\n        return self\n\n    def __exit__(self, *exc_info):\n        self.work = None\n\n    def commit(self):\n        self.data.update(self.work)\n\nstore = {\"MUG\": 3}\nwith UnitOfWork(store) as uow:\n    uow.work[\"MUG\"] = 0\nprint(store)  # no commit, still 3\n```\n\nThe service never learns whether it is talking to a database transaction or a copied dict. It opens the unit of work, changes things through it, and commits once, as its last step. An exception halfway leaves everything as it was, because nothing was published.\n\nA fake unit of work can also record that `commit()` was called, so a test can check that the service committed.\n",
+      "task": "Write `InMemoryUnitOfWork(stock)`, where `stock` maps sku to quantity: entering `with` exposes a working copy as `.stock`, `commit()` writes the copy back into the original dict and sets `committed` to `True`, and leaving without a commit discards the changes. Write `transfer(uow, from_sku, to_sku, qty)` that moves stock between two skus all or nothing, raising `ValueError` when `from_sku` has too little.",
+      "starter": "class InMemoryUnitOfWork:\n    def __init__(self, stock):\n        self.stock = stock\n        self.committed = False\n\n    def __enter__(self):\n        return self\n\n    def __exit__(self, *exc_info):\n        pass\n\n    def commit(self):\n        self.committed = True\n\n\ndef transfer(uow, from_sku, to_sku, qty):\n    with uow:\n        uow.stock[from_sku] -= qty\n        uow.stock[to_sku] += qty\n        uow.commit()\n",
+      "solution": "import copy\n\n\nclass InMemoryUnitOfWork:\n    def __init__(self, stock):\n        self._stored = stock\n        self.stock = None\n        self.committed = False\n\n    def __enter__(self):\n        self.stock = copy.deepcopy(self._stored)\n        return self\n\n    def __exit__(self, *exc_info):\n        self.stock = None\n\n    def commit(self):\n        self._stored.clear()\n        self._stored.update(self.stock)\n        self.committed = True\n\n\ndef transfer(uow, from_sku, to_sku, qty):\n    with uow:\n        available = uow.stock[from_sku]\n        if available < qty:\n            raise ValueError(f\"{from_sku} has {available}, cannot move {qty}\")\n        uow.stock[from_sku] -= qty\n        uow.stock[to_sku] += qty\n        uow.commit()\n",
+      "checks": [
+        {
+          "name": "changes need a commit",
+          "code": "store = {\"A\": 5}\nuow = InMemoryUnitOfWork(store)\nwith uow:\n    uow.stock[\"A\"] = 1\nassert store == {\"A\": 5}, store\nassert uow.committed is False, uow.committed"
+        },
+        {
+          "name": "commit writes back",
+          "code": "store = {\"A\": 5}\nuow = InMemoryUnitOfWork(store)\nwith uow:\n    uow.stock[\"A\"] = 1\n    uow.stock[\"B\"] = 2\n    uow.commit()\nassert store == {\"A\": 1, \"B\": 2}, store\nassert uow.committed is True, uow.committed"
+        },
+        {
+          "name": "an exception discards the changes",
+          "code": "store = {\"A\": 5}\nuow = InMemoryUnitOfWork(store)\nraised = False\ntry:\n    with uow:\n        uow.stock[\"A\"] = 0\n        raise RuntimeError(\"boom\")\nexcept RuntimeError:\n    raised = True\nassert raised, \"the exception should leave the with block\"\nassert store == {\"A\": 5}, store"
+        },
+        {
+          "name": "transfer moves stock",
+          "code": "store = {\"A\": 5, \"B\": 1}\nuow = InMemoryUnitOfWork(store)\ntransfer(uow, \"A\", \"B\", 3)\nassert store == {\"A\": 2, \"B\": 4}, store\nassert uow.committed, \"transfer should commit\""
+        },
+        {
+          "name": "transfer is all or nothing",
+          "code": "store = {\"A\": 5}\nuow = InMemoryUnitOfWork(store)\nraised = False\ntry:\n    transfer(uow, \"A\", \"MISSING\", 3)\nexcept KeyError:\n    raised = True\nassert raised, \"an unknown target sku should raise KeyError\"\nassert store == {\"A\": 5}, store"
+        },
+        {
+          "name": "transfer refuses too little stock",
+          "code": "store = {\"A\": 1, \"B\": 0}\nuow = InMemoryUnitOfWork(store)\nraised = False\ntry:\n    transfer(uow, \"A\", \"B\", 2)\nexcept ValueError:\n    raised = True\nassert raised, \"moving more than is available should raise ValueError\"\nassert store == {\"A\": 1, \"B\": 0}, store\nassert not uow.committed, \"nothing should be committed\""
+        }
+      ],
+      "hints": [
+        "The unit of work must not hand out the original dict. Make a copy in `__enter__` and let the service work on that.",
+        "`commit()` copies the working dict back into the original (`clear()` then `update()` keeps the caller's dict object). `__exit__` just drops the copy, so anything uncommitted is gone.",
+        "In `transfer`, do everything inside `with uow:`, check `uow.stock[from_sku] < qty` before changing anything, and call `uow.commit()` as the last line."
+      ],
+      "explanation": "Writing straight into the shared dict meant that when the second step failed, the first had already happened: stock left one sku and arrived nowhere. Working on a copy and publishing it only in `commit()` turns the whole transfer into one step.\n\nCommitting explicitly, as the service's last line, is deliberate: the safe default is to lose changes, not to keep half of them. A sqlite version of the same class would call `conn.commit()` and `conn.rollback()`, and `transfer` would not change at all."
+    },
+    {
+      "id": "domain-events",
+      "title": "Domain events and handlers",
+      "body": "# Domain events and handlers\n\nWhen stock runs out, someone should be told. Sending an email from inside `Product.reserve` would drag email into the domain. Instead the domain records what happened, as an event, and code outside decides what to do about it.\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass OutOfStock:\n    sku: str\n\ndef email_buyer(event):\n    print(\"email buyer:\", event.sku)\n\ndef hide_listing(event):\n    print(\"hide listing:\", event.sku)\n\nHANDLERS = {OutOfStock: [email_buyer,\n                         hide_listing]}\n\ndef publish(event):\n    for handle in HANDLERS[type(event)]:\n        handle(event)\n\npublish(OutOfStock(\"MUG\"))\n```\n\nAn event is a small immutable record of a fact. An entity appends events to a list as it changes. When the use case has finished, the service layer hands them to a message bus, which calls every handler subscribed to that type of event.\n\nA new reaction, such as reordering stock, is a new handler. The entity does not change, and it never imports the code that reacts.\n",
+      "task": "Write `Product.reserve(qty)` that raises `ValueError` when there is too little stock and appends `OutOfStock(sku)` to `self.events` when the stock reaches 0. Write `MessageBus` with `subscribe(event_type, handler)` and `publish(events)`, calling handlers in subscription order and ignoring events nobody subscribed to, and `reserve_and_publish(product, qty, bus)` that reserves, then publishes and clears the product's events.",
+      "starter": "from dataclasses import dataclass, field\n\n\n@dataclass(frozen=True)\nclass OutOfStock:\n    sku: str\n\n\n@dataclass\nclass Product:\n    sku: str\n    stock: int\n    events: list = field(default_factory=list)\n\n    def reserve(self, qty):\n        if qty > self.stock:\n            raise ValueError(f\"only {self.stock} left\")\n        self.stock -= qty\n        if self.stock == 0:\n            print(f\"emailing the buyer: {self.sku} is out\")\n\n\nclass MessageBus:\n    handlers = {}\n\n    def subscribe(self, event_type, handler):\n        self.handlers.setdefault(event_type, []).append(handler)\n\n    def publish(self, events):\n        for event in events:\n            for handler in self.handlers[type(event)]:\n                handler(event)\n\n\ndef reserve_and_publish(product, qty, bus):\n    product.reserve(qty)\n    bus.publish(product.events)\n",
+      "solution": "from dataclasses import dataclass, field\n\n\n@dataclass(frozen=True)\nclass OutOfStock:\n    sku: str\n\n\n@dataclass\nclass Product:\n    sku: str\n    stock: int\n    events: list = field(default_factory=list)\n\n    def reserve(self, qty):\n        if qty > self.stock:\n            raise ValueError(f\"only {self.stock} of {self.sku} left\")\n        self.stock -= qty\n        if self.stock == 0:\n            self.events.append(OutOfStock(self.sku))\n\n\nclass MessageBus:\n    def __init__(self):\n        self.handlers = {}\n\n    def subscribe(self, event_type, handler):\n        self.handlers.setdefault(event_type, []).append(handler)\n\n    def publish(self, events):\n        for event in events:\n            for handler in self.handlers.get(type(event), []):\n                handler(event)\n\n\ndef reserve_and_publish(product, qty, bus):\n    product.reserve(qty)\n    events, product.events = product.events, []\n    bus.publish(events)\n",
+      "checks": [
+        {
+          "name": "selling the last item records an event",
+          "code": "product = Product(\"MUG\", 2)\nproduct.reserve(1)\nassert product.events == [], product.events\nproduct.reserve(1)\nassert product.events == [OutOfStock(\"MUG\")], product.events"
+        },
+        {
+          "name": "handlers run in subscription order",
+          "code": "bus = MessageBus()\nseen = []\nbus.subscribe(OutOfStock, lambda e: seen.append((\"first\", e.sku)))\nbus.subscribe(OutOfStock, lambda e: seen.append((\"second\", e.sku)))\nbus.publish([OutOfStock(\"PEN\")])\nassert seen == [(\"first\", \"PEN\"), (\"second\", \"PEN\")], seen"
+        },
+        {
+          "name": "events nobody handles are ignored",
+          "code": "class Restocked:\n    pass\n\nbus = MessageBus()\nseen = []\nbus.subscribe(OutOfStock, seen.append)\nbus.publish([Restocked()])\nassert seen == [], seen"
+        },
+        {
+          "name": "each bus has its own handlers",
+          "code": "one, two = MessageBus(), MessageBus()\nseen = []\none.subscribe(OutOfStock, seen.append)\ntwo.publish([OutOfStock(\"CUP\")])\nassert seen == [], \"a handler on one bus fired for another\""
+        },
+        {
+          "name": "events are published once",
+          "code": "bus = MessageBus()\nseen = []\nbus.subscribe(OutOfStock, seen.append)\nproduct = Product(\"MUG\", 1)\nreserve_and_publish(product, 1, bus)\nassert seen == [OutOfStock(\"MUG\")], seen\nassert product.events == [], product.events\nother = Product(\"PEN\", 3)\nreserve_and_publish(other, 1, bus)\nassert seen == [OutOfStock(\"MUG\")], seen"
+        }
+      ],
+      "hints": [
+        "`reserve` should only record: `self.events.append(OutOfStock(self.sku))` when the stock reaches 0. No printing and no bus.",
+        "Give each bus its own `self.handlers = {}` in `__init__`, and look handlers up with `.get(type(event), [])` so unhandled events pass quietly.",
+        "In `reserve_and_publish`, take the events and reset the list before publishing: `events, product.events = product.events, []`, then `bus.publish(events)`."
+      ],
+      "explanation": "A dict written in the class body is shared by every instance, so a handler subscribed on one bus fired on all the others. State that belongs to an object goes in `__init__`.\n\nThe entity now knows nothing about email or buses; it only remembers what happened. Clearing its list before publishing means the same event cannot be handled twice, even if a handler triggers more work. New reactions are new subscriptions, and `Product` never changes for them."
+    },
+    {
+      "id": "commands-and-queries",
+      "title": "Commands and queries",
+      "body": "# Commands and queries\n\nA method that changes state and also returns data is hard to reason about: calling it just to look is no longer safe. Keep the two apart. A command changes something and returns nothing. A query returns data and changes nothing, so it can run as often as you like.\n\n```python\nclass Cart:\n    def __init__(self):\n        self._items = {}\n\n    def add(self, sku, qty):  # command\n        n = self._items.get(sku, 0)\n        self._items[sku] = n + qty\n\n    def count(self):  # query\n        return sum(self._items.values())\n\ncart = Cart()\ncart.add(\"MUG\", 2)\ncart.add(\"PEN\", 1)\nprint(cart.count())\n```\n\nAt the application level the same split separates a write side, which runs commands through the domain, from a read side, which answers queries from data shaped for the screen. Commands become small dataclasses that name an intention, each handled in one place.\n\n## Who chooses the id?\n\nIf adding returns nothing, how does the caller learn the new id? Let the caller choose it, for example with `uuid4()`, and put it in the command.\n",
+      "task": "Write frozen dataclasses `AddTask(task_id, title)` and `CompleteTask(task_id)`, and `TaskList.execute(command)` that applies either one and returns `None`, raising `ValueError` for an id that already exists, `KeyError` for completing an unknown id and `TypeError` for anything else. Write the queries `open_titles()`, the titles not yet done in the order they were added, and `done_count()`.",
+      "starter": "from dataclasses import dataclass\n\n\n@dataclass(frozen=True)\nclass AddTask:\n    task_id: int\n    title: str\n\n\n@dataclass(frozen=True)\nclass CompleteTask:\n    task_id: int\n\n\nclass TaskList:\n    def __init__(self):\n        self.tasks = {}\n\n    def execute(self, command):\n        if isinstance(command, AddTask):\n            self.tasks[command.task_id] = [command.title, False]\n        else:\n            self.tasks[command.task_id][1] = True\n        return self.open_titles()\n\n    def open_titles(self):\n        return [title for title, done in self.tasks.values() if not done]\n",
+      "solution": "from dataclasses import dataclass\n\n\n@dataclass(frozen=True)\nclass AddTask:\n    task_id: int\n    title: str\n\n\n@dataclass(frozen=True)\nclass CompleteTask:\n    task_id: int\n\n\nclass TaskList:\n    def __init__(self):\n        self._titles = {}\n        self._done = set()\n\n    def execute(self, command):\n        match command:\n            case AddTask(task_id, title):\n                if task_id in self._titles:\n                    raise ValueError(f\"task {task_id} already exists\")\n                self._titles[task_id] = title\n            case CompleteTask(task_id):\n                if task_id not in self._titles:\n                    raise KeyError(task_id)\n                self._done.add(task_id)\n            case _:\n                raise TypeError(f\"unknown command: {command!r}\")\n\n    def open_titles(self):\n        return [\n            title for task_id, title in self._titles.items()\n            if task_id not in self._done\n        ]\n\n    def done_count(self):\n        return len(self._done)\n",
+      "checks": [
+        {
+          "name": "commands return nothing",
+          "code": "tasks = TaskList()\ngot = tasks.execute(AddTask(1, \"write\"))\nassert got is None, got\ngot = tasks.execute(CompleteTask(1))\nassert got is None, got"
+        },
+        {
+          "name": "queries report the state",
+          "code": "tasks = TaskList()\ntasks.execute(AddTask(7, \"plan\"))\ntasks.execute(AddTask(3, \"build\"))\ntasks.execute(AddTask(5, \"ship\"))\ntasks.execute(CompleteTask(3))\nassert tasks.open_titles() == [\"plan\", \"ship\"], tasks.open_titles()\nassert tasks.done_count() == 1, tasks.done_count()"
+        },
+        {
+          "name": "queries change nothing",
+          "code": "tasks = TaskList()\ntasks.execute(AddTask(1, \"plan\"))\nfirst = tasks.open_titles()\nfirst.append(\"sneaky\")\nassert tasks.open_titles() == [\"plan\"], tasks.open_titles()\nassert tasks.done_count() == 0, tasks.done_count()"
+        },
+        {
+          "name": "ids belong to the caller",
+          "code": "tasks = TaskList()\ntasks.execute(AddTask(1, \"plan\"))\nraised = False\ntry:\n    tasks.execute(AddTask(1, \"again\"))\nexcept ValueError:\n    raised = True\nassert raised, \"adding an existing id should raise ValueError\"\nassert tasks.open_titles() == [\"plan\"], tasks.open_titles()"
+        },
+        {
+          "name": "bad commands are refused",
+          "code": "tasks = TaskList()\nraised = False\ntry:\n    tasks.execute(CompleteTask(42))\nexcept KeyError:\n    raised = True\nassert raised, \"completing an unknown id should raise KeyError\"\nraised = False\ntry:\n    tasks.execute(\"add milk\")\nexcept TypeError:\n    raised = True\nassert raised, \"a non-command should raise TypeError\""
+        }
+      ],
+      "hints": [
+        "`execute` should end without a `return` value. Callers that need data ask a query afterwards.",
+        "`match command:` with `case AddTask(task_id, title):` and `case CompleteTask(task_id):` dispatches by type; `case _:` catches anything else.",
+        "Refuse an `AddTask` whose id exists (`ValueError`) and a `CompleteTask` whose id does not (`KeyError`). Each query builds a new list or number from the stored data and never assigns to `self`."
+      ],
+      "explanation": "Returning the open titles from `execute` looked convenient, but every caller now pays for a query it may not want, and a command's result gets mixed up with its effect. With the caller choosing the id, a command needs no return value at all: the caller already knows how to refer to the new task.\n\nQueries that only read can be cached, repeated and moved to a faster read store later. Commands that only write can be logged, retried and queued. Keeping them apart keeps those options open."
+    },
+    {
+      "id": "ports-and-adapters",
+      "title": "Ports and adapters",
+      "body": "# Ports and adapters\n\nYour domain needs exchange rates, and a provider serves them over HTTP. Define a port: the interface the domain wants, in its own words. Then write adapters that plug into it, one that calls the real API and a fake for tests.\n\n```python\nfrom decimal import Decimal\nfrom typing import Protocol\n\nclass Rates(Protocol):\n    def rate(self, base: str,\n             quote: str) -> Decimal: ...\n\nclass FakeRates:\n    def __init__(self, table):\n        self.table = table\n\n    def rate(self, base, quote):\n        return self.table[(base, quote)]\n\ndef convert(amount, base, quote, rates):\n    return amount * rates.rate(base, quote)\n\ntable = {(\"EUR\", \"USD\"): Decimal(\"1.1\")}\nprint(convert(Decimal(10), \"EUR\", \"USD\",\n              FakeRates(table)))\n```\n\nThe real adapter takes an `httpx.Client` instead of creating one. A test can give it a client with an in-memory transport and exercise the real parsing without a network:\n\n```python\nimport httpx\n\ndef api(request):\n    return httpx.Response(\n        200, json={\"rate\": \"1.1\"})\n\nclient = httpx.Client(\n    base_url=\"https://rates.test\",\n    transport=httpx.MockTransport(api))\nprint(client.get(\"/rates/EUR/USD\").json())\n```\n",
+      "task": "Write `HttpRates(client)` whose `rate(base, quote)` requests `GET /rates/{base}/{quote}`, raises for an error status, and returns the `\"rate\"` field as an exact `Decimal`, and `FakeRates(table)` reading a dict keyed by `(base, quote)`. Write `convert(amount, base, quote, rates)` returning the amount converted and rounded to cents, or the amount unchanged, without asking for a rate, when the currencies match.",
+      "starter": "from decimal import Decimal\nfrom typing import Protocol\n\n\nclass Rates(Protocol):\n    def rate(self, base: str, quote: str) -> Decimal: ...\n\n\nclass HttpRates:\n    def __init__(self, client):\n        self.client = client\n\n    def rate(self, base, quote):\n        data = self.client.get(f\"/rates/{base}/{quote}\").json()\n        return float(data[\"rate\"])\n\n\nclass FakeRates:\n    def __init__(self, table):\n        self.table = table\n\n    def rate(self, base, quote):\n        return self.table[(base, quote)]\n\n\ndef convert(amount, base, quote, rates):\n    return amount * rates.rate(base, quote)\n",
+      "solution": "from decimal import Decimal\nfrom typing import Protocol\n\n\nclass Rates(Protocol):\n    def rate(self, base: str, quote: str) -> Decimal: ...\n\n\nclass HttpRates:\n    def __init__(self, client):\n        self.client = client\n\n    def rate(self, base, quote):\n        response = self.client.get(f\"/rates/{base}/{quote}\")\n        response.raise_for_status()\n        return Decimal(str(response.json()[\"rate\"]))\n\n\nclass FakeRates:\n    def __init__(self, table):\n        self.table = table\n\n    def rate(self, base, quote):\n        return self.table[(base, quote)]\n\n\ndef convert(amount, base, quote, rates: Rates):\n    if base == quote:\n        return amount\n    return (amount * rates.rate(base, quote)).quantize(Decimal(\"0.01\"))\n",
+      "checks": [
+        {
+          "name": "convert uses the port",
+          "code": "from decimal import Decimal\nrates = FakeRates({(\"EUR\", \"USD\"): Decimal(\"1.1\")})\ngot = convert(Decimal(\"10\"), \"EUR\", \"USD\", rates)\nassert got == Decimal(\"11.00\"), got\ngot = convert(Decimal(\"3\"), \"EUR\", \"GBP\", FakeRates({(\"EUR\", \"GBP\"): Decimal(\"0.3333\")}))\nassert str(got) == \"1.00\", got"
+        },
+        {
+          "name": "the same currency needs no rate",
+          "code": "from decimal import Decimal\n\nclass Refuses:\n    def rate(self, base, quote):\n        raise AssertionError(\"convert should not ask for EUR to EUR\")\n\ngot = convert(Decimal(\"5.25\"), \"EUR\", \"EUR\", Refuses())\nassert got == Decimal(\"5.25\"), got"
+        },
+        {
+          "name": "the HTTP adapter calls the right path",
+          "code": "import httpx\nfrom decimal import Decimal\npaths = []\n\ndef api(request):\n    paths.append(request.url.path)\n    return httpx.Response(200, json={\"rate\": \"0.86\"})\n\nclient = httpx.Client(base_url=\"https://rates.test\", transport=httpx.MockTransport(api))\ngot = HttpRates(client).rate(\"USD\", \"EUR\")\nassert got == Decimal(\"0.86\"), got\nassert paths == [\"/rates/USD/EUR\"], paths"
+        },
+        {
+          "name": "JSON numbers become exact decimals",
+          "code": "import httpx\nfrom decimal import Decimal\nclient = httpx.Client(\n    base_url=\"https://rates.test\",\n    transport=httpx.MockTransport(lambda request: httpx.Response(200, json={\"rate\": 1.1})),\n)\ngot = HttpRates(client).rate(\"EUR\", \"USD\")\nassert isinstance(got, Decimal), type(got)\nassert got == Decimal(\"1.1\"), got"
+        },
+        {
+          "name": "an error status is not a rate",
+          "code": "import httpx\nclient = httpx.Client(\n    base_url=\"https://rates.test\",\n    transport=httpx.MockTransport(lambda request: httpx.Response(404, json={\"detail\": \"unknown\"})),\n)\nraised = False\ntry:\n    HttpRates(client).rate(\"EUR\", \"XXX\")\nexcept httpx.HTTPStatusError:\n    raised = True\nassert raised, \"a 404 should raise httpx.HTTPStatusError\""
+        }
+      ],
+      "hints": [
+        "`convert` should only talk to the port: one call to `rates.rate(base, quote)`, skipped when the currencies match. Round with `.quantize(Decimal(\"0.01\"))`.",
+        "The adapter's job is translation. Call `response.raise_for_status()` before reading the body, and turn the JSON value into a `Decimal`.",
+        "A JSON number arrives as a float: `Decimal(str(value))` keeps `1.1` exact, where `Decimal(1.1)` would not."
+      ],
+      "explanation": "Returning `float` let the provider's representation leak into the domain, where money arithmetic needs exact decimals. The adapter is the one place that knows the wire format, so it is where JSON numbers become `Decimal` and HTTP failures become exceptions instead of bad data.\n\nBecause `HttpRates` receives its client, the test drives the real parsing code through an in-memory transport, and `convert` is tested with a three-line fake. Changing provider means writing one new adapter; `convert` stays exactly as it is."
+    },
+    {
+      "id": "errors-at-boundaries",
+      "title": "Errors at layer boundaries",
+      "body": "# Errors at layer boundaries\n\nEach layer should raise errors in its own vocabulary. A web handler should not catch `sqlite3.IntegrityError`, and the domain should not know HTTP status codes. At each boundary, catch what the inner layer raised and raise what the outer layer understands.\n\n```python\nimport sqlite3\n\nclass EmailTaken(Exception):\n    pass\n\ndb = sqlite3.connect(\":memory:\")\ndb.execute(\"CREATE TABLE users\"\n           \" (email TEXT PRIMARY KEY)\")\n\ndef add_user(email):\n    try:\n        db.execute(\"INSERT INTO users\"\n                   \" VALUES (?)\", (email,))\n    except sqlite3.IntegrityError as err:\n        raise EmailTaken(email) from err\n\nadd_user(\"ada@x.io\")\ntry:\n    add_user(\"ada@x.io\")\nexcept EmailTaken as err:\n    print(\"taken:\", err, \"|\", err.__cause__)\n```\n\n`from err` keeps the original exception as `__cause__`, so the traceback still shows the database error underneath.\n\n## The outermost boundary\n\nAt the very edge, an error boundary turns known domain errors into responses, and anything unexpected into a generic failure. The details of that failure go to the logs, never to the user.\n",
+      "task": "Write `SqliteUsers(conn)` whose `add(email)` raises `EmailTaken` chained from the `IntegrityError` and whose `get(email)` returns the email or raises `UserNotFound`. Write `handle(action, *args)` returning `(200, result)` on success, `(409, message)` for `EmailTaken`, `(404, message)` for `UserNotFound`, both messages naming the email, and `(500, \"internal error\")` for any other exception.",
+      "starter": "import sqlite3\n\n\nclass EmailTaken(Exception):\n    pass\n\n\nclass UserNotFound(Exception):\n    pass\n\n\nclass SqliteUsers:\n    def __init__(self, conn):\n        self.conn = conn\n        conn.execute(\"CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY)\")\n\n    def add(self, email):\n        self.conn.execute(\"INSERT INTO users (email) VALUES (?)\", (email,))\n\n    def get(self, email):\n        row = self.conn.execute(\"SELECT email FROM users WHERE email = ?\", (email,)).fetchone()\n        return row[0] if row else None\n\n\ndef handle(action, *args):\n    try:\n        return 200, action(*args)\n    except Exception as error:\n        return 500, str(error)\n",
+      "solution": "import sqlite3\n\n\nclass EmailTaken(Exception):\n    pass\n\n\nclass UserNotFound(Exception):\n    pass\n\n\nclass SqliteUsers:\n    def __init__(self, conn):\n        self.conn = conn\n        conn.execute(\"CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY)\")\n\n    def add(self, email):\n        try:\n            self.conn.execute(\"INSERT INTO users (email) VALUES (?)\", (email,))\n        except sqlite3.IntegrityError as error:\n            raise EmailTaken(email) from error\n\n    def get(self, email):\n        row = self.conn.execute(\n            \"SELECT email FROM users WHERE email = ?\", (email,)\n        ).fetchone()\n        if row is None:\n            raise UserNotFound(email)\n        return row[0]\n\n\ndef handle(action, *args):\n    try:\n        return 200, action(*args)\n    except EmailTaken as error:\n        return 409, f\"email already registered: {error}\"\n    except UserNotFound as error:\n        return 404, f\"no such user: {error}\"\n    except Exception:\n        return 500, \"internal error\"\n",
+      "checks": [
+        {
+          "name": "a duplicate is a domain error",
+          "code": "import sqlite3\nusers = SqliteUsers(sqlite3.connect(\":memory:\"))\nusers.add(\"ada@example.org\")\ncaught = None\ntry:\n    users.add(\"ada@example.org\")\nexcept EmailTaken as error:\n    caught = error\nassert caught is not None, \"a second add should raise EmailTaken\"\nassert isinstance(caught.__cause__, sqlite3.IntegrityError), \"chain it with raise ... from error\""
+        },
+        {
+          "name": "missing users",
+          "code": "import sqlite3\nusers = SqliteUsers(sqlite3.connect(\":memory:\"))\nusers.add(\"bo@example.org\")\nassert users.get(\"bo@example.org\") == \"bo@example.org\", users.get(\"bo@example.org\")\nraised = False\ntry:\n    users.get(\"nobody@example.org\")\nexcept UserNotFound:\n    raised = True\nassert raised, \"an unknown email should raise UserNotFound\""
+        },
+        {
+          "name": "the boundary maps errors to statuses",
+          "code": "import sqlite3\nusers = SqliteUsers(sqlite3.connect(\":memory:\"))\ngot = handle(users.add, \"cy@example.org\")\nassert got == (200, None), got\ngot = handle(users.get, \"cy@example.org\")\nassert got == (200, \"cy@example.org\"), got\nstatus, _ = handle(users.add, \"cy@example.org\")\nassert status == 409, status\nstatus, _ = handle(users.get, \"zed@example.org\")\nassert status == 404, status"
+        },
+        {
+          "name": "messages name the email",
+          "code": "import sqlite3\nusers = SqliteUsers(sqlite3.connect(\":memory:\"))\nusers.add(\"eve@example.org\")\n_, message = handle(users.add, \"eve@example.org\")\nassert \"eve@example.org\" in message, message\n_, message = handle(users.get, \"fay@example.org\")\nassert \"fay@example.org\" in message, message"
+        },
+        {
+          "name": "unexpected errors stay generic",
+          "code": "def broken():\n    raise RuntimeError(\"password=hunter2 in /srv/app/config.py\")\n\ngot = handle(broken)\nassert got == (500, \"internal error\"), got"
+        }
+      ],
+      "hints": [
+        "Wrap the `INSERT` in `try`, catch `sqlite3.IntegrityError`, and `raise EmailTaken(email) from error`. In `get`, raise `UserNotFound(email)` when the row is `None`.",
+        "In `handle`, order matters: the `except` clauses for the domain errors come first, and a final `except Exception` comes last.",
+        "The last clause returns the fixed `(500, \"internal error\")`, never `str(error)`, which could reveal paths, SQL or data."
+      ],
+      "explanation": "Letting `IntegrityError` escape forces every caller to know that users live in sqlite, and the boundary could only answer 500 to an ordinary duplicate. Translating it in the adapter gives the rest of the code one meaningful error, and `from error` keeps the cause for whoever reads the traceback.\n\nThe outermost boundary is the only place that catches everything. It answers with a fixed message because exception text is written for developers and may contain secrets; in a real application that clause also logs the full traceback."
+    },
+    {
+      "id": "caching-behind-an-interface",
+      "title": "Caching behind an interface",
+      "body": "# Caching behind an interface\n\nWhen a lookup is slow, wrap it rather than editing it. A caching wrapper has the same methods as the real implementation, holds it, and answers repeated requests from memory. Callers cannot tell the difference, and the slow code stays simple.\n\n```python\nclass SlowPrices:\n    def price(self, sku):\n        print(\"asking the slow service\")\n        return 3\n\nclass CachedPrices:\n    def __init__(self, inner):\n        self.inner = inner\n        self.cache = {}\n\n    def price(self, sku):\n        if sku not in self.cache:\n            p = self.inner.price(sku)\n            self.cache[sku] = p\n        return self.cache[sku]\n\ncached = CachedPrices(SlowPrices())\nprint(cached.price(\"A\"), cached.price(\"A\"))\n```\n\n## Expiry needs a clock\n\nCached data goes stale, so give each entry an age limit. Do not read the system clock inside the cache: take a clock as a parameter, a function returning seconds. The application passes `time.monotonic`; a test passes a fake it can move forward, and expiry becomes a plain assertion instead of a wait.\n",
+      "task": "Write `CachedPrices(inner, ttl, clock)` whose `price(sku)` calls `inner.price(sku)` only when there is no entry for `sku` or the entry is at least `ttl` seconds old by `clock()`, and whose `invalidate(sku)` drops one entry, ignoring unknown skus. A price of 0 is cached like any other.",
+      "starter": "class CachedPrices:\n    def __init__(self, inner, ttl, clock):\n        self.inner = inner\n        self.cache = {}\n\n    def price(self, sku):\n        if not self.cache.get(sku):\n            self.cache[sku] = self.inner.price(sku)\n        return self.cache[sku]\n\n    def invalidate(self, sku):\n        del self.cache[sku]\n",
+      "solution": "import time\n\n\nclass CachedPrices:\n    def __init__(self, inner, ttl, clock=time.monotonic):\n        self.inner = inner\n        self.ttl = ttl\n        self.clock = clock\n        self._entries = {}\n\n    def price(self, sku):\n        now = self.clock()\n        entry = self._entries.get(sku)\n        if entry is None or now - entry[1] >= self.ttl:\n            entry = (self.inner.price(sku), now)\n            self._entries[sku] = entry\n        return entry[0]\n\n    def invalidate(self, sku):\n        self._entries.pop(sku, None)\n",
+      "checks": [
+        {
+          "name": "repeats come from memory",
+          "code": "class Counting:\n    def __init__(self, value):\n        self.value, self.calls = value, []\n\n    def price(self, sku):\n        self.calls.append(sku)\n        return self.value\n\ninner = Counting(5)\ncache = CachedPrices(inner, ttl=60, clock=lambda: 100.0)\nassert cache.price(\"A\") == 5, cache.price(\"A\")\nassert cache.price(\"A\") == 5, cache.price(\"A\")\ncache.price(\"B\")\ncache.price(\"A\")\nassert inner.calls == [\"A\", \"B\"], inner.calls"
+        },
+        {
+          "name": "entries expire after ttl seconds",
+          "code": "class Counting:\n    def __init__(self, value):\n        self.value, self.calls = value, []\n\n    def price(self, sku):\n        self.calls.append(sku)\n        return self.value\n\nnow = [100.0]\ninner = Counting(5)\ncache = CachedPrices(inner, ttl=60, clock=lambda: now[0])\ncache.price(\"A\")\nnow[0] = 159.0\ncache.price(\"A\")\nassert inner.calls == [\"A\"], (\"still fresh at 59 seconds\", inner.calls)\nnow[0] = 160.0\ncache.price(\"A\")\nassert inner.calls == [\"A\", \"A\"], (\"stale at 60 seconds\", inner.calls)"
+        },
+        {
+          "name": "zero is a price too",
+          "code": "class Counting:\n    def __init__(self, value):\n        self.value, self.calls = value, []\n\n    def price(self, sku):\n        self.calls.append(sku)\n        return self.value\n\ninner = Counting(0)\ncache = CachedPrices(inner, ttl=60, clock=lambda: 0.0)\nassert cache.price(\"FREE\") == 0, cache.price(\"FREE\")\ncache.price(\"FREE\")\nassert inner.calls == [\"FREE\"], inner.calls"
+        },
+        {
+          "name": "invalidate drops one entry",
+          "code": "class Counting:\n    def __init__(self, value):\n        self.value, self.calls = value, []\n\n    def price(self, sku):\n        self.calls.append(sku)\n        return self.value\n\ninner = Counting(5)\ncache = CachedPrices(inner, ttl=60, clock=lambda: 0.0)\ncache.price(\"A\")\ncache.price(\"B\")\ncache.invalidate(\"A\")\ncache.invalidate(\"NEVER-SEEN\")\ncache.price(\"A\")\ncache.price(\"B\")\nassert inner.calls == [\"A\", \"B\", \"A\"], inner.calls"
+        },
+        {
+          "name": "callers cannot tell the difference",
+          "code": "class Fixed:\n    def price(self, sku):\n        return {\"MUG\": 4, \"PEN\": 1}[sku]\n\ndef basket_total(prices, skus):\n    return sum(prices.price(sku) for sku in skus)\n\ncache = CachedPrices(Fixed(), ttl=60, clock=lambda: 0.0)\ngot = basket_total(cache, [\"MUG\", \"PEN\", \"MUG\"])\nassert got == basket_total(Fixed(), [\"MUG\", \"PEN\", \"MUG\"]), got"
+        }
+      ],
+      "hints": [
+        "Store each entry with the time it was fetched, `(value, now)`, where `now = self.clock()`.",
+        "Refetch when there is no entry or `now - fetched_at >= self.ttl`. Test for a missing entry with `is None`, not truthiness, so a cached 0 still counts.",
+        "`invalidate` is `self._entries.pop(sku, None)`, which ignores skus that were never cached."
+      ],
+      "explanation": "`if not self.cache.get(sku)` treats a cached 0 like a missing entry, and without timestamps nothing ever expires. Storing the fetch time next to the value answers both.\n\nThe clock is a dependency like any other. Passed in, it lets a test move time by assigning a number, so the expiry rule is checked exactly at 59 and 60 seconds, instantly. And because the wrapper has the same `price` method, it can be added or removed where the application is wired together without touching a single caller."
+    },
+    {
+      "id": "plugin-registries",
+      "title": "Plugin registries",
+      "body": "# Plugin registries\n\nSome parts of an application are open-ended: export formats, payment methods, file importers. Instead of an `if` chain that grows with each one, keep a registry that maps a name to an implementation, and let each plugin register itself with a decorator.\n\n```python\nclass Registry:\n    def __init__(self):\n        self.items = {}\n\n    def register(self, name):\n        def deco(fn):\n            self.items[name] = fn\n            return fn\n        return deco\n\nexporters = Registry()\n\n@exporters.register(\"csv\")\ndef to_csv(rows):\n    lines = [\",\".join(r) for r in rows]\n    return \"\\n\".join(lines)\n\nprint(exporters.items[\"csv\"]([[\"a\", \"b\"]]))\n```\n\nCode that uses the registry asks for a name and never imports the plugins, so adding a format means adding a function, not editing a dispatcher.\n\nMake the registry an object rather than a module-level dict, so each test can build its own. Installed packages use the same idea at a larger scale, through entry points.\n",
+      "task": "Write `Registry` with `register(name)`, a decorator that returns the function unchanged and raises `ValueError` if the name is taken, `get(name)` raising a `LookupError` whose message lists the available names, and `names()` returning them sorted. Register `\"csv\"` and `\"json\"` exporters on a module-level `exporters` registry and write `export(fmt, rows)` using it.",
+      "starter": "import json\n\n\nclass Registry:\n    def __init__(self):\n        self.items = {}\n\n    def register(self, name):\n        def decorator(fn):\n            self.items[name] = fn\n        return decorator\n\n    def get(self, name):\n        return self.items[name]\n\n    def names(self):\n        return list(self.items)\n\n\nexporters = Registry()\n\n\n@exporters.register(\"csv\")\ndef to_csv(rows):\n    return \"\\n\".join(\",\".join(row) for row in rows)\n\n\ndef export(fmt, rows):\n    if fmt == \"json\":\n        return json.dumps(rows)\n    return exporters.get(fmt)(rows)\n",
+      "solution": "import json\n\n\nclass Registry:\n    def __init__(self):\n        self._items = {}\n\n    def register(self, name):\n        def decorator(fn):\n            if name in self._items:\n                raise ValueError(f\"{name!r} is already registered\")\n            self._items[name] = fn\n            return fn\n        return decorator\n\n    def get(self, name):\n        try:\n            return self._items[name]\n        except KeyError:\n            available = \", \".join(self.names())\n            raise LookupError(f\"unknown {name!r}; available: {available}\") from None\n\n    def names(self):\n        return sorted(self._items)\n\n\nexporters = Registry()\n\n\n@exporters.register(\"csv\")\ndef to_csv(rows):\n    return \"\\n\".join(\",\".join(row) for row in rows)\n\n\n@exporters.register(\"json\")\ndef to_json(rows):\n    return json.dumps(rows)\n\n\ndef export(fmt, rows):\n    return exporters.get(fmt)(rows)\n",
+      "checks": [
+        {
+          "name": "registering keeps the function",
+          "code": "registry = Registry()\n\n@registry.register(\"shout\")\ndef shout(text):\n    return text.upper()\n\nassert shout(\"hi\") == \"HI\", \"the decorator should return the function unchanged\"\nassert registry.get(\"shout\") is shout, registry.get(\"shout\")"
+        },
+        {
+          "name": "names are sorted",
+          "code": "registry = Registry()\nregistry.register(\"pdf\")(lambda rows: \"\")\nregistry.register(\"csv\")(lambda rows: \"\")\nassert registry.names() == [\"csv\", \"pdf\"], registry.names()"
+        },
+        {
+          "name": "taken names are refused",
+          "code": "registry = Registry()\nregistry.register(\"csv\")(lambda rows: \"first\")\nraised = False\ntry:\n    registry.register(\"csv\")(lambda rows: \"second\")\nexcept ValueError:\n    raised = True\nassert raised, \"registering csv twice should raise ValueError\"\nassert registry.get(\"csv\")([]) == \"first\", registry.get(\"csv\")([])"
+        },
+        {
+          "name": "unknown names list the choices",
+          "code": "registry = Registry()\nregistry.register(\"pdf\")(lambda rows: \"\")\nregistry.register(\"csv\")(lambda rows: \"\")\nmessage = None\ntry:\n    registry.get(\"xml\")\nexcept LookupError as error:\n    message = str(error)\nassert message is not None, \"an unknown name should raise LookupError\"\nassert \"csv\" in message and \"pdf\" in message, message"
+        },
+        {
+          "name": "the exporters registry",
+          "code": "assert exporters.names() == [\"csv\", \"json\"], exporters.names()\ngot = export(\"csv\", [[\"a\", \"b\"], [\"c\", \"d\"]])\nassert got == \"a,b\\nc,d\", got\ngot = export(\"json\", [[\"a\"]])\nassert got == '[[\"a\"]]', got"
+        },
+        {
+          "name": "registries are independent",
+          "code": "assert Registry().names() == [], Registry().names()"
+        }
+      ],
+      "hints": [
+        "A decorator must return the function, or the decorated name becomes `None`. Check whether the name is taken inside `decorator`, before storing.",
+        "`get` can catch the `KeyError` and raise `LookupError(f\"unknown {name!r}; available: ...\")`, built from `self.names()`.",
+        "Register the JSON exporter just like CSV, with `@exporters.register(\"json\")` returning `json.dumps(rows)`, so `export` is only `exporters.get(fmt)(rows)`."
+      ],
+      "explanation": "The starter's inner function returned nothing, so `@exporters.register(\"csv\")` replaced `to_csv` with `None`: registration worked, but the module lost its own function. And `export` still special-cased JSON, which is the `if` chain the registry was meant to remove.\n\nRefusing a taken name turns a silent override, where whichever plugin loads last wins, into an error at start-up. A `LookupError` that lists the choices turns a typo in a config file into a one-line fix."
+    },
+    {
+      "id": "configuration-and-wiring",
+      "title": "Configuration and wiring",
+      "body": "# Configuration and wiring\n\nA function that reads `os.environ` deep inside is configured by a global: tests have to patch it, and nobody can see which settings exist. Read configuration once, at start-up, into a frozen object, and pass it to whatever needs it.\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass Settings:\n    db_path: str = \":memory:\"\n    page_size: int = 20\n\n    @classmethod\n    def from_env(cls, env):\n        path = env.get(\"DB\", \":memory:\")\n        size = env.get(\"PAGE_SIZE\", \"20\")\n        return cls(path, int(size))\n\nprint(Settings.from_env({\"PAGE_SIZE\": \"5\"}))\n```\n\n`from_env` takes any mapping, so a test passes a plain dict and the program passes `os.environ`.\n\n## The composition root\n\nOne function near `main` builds the whole object graph: it creates the adapters and services and connects them. It is the only place that names the concrete classes, and its keyword arguments let a test swap any piece for a fake. This is dependency injection without a framework.\n",
+      "task": "Write a frozen `Settings(db_path, page_size)` with `from_env(env)` reading `SHOP_DB` (default `\":memory:\"`) and `SHOP_PAGE_SIZE` (default 20), raising a `ValueError` that names the variable when the size is not a positive whole number. Write `build_app(settings, repo=None)` returning an `App` whose `repo` is the one given or a new `SqliteRepo(settings.db_path)`, and whose `catalog` is a `Catalog` sharing that repo with the configured page size.",
+      "starter": "import os\nimport sqlite3\nfrom dataclasses import dataclass\n\n\nclass SqliteRepo:\n    def __init__(self, path):\n        self.conn = sqlite3.connect(path)\n        self.conn.execute(\"CREATE TABLE IF NOT EXISTS products (name TEXT)\")\n\n    def add(self, name):\n        self.conn.execute(\"INSERT INTO products VALUES (?)\", (name,))\n\n    def names(self):\n        rows = self.conn.execute(\"SELECT name FROM products ORDER BY name\")\n        return [name for (name,) in rows]\n\n\nclass Catalog:\n    def __init__(self, repo, page_size):\n        self.repo = repo\n        self.page_size = page_size\n\n    def page(self, number):\n        start = (number - 1) * self.page_size\n        return self.repo.names()[start:start + self.page_size]\n\n\n@dataclass\nclass App:\n    settings: object\n    repo: object\n    catalog: Catalog\n\n\nPAGE_SIZE = int(os.environ.get(\"SHOP_PAGE_SIZE\", \"20\"))\n\n\n@dataclass(frozen=True)\nclass Settings:\n    db_path: str = \":memory:\"\n    page_size: int = 20\n\n    @classmethod\n    def from_env(cls, env):\n        return cls(env.get(\"SHOP_DB\", \":memory:\"), int(env.get(\"SHOP_PAGE_SIZE\", \"20\")))\n\n\ndef build_app(settings, repo=None):\n    repo = SqliteRepo(settings.db_path)\n    return App(settings, repo, Catalog(SqliteRepo(settings.db_path), PAGE_SIZE))\n",
+      "solution": "import os\nimport sqlite3\nfrom dataclasses import dataclass\n\n\nclass SqliteRepo:\n    def __init__(self, path):\n        self.conn = sqlite3.connect(path)\n        self.conn.execute(\"CREATE TABLE IF NOT EXISTS products (name TEXT)\")\n\n    def add(self, name):\n        self.conn.execute(\"INSERT INTO products VALUES (?)\", (name,))\n\n    def names(self):\n        rows = self.conn.execute(\"SELECT name FROM products ORDER BY name\")\n        return [name for (name,) in rows]\n\n\nclass Catalog:\n    def __init__(self, repo, page_size):\n        self.repo = repo\n        self.page_size = page_size\n\n    def page(self, number):\n        start = (number - 1) * self.page_size\n        return self.repo.names()[start:start + self.page_size]\n\n\n@dataclass\nclass App:\n    settings: object\n    repo: object\n    catalog: Catalog\n\n\n@dataclass(frozen=True)\nclass Settings:\n    db_path: str = \":memory:\"\n    page_size: int = 20\n\n    @classmethod\n    def from_env(cls, env):\n        raw = env.get(\"SHOP_PAGE_SIZE\", \"20\")\n        if not raw.isdecimal() or int(raw) == 0:\n            raise ValueError(f\"SHOP_PAGE_SIZE must be a positive integer, not {raw!r}\")\n        return cls(db_path=env.get(\"SHOP_DB\", \":memory:\"), page_size=int(raw))\n\n\ndef build_app(settings, repo=None):\n    if repo is None:\n        repo = SqliteRepo(settings.db_path)\n    return App(settings=settings, repo=repo, catalog=Catalog(repo, settings.page_size))\n\n\ndef main():\n    app = build_app(Settings.from_env(os.environ))\n    print(f\"catalog ready, {app.settings.page_size} products per page\")\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "checks": [
+        {
+          "name": "settings come from the mapping given",
+          "code": "settings = Settings.from_env({\"SHOP_DB\": \"shop.db\", \"SHOP_PAGE_SIZE\": \"5\"})\nassert (settings.db_path, settings.page_size) == (\"shop.db\", 5), settings\ndefaults = Settings.from_env({})\nassert (defaults.db_path, defaults.page_size) == (\":memory:\", 20), defaults"
+        },
+        {
+          "name": "bad page sizes name the variable",
+          "code": "for raw in [\"0\", \"-3\", \"ten\", \"2.5\", \"\"]:\n    message = None\n    try:\n        Settings.from_env({\"SHOP_PAGE_SIZE\": raw})\n    except ValueError as error:\n        message = str(error)\n    assert message is not None, f\"SHOP_PAGE_SIZE={raw!r} should raise ValueError\"\n    assert \"SHOP_PAGE_SIZE\" in message, message"
+        },
+        {
+          "name": "settings are frozen",
+          "code": "import dataclasses\nsettings = Settings.from_env({})\nfrozen = False\ntry:\n    settings.page_size = 1\nexcept dataclasses.FrozenInstanceError:\n    frozen = True\nassert frozen, \"Settings should be a frozen dataclass\""
+        },
+        {
+          "name": "the wiring ignores os.environ",
+          "code": "import os\nos.environ[\"SHOP_PAGE_SIZE\"] = \"7\"\napp = build_app(Settings.from_env({\"SHOP_PAGE_SIZE\": \"3\"}))\ndel os.environ[\"SHOP_PAGE_SIZE\"]\nassert app.catalog.page_size == 3, app.catalog.page_size"
+        },
+        {
+          "name": "tests can swap the repository",
+          "code": "class FakeRepo:\n    def names(self):\n        return [\"cup\", \"mug\", \"pen\"]\n\nfake = FakeRepo()\napp = build_app(Settings(page_size=2), repo=fake)\nassert app.repo is fake, app.repo\nassert app.catalog.repo is fake, \"the catalog should use the repository passed in\"\nassert app.catalog.page(2) == [\"pen\"], app.catalog.page(2)"
+        },
+        {
+          "name": "the default wiring shares one repository",
+          "code": "app = build_app(Settings.from_env({\"SHOP_PAGE_SIZE\": \"2\"}))\nfor name in [\"pen\", \"cup\", \"mug\"]:\n    app.repo.add(name)\nassert app.catalog.page(1) == [\"cup\", \"mug\"], app.catalog.page(1)\nassert app.catalog.page(2) == [\"pen\"], app.catalog.page(2)"
+        }
+      ],
+      "hints": [
+        "`from_env` reads only the mapping it is given, with `env.get(name, default)`. Validate the page size text before converting it, and put the variable's name in the error.",
+        "In `build_app`, create the repository once, `if repo is None: repo = SqliteRepo(settings.db_path)`, and hand that same object to `Catalog`.",
+        "Pass `settings.page_size` to `Catalog` instead of any module-level constant, and return `App(settings=settings, repo=repo, catalog=Catalog(repo, settings.page_size))`."
+      ],
+      "explanation": "The module-level `PAGE_SIZE` was read once at import, before any test could choose a value, and building a second `SqliteRepo` gave the catalog its own empty in-memory database. Both bugs come from parts finding their own dependencies instead of receiving them.\n\nWith one composition root, the whole graph is visible in a few lines, `os.environ` is read in exactly one place, and a test builds the real application with a single fake swapped in. A dependency injection framework automates this wiring; for most Python applications, a plain function is enough."
+    }
+  ]
+}

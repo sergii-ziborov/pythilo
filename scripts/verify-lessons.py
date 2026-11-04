@@ -30,15 +30,19 @@ TORCH_IMPORT_SECONDS = 20
 
 # File stem -> (course id, kind, number of lessons)
 EXPECTED_COURSES = {
-    "1-foundations": ("foundations", "path", 10),
-    "2-deeper": ("deeper", "path", 9),
-    "3-tools": ("tools", "path", 5),
-    "4-web": ("web", "path", 5),
-    "5-data": ("data", "path", 4),
-    "6-ml": ("ml", "path", 10),
-    "7-llm": ("llm", "path", 9),
-    "8-ai": ("ai", "path", 3),
-    "9-interview": ("interview", "interview", 20),
+    "1-foundations": ("foundations", "path", 30),
+    "2-deeper": ("deeper", "path", 30),
+    "3-clean-code": ("clean-code", "path", 15),
+    "4-testing": ("testing", "path", 12),
+    "5-tools": ("tools", "path", 15),
+    "6-architecture": ("architecture", "path", 15),
+    "7-async": ("async", "path", 12),
+    "8-web": ("web", "path", 5),
+    "9-data": ("data", "path", 4),
+    "10-ml": ("ml", "path", 18),
+    "11-llm": ("llm", "path", 9),
+    "12-ai": ("ai", "path", 3),
+    "13-interview": ("interview", "interview", 20),
 }
 INTERVIEW_LEVELS = {"Easy": 7, "Medium": 9, "Hard": 4}
 REQUIRED_TEXT_FIELDS = ("id", "title", "body", "task", "starter", "solution", "explanation")
@@ -367,6 +371,9 @@ def missing_modules(python, names):
 
 
 def main():
+    only = None
+    if "--only" in sys.argv:
+        only = set(sys.argv[sys.argv.index("--only") + 1].split(","))
     python = shutil.which("python3")
     if python is None:
         print("FAIL python3 not found on PATH")
@@ -397,8 +404,18 @@ def main():
 
     found = {stem for stem, _ in courses}
     for stem in EXPECTED_COURSES:
+        if only is not None and EXPECTED_COURSES[stem][0] not in only:
+            continue
         if stem not in found and not (COURSES_DIR / f"{stem}.json").exists():
             fail(stem, "course file is missing")
+    if only is not None:
+        other_ids = {lesson.get("id"): stem for stem, course in courses if EXPECTED_COURSES[stem][0] not in only
+                     for lesson in course.get("lessons") or [] if isinstance(lesson, dict)}
+        courses = [(stem, course) for stem, course in courses if EXPECTED_COURSES[stem][0] in only]
+        for stem, course in courses:
+            for lesson in course.get("lessons") or []:
+                if isinstance(lesson, dict) and lesson.get("id") in other_ids:
+                    fail(stem, f"lesson id {lesson.get('id')!r} is already used in {other_ids[lesson.get('id')]}")
 
     wanted_modules = set()
     for _, course in courses:

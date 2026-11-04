@@ -1,7 +1,7 @@
 {
   "id": "foundations",
   "title": "Python foundations",
-  "summary": "Values, control flow, data structures, errors and files.",
+  "summary": "Values, strings, control flow, functions, data structures, errors, files, JSON and dates, then a small project.",
   "kind": "path",
   "lessons": [
     {
@@ -39,6 +39,42 @@
         "`return type(value).__name__ + \": \" + repr(value)`, and `return b, a` for the swap."
       ],
       "explanation": "`repr` is the form meant for programmers, so `\"hi\"` keeps its quotes and is easy to tell apart from the number or name it might look like.\n\n`return b, a` builds a tuple. Commas make tuples, not parentheses. The same mechanism on the left side of `=` is what makes `x, y = y, x` work."
+    },
+    {
+      "id": "printing-output",
+      "title": "Printing output",
+      "body": "# Printing output\n\n`print` takes any number of values, turns each one into text with `str`, and writes them with a space between and a newline at the end. Two keyword arguments change that.\n\n```python\nprint(\"a\", 1, True)       # a 1 True\nprint(\"a\", \"b\", sep=\"-\")  # a-b\nprint(\"same\", end=\"\")\nprint(\" line\")            # same line\nnums = [1, 2, 3]\nprint(*nums, sep=\", \")    # 1, 2, 3\nprint()                   # empty line\n```\n\n- `sep` goes between the values. The default is one space.\n- `end` goes after the last value. The default is `\"\\n\"`, a newline.\n- `*nums` spreads a list into separate arguments, so each item is printed on its own terms.\n\n## Printing is not returning\n\n`print` shows text to a person and gives back `None`. A function that works something out should usually `return` the result and let the caller decide whether to print it. Code that only prints is hard to reuse and hard to test.\n",
+      "task": "Write `print_row(values)` that prints the values on one line separated by `\" | \"`. Write `print_list(words)` that prints the words on one line separated by `\", \"`, ending with `\".\\n\"` instead of a plain newline.",
+      "starter": "def print_row(values):\n    print(values)\n\n\ndef print_list(words):\n    for word in words:\n        print(word)\n",
+      "solution": "def print_row(values):\n    print(*values, sep=\" | \")\n\n\ndef print_list(words):\n    print(*words, sep=\", \", end=\".\\n\")\n",
+      "checks": [
+        {
+          "name": "values are separated by bars",
+          "code": "import contextlib, io\nout = io.StringIO()\nwith contextlib.redirect_stdout(out):\n    print_row([1, \"a\", 2.5])\ntext = out.getvalue()\nassert text == '1 | a | 2.5\\n', repr(text)"
+        },
+        {
+          "name": "one value has no bars",
+          "code": "import contextlib, io\nout = io.StringIO()\nwith contextlib.redirect_stdout(out):\n    print_row([\"solo\"])\ntext = out.getvalue()\nassert text == 'solo\\n', repr(text)"
+        },
+        {
+          "name": "both return None",
+          "code": "import contextlib, io\nout = io.StringIO()\nwith contextlib.redirect_stdout(out):\n    a = print_row([1])\n    b = print_list([\"x\"])\nassert a is None and b is None, (a, b)"
+        },
+        {
+          "name": "prints a sentence",
+          "code": "import contextlib, io\nout = io.StringIO()\nwith contextlib.redirect_stdout(out):\n    print_list([\"tea\", \"milk\", \"jam\"])\ntext = out.getvalue()\nassert text == 'tea, milk, jam.\\n', repr(text)"
+        },
+        {
+          "name": "each call ends its own line",
+          "code": "import contextlib, io\nout = io.StringIO()\nwith contextlib.redirect_stdout(out):\n    print_list([\"a\"])\n    print_list([\"b\", \"c\"])\ntext = out.getvalue()\nassert text == 'a.\\nb, c.\\n', repr(text)"
+        }
+      ],
+      "hints": [
+        "`print` already knows how to put text between several values. A list, though, is a single value.",
+        "`print(*values)` passes each item as its own argument, and `sep` sets what goes between them. `end` replaces the newline.",
+        "`print(*values, sep=\" | \")`, and `print(*words, sep=\", \", end=\".\\n\")`."
+      ],
+      "explanation": "`print(values)` passes one argument, the list itself, so you see its brackets and the quotes around `'a'`. With `print(*values)` every item becomes its own argument, and `print` turns each one into text with `str`, which has no quotes.\n\n`end` replaces the newline instead of adding to it. That is why the full stop version still has to include `\\n`, or the next print would continue on the same line."
     },
     {
       "id": "strings-and-fstrings",
@@ -113,6 +149,42 @@
       "explanation": "`divmod(a, b)` returns `(a // b, a % b)`. Keeping money in integer cents means no result is ever approximate.\n\n`isclose` defaults to a relative tolerance of `1e-09`. Relative to zero, that tolerance is zero, so `isclose(1e-12, 0.0)` is false without `abs_tol`."
     },
     {
+      "id": "comparisons-and-booleans",
+      "title": "Comparisons and booleans",
+      "body": "# Comparisons and booleans\n\nA comparison produces a `bool`, which is either `True` or `False`. A bool is an ordinary value: you can store it in a name, return it or print it.\n\n```python\nage = 17\nis_adult = age >= 18\nprint(is_adult)            # False\nprint(3 == 3.0, 3 != 4)    # True True\nprint(\"apple\" < \"banana\")  # True\nprint(\"Zebra\" < \"apple\")   # True\nprint(True + True)         # 2\nprint(sum([True, False, True]))  # 2\n```\n\n- `==` and `!=` test equality. `<`, `<=`, `>` and `>=` test order.\n- Strings compare character by character, by code point, so every capital letter sorts before every lowercase one. Compare `a.lower()` with `b.lower()` when case should not matter.\n- `bool` is a kind of `int`: `True` counts as 1 and `False` as 0, so `sum` over bools counts the true ones.\n- `1 < \"2\"` raises `TypeError`, while `1 == \"1\"` is simply `False`.\n\n## Return the comparison\n\n`return x > 0` already is `True` or `False`. Wrapping it in an `if` that returns `True` or `False` adds lines and room for mistakes.\n",
+      "task": "Write `is_teen(age)` returning `True` for ages 13 to 19 inclusive and `False` otherwise. Write `count_passing(scores, pass_mark)` returning how many scores are at least `pass_mark`.",
+      "starter": "def is_teen(age):\n    if age > 13 and age < 19:\n        return True\n\n\ndef count_passing(scores, pass_mark):\n    return len(scores)\n",
+      "solution": "def is_teen(age):\n    return 13 <= age <= 19\n\n\ndef count_passing(scores, pass_mark):\n    return sum(score >= pass_mark for score in scores)\n",
+      "checks": [
+        {
+          "name": "teen ages, ends included",
+          "code": "for age in [13, 15, 19]:\n    assert is_teen(age) is True, (age, is_teen(age))"
+        },
+        {
+          "name": "other ages give False, not None",
+          "code": "for age in [0, 12, 20, 45]:\n    assert is_teen(age) is False, (age, is_teen(age))"
+        },
+        {
+          "name": "counts passing scores",
+          "code": "assert count_passing([40, 55, 70, 90], 55) == 3, count_passing([40, 55, 70, 90], 55)"
+        },
+        {
+          "name": "the mark itself passes",
+          "code": "assert count_passing([50, 50, 49], 50) == 2, count_passing([50, 50, 49], 50)"
+        },
+        {
+          "name": "no scores",
+          "code": "got = count_passing([], 50)\nassert got == 0, got\nassert isinstance(got, int), type(got)"
+        }
+      ],
+      "hints": [
+        "A function that ends without `return` gives back `None`, which is not the same as `False`.",
+        "`13 <= age <= 19` is already a bool, so you can return it directly. For counting, each `score >= pass_mark` is `True` or `False`.",
+        "`return 13 <= age <= 19`, and `return sum(score >= pass_mark for score in scores)`."
+      ],
+      "explanation": "The first attempt has two problems: `>` and `<` leave out 13 and 19, and when the condition is false the function falls off the end and returns `None`. Returning the comparison itself fixes both, because it always produces a real `True` or `False`.\n\nSince `True` is 1 and `False` is 0, `sum` over a run of comparisons counts how many were true. It reads as \"add one for every passing score\"."
+    },
+    {
       "id": "branching",
       "title": "Branching",
       "body": "# Branching\n\n`if`, `elif` and `else` run the first block whose condition is true. Indentation marks the block.\n\n```python\ndef label(n):\n    if n < 0:\n        return \"negative\"\n    elif n == 0:\n        return \"zero\"\n    else:\n        return \"positive\"\n```\n\n## Truthiness\n\nAny value can be a condition. These count as false: `0`, `0.0`, `\"\"`, `[]`, `{}`, `None` and `False`. Almost everything else is true.\n\n## Combining conditions\n\n- `and`, `or` and `not` combine conditions and stop as soon as the answer is known.\n- Comparisons chain: `0 < x <= 10` means `0 < x and x <= 10`.\n- `a if condition else b` is an expression, handy for short choices.\n\nConditions are checked from top to bottom. Order them so that an earlier test does not swallow a case meant for a later one. Boundaries are where most branching bugs live, so test them first.",
@@ -147,6 +219,114 @@
         "`if weight_kg <= 1: cost = 5`, `elif weight_kg <= 5: cost = 9`, `else: cost = 15`, then `return cost * 2 if express else cost`. For leap years test `% 400`, then `% 100`, then `% 4`."
       ],
       "explanation": "Returning early for the special case keeps the main logic flat. Each `elif` only runs when earlier conditions were false, so `weight_kg <= 5` already implies the weight is over 1.\n\nThe leap rule reads most clearly from the narrowest case outward: 400 wins over 100, and 100 wins over 4."
+    },
+    {
+      "id": "none-the-missing-value",
+      "title": "None, the missing value",
+      "body": "# None, the missing value\n\n`None` is Python's value for \"nothing here\". A function that ends without `return` gives back `None`, and so does `print`.\n\n```python\ndef find_user(name):\n    if name == \"ada\":\n        return \"Ada Lovelace\"\n\nuser = find_user(\"bob\")\nif user is None:\n    print(\"not found\")\nresult = print(\"hi\")\nprint(result)  # None\n```\n\nThere is only one `None` object, so test for it with `x is None` and `x is not None`, not with `==`.\n\n## The trap with or\n\n`x or default` gives `default` whenever `x` is false. That covers `None`, but also `0`, `\"\"` and `[]`, which are often real answers:\n\n```python\ncount = 0\nprint(count or 10)  # 10, wrong\nif count is None:\n    count = 10\nprint(count)        # 0, right\n```\n\nUse `None` to mean \"not given\" or \"not found\", and check it with `is None`. Then a zero, an empty string or an empty list stays what it is.\n",
+      "task": "Write `describe_score(score)` returning `\"no score\"` when `score` is `None` and `f\"score: {score}\"` otherwise, where 0 is a real score. Write `pick(value, default)` returning `default` only when `value` is `None`, and `value` otherwise.",
+      "starter": "def describe_score(score):\n    if not score:\n        return \"no score\"\n    return f\"score: {score}\"\n\n\ndef pick(value, default):\n    return value or default\n",
+      "solution": "def describe_score(score):\n    if score is None:\n        return \"no score\"\n    return f\"score: {score}\"\n\n\ndef pick(value, default):\n    if value is None:\n        return default\n    return value\n",
+      "checks": [
+        {
+          "name": "missing score",
+          "code": "assert describe_score(None) == \"no score\", describe_score(None)"
+        },
+        {
+          "name": "zero is a real score",
+          "code": "assert describe_score(0) == \"score: 0\", describe_score(0)"
+        },
+        {
+          "name": "other scores",
+          "code": "assert describe_score(7) == \"score: 7\", describe_score(7)"
+        },
+        {
+          "name": "pick replaces None",
+          "code": "assert pick(None, 5) == 5, pick(None, 5)\nassert pick(3, 5) == 3, pick(3, 5)"
+        },
+        {
+          "name": "pick keeps false values",
+          "code": "assert pick(0, 5) == 0, pick(0, 5)\nassert pick(\"\", \"x\") == \"\", pick(\"\", \"x\")\nassert pick([], [1]) == [], pick([], [1])"
+        }
+      ],
+      "hints": [
+        "`not score` is true for `None`, but also for `0`. You need a test that only `None` passes.",
+        "`value is None` is true for `None` and nothing else. Use it instead of truthiness in both functions.",
+        "`if score is None: return \"no score\"`, and in `pick`: `if value is None: return default`, then `return value`."
+      ],
+      "explanation": "Truthiness lumps `None` together with `0`, `\"\"` and `[]`. That is handy when all of them mean \"nothing\", and wrong when zero is a valid score or an empty list is a valid answer.\n\n`is None` asks exactly one question: was a value given at all? Use it whenever `None` stands for \"missing\", and the other false values keep their meaning."
+    },
+    {
+      "id": "indexing-and-slicing",
+      "title": "Indexing and slicing",
+      "body": "# Indexing and slicing\n\nStrings, lists and tuples are sequences. Each item has a position counted from 0, and negative positions count back from the end.\n\n```python\nword = \"python\"\nprint(word[0], word[-1])  # p n\nprint(word[1:4])   # yth\nprint(word[:2])    # py\nprint(word[2:])    # thon\nprint(word[-3:])   # hon\nprint(word[::2])   # pto\nprint(word[::-1])  # nohtyp\n```\n\n## How a slice reads\n\n`s[start:stop:step]` begins at `start` and stops before `stop`, so `s[1:4]` holds 4 - 1 = 3 items. Leave out `start` to begin at the edge, `stop` to run to the other edge, and `step` to take every item. A negative step walks backwards.\n\n- An index past the end raises `IndexError`.\n- A slice past the end returns whatever exists, possibly an empty string.\n- `s[:n]` is the first `n` items and `s[-n:]` the last `n`.\n- A slice is a new object. Strings cannot be changed in place, so you build a new one instead.\n",
+      "task": "Write `mask(text)` returning `text` with every character except the last 4 replaced by `\"#\"`, leaving text of 4 characters or fewer unchanged. Write `is_palindrome(word)` returning whether `word` reads the same backwards, ignoring case.",
+      "starter": "def mask(text):\n    return \"#\" * len(text)\n\n\ndef is_palindrome(word):\n    return word == word[::-1]\n",
+      "solution": "def mask(text):\n    hidden = len(text) - 4\n    return \"#\" * hidden + text[-4:]\n\n\ndef is_palindrome(word):\n    word = word.lower()\n    return word == word[::-1]\n",
+      "checks": [
+        {
+          "name": "hides all but the last four",
+          "code": "assert mask(\"5551234567\") == \"######4567\", mask(\"5551234567\")"
+        },
+        {
+          "name": "keeps the length",
+          "code": "assert len(mask(\"abcdefgh\")) == 8, mask(\"abcdefgh\")"
+        },
+        {
+          "name": "short text is unchanged",
+          "code": "for text in [\"\", \"123\", \"1234\"]:\n    assert mask(text) == text, (text, mask(text))"
+        },
+        {
+          "name": "palindromes, any case",
+          "code": "assert is_palindrome(\"level\") is True, is_palindrome(\"level\")\nassert is_palindrome(\"Racecar\") is True, is_palindrome(\"Racecar\")"
+        },
+        {
+          "name": "other words",
+          "code": "assert is_palindrome(\"python\") is False, is_palindrome(\"python\")\nassert is_palindrome(\"\") is True, is_palindrome(\"\")"
+        }
+      ],
+      "hints": [
+        "The last four characters are a slice with a negative start. The rest is a count of `#` characters.",
+        "`\"#\" * n` repeats a string, and a negative `n` gives `\"\"`. For the palindrome, lower-case the word before comparing it with its reverse.",
+        "`return \"#\" * (len(text) - 4) + text[-4:]`, and `word = word.lower()` then `return word == word[::-1]`."
+      ],
+      "explanation": "`text[-4:]` never raises: for text shorter than four characters it is the whole text. And `\"#\" * n` with `n` zero or negative is the empty string. Together they handle short input with no `if` at all.\n\n`word[::-1]` is a reversed copy. Comparing `\"Racecar\"` with `\"racecaR\"` fails because `R` and `r` are different characters, so normalise the case first."
+    },
+    {
+      "id": "common-string-methods",
+      "title": "String methods",
+      "body": "# String methods\n\nStrings have many methods, and none of them change the string. Each returns a new value, so keep the result.\n\n```python\ns = \"  Hello, World  \"\nt = s.strip()\nprint(t.lower())             # hello, world\nprint(t.replace(\"World\", \"Ada\"))\nprint(t.startswith(\"Hell\"))  # True\nprint(t.find(\"o\"), t.count(\"o\"))  # 4 2\nprint(\"42\".isdigit(), \"4a\".isdigit())\nprint(\"x\" in t)              # False\nprint(\"k=v=w\".partition(\"=\"))\n```\n\n- `find` returns the position of the first match, or -1. `index` does the same but raises `ValueError` when nothing matches.\n- `count` counts matches that do not overlap.\n- `isdigit`, `isalpha` and `isspace` are true only when every character fits.\n- `split(\",\")` splits at every comma and keeps empty pieces.\n- `partition(\"=\")` splits once, at the first match, and returns three parts: before, the separator, after. If there is no match, the last two are empty.\n\nA line like `s.upper()` on its own does nothing useful. Write `s = s.upper()`.\n",
+      "task": "Write `parse_setting(line)` that turns text like `\" Volume = 7 \"` into `(\"volume\", \"7\")`: split at the first `=`, strip both parts, lower-case the key, and return `None` if there is no `=`. Write `digits_only(text)` returning just the digit characters of `text`.",
+      "starter": "def parse_setting(line):\n    key, value = line.split(\"=\")\n    return key, value\n\n\ndef digits_only(text):\n    return text.replace(\"-\", \"\")\n",
+      "solution": "def parse_setting(line):\n    key, sep, value = line.partition(\"=\")\n    if not sep:\n        return None\n    return key.strip().lower(), value.strip()\n\n\ndef digits_only(text):\n    return \"\".join(ch for ch in text if ch.isdigit())\n",
+      "checks": [
+        {
+          "name": "strips and lower-cases",
+          "code": "got = parse_setting(\" Volume = 7 \")\nassert got == (\"volume\", \"7\"), got"
+        },
+        {
+          "name": "splits at the first = only",
+          "code": "got = parse_setting(\"url = a=b\")\nassert got == (\"url\", \"a=b\"), got"
+        },
+        {
+          "name": "no = gives None",
+          "code": "assert parse_setting(\"volume 7\") is None, parse_setting(\"volume 7\")"
+        },
+        {
+          "name": "keeps only digits",
+          "code": "got = digits_only(\"+1 (555) 123-4567\")\nassert got == \"15551234567\", got"
+        },
+        {
+          "name": "no digits at all",
+          "code": "assert digits_only(\"call me\") == \"\", digits_only(\"call me\")"
+        }
+      ],
+      "hints": [
+        "`split(\"=\")` splits at every `=`, so a value that contains `=` breaks the unpacking. One method splits only once.",
+        "`line.partition(\"=\")` returns `(before, sep, after)`, and `sep` is empty when there was no `=`. For the digits, test each character with `isdigit`.",
+        "`key, sep, value = line.partition(\"=\")`, return `None` if not `sep`, else `key.strip().lower(), value.strip()`. Then `\"\".join(ch for ch in text if ch.isdigit())`."
+      ],
+      "explanation": "`split(\"=\")` gives three pieces for `\"url = a=b\"`, and unpacking three pieces into two names raises `ValueError`. `partition` always returns exactly three parts and tells you, through the middle one, whether the separator was there.\n\nRemoving the characters you expect, such as `-`, misses the ones you did not expect: spaces, brackets, a plus sign. Keeping only what you want is the safer direction."
     },
     {
       "id": "loops",
@@ -185,6 +365,42 @@
       "explanation": "A `while` loop fits when the stopping condition depends on values computed along the way. A `return` inside a `for` loop stops as soon as the answer is known, and the line after the loop only runs when nothing was found.\n\nUsing `/` in the first function would pass with small inputs and then lose precision on large ones, because floats cannot hold every large integer."
     },
     {
+      "id": "break-continue-and-else",
+      "title": "break, continue and else",
+      "body": "# break, continue and else\n\nInside any loop, `break` leaves the loop at once and `continue` skips the rest of the current pass. A loop can also end with an `else` block, which runs only if the loop finished without a `break`.\n\n```python\nfor n in [4, 9, 15, 21]:\n    if n % 2 == 0:\n        continue          # skip evens\n    if n > 10:\n        print(\"stopped at\", n)\n        break\n    print(\"odd\", n)\nelse:\n    print(\"not printed: break ran\")\n```\n\n## while True\n\nWhen the exit test belongs in the middle of the loop, write `while True` and leave with `break`:\n\n```python\ntotal = 0\nwhile True:\n    total += 7\n    if total > 30:\n        break\nprint(total)  # 35\n```\n\nRead `else` on a loop as \"no break happened\". It fits searches: `break` when you find what you want, and put the not-found case in `else`. Keep loops short, so every `break` is easy to spot.\n",
+      "task": "Write `total_until_stop(numbers)` that adds the numbers in order, skips negative ones, and stops at the first 0. Write `smallest_divisor(n)` for `n` of at least 2, returning the smallest divisor above 1 (which is `n` itself for a prime), trying `d` only while `d * d <= n`.",
+      "starter": "def total_until_stop(numbers):\n    total = 0\n    for n in numbers:\n        total += n\n    return total\n\n\ndef smallest_divisor(n):\n    for d in range(2, n):\n        if n % d == 0:\n            return d\n",
+      "solution": "def total_until_stop(numbers):\n    total = 0\n    for n in numbers:\n        if n == 0:\n            break\n        if n < 0:\n            continue\n        total += n\n    return total\n\n\ndef smallest_divisor(n):\n    d = 2\n    while d * d <= n:\n        if n % d == 0:\n            break\n        d += 1\n    else:\n        d = n\n    return d\n",
+      "checks": [
+        {
+          "name": "stops at the first zero",
+          "code": "assert total_until_stop([3, 4, 0, 5]) == 7, total_until_stop([3, 4, 0, 5])"
+        },
+        {
+          "name": "skips negatives",
+          "code": "assert total_until_stop([3, -2, 4]) == 7, total_until_stop([3, -2, 4])"
+        },
+        {
+          "name": "nothing to add",
+          "code": "assert total_until_stop([]) == 0, total_until_stop([])\nassert total_until_stop([0, 9]) == 0, total_until_stop([0, 9])"
+        },
+        {
+          "name": "divisors of composites",
+          "code": "for n, want in [(15, 3), (49, 7), (2 ** 20, 2), (91, 7)]:\n    assert smallest_divisor(n) == want, (n, smallest_divisor(n))"
+        },
+        {
+          "name": "primes give themselves",
+          "code": "for n in [2, 3, 13, 999983]:\n    assert smallest_divisor(n) == n, (n, smallest_divisor(n))"
+        }
+      ],
+      "hints": [
+        "The first function needs two different exits from a pass: one ends the whole loop, the other only the current item.",
+        "`break` at 0 and `continue` for negatives, before adding. For the divisor, a `while` loop's `else` runs when no `break` happened, which means no divisor was found.",
+        "`if n == 0: break`, `if n < 0: continue`, then `total += n`. For the divisor: `while d * d <= n:` with `break` on a match, and `else: d = n`."
+      ],
+      "explanation": "`continue` and `break` look alike but differ in reach: `continue` abandons one item, `break` abandons the rest of the list. Testing for 0 before the negative check keeps the two rules from tangling.\n\nThe first `smallest_divisor` forgets the case where nothing divides, so for a prime it falls off the end and returns `None`. The loop `else` is exactly that case. A divisor larger than the square root always pairs with one smaller than it, so stopping at `d * d <= n` is enough."
+    },
+    {
       "id": "functions",
       "title": "Functions",
       "body": "# Functions\n\n`def` creates a function. Without a `return`, it returns `None`.\n\n```python\ndef greet(name, greeting=\"Hi\"):\n    return f\"{greeting}, {name}\"\n\ngreet(\"Ada\")\ngreet(\"Ada\", greeting=\"Hello\")\n```\n\n## Parameter kinds\n\n- A parameter with `=` has a default and may be left out.\n- `*args` collects extra positional arguments into a tuple.\n- Anything after `*args` can only be passed by name. Those are keyword-only parameters.\n- `**kwargs` collects extra named arguments into a dict.\n\n```python\ndef log(*parts, sep=\" \"):\n    return sep.join(parts)\n\nlog(\"a\", \"b\")           # \"a b\"\nlog(\"a\", \"b\", sep=\"-\")  # \"a-b\"\n```\n\nNames assigned inside a function are local to it. A default value is computed once, when `def` runs, so never use a list or dict as a default. Use `None` and create the list inside.",
@@ -219,6 +435,38 @@
         "`return max(low, min(value, high))`. In `average`: `if not numbers: return default`, then `return sum(numbers) / len(numbers)`."
       ],
       "explanation": "`min(value, high)` applies the upper limit and `max(low, ...)` applies the lower one. That reads better than three branches once you have seen it.\n\nBecause `default` comes after `*numbers`, it can only be passed by name. Otherwise `average(1, 3, 99)` would be ambiguous."
+    },
+    {
+      "id": "local-and-global-scope",
+      "title": "Local and global scope",
+      "body": "# Local and global scope\n\nA name assigned inside a function is local: it exists only while that call runs, and code outside cannot see it. To look a name up, Python checks the local scope, then any enclosing function, then the module level (global), then the builtins.\n\n```python\nrate = 2  # global\n\ndef scale(x):\n    result = x * rate  # reads the global\n    return result\n\nprint(scale(5))  # 10\nprint(\"result\" in globals())  # False\n```\n\n## Assigning makes a name local\n\nIf a function assigns to a name anywhere in its body, that name is local for the whole function. So `count += 1` on a global raises `UnboundLocalError`, unless the function declares `global count` first.\n\n```python\ncount = 0\n\ndef bump():\n    global count\n    count += 1\n\nbump()\nprint(count)  # 1\n```\n\n`global` works, but a function that changes globals gives different answers depending on what ran before it. Pass values in as arguments and hand results back with `return`. And do not name your variables `sum`, `max` or `list`: that hides the builtin.\n",
+      "task": "Rewrite the starter without the global: `add_points(total, points)` returns the new total, and `tally(rounds)` starts from 0, uses `add_points` for each number in `rounds`, and returns the result.",
+      "starter": "total = 0\n\n\ndef add_points(points):\n    global total\n    total += points\n    return total\n\n\ndef tally(rounds):\n    for points in rounds:\n        add_points(points)\n    return total\n",
+      "solution": "def add_points(total, points):\n    return total + points\n\n\ndef tally(rounds):\n    total = 0\n    for points in rounds:\n        total = add_points(total, points)\n    return total\n",
+      "checks": [
+        {
+          "name": "add_points returns the new total",
+          "code": "assert add_points(10, 5) == 15, add_points(10, 5)\nassert add_points(0, 0) == 0, add_points(0, 0)"
+        },
+        {
+          "name": "tally adds every round",
+          "code": "assert tally([1, 2, 3]) == 6, tally([1, 2, 3])"
+        },
+        {
+          "name": "calls do not leak into each other",
+          "code": "first = tally([5])\nsecond = tally([5])\nassert (first, second) == (5, 5), (first, second)"
+        },
+        {
+          "name": "no rounds",
+          "code": "assert tally([]) == 0, tally([])"
+        }
+      ],
+      "hints": [
+        "The global `total` survives between calls, so every `tally` keeps adding to the previous one. The total has to travel as an argument instead.",
+        "Give `add_points` both numbers and have it return their sum. In `tally`, keep a local `total` and replace it with what `add_points` returns.",
+        "`def add_points(total, points): return total + points`, and in `tally`: `total = 0`, then `total = add_points(total, points)` in the loop."
+      ],
+      "explanation": "With a global, the second `tally([5])` returns 10, because the first call's points are still there. Nothing in the call itself tells you that, which is what makes global state hard to test.\n\nWhen every value a function needs comes in as an argument and every result goes out through `return`, the same call always gives the same answer, wherever and however often it runs."
     },
     {
       "id": "lists",
@@ -257,6 +505,82 @@
       "explanation": "`sorted` is `O(n log n)` and leaves the caller's list untouched. The slice handles short input with no special case.\n\nThe range step in `chunks` gives each start position once. The final slice may be short, and an empty input produces no starts at all, so the empty case needs no extra code."
     },
     {
+      "id": "list-methods-and-copies",
+      "title": "List methods and copies",
+      "body": "# List methods and copies\n\nLists change in place. These methods modify the list and return `None`, except `pop`, which returns what it removed.\n\n```python\nxs = [3, 1]\nxs.append(4)       # [3, 1, 4]\nxs.extend([1, 5])  # [3, 1, 4, 1, 5]\nxs.insert(0, 9)    # [9, 3, 1, 4, 1, 5]\nxs.remove(1)       # first 1 only\nlast = xs.pop()    # takes the 5\nprint(xs, last)    # [9, 3, 4, 1] 5\nprint(xs.index(4), xs.count(1))  # 2 1\n```\n\n`remove` and `index` raise `ValueError` when the value is not there, so check with `in` first. `pop(0)` takes from the front.\n\n## Copies\n\n`b = a` gives the same list a second name. `a.copy()`, `list(a)` and `a[:]` make a new outer list:\n\n```python\na = [[1, 2], [3]]\nb = a.copy()\nb.append([4])\nb[0].append(99)\nprint(a)  # [[1, 2, 99], [3]]\n```\n\nThe copy is shallow: it holds the same inner lists. `copy.deepcopy` copies all the way down. `[[0] * 3] * 3` has the same trap, three references to one row.\n",
+      "task": "Write `move_to_front(items, value)` returning a new list with the first occurrence of `value` moved to the front, leaving `items` unchanged (a plain copy if `value` is missing). Write `make_grid(rows, cols)` returning `rows` separate lists of `cols` zeros.",
+      "starter": "def move_to_front(items, value):\n    items.remove(value)\n    items.insert(0, value)\n    return items\n\n\ndef make_grid(rows, cols):\n    return [[0] * cols] * rows\n",
+      "solution": "def move_to_front(items, value):\n    result = items.copy()\n    if value in result:\n        result.remove(value)\n        result.insert(0, value)\n    return result\n\n\ndef make_grid(rows, cols):\n    return [[0] * cols for _ in range(rows)]\n",
+      "checks": [
+        {
+          "name": "moves the value",
+          "code": "got = move_to_front([\"a\", \"b\", \"c\"], \"c\")\nassert got == [\"c\", \"a\", \"b\"], got"
+        },
+        {
+          "name": "only the first occurrence",
+          "code": "got = move_to_front([1, 2, 3, 2], 2)\nassert got == [2, 1, 3, 2], got"
+        },
+        {
+          "name": "input is left alone",
+          "code": "items = [1, 2, 3]\nmove_to_front(items, 3)\nassert items == [1, 2, 3], items"
+        },
+        {
+          "name": "missing value gives a copy",
+          "code": "items = [1, 2]\ngot = move_to_front(items, 9)\nassert got == [1, 2], got\nassert got is not items, \"return a new list, not the input\""
+        },
+        {
+          "name": "grid shape",
+          "code": "got = make_grid(2, 3)\nassert got == [[0, 0, 0], [0, 0, 0]], got\nassert make_grid(0, 4) == [], make_grid(0, 4)"
+        },
+        {
+          "name": "rows are separate lists",
+          "code": "grid = make_grid(3, 2)\ngrid[0][0] = 1\nassert grid == [[1, 0], [0, 0], [0, 0]], grid"
+        }
+      ],
+      "hints": [
+        "`remove` and `insert` change the list you call them on. Call them on a copy, and check with `in` before removing.",
+        "`items.copy()` gives you a list you may change. For the grid, `[0] * cols` is fine for one row, but each row must be built separately.",
+        "`result = items.copy()`, then `if value in result:` remove and `insert(0, value)`. For the grid: `[[0] * cols for _ in range(rows)]`."
+      ],
+      "explanation": "The first version changes the caller's list, because `items` is the caller's list under another name, and it raises `ValueError` for a missing value. Copying first and checking with `in` fixes both.\n\n`[[0] * cols] * rows` repeats a reference to one row, so writing to `grid[0][0]` changes every row. A comprehension runs `[0] * cols` once per row and builds independent lists. The name `_` says the loop variable is not used."
+    },
+    {
+      "id": "tuples-and-unpacking",
+      "title": "Tuples and unpacking",
+      "body": "# Tuples and unpacking\n\nA tuple is an ordered sequence that cannot change after it is made. Use one for a fixed group of values, such as a point or a record, and a list for a collection that grows.\n\n```python\npoint = (3, 4)\nx, y = point            # unpacking\nfirst, *rest = [1, 2, 3, 4]\nprint(x, y, first, rest)  # 3 4 1 [2, 3, 4]\nsingle = (5,)           # the comma makes it\nprint(type(single).__name__)  # tuple\nprint((1, 2) == [1, 2])       # False\n```\n\n- Unpacking needs as many names as there are items, unless one name has a star, which collects the rest into a list.\n- A function returns several values by returning a tuple, and the caller unpacks it.\n- A tuple and a list with the same items are not equal.\n- Tuples can be dict keys and set members, because they cannot change. Lists cannot.\n\n```python\ngrid = {(0, 0): \"start\", (2, 1): \"goal\"}\nfor (row, col), name in grid.items():\n    print(row, col, name)\n```\n",
+      "task": "Write `min_max(numbers)` returning a `(smallest, largest)` tuple for a non-empty list. Write `walk(steps)` that starts at `(0, 0)`, adds each `(dx, dy)` step in turn, and returns the final position as a tuple.",
+      "starter": "def min_max(numbers):\n    return [min(numbers), max(numbers)]\n\n\ndef walk(steps):\n    position = (0, 0)\n    for step in steps:\n        position = step\n    return position\n",
+      "solution": "def min_max(numbers):\n    return min(numbers), max(numbers)\n\n\ndef walk(steps):\n    x, y = 0, 0\n    for dx, dy in steps:\n        x, y = x + dx, y + dy\n    return x, y\n",
+      "checks": [
+        {
+          "name": "returns a tuple",
+          "code": "got = min_max([3, 1, 9])\nassert got == (1, 9), got"
+        },
+        {
+          "name": "one number",
+          "code": "assert min_max([5]) == (5, 5), min_max([5])"
+        },
+        {
+          "name": "callers can unpack it",
+          "code": "low, high = min_max([2, 8, 4])\nassert (low, high) == (2, 8), (low, high)"
+        },
+        {
+          "name": "walk adds the steps",
+          "code": "got = walk([(1, 0), (0, 2), (-3, 1)])\nassert got == (-2, 3), got"
+        },
+        {
+          "name": "no steps",
+          "code": "assert walk([]) == (0, 0), walk([])\nassert isinstance(walk([(1, 1)]), tuple), type(walk([(1, 1)]))"
+        }
+      ],
+      "hints": [
+        "`[1, 9]` and `(1, 9)` hold the same numbers but are different types, and they do not compare equal.",
+        "`return a, b` returns a tuple. In `walk`, unpack each step into `dx, dy` and keep `x` and `y` in two names.",
+        "`return min(numbers), max(numbers)`. In `walk`: `x, y = 0, 0`, `for dx, dy in steps: x, y = x + dx, y + dy`, then `return x, y`."
+      ],
+      "explanation": "Commas make tuples, so `return min(numbers), max(numbers)` already returns one. A list was the wrong shape here: the result is a fixed pair, and `[1, 9] == (1, 9)` is `False`.\n\nThe starter `walk` replaced the position with each step instead of adding it. Unpacking the step in the `for` line names both parts, and the right side of `x, y = x + dx, y + dy` is computed in full before either name changes."
+    },
+    {
       "id": "dicts-and-sets",
       "title": "Dicts and sets",
       "body": "# Dicts and sets\n\nA dict maps keys to values. Lookup by key takes about the same time however large the dict is. Dicts keep insertion order.\n\n```python\nages = {\"ada\": 36}\nages[\"alan\"] = 41\nprint(ages.get(\"bob\", 0))  # 0, no error\nprint(\"ada\" in ages)       # True\nfor k, v in ages.items():\n    print(k, v)\n```\n\n`d[key]` raises `KeyError` when the key is missing. `d.get(key, default)` does not. Keys must be hashable, so strings, numbers and tuples work and lists do not.\n\n## Sets\n\nA set holds unique values with no useful order, and it supports membership tests and set algebra.\n\n```python\na = {1, 2, 3}\nb = {2, 3, 4}\nprint(a & b)  # intersection\nprint(a | b)  # union\nprint(a - b)  # difference\n```\n\nBecause a set's order is not guaranteed, sort it before showing or comparing it. Write `set()` for an empty set, since `{}` is an empty dict.",
@@ -291,6 +615,186 @@
         "`counts[word] = counts.get(word, 0) + 1` over `text.lower().split()`, and `return sorted(set(a) & set(b))`."
       ],
       "explanation": "The `get` pattern avoids a separate first-time branch. `collections.Counter` does the same job, and you will meet it in the next course.\n\nScanning with `x in b` on a list is `O(n)` per lookup. Building sets makes the intersection about `O(len(a) + len(b))`, and `sorted` then gives the result a predictable order."
+    },
+    {
+      "id": "dict-and-set-comprehensions",
+      "title": "More comprehensions",
+      "body": "# More comprehensions\n\nThe comprehension shape works for dicts and sets too, and it can choose a value for each item instead of filtering.\n\n```python\nwords = [\"tea\", \"milk\", \"tea\", \"jam\"]\nlengths = {w: len(w) for w in words}\nfirsts = {w[0] for w in words}\nsizes = [\"big\" if len(w) > 3 else \"small\"\n         for w in words]\nprint(lengths)\nprint(sorted(firsts))  # ['j', 'm', 't']\nprint(sizes)\n```\n\n- A trailing `if` filters: items that fail it are left out.\n- `a if condition else b` before the `for` picks a value for every item, so the result has one entry per input.\n- Two `for` clauses run like nested loops, outer first: `[(r, c) for r in range(2) for c in range(3)]`.\n- Round brackets give a generator expression, which feeds `sum`, `any`, `all`, `min` and `max` without building a list.\n\n```python\nnums = [3, 8, 12]\nprint(any(n > 10 for n in nums))  # True\nprint(all(n > 0 for n in nums))   # True\n```\n\nWhen a comprehension needs several conditions and a nested loop, a plain `for` loop is easier to read.\n",
+      "task": "Write `price_index(pairs)` turning a list of `(name, price)` tuples into a dict from name to price, leaving out prices of 0 or less. Write `labels(scores)` returning a list with `\"pass\"` for each score of at least 50 and `\"fail\"` for the others.",
+      "starter": "def price_index(pairs):\n    return [name for name, price in pairs]\n\n\ndef labels(scores):\n    return [\"pass\" for s in scores if s >= 50]\n",
+      "solution": "def price_index(pairs):\n    return {\n        name: price\n        for name, price in pairs\n        if price > 0\n    }\n\n\ndef labels(scores):\n    return [\"pass\" if s >= 50 else \"fail\" for s in scores]\n",
+      "checks": [
+        {
+          "name": "builds a dict",
+          "code": "got = price_index([(\"tea\", 3), (\"jam\", 5)])\nassert got == {\"tea\": 3, \"jam\": 5}, got"
+        },
+        {
+          "name": "drops free and negative prices",
+          "code": "got = price_index([(\"tea\", 3), (\"gift\", 0), (\"refund\", -2)])\nassert got == {\"tea\": 3}, got"
+        },
+        {
+          "name": "no pairs",
+          "code": "assert price_index([]) == {}, price_index([])"
+        },
+        {
+          "name": "one label per score",
+          "code": "got = labels([70, 20, 50])\nassert got == [\"pass\", \"fail\", \"pass\"], got"
+        },
+        {
+          "name": "labels keep the length",
+          "code": "assert len(labels(list(range(100)))) == 100, len(labels(list(range(100))))\nassert labels([]) == [], labels([])"
+        }
+      ],
+      "hints": [
+        "Curly braces with `key: value` before the `for` build a dict. In `labels`, a trailing `if` removes the failing scores instead of labelling them.",
+        "Keep the trailing `if price > 0` in the dict comprehension. In `labels`, move the condition before the `for` as `\"pass\" if s >= 50 else \"fail\"`.",
+        "`{name: price for name, price in pairs if price > 0}`, and `[\"pass\" if s >= 50 else \"fail\" for s in scores]`."
+      ],
+      "explanation": "The position of `if` changes its job. After the `for`, it decides whether an item appears at all. Before the `for`, as part of `a if condition else b`, it decides what each item becomes, and every item appears.\n\nA dict comprehension needs both a key and a value, separated by a colon. Without the colon, curly braces build a set."
+    },
+    {
+      "id": "grouping-and-counting",
+      "title": "Grouping and counting",
+      "body": "# Grouping and counting\n\nTwo dict patterns come up again and again: counting how often each thing appears, and grouping items under a shared key.\n\n```python\nfrom collections import Counter\n\nwords = [\"ant\", \"bee\", \"ape\", \"bat\", \"ant\"]\ncounts = Counter(words)\nprint(counts[\"ant\"], counts[\"cow\"])  # 2 0\nprint(counts.most_common(1))  # [('ant', 2)]\n\ngroups = {}\nfor w in words:\n    groups.setdefault(w[0], []).append(w)\nprint(groups)\n```\n\n- `Counter` is a dict that counts. A missing key reads as 0 instead of raising `KeyError`.\n- `most_common(n)` returns the `n` biggest counts as `(item, count)` pairs, largest first. Equal counts keep the order in which the items were first seen.\n- `d.setdefault(key, [])` returns the list stored under `key`, creating an empty one first if needed, so one line both creates and appends.\n- `collections.defaultdict(list)` does the same job: a missing key gets a fresh empty list.\n\nEach group keeps the order its items arrived in, which is usually what a reader expects.\n",
+      "task": "Write `group_by_length(words)` returning a dict from word length to the list of words of that length, in their original order. Write `top_letters(text, n)` returning the `n` most common letters as `(letter, count)` pairs, ignoring case and skipping anything that is not a letter.",
+      "starter": "from collections import Counter\n\n\ndef group_by_length(words):\n    groups = {}\n    for word in words:\n        groups[len(word)] = [word]\n    return groups\n\n\ndef top_letters(text, n):\n    return Counter(text).most_common(n)\n",
+      "solution": "from collections import Counter\n\n\ndef group_by_length(words):\n    groups = {}\n    for word in words:\n        groups.setdefault(len(word), []).append(word)\n    return groups\n\n\ndef top_letters(text, n):\n    letters = [ch for ch in text.lower() if ch.isalpha()]\n    return Counter(letters).most_common(n)\n",
+      "checks": [
+        {
+          "name": "groups by length",
+          "code": "got = group_by_length([\"ox\", \"cat\", \"be\", \"dog\"])\nassert got == {2: [\"ox\", \"be\"], 3: [\"cat\", \"dog\"]}, got"
+        },
+        {
+          "name": "no words",
+          "code": "assert group_by_length([]) == {}, group_by_length([])"
+        },
+        {
+          "name": "ignores case and spaces",
+          "code": "got = top_letters(\"Banana BAND!\", 2)\nassert got == [(\"a\", 4), (\"n\", 3)], got"
+        },
+        {
+          "name": "skips digits and symbols",
+          "code": "got = top_letters(\"1 2 3 ... z\", 1)\nassert got == [(\"z\", 1)], got"
+        },
+        {
+          "name": "ties and empty text",
+          "code": "assert top_letters(\"ab\", 5) == [(\"a\", 1), (\"b\", 1)], top_letters(\"ab\", 5)\nassert top_letters(\"\", 3) == [], top_letters(\"\", 3)"
+        }
+      ],
+      "hints": [
+        "`groups[key] = [word]` replaces the list every time. You want to add to the list that is already there.",
+        "`groups.setdefault(len(word), [])` gives the existing list or a new one. For letters, lower-case the text and keep only characters where `isalpha()` is true.",
+        "`groups.setdefault(len(word), []).append(word)`, and `Counter([ch for ch in text.lower() if ch.isalpha()]).most_common(n)`."
+      ],
+      "explanation": "Assigning `[word]` throws away the words collected so far for that length. `setdefault` creates the list only the first time and returns the same list on every later call, so `append` grows it.\n\n`Counter(text)` counts every character, so spaces, `B` and `b` all get their own entries. Cleaning the input before counting keeps the counting code simple."
+    },
+    {
+      "id": "nested-data",
+      "title": "Nested data",
+      "body": "# Nested data\n\nReal data is usually nested: a list of records, where each record is a dict that may hold lists of its own. Read it one layer at a time.\n\n```python\norders = [\n    {\"id\": 1, \"items\": [\"tea\", \"jam\"],\n     \"total\": 7.5},\n    {\"id\": 2, \"items\": [\"milk\"],\n     \"total\": 2.0},\n]\nprint(orders[0][\"items\"][1])  # jam\nprint(sum(o[\"total\"] for o in orders))\nfor order in orders:\n    print(order[\"id\"], len(order[\"items\"]))\n```\n\n- `orders[0]` is a dict, `orders[0][\"items\"]` is a list, and `[1]` picks from that list. Each step works on the result of the one before.\n- When you are lost, print one level, such as `orders[0]`, and look at its shape.\n- Use `record.get(\"key\", default)` when some records may lack a field.\n- A dict you take out of the list is the same object as the one inside it, so changing it changes the list's data too.\n\nWrite small functions that each walk one level. They are easier to test than one long expression.\n",
+      "task": "Each item is a dict with `\"name\"`, `\"price\"`, `\"qty\"` and sometimes `\"tags\"` (a list of strings). Write `stock_value(items)` returning the sum of price times qty, and `names_tagged(items, tag)` returning the names of items whose tags include `tag`, in order, treating a missing `\"tags\"` as no tags.",
+      "starter": "def stock_value(items):\n    return sum(item[\"price\"] for item in items)\n\n\ndef names_tagged(items, tag):\n    return [item[\"name\"] for item in items if tag in item[\"tags\"]]\n",
+      "solution": "def stock_value(items):\n    return sum(item[\"price\"] * item[\"qty\"] for item in items)\n\n\ndef names_tagged(items, tag):\n    return [\n        item[\"name\"]\n        for item in items\n        if tag in item.get(\"tags\", [])\n    ]\n",
+      "checks": [
+        {
+          "name": "totals price times qty",
+          "code": "items = [\n    {\"name\": \"tea\", \"price\": 3.5, \"qty\": 2, \"tags\": [\"drink\", \"hot\"]},\n    {\"name\": \"jam\", \"price\": 4.0, \"qty\": 1},\n    {\"name\": \"milk\", \"price\": 1.25, \"qty\": 4, \"tags\": [\"drink\"]},\n]\nassert stock_value(items) == 16.0, stock_value(items)"
+        },
+        {
+          "name": "empty stock is worth 0",
+          "code": "assert stock_value([]) == 0, stock_value([])"
+        },
+        {
+          "name": "finds tagged names in order",
+          "code": "items = [\n    {\"name\": \"tea\", \"price\": 3.5, \"qty\": 2, \"tags\": [\"drink\", \"hot\"]},\n    {\"name\": \"milk\", \"price\": 1.25, \"qty\": 4, \"tags\": [\"drink\"]},\n]\nassert names_tagged(items, \"drink\") == [\"tea\", \"milk\"], names_tagged(items, \"drink\")"
+        },
+        {
+          "name": "missing tags count as none",
+          "code": "items = [\n    {\"name\": \"tea\", \"price\": 3.5, \"qty\": 2, \"tags\": [\"drink\", \"hot\"]},\n    {\"name\": \"jam\", \"price\": 4.0, \"qty\": 1},\n]\nassert names_tagged(items, \"hot\") == [\"tea\"], names_tagged(items, \"hot\")\nassert names_tagged(items, \"cold\") == [], names_tagged(items, \"cold\")"
+        }
+      ],
+      "hints": [
+        "The value of one item is its price multiplied by its quantity. And `item[\"tags\"]` raises `KeyError` for an item without tags.",
+        "Multiply inside the generator expression. `item.get(\"tags\", [])` gives an empty list when the key is missing, and `tag in []` is simply false.",
+        "`sum(item[\"price\"] * item[\"qty\"] for item in items)`, and `[item[\"name\"] for item in items if tag in item.get(\"tags\", [])]`."
+      ],
+      "explanation": "Square brackets demand that the key exists. For a field that some records simply do not have, `get` with a sensible default turns \"missing\" into an ordinary empty value, and the rest of the expression needs no special case.\n\nBoth functions read one level at a time: the list gives items, each item gives fields. Naming the loop variable `item` keeps each step readable."
+    },
+    {
+      "id": "recursion-basics",
+      "title": "Recursion",
+      "body": "# Recursion\n\nA recursive function calls itself on a smaller piece of the problem. It needs a base case that it answers directly, and every other call must move closer to that base case.\n\n```python\ndef countdown(n):\n    if n == 0:          # base case\n        return [\"go\"]\n    return [n] + countdown(n - 1)\n\nprint(countdown(3))  # [3, 2, 1, 'go']\n```\n\nRecursion suits data that is shaped like itself, such as lists that contain lists:\n\n```python\ndef count_items(data):\n    total = 0\n    for x in data:\n        if isinstance(x, list):\n            total += count_items(x)\n        else:\n            total += 1\n    return total\n\nprint(count_items([1, [2, [3]], 4]))  # 4\n```\n\n`isinstance(x, list)` asks whether `x` is a list. Each inner list is handled by the same function, however deep it sits. Python stops runaway recursion after about 1000 nested calls with `RecursionError`, so for a long, flat sequence a loop is the better tool.\n",
+      "task": "Write `nested_sum(data)` returning the sum of all numbers in a list whose items may be numbers or lists, nested to any depth. Write `depth(data)` returning how deeply lists nest: `[]` and `[1, 2]` have depth 1, `[1, [2]]` has depth 2.",
+      "starter": "def nested_sum(data):\n    return sum(data)\n\n\ndef depth(data):\n    return 1\n",
+      "solution": "def nested_sum(data):\n    total = 0\n    for x in data:\n        if isinstance(x, list):\n            total += nested_sum(x)\n        else:\n            total += x\n    return total\n\n\ndef depth(data):\n    deepest = 0\n    for x in data:\n        if isinstance(x, list):\n            deepest = max(deepest, depth(x))\n    return 1 + deepest\n",
+      "checks": [
+        {
+          "name": "flat lists",
+          "code": "assert nested_sum([1, 2, 3]) == 6, nested_sum([1, 2, 3])"
+        },
+        {
+          "name": "any depth",
+          "code": "got = nested_sum([1, [2, [3, [4]]], 5])\nassert got == 15, got"
+        },
+        {
+          "name": "empty lists add nothing",
+          "code": "assert nested_sum([]) == 0, nested_sum([])\nassert nested_sum([[], [[]]]) == 0, nested_sum([[], [[]]])"
+        },
+        {
+          "name": "depth of simple lists",
+          "code": "for data, want in [([], 1), ([1, 2], 1), ([1, [2]], 2)]:\n    assert depth(data) == want, (data, depth(data))"
+        },
+        {
+          "name": "depth follows the deepest branch",
+          "code": "got = depth([[1], [[2]], 3])\nassert got == 3, got\nassert depth([[[[]]]]) == 4, depth([[[[]]]])"
+        }
+      ],
+      "hints": [
+        "`sum` fails as soon as it meets a list inside the list. Each inner list is a smaller version of the same problem.",
+        "Loop over the items: add numbers directly and call `nested_sum` on lists. For `depth`, find the deepest inner list and add 1 for the current level.",
+        "In `nested_sum`, `total += nested_sum(x)` for lists and `total += x` otherwise. In `depth`, `deepest = max(deepest, depth(x))` for lists, then `return 1 + deepest`."
+      ],
+      "explanation": "The base case here is hidden in the loop: a list with no inner lists makes no further calls. An empty list returns 0 for the sum and 1 for the depth, so empty lists at any level need no special handling.\n\n`depth` does not add up its children. It keeps only the largest, because nesting depth is the longest path down, not the total amount of nesting."
+    },
+    {
+      "id": "sorting-with-key-and-lambda",
+      "title": "Sorting with key and lambda",
+      "body": "# Sorting with key and lambda\n\n`sorted`, `min` and `max` accept `key`: a function applied to each item, whose result is compared instead of the item itself.\n\n```python\nwords = [\"kiwi\", \"Fig\", \"banana\"]\nprint(sorted(words))          # Fig first\nprint(sorted(words, key=str.lower))\nprint(max(words, key=len))    # banana\n\npeople = [(\"ada\", 36), (\"alan\", 41)]\noldest = max(people, key=lambda p: p[1])\nprint(oldest)  # ('alan', 41)\n```\n\n`lambda args: expression` makes a small unnamed function. Use it where a function is needed only once.\n\n## Several keys\n\nReturn a tuple to sort by more than one thing. Tuples compare item by item, so `key=lambda p: (-p[1], p[0])` sorts by age, oldest first, and then by name. The minus sign reverses only the number. Sorting is stable: items with equal keys keep their original order.\n\n`min` and `max` return the first of several equal items, and take `default=` for an empty input. `map(f, xs)` and `filter(f, xs)` apply or test a function on each item, though a comprehension usually reads better.\n",
+      "task": "Write `rank(players)` that takes `(name, score)` tuples and returns a new list sorted by score, highest first, with equal scores ordered by name from A to Z. Write `longest_word(words)` returning the longest word, the first one on ties, or `None` for an empty list.",
+      "starter": "def rank(players):\n    return sorted(players, reverse=True)\n\n\ndef longest_word(words):\n    return max(words)\n",
+      "solution": "def rank(players):\n    return sorted(players, key=lambda p: (-p[1], p[0]))\n\n\ndef longest_word(words):\n    return max(words, key=len, default=None)\n",
+      "checks": [
+        {
+          "name": "highest score first",
+          "code": "got = rank([(\"ann\", 3), (\"bob\", 9), (\"cy\", 5)])\nassert got == [(\"bob\", 9), (\"cy\", 5), (\"ann\", 3)], got"
+        },
+        {
+          "name": "ties sorted by name",
+          "code": "got = rank([(\"zed\", 5), (\"amy\", 5), (\"bo\", 7)])\nassert got == [(\"bo\", 7), (\"amy\", 5), (\"zed\", 5)], got"
+        },
+        {
+          "name": "input is left alone",
+          "code": "players = [(\"a\", 1), (\"b\", 2)]\nrank(players)\nassert players == [(\"a\", 1), (\"b\", 2)], players"
+        },
+        {
+          "name": "longest word",
+          "code": "assert longest_word([\"fig\", \"banana\", \"kiwi\"]) == \"banana\", longest_word([\"fig\", \"banana\", \"kiwi\"])"
+        },
+        {
+          "name": "first wins a tie",
+          "code": "assert longest_word([\"abc\", \"xyz\"]) == \"abc\", longest_word([\"abc\", \"xyz\"])"
+        },
+        {
+          "name": "no words",
+          "code": "assert longest_word([]) is None, longest_word([])"
+        }
+      ],
+      "hints": [
+        "Without `key`, tuples compare by their first item, the name. `max` on strings picks the last one alphabetically, not the longest.",
+        "A key of `(-score, name)` puts high scores first and breaks ties by name. `max` takes `key=len`, and `default=None` for an empty list.",
+        "`sorted(players, key=lambda p: (-p[1], p[0]))`, and `max(words, key=len, default=None)`."
+      ],
+      "explanation": "`reverse=True` reverses the whole comparison, so it would also sort equal scores from Z to A. Negating only the score inside a tuple key flips that one part and leaves the name ascending.\n\n`max(words)` compares the words themselves, alphabetically. `key=len` compares lengths instead, and because `max` keeps the first of equal items, ties go to the earlier word. Without `default`, an empty list raises `ValueError`."
     },
     {
       "id": "errors-and-try-except",
@@ -329,6 +833,38 @@
       "explanation": "Reusing the `ValueError` that `int` raises means callers handle one error type for every kind of bad input.\n\nCatching only `ZeroDivisionError` documents exactly what `None` means here. If someone passes a string, that is a bug, and it should stay loud."
     },
     {
+      "id": "raising-your-own-exceptions",
+      "title": "Raising your own exceptions",
+      "body": "# Raising your own exceptions\n\nWhen a function cannot do its job, `raise` an exception rather than returning an odd value that the caller might not check. Pick the built-in type that fits: `ValueError` for a bad value, `TypeError` for a wrong type, `KeyError` for a missing key.\n\nFor errors that belong to your program, define your own class. It only needs a name and a parent:\n\n```python\nclass OutOfStock(Exception):\n    pass\n\ndef take(stock, item):\n    if stock.get(item, 0) == 0:\n        raise OutOfStock(f\"no {item} left\")\n    stock[item] -= 1\n\ntry:\n    take({\"tea\": 0}, \"tea\")\nexcept OutOfStock as error:\n    print(\"sorry:\", error)\n```\n\n- `except SomeError as error` gives you the exception object, and `str(error)` is its message.\n- Inherit from `ValueError` or `LookupError` when your error is a special case of one, so handlers that already catch the parent keep working.\n- Write messages that say what went wrong and with which values.\n",
+      "task": "Define `InsufficientFunds` as a subclass of `ValueError`. Write `withdraw(balance, amount)` returning the new balance, raising `ValueError` if `amount` is 0 or less, and `InsufficientFunds` with a message containing both numbers if `amount` is more than `balance`.",
+      "starter": "class InsufficientFunds(Exception):\n    pass\n\n\ndef withdraw(balance, amount):\n    if amount > balance:\n        return None\n    return balance - amount\n",
+      "solution": "class InsufficientFunds(ValueError):\n    pass\n\n\ndef withdraw(balance, amount):\n    if amount <= 0:\n        raise ValueError(f\"amount must be positive: {amount}\")\n    if amount > balance:\n        raise InsufficientFunds(\n            f\"cannot take {amount} from {balance}\"\n        )\n    return balance - amount\n",
+      "checks": [
+        {
+          "name": "withdraws",
+          "code": "assert withdraw(100, 30) == 70, withdraw(100, 30)\nassert withdraw(5, 5) == 0, withdraw(5, 5)"
+        },
+        {
+          "name": "it is a ValueError",
+          "code": "assert issubclass(InsufficientFunds, ValueError), \"InsufficientFunds should inherit from ValueError\""
+        },
+        {
+          "name": "too much raises InsufficientFunds",
+          "code": "try:\n    withdraw(10, 25)\nexcept InsufficientFunds as error:\n    message = str(error)\nelse:\n    message = None\nassert message is not None, \"withdraw(10, 25) should raise InsufficientFunds\"\nassert \"10\" in message and \"25\" in message, message"
+        },
+        {
+          "name": "bad amounts raise a plain ValueError",
+          "code": "for amount in [0, -5]:\n    kind = None\n    try:\n        withdraw(10, amount)\n    except InsufficientFunds:\n        kind = \"InsufficientFunds\"\n    except ValueError:\n        kind = \"ValueError\"\n    assert kind == \"ValueError\", f\"withdraw(10, {amount}) raised {kind}\""
+        }
+      ],
+      "hints": [
+        "Returning `None` lets a caller carry on as if the money had been taken. Raising makes the problem impossible to miss.",
+        "Put `ValueError` in the brackets of the class line. Check the amount first, then the balance, and build each message with an f-string.",
+        "`class InsufficientFunds(ValueError): pass`, then `if amount <= 0: raise ValueError(...)` and `if amount > balance: raise InsufficientFunds(f\"cannot take {amount} from {balance}\")`."
+      ],
+      "explanation": "A `None` result is easy to ignore: `balance = withdraw(balance, 50)` quietly sets the balance to `None`. An exception stops the program at the exact point of the problem, unless the caller has decided how to handle it.\n\nMaking `InsufficientFunds` a `ValueError` gives callers a choice. They can catch the specific case and offer a smaller amount, or catch `ValueError` and treat every bad withdrawal the same way."
+    },
+    {
       "id": "reading-and-writing-files",
       "title": "Reading and writing files",
       "body": "# Reading and writing files\n\n`open` returns a file object. Use `with` so it closes even if an error happens.\n\n```python\nwith open(\"notes.txt\", \"w\",\n          encoding=\"utf-8\") as f:\n    f.write(\"first\\n\")\n\nwith open(\"notes.txt\",\n          encoding=\"utf-8\") as f:\n    for line in f:\n        print(line.rstrip(\"\\n\"))\n```\n\n- Mode `\"r\"` reads and is the default. `\"w\"` replaces the file. `\"a\"` appends.\n- Always pass `encoding=\"utf-8\"`, so text behaves the same everywhere.\n- Each line you iterate over keeps its newline. `write` adds none, so you add it yourself.\n- Opening a missing file for reading raises `FileNotFoundError`.\n\n## pathlib\n\n`pathlib.Path` wraps a path in an object, with shortcuts for whole-file work:\n\n```python\nfrom pathlib import Path\n\np = Path(\"notes.txt\")\np.write_text(\"hi\\n\", encoding=\"utf-8\")\nprint(p.read_text(encoding=\"utf-8\"))\nprint(p.exists(), p.suffix)\n```",
@@ -363,6 +899,178 @@
         "`f.write(line + \"\\n\")` in mode `\"w\"`. Then `sum(1 for line in f if line.strip())` inside `try`, with `except FileNotFoundError: return 0`."
       ],
       "explanation": "`with` closes the file on every exit path, including exceptions. Iterating over the file reads one line at a time, so counting works on files larger than memory.\n\nCatching only `FileNotFoundError` keeps other problems visible, such as a permission error or a path that is a folder."
+    },
+    {
+      "id": "paths-and-folders",
+      "title": "Paths and folders",
+      "body": "# Paths and folders\n\n`pathlib.Path` joins path parts with `/`, so the same code works on every system. A `Path` is only a name until you ask it to touch the disk.\n\n```python\nfrom pathlib import Path\n\nfolder = Path(\"notes\")\nfolder.mkdir(exist_ok=True)\na = folder / \"a.txt\"\na.write_text(\"hi\", encoding=\"utf-8\")\nb = folder / \"b.md\"\nb.write_text(\"yo\", encoding=\"utf-8\")\n\nprint(a.name, a.stem, a.suffix)\nprint(a.parent)  # notes\ntxt = folder.glob(\"*.txt\")\nprint(sorted(p.name for p in txt))\n```\n\n- `mkdir(parents=True, exist_ok=True)` creates any missing parent folders and does not fail when the folder already exists.\n- `iterdir()` lists a folder's entries. `glob(\"*.txt\")` matches names, and `rglob` also searches subfolders.\n- `is_file()` and `is_dir()` tell entries apart, and `exists()` checks either.\n- `a.with_suffix(\".bak\")` is a new path with another extension.\n\nThe order of `iterdir` and `glob` results is not defined, so sort them before you depend on it.\n",
+      "task": "Write `save_note(folder, name, text)` that creates `folder` and any missing parents, writes `text` to the file `name + \".txt\"` inside it, and returns the path. Write `list_notes(folder)` returning the sorted stems of the `.txt` files in `folder`, or `[]` if the folder does not exist.",
+      "starter": "from pathlib import Path\n\n\ndef save_note(folder, name, text):\n    path = Path(folder) / name\n    path.write_text(text, encoding=\"utf-8\")\n    return path\n\n\ndef list_notes(folder):\n    return [p.name for p in Path(folder).iterdir()]\n",
+      "solution": "from pathlib import Path\n\n\ndef save_note(folder, name, text):\n    folder = Path(folder)\n    folder.mkdir(parents=True, exist_ok=True)\n    path = folder / f\"{name}.txt\"\n    path.write_text(text, encoding=\"utf-8\")\n    return path\n\n\ndef list_notes(folder):\n    folder = Path(folder)\n    if not folder.is_dir():\n        return []\n    return sorted(p.stem for p in folder.glob(\"*.txt\"))\n",
+      "checks": [
+        {
+          "name": "creates folders and writes the file",
+          "code": "import tempfile\nfrom pathlib import Path\nwith tempfile.TemporaryDirectory() as tmp:\n    path = Path(save_note(Path(tmp) / \"a\" / \"b\", \"todo\", \"buy tea\"))\n    name = path.name\n    text = path.read_text(encoding=\"utf-8\")\nassert name == \"todo.txt\", name\nassert text == \"buy tea\", repr(text)"
+        },
+        {
+          "name": "works with a string folder that exists",
+          "code": "import tempfile\nfrom pathlib import Path\nwith tempfile.TemporaryDirectory() as tmp:\n    save_note(tmp, \"n\", \"old\")\n    path = Path(save_note(tmp, \"n\", \"new\"))\n    text = path.read_text(encoding=\"utf-8\")\nassert text == \"new\", repr(text)"
+        },
+        {
+          "name": "lists .txt stems, sorted",
+          "code": "import tempfile\nfrom pathlib import Path\nwith tempfile.TemporaryDirectory() as tmp:\n    save_note(tmp, \"zoo\", \"1\")\n    save_note(tmp, \"apple\", \"2\")\n    (Path(tmp) / \"c.md\").write_text(\"3\", encoding=\"utf-8\")\n    got = list_notes(tmp)\nassert got == [\"apple\", \"zoo\"], got"
+        },
+        {
+          "name": "missing folder gives []",
+          "code": "import tempfile\nfrom pathlib import Path\nwith tempfile.TemporaryDirectory() as tmp:\n    got = list_notes(Path(tmp) / \"nope\")\nassert got == [], got"
+        }
+      ],
+      "hints": [
+        "Writing a file inside a folder that does not exist raises `FileNotFoundError`. And the file name needs its `.txt` ending.",
+        "`Path(folder).mkdir(parents=True, exist_ok=True)` makes the folders. For listing, `glob(\"*.txt\")` picks the right files and `.stem` drops the extension.",
+        "`folder / f\"{name}.txt\"` after `mkdir(parents=True, exist_ok=True)`. Then `if not folder.is_dir(): return []` and `return sorted(p.stem for p in folder.glob(\"*.txt\"))`."
+      ],
+      "explanation": "`write_text` creates the file but never the folders around it, which is why the first version fails for a new folder. `mkdir` with `parents=True` builds the whole chain, and `exist_ok=True` makes the call safe to repeat.\n\n`iterdir` returns every entry, in no promised order, and `.name` keeps the extension. Filtering with `glob`, taking `.stem` and sorting gives a result that is the same on every device."
+    },
+    {
+      "id": "json-files",
+      "title": "JSON files",
+      "body": "# JSON files\n\nJSON is a text format for nested data that almost every language can read. The `json` module turns dicts, lists, strings, numbers, booleans and `None` into JSON text and back.\n\n```python\nimport json\nfrom pathlib import Path\n\ndata = {\"name\": \"Ada\", \"langs\": [\"py\"],\n        \"active\": True, \"boss\": None}\np = Path(\"user.json\")\nwith p.open(\"w\", encoding=\"utf-8\") as f:\n    json.dump(data, f, indent=2)\n\nwith p.open(encoding=\"utf-8\") as f:\n    loaded = json.load(f)\nprint(loaded == data)  # True\n```\n\n- `dump` and `load` work with files. `dumps` and `loads`, with an s for string, work with text.\n- `indent=2` makes the file readable, and `sort_keys=True` gives a stable key order.\n- Tuples come back as lists, and dict keys always come back as strings.\n- A `set` cannot be saved and raises `TypeError`. Convert it to a list first, and back again after loading.\n\nA JSON file is a good fit for settings and small saved state. It is plain text, so you can open it and read it.\n",
+      "task": "Write `save_tags(path, tags)`, where `tags` maps a name to a set of strings, saving it as JSON with `indent=2` and sorted keys, each set stored as a sorted list. Write `load_tags(path)` reading it back with each list turned into a set again, or returning `{}` if the file does not exist.",
+      "starter": "import json\n\n\ndef save_tags(path, tags):\n    with open(path, \"w\", encoding=\"utf-8\") as f:\n        json.dump(tags, f)\n\n\ndef load_tags(path):\n    with open(path, encoding=\"utf-8\") as f:\n        return json.load(f)\n",
+      "solution": "import json\n\n\ndef save_tags(path, tags):\n    data = {name: sorted(values) for name, values in tags.items()}\n    with open(path, \"w\", encoding=\"utf-8\") as f:\n        json.dump(data, f, indent=2, sort_keys=True)\n\n\ndef load_tags(path):\n    try:\n        with open(path, encoding=\"utf-8\") as f:\n            data = json.load(f)\n    except FileNotFoundError:\n        return {}\n    return {name: set(values) for name, values in data.items()}\n",
+      "checks": [
+        {
+          "name": "round trip keeps sets",
+          "code": "import os, tempfile\nwith tempfile.TemporaryDirectory() as folder:\n    path = os.path.join(folder, \"tags.json\")\n    tags = {\"tea\": {\"hot\", \"drink\"}, \"jam\": set()}\n    save_tags(path, tags)\n    got = load_tags(path)\nassert got == tags, got"
+        },
+        {
+          "name": "the file holds sorted lists",
+          "code": "import json, os, tempfile\nwith tempfile.TemporaryDirectory() as folder:\n    path = os.path.join(folder, \"tags.json\")\n    save_tags(path, {\"b\": {\"y\", \"x\"}, \"a\": {\"z\"}})\n    with open(path, encoding=\"utf-8\") as f:\n        raw = json.load(f)\nassert raw == {\"a\": [\"z\"], \"b\": [\"x\", \"y\"]}, raw"
+        },
+        {
+          "name": "indented, with sorted keys",
+          "code": "import os, tempfile\nwith tempfile.TemporaryDirectory() as folder:\n    path = os.path.join(folder, \"tags.json\")\n    save_tags(path, {\"b\": {\"y\"}, \"a\": {\"z\"}})\n    with open(path, encoding=\"utf-8\") as f:\n        text = f.read()\nassert \"\\n  \" in text, \"use indent=2: \" + repr(text)\nassert text.index('\"a\"') < text.index('\"b\"'), \"use sort_keys=True: \" + repr(text)"
+        },
+        {
+          "name": "missing file gives {}",
+          "code": "import os, tempfile\nwith tempfile.TemporaryDirectory() as folder:\n    got = load_tags(os.path.join(folder, \"none.json\"))\nassert got == {}, got"
+        }
+      ],
+      "hints": [
+        "`json.dump` raises `TypeError` for a set. Convert each set before saving, and convert back after loading.",
+        "A dict comprehension with `sorted(values)` makes JSON-ready data. Catch `FileNotFoundError` around the `open` in `load_tags`.",
+        "`json.dump({name: sorted(v) for name, v in tags.items()}, f, indent=2, sort_keys=True)`, and `return {name: set(v) for name, v in data.items()}` after loading."
+      ],
+      "explanation": "JSON has arrays but no sets, so `json.dump` refuses them. Turning each set into a sorted list makes the file valid and also identical from run to run, since set order is not defined. Loading must undo the conversion, or callers would get lists back.\n\nCatching only `FileNotFoundError` treats \"no file yet\" as \"no tags\". A file with broken JSON still raises, which is right: that is a real problem, not an empty state."
+    },
+    {
+      "id": "dates-and-durations",
+      "title": "Dates and times",
+      "body": "# Dates and times\n\nThe `datetime` module has `date` for calendar days, `datetime` for a day plus a time of day, and `timedelta` for a length of time.\n\n```python\nfrom datetime import date, timedelta\n\nd = date.fromisoformat(\"2024-02-27\")\nlater = d + timedelta(days=3)\nprint(later)               # 2024-03-01\nprint((later - d).days)    # 3\nprint(later.strftime(\"%d %b %Y\"))\nprint(later.weekday())     # 4, a Friday\nprint(later.isoformat() > \"2024-01-31\")\n```\n\n- `fromisoformat` reads, and `isoformat` writes, the `YYYY-MM-DD` form. Text in that form also sorts in date order.\n- Adding a `timedelta` handles month ends and leap years for you. Subtracting two dates gives a `timedelta`, and `.days` is a whole number.\n- `strftime` formats a date with codes such as `%Y`, `%m`, `%d` and `%A`, the weekday name. `strptime` parses text with the same codes.\n- `weekday()` counts Monday as 0.\n\n`date.today()` and `datetime.now()` change every day. Pass dates into your functions instead of reading the clock inside them, so the functions stay testable.\n",
+      "task": "Write `days_between(start, end)` taking two `YYYY-MM-DD` strings and returning the number of days from `start` to `end`, negative if `end` is earlier. Write `due_date(start, days)` returning the date `days` after `start`, as a `YYYY-MM-DD` string.",
+      "starter": "from datetime import date, timedelta\n\n\ndef days_between(start, end):\n    return int(end[-2:]) - int(start[-2:])\n\n\ndef due_date(start, days):\n    year, month, day = start.split(\"-\")\n    return f\"{year}-{month}-{int(day) + days:02d}\"\n",
+      "solution": "from datetime import date, timedelta\n\n\ndef days_between(start, end):\n    first = date.fromisoformat(start)\n    last = date.fromisoformat(end)\n    return (last - first).days\n\n\ndef due_date(start, days):\n    day = date.fromisoformat(start) + timedelta(days=days)\n    return day.isoformat()\n",
+      "checks": [
+        {
+          "name": "within one month",
+          "code": "assert days_between(\"2024-05-01\", \"2024-05-20\") == 19, days_between(\"2024-05-01\", \"2024-05-20\")"
+        },
+        {
+          "name": "across a leap day",
+          "code": "assert days_between(\"2024-02-27\", \"2024-03-01\") == 3, days_between(\"2024-02-27\", \"2024-03-01\")"
+        },
+        {
+          "name": "across years and backwards",
+          "code": "assert days_between(\"2023-12-31\", \"2024-12-31\") == 366, days_between(\"2023-12-31\", \"2024-12-31\")\nassert days_between(\"2024-01-10\", \"2024-01-01\") == -9, days_between(\"2024-01-10\", \"2024-01-01\")"
+        },
+        {
+          "name": "due date in the same month",
+          "code": "assert due_date(\"2024-05-01\", 9) == \"2024-05-10\", due_date(\"2024-05-01\", 9)"
+        },
+        {
+          "name": "due date rolls over",
+          "code": "assert due_date(\"2023-12-30\", 3) == \"2024-01-02\", due_date(\"2023-12-30\", 3)\nassert due_date(\"2024-02-28\", 1) == \"2024-02-29\", due_date(\"2024-02-28\", 1)"
+        }
+      ],
+      "hints": [
+        "Doing arithmetic on the day number works until a month ends. Let `date` do the calendar work.",
+        "`date.fromisoformat(text)` turns the text into a date. Subtract two dates for a `timedelta`, or add `timedelta(days=days)` to move forward.",
+        "`(date.fromisoformat(end) - date.fromisoformat(start)).days`, and `(date.fromisoformat(start) + timedelta(days=days)).isoformat()`."
+      ],
+      "explanation": "Counting with the day of the month gives the right answer inside one month and nonsense across a boundary: February 30th, or 3 minus 27. Months of different lengths and leap years are exactly what `date` and `timedelta` already know.\n\nConverting text to `date` objects at the edges, doing the work with dates, and converting back with `isoformat` keeps the calendar rules out of your own code."
+    },
+    {
+      "id": "math-and-seeded-random",
+      "title": "math and random",
+      "body": "# math and random\n\nThe `math` module holds the usual functions for numbers, and `random` makes pseudo-random choices.\n\n```python\nimport math\n\nprint(math.sqrt(16), math.pi)\nprint(math.floor(2.7), math.ceil(2.1))\nprint(math.hypot(3, 4))      # 5.0\nprint(math.dist((0, 0), (1, 1)))\nprint(math.prod([2, 3, 4]))  # 24\n```\n\n`math.floor` rounds down and `math.ceil` rounds up, and both return an `int`. `math.dist` measures a straight line between two points.\n\n## Seeded randomness\n\n```python\nimport random\n\nrng = random.Random(7)\nprint(rng.randint(1, 6))     # 1 to 6\nprint(rng.choice([\"a\", \"b\"]))\nprint(rng.random())          # below 1\n```\n\nA seed fixes the sequence: `random.Random(7)` makes the same choices on every run, which tests need. `randint(a, b)` includes both ends, unlike `range`. Make your own `Random` object instead of calling `random.seed`, which resets the generator that every other part of the program shares.\n",
+      "task": "Write `roll_dice(n, seed)` returning a list of `n` six-sided die rolls made with its own `random.Random(seed)`, without touching the shared generator. Write `distance(a, b)` returning the straight-line distance between two `(x, y)` points.",
+      "starter": "import math\nimport random\n\n\ndef roll_dice(n, seed):\n    random.seed(seed)\n    return [random.randint(1, 6) for _ in range(n)]\n\n\ndef distance(a, b):\n    return (b[0] - a[0]) + (b[1] - a[1])\n",
+      "solution": "import math\nimport random\n\n\ndef roll_dice(n, seed):\n    rng = random.Random(seed)\n    return [rng.randint(1, 6) for _ in range(n)]\n\n\ndef distance(a, b):\n    return math.dist(a, b)\n",
+      "checks": [
+        {
+          "name": "rolls are 1 to 6",
+          "code": "rolls = roll_dice(50, 3)\nassert len(rolls) == 50, len(rolls)\nassert all(1 <= r <= 6 for r in rolls), rolls"
+        },
+        {
+          "name": "every face can appear",
+          "code": "got = set(roll_dice(300, 5))\nassert got == {1, 2, 3, 4, 5, 6}, sorted(got)"
+        },
+        {
+          "name": "a seed repeats its rolls",
+          "code": "assert roll_dice(10, 42) == roll_dice(10, 42), \"the same seed should give the same rolls\"\nassert roll_dice(20, 1) != roll_dice(20, 2), \"different seeds should give different rolls\""
+        },
+        {
+          "name": "the shared generator is untouched",
+          "code": "import random\nrandom.seed(0)\nwant = random.random()\nrandom.seed(0)\nroll_dice(5, 1)\ngot = random.random()\nassert got == want, \"roll_dice changed the shared random generator\""
+        },
+        {
+          "name": "straight-line distance",
+          "code": "assert distance((0, 0), (3, 4)) == 5.0, distance((0, 0), (3, 4))\nassert distance((1, 1), (1, 1)) == 0.0, distance((1, 1), (1, 1))\nassert abs(distance((-1, 0), (2, -4)) - 5.0) < 1e-9, distance((-1, 0), (2, -4))"
+        }
+      ],
+      "hints": [
+        "`random.seed` resets the generator every module shares. Your function should have a generator of its own.",
+        "`rng = random.Random(seed)` creates one, and `rng.randint(1, 6)` rolls it. For the distance, `math` has a function that takes two points.",
+        "`rng = random.Random(seed)`, then `[rng.randint(1, 6) for _ in range(n)]`, and `return math.dist(a, b)`."
+      ],
+      "explanation": "The starter's rolls are repeatable, but it resets the shared generator as a side effect, so any other code using `random` suddenly gets a different sequence. A private `Random(seed)` gives the same repeatable rolls and leaves everything else alone.\n\nAdding the differences is not a distance: it can even be negative. The straight line is the square root of the squared differences, which `math.dist` computes for points of any dimension."
+    },
+    {
+      "id": "project-word-report",
+      "title": "Project: a word report",
+      "body": "# Project: a word report\n\nThis lesson puts the course together. A word report reads text, cleans it into words, counts them and lists the most common ones. Split the job into small functions so each step can be tested alone.\n\n```python\nimport string\nfrom collections import Counter\n\nprint(string.punctuation)\nprint(\"'Hi!'\".strip(string.punctuation))\nprint(\"don't\".strip(string.punctuation))\nprint(repr(\"...\".strip(string.punctuation)))\n\nwords = [\"the\", \"cat\", \"the\"]\nprint(Counter(words).most_common(1))\n```\n\n## The plan\n\n- `clean_words` lower-cases the text, splits it on whitespace, strips punctuation from both ends of each piece, and drops pieces that end up empty. Stripping only the ends keeps words like `don't` whole.\n- `Counter(words).most_common(n)` finds the top words. Equal counts keep the order in which the words first appeared.\n- Formatting comes last, in its own function, so the counting can be checked without reading printed text.\n\nTest each function on a tiny input you can count by hand before trusting it with a long text.\n",
+      "task": "Write `clean_words(text)` returning the lower-case words of `text`, with punctuation stripped from both ends of each and empty results dropped. Write `report(text, n)` returning the `n` most common words as lines like `\"cat: 2\"` joined with newlines, or `\"no words\"` when there are none.",
+      "starter": "import string\nfrom collections import Counter\n\n\ndef clean_words(text):\n    return text.split()\n\n\ndef report(text, n):\n    counts = Counter(clean_words(text))\n    return str(counts.most_common(n))\n",
+      "solution": "import string\nfrom collections import Counter\n\n\ndef clean_words(text):\n    words = []\n    for piece in text.lower().split():\n        word = piece.strip(string.punctuation)\n        if word:\n            words.append(word)\n    return words\n\n\ndef report(text, n):\n    counts = Counter(clean_words(text))\n    if not counts:\n        return \"no words\"\n    lines = [\n        f\"{word}: {count}\"\n        for word, count in counts.most_common(n)\n    ]\n    return \"\\n\".join(lines)\n",
+      "checks": [
+        {
+          "name": "lower-cases and strips",
+          "code": "got = clean_words(\"Hello, World!\")\nassert got == [\"hello\", \"world\"], got"
+        },
+        {
+          "name": "keeps inner apostrophes",
+          "code": "got = clean_words(\"Don't stop -- ever.\")\nassert got == [\"don't\", \"stop\", \"ever\"], got\nassert clean_words(\"  ... \") == [], clean_words(\"  ... \")"
+        },
+        {
+          "name": "reports the top words",
+          "code": "got = report(\"The cat sat. The cat ran! the end\", 2)\nassert got == \"the: 3\\ncat: 2\", repr(got)"
+        },
+        {
+          "name": "ties keep first appearance",
+          "code": "got = report(\"b a b a c\", 3)\nassert got == \"b: 2\\na: 2\\nc: 1\", repr(got)"
+        },
+        {
+          "name": "nothing to report",
+          "code": "assert report(\"?! ...\", 3) == \"no words\", report(\"?! ...\", 3)"
+        }
+      ],
+      "hints": [
+        "`split` alone keeps capitals and the punctuation stuck to words, such as `\"World!\"`. Clean every piece before counting.",
+        "Loop over `text.lower().split()`, call `piece.strip(string.punctuation)` and keep the result only if it is not empty. In `report`, build one f-string per pair from `most_common(n)`.",
+        "In `clean_words`, append each non-empty `piece.strip(string.punctuation)`. In `report`, return `\"no words\"` for an empty `Counter`, else `\"\\n\".join(f\"{word}: {count}\" for word, count in counts.most_common(n))`."
+      ],
+      "explanation": "Without cleaning, `\"The\"`, `\"the\"` and `\"cat.\"` count as different words, and the report is quietly wrong. Normalising case and trimming punctuation first means every later step works on clean data, and `strip` only touches the ends, so `don't` survives.\n\n`str(counts.most_common(n))` is a Python list printed as text, not a report a person wants to read. Keeping counting and formatting in separate steps means each one can be tested alone, which is how longer programs stay manageable."
     }
   ]
 }

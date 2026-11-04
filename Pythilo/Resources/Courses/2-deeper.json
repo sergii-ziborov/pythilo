@@ -1,7 +1,7 @@
 {
   "id": "deeper",
   "title": "Python deeper",
-  "summary": "Modules, classes, iteration, decorators, closures and typing.",
+  "summary": "Packages, how objects behave, classes in depth, iteration tools, errors, pattern matching, functools and typing.",
   "kind": "path",
   "lessons": [
     {
@@ -39,6 +39,114 @@
         "`Counter(words).most_common(1)[0][0]` after handling the empty list, and `json.dumps(data, sort_keys=True)`."
       ],
       "explanation": "`most_common` orders equal counts by first appearance, so ties resolve predictably without extra code.\n\n`import math` keeps the module name visible at the call site. `from collections import Counter` is reasonable when one name is used often and its origin is obvious."
+    },
+    {
+      "id": "packages-and-init",
+      "title": "Packages",
+      "body": "# Packages\n\nA package is a folder of modules. Its `__init__.py` runs once, the first time anything from the package is imported, and the names it defines become the package's attributes. Technically a package is a module with a `__path__`: the list of folders its submodules are loaded from.\n\n```python\nimport importlib\nimport os\nimport sys\nfrom pathlib import Path\n\nPath(\"shop\").mkdir(exist_ok=True)\nPath(\"shop/prices.py\").write_text(\n    \"TAX = 0.2\\n\")\nPath(\"shop/__init__.py\").write_text(\n    \"from .prices import TAX\\n\"\n    \"__all__ = ['TAX']\\n\")\nsys.path.insert(0, os.getcwd())\nimportlib.invalidate_caches()\n\nimport shop\nprint(shop.TAX, shop.__all__)\nprint(shop.prices.__name__)\nprint(shop.__path__)\n```\n\n## Inside a package\n\n- `from .prices import TAX` is a relative import: `.` is this package and `..` its parent. It works only in a module imported as part of a package.\n- A submodule loads only when something imports it. Here `import shop` loads `shop.prices` because `__init__.py` imports it.\n- `__all__` lists the names that `from shop import *` binds. Without it, every name not starting with `_` is bound.\n\nKeep `__init__.py` short: re-export the public names and leave the real work in submodules.",
+      "task": "Write `is_package(module)`, true when the module has a `__path__`. Write `public_names(module)` returning what `from module import *` would bind: `module.__all__` as a list when it exists, otherwise the sorted names not starting with `_`. Write `submodule_names(package)` returning the sorted names of every module in the package's folders, imported or not, using `pkgutil.iter_modules`.",
+      "starter": "import types\n\n\ndef is_package(module):\n    return hasattr(module, \"__file__\")\n\n\ndef public_names(module):\n    return sorted(n for n in dir(module) if not n.startswith(\"_\"))\n\n\ndef submodule_names(package):\n    names = []\n    for name in dir(package):\n        if isinstance(getattr(package, name), types.ModuleType):\n            names.append(name)\n    return sorted(names)\n",
+      "solution": "import pkgutil\n\n\ndef is_package(module):\n    return hasattr(module, \"__path__\")\n\n\ndef public_names(module):\n    if hasattr(module, \"__all__\"):\n        return list(module.__all__)\n    return sorted(n for n in vars(module) if not n.startswith(\"_\"))\n\n\ndef submodule_names(package):\n    found = pkgutil.iter_modules(package.__path__)\n    return sorted(info.name for info in found)\n",
+      "checks": [
+        {
+          "name": "packages have a __path__",
+          "code": "import json\nimport json.decoder\nassert is_package(json), \"json is a package\"\ngot = is_package(json.decoder)\nassert not got, \"json.decoder is a plain module\""
+        },
+        {
+          "name": "__all__ decides what a star import binds",
+          "code": "import importlib, os, sys\nfrom pathlib import Path\nPath(\"kit\").mkdir(exist_ok=True)\nPath(\"kit/tools.py\").write_text(\"def f():\\n    return 1\\n\")\nPath(\"kit/__init__.py\").write_text(\"from .tools import f\\nVERSION = 1\\n__all__ = ['f']\\n\")\nsys.path.insert(0, os.getcwd())\nimportlib.invalidate_caches()\nkit = importlib.import_module(\"kit\")\nassert is_package(kit), \"kit is a package\"\ngot = public_names(kit)\nassert got == [\"f\"], got"
+        },
+        {
+          "name": "without __all__, public names are bound",
+          "code": "import importlib, os, sys\nfrom pathlib import Path\nPath(\"plain_mod.py\").write_text(\"A = 1\\n_hidden = 2\\ndef go():\\n    pass\\n\")\nsys.path.insert(0, os.getcwd())\nimportlib.invalidate_caches()\nplain_mod = importlib.import_module(\"plain_mod\")\ngot = public_names(plain_mod)\nassert got == [\"A\", \"go\"], got"
+        },
+        {
+          "name": "finds submodules nobody imported yet",
+          "code": "import importlib, os, sys\nfrom pathlib import Path\nPath(\"box/inner\").mkdir(parents=True, exist_ok=True)\nfor name in [\"box/__init__.py\", \"box/a.py\", \"box/b.py\", \"box/inner/__init__.py\"]:\n    Path(name).write_text(\"\")\nsys.path.insert(0, os.getcwd())\nimportlib.invalidate_caches()\nbox = importlib.import_module(\"box\")\ngot = submodule_names(box)\nassert got == [\"a\", \"b\", \"inner\"], got"
+        }
+      ],
+      "hints": [
+        "Every package has a `__path__` attribute and plain modules do not. `__file__` will not tell them apart, because packages have one too.",
+        "`hasattr(module, \"__all__\")` tells you whether `__all__` exists. For the folder listing, `pkgutil.iter_modules(package.__path__)` yields objects with a `.name`.",
+        "`return hasattr(module, \"__path__\")`; `return list(module.__all__)` when it exists, else `sorted(n for n in vars(module) if not n.startswith(\"_\"))`; and `sorted(m.name for m in pkgutil.iter_modules(package.__path__))`."
+      ],
+      "explanation": "`dir(package)` lists only the submodules that something has already imported, because importing a package runs `__init__.py` and nothing more. `pkgutil.iter_modules` reads the package's folders instead, so it also finds modules nobody has loaded yet.\n\n`__path__` is the real mark of a package: it tells the import system where to look for `package.name`. `__all__` is a statement of the public interface, which is why star imports and documentation tools respect it."
+    },
+    {
+      "id": "identity-equality-and-copies",
+      "title": "Identity, equality and copies",
+      "body": "# Identity, equality and copies\n\n`==` asks whether two objects have equal values. `is` asks whether two names refer to the very same object, the one `id(x)` identifies. Use `is` for `None` and other singletons, and `==` for everything else. Small ints and short strings are sometimes shared, so `is` can seem to work on them; never rely on it.\n\n```python\nimport copy\n\na = [1, 2]\nb = [1, 2]\nprint(a == b, a is b)  # True False\n\nt = (a, \"x\")\na.append(3)\nprint(t)  # the list inside changed\n\nshared = [a, a]\ndeep = copy.deepcopy(shared)\nprint(deep[0] is deep[1])  # True\n```\n\n## Mutable and immutable\n\nLists, dicts, sets and most objects can change in place, and every name bound to one sees the change. Numbers, strings, tuples and frozensets cannot. A tuple is only as fixed as what it holds: a tuple containing a list can still change, so it cannot be hashed.\n\n`x += y` changes a list in place but builds a new object for a tuple or a string. A function that receives a list receives that same list, not a copy.\n\n`copy.deepcopy` copies nested objects all the way down and keeps shared references shared, so the copy has the same shape as the original.",
+      "task": "Write `unique_objects(items)` dropping repeats of the same object, by identity rather than equality, keeping the first. Write `with_item(order, item)` returning a new order dict whose `\"items\"` list ends with `item`, leaving `order` and the list inside it unchanged. Write `freeze(data)` returning a hashable copy of nested data: lists and tuples become tuples, sets become frozensets, and dicts become tuples of `(key, value)` pairs sorted by key, all recursively.",
+      "starter": "import copy\n\n\ndef unique_objects(items):\n    result = []\n    for item in items:\n        if item not in result:\n            result.append(item)\n    return result\n\n\ndef with_item(order, item):\n    new = copy.copy(order)\n    new[\"items\"].append(item)\n    return new\n\n\ndef freeze(data):\n    if isinstance(data, list):\n        return tuple(data)\n    return data\n",
+      "solution": "import copy\n\n\ndef unique_objects(items):\n    seen = set()\n    result = []\n    for item in items:\n        if id(item) not in seen:\n            seen.add(id(item))\n            result.append(item)\n    return result\n\n\ndef with_item(order, item):\n    new = copy.deepcopy(order)\n    new[\"items\"].append(item)\n    return new\n\n\ndef freeze(data):\n    if isinstance(data, dict):\n        return tuple((k, freeze(v)) for k, v in sorted(data.items()))\n    if isinstance(data, (list, tuple)):\n        return tuple(freeze(x) for x in data)\n    if isinstance(data, (set, frozenset)):\n        return frozenset(freeze(x) for x in data)\n    return data\n",
+      "checks": [
+        {
+          "name": "unique by identity, not equality",
+          "code": "a = [1]\nb = [1]\ngot = unique_objects([a, b, a])\nassert len(got) == 2, got\nassert got[0] is a and got[1] is b, \"keep a and b: equal, but different objects\"\nassert unique_objects([]) == [], unique_objects([])"
+        },
+        {
+          "name": "with_item returns the new order",
+          "code": "order = {\"id\": 1, \"items\": [\"a\"]}\ngot = with_item(order, \"b\")\nassert got == {\"id\": 1, \"items\": [\"a\", \"b\"]}, got"
+        },
+        {
+          "name": "with_item leaves the original alone",
+          "code": "order = {\"id\": 1, \"items\": [\"a\"]}\nwith_item(order, \"b\")\nassert order == {\"id\": 1, \"items\": [\"a\"]}, order"
+        },
+        {
+          "name": "freeze goes all the way down",
+          "code": "got = freeze([1, [2, [3]]])\nassert got == (1, (2, (3,))), got\nhash(got)"
+        },
+        {
+          "name": "freeze handles dicts and sets",
+          "code": "got = freeze({\"b\": [1], \"a\": {2}})\nassert got == ((\"a\", frozenset({2})), (\"b\", (1,))), got\nhash(got)"
+        },
+        {
+          "name": "freeze copies and keeps plain values",
+          "code": "data = {\"x\": [1]}\nfreeze(data)\nassert data == {\"x\": [1]}, data\nassert freeze(\"text\") == \"text\", freeze(\"text\")\nassert freeze(5) == 5, freeze(5)"
+        }
+      ],
+      "hints": [
+        "`==`, and so `in`, treat two equal lists as the same item. `id(obj)` is unique among living objects and works even for unhashable items such as lists.",
+        "A shallow copy of `order` still shares its `\"items\"` list. In `freeze`, check the container type and call `freeze` again on every element.",
+        "A `seen` set of `id(item)` values; `copy.deepcopy(order)` before appending; and in `freeze`, `tuple((k, freeze(v)) for k, v in sorted(data.items()))` for dicts, `tuple(freeze(x) for x in data)` for lists and tuples, `frozenset(...)` for sets."
+      ],
+      "explanation": "`in` and `==` compare values, so two equal lists looked like one object. Comparing `id` values, which is what `is` does, keeps distinct objects apart even when they are equal. `copy.copy(order)` copied the dict but shared its list, so `append` reached the caller's order.\n\nTurning only the outer list into a tuple leaves the inner lists mutable, and `hash` refuses a tuple that holds a list. Freezing has to go all the way down, for the same reason `deepcopy` exists: copying one level protects only one level."
+    },
+    {
+      "id": "bytes-str-and-unicode",
+      "title": "Bytes, str and Unicode",
+      "body": "# Bytes, str and Unicode\n\nA `str` is a sequence of Unicode code points. A `bytes` object is a sequence of numbers from 0 to 255. Files, networks and hashes work in bytes, so text is encoded on the way out and decoded on the way in.\n\n```python\ns = \"café\"\nb = s.encode(\"utf-8\")\nprint(len(s), len(b))  # 4 5\nprint(b)               # b'caf\\xc3\\xa9'\nprint(b[0], list(b[3:]))\nprint(b.decode(\"utf-8\"), ord(\"é\"))\n```\n\nUTF-8 uses one byte for ASCII and up to four for other characters, so the length in characters and the length in bytes differ. Decoding with the wrong codec raises `UnicodeDecodeError` or, worse, quietly produces the wrong text. `errors=\"replace\"` puts the marker U+FFFD in place of bad bytes.\n\n## Equal-looking text\n\n```python\nimport unicodedata\n\na = \"café\"\nb = \"café\"\nprint(a == b, len(a), len(b))\nnfc = unicodedata.normalize(\"NFC\", b)\nprint(a == nfc)\n```\n\nThe same letter can be one code point or a letter plus a combining accent. `normalize(\"NFC\", s)` picks the composed form. For case-insensitive comparison use `s.casefold()`, a stronger `lower()` that also turns ß into ss.",
+      "task": "Write `utf8_size(text)` returning how many bytes `text` takes in UTF-8. Write `safe_decode(data)` decoding UTF-8 bytes with each invalid byte replaced by U+FFFD instead of raising. Write `same_text(a, b)` telling whether two strings match after NFC normalization and case folding.",
+      "starter": "def utf8_size(text):\n    return len(text)\n\n\ndef safe_decode(data):\n    return data.decode(\"utf-8\")\n\n\ndef same_text(a, b):\n    return a.lower() == b.lower()\n",
+      "solution": "import unicodedata\n\n\ndef utf8_size(text):\n    return len(text.encode(\"utf-8\"))\n\n\ndef safe_decode(data):\n    return data.decode(\"utf-8\", errors=\"replace\")\n\n\ndef _key(text):\n    return unicodedata.normalize(\"NFC\", text.casefold())\n\n\ndef same_text(a, b):\n    return _key(a) == _key(b)\n",
+      "checks": [
+        {
+          "name": "counts bytes, not characters",
+          "code": "assert utf8_size(\"abc\") == 3, utf8_size(\"abc\")\nassert utf8_size(\"café\") == 5, utf8_size(\"café\")\nassert utf8_size(\"日本\") == 6, utf8_size(\"日本\")\nassert utf8_size(\"\\U0001D11E\") == 4, utf8_size(\"\\U0001D11E\")"
+        },
+        {
+          "name": "decodes good bytes",
+          "code": "got = safe_decode(b\"caf\\xc3\\xa9\")\nassert got == \"café\", repr(got)"
+        },
+        {
+          "name": "replaces bad bytes",
+          "code": "got = safe_decode(b\"ok\\xff!\")\nassert got == \"ok�!\", repr(got)"
+        },
+        {
+          "name": "composed and decomposed forms match",
+          "code": "assert same_text(\"café\", \"café\"), \"the two spellings of café should match\"\nassert not same_text(\"cafe\", \"café\"), \"a missing accent is a different word\""
+        },
+        {
+          "name": "ignores case, including ß",
+          "code": "assert same_text(\"Straße\", \"STRASSE\"), \"ß case-folds to ss\"\nassert same_text(\"Hello\", \"hELLO\"), \"case should not matter\"\nassert not same_text(\"a\", \"b\"), \"different letters\""
+        }
+      ],
+      "hints": [
+        "`len` counts code points. Encode the text first and measure the bytes.",
+        "`bytes.decode` takes an `errors` argument. For the comparison, combine `unicodedata.normalize(\"NFC\", s)` with `s.casefold()`.",
+        "`len(text.encode(\"utf-8\"))`, `data.decode(\"utf-8\", errors=\"replace\")`, and compare `unicodedata.normalize(\"NFC\", s.casefold())` for both strings."
+      ],
+      "explanation": "`len(text)` counts code points, so `\"café\"` is 4 even though it needs 5 bytes. Anything that stores or sends text, from file sizes to network limits, needs the encoded length.\n\n`lower()` does not turn ß into ss, and plain `==` sees a precomposed é and an e followed by a combining accent as different strings. Case folding and normalizing both sides gives a key that compares the way people read text."
     },
     {
       "id": "classes",
@@ -81,6 +189,150 @@
       "explanation": "Validating before changing state means a raised error leaves the object as it was. That is the easiest invariant to keep.\n\n`!r` in the f-string uses `repr`, which adds the quotes around the owner name. The subclass reuses parent setup through `super()` instead of repeating it, so a later change to `Wallet` reaches both classes."
     },
     {
+      "id": "inheritance-and-super",
+      "title": "Inheritance and super()",
+      "body": "# Inheritance and super()\n\nA subclass can replace a parent's method or extend it. To extend, call the next version with `super()` and build on its result.\n\n```python\nclass Base:\n    def tags(self):\n        return [\"base\"]\n\nclass Logged(Base):\n    def tags(self):\n        return [\"logged\"] + super().tags()\n\nclass Cached(Base):\n    def tags(self):\n        return [\"cached\"] + super().tags()\n\nclass Service(Logged, Cached):\n    pass\n\nprint(Service().tags())\nprint([c.__name__ for c in Service.__mro__])\n```\n\n## The method resolution order\n\nEvery class has an `__mro__`, the order in which Python searches classes for an attribute. A class comes before its parents, and parents keep the order they are listed in.\n\n`super()` means the next class in that order for this object, not simply the parent. In a `Service`, the `super()` inside `Logged` reaches `Cached`, a class `Logged` never mentions. If every class calls `super()` once, each method runs exactly once. This is cooperative inheritance.\n\n`__init__` follows the same rule. Make arguments keyword-only, let each class take its own and pass the rest on with `super().__init__(**kwargs)`.",
+      "task": "Make `Colored` and `Bordered` cooperative: each `__init__` takes keyword-only arguments, keeps its own (`color=\"black\"`, `width=1`) and passes the rest to `super().__init__`, and each `describe` extends `super().describe()`. Then `Badge(name=\"ok\", color=\"red\", width=2).describe()` returns `[\"ok\", \"2px\", \"red\"]`.",
+      "starter": "class Shape:\n    def __init__(self, name):\n        self.name = name\n\n    def describe(self):\n        return [self.name]\n\n\nclass Colored(Shape):\n    def __init__(self, name, color=\"black\"):\n        Shape.__init__(self, name)\n        self.color = color\n\n    def describe(self):\n        return Shape.describe(self) + [self.color]\n\n\nclass Bordered(Shape):\n    def __init__(self, name, width=1):\n        Shape.__init__(self, name)\n        self.width = width\n\n    def describe(self):\n        return Shape.describe(self) + [f\"{self.width}px\"]\n\n\nclass Badge(Colored, Bordered):\n    pass\n",
+      "solution": "class Shape:\n    def __init__(self, name):\n        self.name = name\n\n    def describe(self):\n        return [self.name]\n\n\nclass Colored(Shape):\n    def __init__(self, *, color=\"black\", **kwargs):\n        super().__init__(**kwargs)\n        self.color = color\n\n    def describe(self):\n        return super().describe() + [self.color]\n\n\nclass Bordered(Shape):\n    def __init__(self, *, width=1, **kwargs):\n        super().__init__(**kwargs)\n        self.width = width\n\n    def describe(self):\n        return super().describe() + [f\"{self.width}px\"]\n\n\nclass Badge(Colored, Bordered):\n    pass\n",
+      "checks": [
+        {
+          "name": "each class works alone",
+          "code": "c = Colored(name=\"a\", color=\"red\")\nassert c.describe() == [\"a\", \"red\"], c.describe()\nb = Bordered(name=\"b\")\nassert b.describe() == [\"b\", \"1px\"], b.describe()"
+        },
+        {
+          "name": "Badge sets every attribute",
+          "code": "b = Badge(name=\"ok\", color=\"red\", width=2)\ngot = (b.name, b.color, b.width)\nassert got == (\"ok\", \"red\", 2), got"
+        },
+        {
+          "name": "defaults still apply in a Badge",
+          "code": "b = Badge(name=\"ok\")\ngot = (b.color, b.width)\nassert got == (\"black\", 1), got"
+        },
+        {
+          "name": "describe visits every class once",
+          "code": "got = Badge(name=\"ok\", color=\"red\", width=2).describe()\nassert got == [\"ok\", \"2px\", \"red\"], got"
+        },
+        {
+          "name": "super() reaches a class it never names",
+          "code": "calls = []\nclass Counted(Shape):\n    def __init__(self, **kwargs):\n        calls.append(\"counted\")\n        super().__init__(**kwargs)\nclass Mixed(Colored, Counted):\n    pass\nMixed(name=\"x\", color=\"blue\")\nassert calls == [\"counted\"], calls"
+        }
+      ],
+      "hints": [
+        "`Shape.__init__(self, name)` always jumps straight to `Shape`, skipping any class that sits between them in a `Badge`'s MRO.",
+        "Give each `__init__` the form `def __init__(self, *, color=\"black\", **kwargs)` and call `super().__init__(**kwargs)` first. Do the same for `describe`.",
+        "`Bordered.describe` returns `super().describe() + [f\"{self.width}px\"]` and `Colored.describe` returns `super().describe() + [self.color]`. A `Badge`'s MRO is `Badge, Colored, Bordered, Shape`."
+      ],
+      "explanation": "Naming the parent directly works in a single chain and breaks with two parents. `Colored.__init__` had no place for `width` and called `Shape.__init__` itself, so `Bordered.__init__` never ran and a `Badge` had no `width` at all.\n\n`super()` follows the MRO of the actual object. For a `Badge` the order is `Badge`, `Colored`, `Bordered`, `Shape`, so `Colored` hands on to `Bordered` without knowing it exists. Keyword arguments let each class take what it understands and forward the rest."
+    },
+    {
+      "id": "equality-hashing-and-ordering",
+      "title": "Equality, hashing and ordering",
+      "body": "# Equality, hashing and ordering\n\nWithout help, `==` on your objects compares identity. Define `__eq__` to compare values. For a type you do not handle, return `NotImplemented`: Python then tries the other operand's method, and for `==` finally falls back to identity.\n\n```python\nfrom functools import total_ordering\n\n@total_ordering\nclass Money:\n    def __init__(self, cents):\n        self.cents = cents\n\n    def __eq__(self, other):\n        if not isinstance(other, Money):\n            return NotImplemented\n        return self.cents == other.cents\n\n    def __lt__(self, other):\n        if not isinstance(other, Money):\n            return NotImplemented\n        return self.cents < other.cents\n\n    def __hash__(self):\n        return hash(self.cents)\n\nprint(Money(5) == Money(5))\nprint(Money(5) > Money(2))\nprint(len({Money(5), Money(5)}))\n```\n\n## Hash follows equality\n\nSets and dicts find a key by its hash, then confirm with `==`. Equal objects must have equal hashes. Defining `__eq__` sets `__hash__` to `None`, so instances become unhashable until you write one. Hash the same fields you compare, and only fields that never change.\n\n## Ordering\n\n`sorted`, `min` and `max` need only `<`. `@total_ordering` from `functools` derives `<=`, `>` and `>=` from `__eq__` and `__lt__`.",
+      "task": "Write `Version(text)` storing `text` and `parts`, the tuple of ints from a string like `\"1.10.2\"`. Versions compare by `parts` with all six comparison operators, work as set members and dict keys, return `NotImplemented` against other types, and repr as `Version('1.10.2')`.",
+      "starter": "class Version:\n    def __init__(self, text):\n        self.text = text\n        self.parts = tuple(text.split(\".\"))\n\n    def __eq__(self, other):\n        return self.text == other.text\n\n    def __repr__(self):\n        return f\"Version({self.text!r})\"\n",
+      "solution": "from functools import total_ordering\n\n\n@total_ordering\nclass Version:\n    def __init__(self, text):\n        self.text = text\n        self.parts = tuple(int(p) for p in text.split(\".\"))\n\n    def __repr__(self):\n        return f\"Version({self.text!r})\"\n\n    def __eq__(self, other):\n        if not isinstance(other, Version):\n            return NotImplemented\n        return self.parts == other.parts\n\n    def __lt__(self, other):\n        if not isinstance(other, Version):\n            return NotImplemented\n        return self.parts < other.parts\n\n    def __hash__(self):\n        return hash(self.parts)\n",
+      "checks": [
+        {
+          "name": "parses numbers",
+          "code": "got = Version(\"1.10.0\").parts\nassert got == (1, 10, 0), got\nassert repr(Version(\"1.4.2\")) == \"Version('1.4.2')\", repr(Version(\"1.4.2\"))"
+        },
+        {
+          "name": "equal versions",
+          "code": "assert Version(\"1.2\") == Version(\"1.2\"), \"same parts should be equal\"\nassert Version(\"1.2\") != Version(\"1.3\"), \"different parts should differ\""
+        },
+        {
+          "name": "orders numerically",
+          "code": "assert Version(\"1.9\") < Version(\"1.10\"), \"1.9 comes before 1.10\"\nassert Version(\"2.0\") >= Version(\"1.10\"), \"2.0 >= 1.10\"\nassert Version(\"1.0\") <= Version(\"1.0\"), \"1.0 <= 1.0\"\nassert Version(\"3.1\") > Version(\"3.0.9\"), \"3.1 > 3.0.9\"\ngot = [v.text for v in sorted([Version(\"1.10\"), Version(\"1.2\"), Version(\"1.9\")])]\nassert got == [\"1.2\", \"1.9\", \"1.10\"], got"
+        },
+        {
+          "name": "works in sets and as dict keys",
+          "code": "got = len({Version(\"1.0\"), Version(\"1.0\"), Version(\"2.0\")})\nassert got == 2, got\nassert {Version(\"1.0\"): \"x\"}[Version(\"1.0\")] == \"x\", \"equal versions should find the same key\""
+        },
+        {
+          "name": "other types",
+          "code": "assert (Version(\"1.0\") == \"1.0\") is False, \"a Version never equals a str\"\nraised = False\ntry:\n    Version(\"1.0\") < 3\nexcept TypeError:\n    raised = True\nassert raised, \"Version < int should raise TypeError\""
+        }
+      ],
+      "hints": [
+        "Compare tuples of ints, not strings: `\"10\" < \"9\"` is true for strings.",
+        "Start `__eq__` and `__lt__` with `if not isinstance(other, Version): return NotImplemented`. Add `@total_ordering` for the other operators, and a `__hash__`.",
+        "`self.parts = tuple(int(p) for p in text.split(\".\"))`, `return self.parts < other.parts` in `__lt__`, and `return hash(self.parts)` in `__hash__`."
+      ],
+      "explanation": "Comparing text sorts `\"1.10\"` before `\"1.9\"`, because strings compare character by character. Tuples of ints compare number by number, which is how versions work.\n\nOnce a class defines `__eq__`, Python sets its `__hash__` to `None`, because the inherited identity hash would break the rule that equal objects hash equally. Hashing `parts`, the same data `__eq__` compares, restores it. Returning `NotImplemented` instead of raising lets `==` with a string quietly give `False`, while `<` with a number raises `TypeError`."
+    },
+    {
+      "id": "properties",
+      "title": "Properties",
+      "body": "# Properties\n\nStart classes with plain attributes. When a value later needs checking or computing, `@property` turns the attribute into method calls without changing how callers read or assign it.\n\n```python\nclass Circle:\n    def __init__(self, radius):\n        self.radius = radius  # setter runs\n\n    @property\n    def radius(self):\n        return self._radius\n\n    @radius.setter\n    def radius(self, value):\n        if value < 0:\n            raise ValueError(\"negative\")\n        self._radius = value\n\n    @property\n    def area(self):\n        return 3.14159 * self.radius ** 2\n\nc = Circle(2)\nc.radius = 3\nprint(c.radius, round(c.area, 2))\n```\n\n- The decorated method is the getter, and `@radius.setter` adds assignment under the same name.\n- The real value lives under another name, by convention `_radius`. Assigning `self.radius` inside the setter would call the setter again, forever.\n- A property without a setter is read-only, so assigning to `c.area` raises `AttributeError`.\n- Assigning in `__init__` goes through the setter, so construction is validated too.\n\nKeep getters cheap and free of side effects. Callers expect reading an attribute to be quick and harmless.",
+      "task": "Write `Temperature(celsius)` where `celsius` is a property whose setter raises `ValueError` below -273.15, including in `__init__`. Add a `fahrenheit` property with a setter that stores the matching Celsius value, and a read-only `kelvin` property.",
+      "starter": "class Temperature:\n    def __init__(self, celsius):\n        if celsius < -273.15:\n            raise ValueError(\"below absolute zero\")\n        self.celsius = celsius\n\n    def fahrenheit(self):\n        return self.celsius * 9 / 5 + 32\n",
+      "solution": "class Temperature:\n    def __init__(self, celsius):\n        self.celsius = celsius\n\n    @property\n    def celsius(self):\n        return self._celsius\n\n    @celsius.setter\n    def celsius(self, value):\n        if value < -273.15:\n            raise ValueError(\"below absolute zero\")\n        self._celsius = value\n\n    @property\n    def fahrenheit(self):\n        return self.celsius * 9 / 5 + 32\n\n    @fahrenheit.setter\n    def fahrenheit(self, value):\n        self.celsius = (value - 32) * 5 / 9\n\n    @property\n    def kelvin(self):\n        return self.celsius + 273.15\n",
+      "checks": [
+        {
+          "name": "reads all three scales",
+          "code": "import math\nt = Temperature(20)\nassert t.celsius == 20, t.celsius\nassert math.isclose(t.fahrenheit, 68), t.fahrenheit\nassert math.isclose(t.kelvin, 293.15), t.kelvin"
+        },
+        {
+          "name": "setting fahrenheit updates celsius",
+          "code": "import math\nt = Temperature(0)\nt.fahrenheit = 212\nassert math.isclose(t.celsius, 100), t.celsius"
+        },
+        {
+          "name": "celsius is checked on every assignment",
+          "code": "raised = False\ntry:\n    Temperature(-300)\nexcept ValueError:\n    raised = True\nassert raised, \"Temperature(-300) should raise ValueError\"\nt = Temperature(5)\nraised = False\ntry:\n    t.celsius = -274\nexcept ValueError:\n    raised = True\nassert raised, \"t.celsius = -274 should raise ValueError\"\nassert t.celsius == 5, t.celsius"
+        },
+        {
+          "name": "fahrenheit is checked too",
+          "code": "t = Temperature(5)\nraised = False\ntry:\n    t.fahrenheit = -500\nexcept ValueError:\n    raised = True\nassert raised, \"-500 F is below absolute zero\"\nassert t.celsius == 5, t.celsius"
+        },
+        {
+          "name": "kelvin is read-only",
+          "code": "t = Temperature(0)\nraised = False\ntry:\n    t.kelvin = 10\nexcept AttributeError:\n    raised = True\nassert raised, \"assigning to kelvin should raise AttributeError\"\nassert isinstance(Temperature.__dict__.get(\"celsius\"), property), \"celsius should be a property\""
+        }
+      ],
+      "hints": [
+        "Store the real value as `self._celsius`, and make `celsius` a property whose setter validates before storing.",
+        "The `fahrenheit` getter computes `self.celsius * 9 / 5 + 32`. Its setter converts back and assigns `self.celsius`, so the same check runs.",
+        "`@fahrenheit.setter` with `self.celsius = (value - 32) * 5 / 9`, and `kelvin` as a `@property` returning `self.celsius + 273.15`, with no setter."
+      ],
+      "explanation": "Validating only in `__init__` leaves a gap: any later `t.celsius = -500` goes straight in. With a property, every assignment, including the one in `__init__`, runs the setter.\n\nRouting the Fahrenheit setter through `self.celsius` reuses that single check instead of copying it. Leaving `kelvin` without a setter makes it derived data that cannot drift out of step with the stored value."
+    },
+    {
+      "id": "class-and-static-methods",
+      "title": "Class and static methods",
+      "body": "# Class and static methods\n\nA normal method receives the instance as `self`. Two decorators change what a method receives.\n\n```python\nclass Point:\n    def __init__(self, x, y):\n        self.x, self.y = x, y\n\n    @classmethod\n    def from_text(cls, text):\n        x, y = text.split(\",\")\n        return cls(int(x), int(y))\n\n    @staticmethod\n    def is_valid(text):\n        return text.count(\",\") == 1\n\nclass Pixel(Point):\n    pass\n\np = Pixel.from_text(\"3,4\")\nprint(type(p).__name__, p.x, p.y)\nprint(Point.is_valid(\"1,2\"))\n```\n\n## classmethod\n\nThe method receives the class as `cls`, whether it is called on the class or on an instance. Its main use is alternative constructors such as `from_text`, `from_dict` or the built-in `dict.fromkeys`. Calling `cls(...)` instead of `Point(...)` means a subclass gets an instance of itself, as `Pixel` does here.\n\n## staticmethod\n\nThe method receives nothing extra. It is a plain function kept in the class because it belongs there, and it can be called on the class or on an instance. If it has nothing to do with the class, a module-level function is just as good.",
+      "task": "Write `Color(r, g, b)` that limits each channel to 0..255 with a static method `clamp(value)`, a class method `from_hex(text)` turning `\"#ff8000\"` into the matching color of whichever class it is called on, and a repr like `Color(255, 128, 0)` that uses the instance's own class name.",
+      "starter": "class Color:\n    def __init__(self, r, g, b):\n        self.r, self.g, self.b = r, g, b\n\n    def clamp(value):\n        return max(0, min(255, value))\n\n    @staticmethod\n    def from_hex(text):\n        digits = text.lstrip(\"#\")\n        r, g, b = (int(digits[i:i + 2], 16) for i in (0, 2, 4))\n        return Color(r, g, b)\n\n    def __repr__(self):\n        return f\"Color({self.r}, {self.g}, {self.b})\"\n",
+      "solution": "class Color:\n    def __init__(self, r, g, b):\n        self.r = self.clamp(r)\n        self.g = self.clamp(g)\n        self.b = self.clamp(b)\n\n    @staticmethod\n    def clamp(value):\n        return max(0, min(255, value))\n\n    @classmethod\n    def from_hex(cls, text):\n        digits = text.removeprefix(\"#\")\n        r, g, b = (int(digits[i:i + 2], 16) for i in (0, 2, 4))\n        return cls(r, g, b)\n\n    def __repr__(self):\n        name = type(self).__name__\n        return f\"{name}({self.r}, {self.g}, {self.b})\"\n",
+      "checks": [
+        {
+          "name": "clamp works on the class and on instances",
+          "code": "assert Color.clamp(300) == 255, Color.clamp(300)\nassert Color.clamp(-5) == 0, Color.clamp(-5)\nassert Color(0, 0, 0).clamp(7) == 7, \"clamp should also work when called on an instance\""
+        },
+        {
+          "name": "channels are clamped",
+          "code": "c = Color(300, -1, 10)\ngot = (c.r, c.g, c.b)\nassert got == (255, 0, 10), got"
+        },
+        {
+          "name": "from_hex",
+          "code": "c = Color.from_hex(\"#ff8000\")\nassert (c.r, c.g, c.b) == (255, 128, 0), repr(c)\nc = Color.from_hex(\"#0A0B0C\")\nassert (c.r, c.g, c.b) == (10, 11, 12), repr(c)"
+        },
+        {
+          "name": "subclasses get their own type",
+          "code": "class Shade(Color):\n    pass\ns = Shade.from_hex(\"#000000\")\nassert type(s) is Shade, type(s).__name__\nassert repr(s) == \"Shade(0, 0, 0)\", repr(s)"
+        },
+        {
+          "name": "repr",
+          "code": "assert repr(Color(1, 2, 3)) == \"Color(1, 2, 3)\", repr(Color(1, 2, 3))"
+        }
+      ],
+      "hints": [
+        "`@staticmethod` lets `clamp` be called on the class or an instance with just `value`. Use it in `__init__` as `self.clamp(r)`.",
+        "`@classmethod` gives `from_hex` the class as `cls`. Build the result with `cls(r, g, b)` so subclasses get their own type. `int(\"ff\", 16)` reads hex.",
+        "`digits = text.removeprefix(\"#\")`, then `int(digits[0:2], 16)` and so on, `return cls(r, g, b)`, and `type(self).__name__` in the repr."
+      ],
+      "explanation": "A function in a class body without a decorator becomes an ordinary method, so `Color(0, 0, 0).clamp(7)` passed the instance as `value` and failed. `@staticmethod` switches that off.\n\nA static `from_hex` that calls `Color(...)` always builds a `Color`, even when called as `Shade.from_hex`. A class method receives the class it was called on, so `cls(...)` builds the right type, and `type(self).__name__` keeps the repr honest for subclasses."
+    },
+    {
       "id": "dataclasses",
       "title": "Dataclasses",
       "body": "# Dataclasses\n\n`@dataclass` writes `__init__`, `__repr__` and `__eq__` from a list of annotated fields. Use it for objects that mainly hold data.\n\n```python\nfrom dataclasses import dataclass, field\n\n@dataclass\nclass Order:\n    item: str\n    qty: int = 1\n    notes: list[str] = field(\n        default_factory=list)\n```\n\nEach `Order` gets its own `notes` list. A plain `notes: list = []` is rejected with an error, because all instances would share one list.\n\n## Options\n\n- `frozen=True` makes instances immutable and hashable, so they can be dict keys.\n- `order=True` adds `<`, `>` and friends, comparing fields in order.\n- `slots=True` uses less memory and blocks stray attributes.\n\n## Validation\n\n`__post_init__` runs right after the generated `__init__`:\n\n```python\n@dataclass\nclass Age:\n    years: int\n\n    def __post_init__(self):\n        if self.years < 0:\n            raise ValueError(\"negative\")\n```",
@@ -121,6 +373,74 @@
       "explanation": "`default_factory` runs once per instance, so tags are never shared. Dataclasses refuse a bare mutable default because it would be a bug in nearly every case.\n\nFreezing a dataclass with the default `eq=True` also generates `__hash__`. That is what lets `Point` work as a dict key. Hash and equality must agree, and frozen fields cannot change, so they always will."
     },
     {
+      "id": "slots",
+      "title": "Slots",
+      "body": "# Slots\n\nEach instance normally keeps its attributes in a dict, `obj.__dict__`. That is flexible, and it costs memory for every object. Listing the attribute names in `__slots__` gives instances fixed storage instead.\n\n```python\nclass Plain:\n    def __init__(self, x):\n        self.x = x\n\nclass Slim:\n    __slots__ = (\"x\",)\n\n    def __init__(self, x):\n        self.x = x\n\np, s = Plain(1), Slim(1)\np.typo = 2  # silently accepted\nprint(hasattr(s, \"__dict__\"))\ntry:\n    s.typo = 2\nexcept AttributeError as e:\n    print(e)\n```\n\n## What changes\n\n- Assigning a name that is not in `__slots__` raises `AttributeError`, which catches misspellings such as `self.raduis`.\n- Instances are smaller and attribute access is a little faster. It matters when you create many thousands of objects.\n- A subclass without its own `__slots__` gets a `__dict__` back. Give each subclass `__slots__` listing only its new names.\n- A slotted name cannot also have a class-level default. Set defaults in `__init__`.\n\n`@dataclass(slots=True)` writes `__slots__` for you.",
+      "task": "Give `Vector(x, y)` `__slots__` so instances have no `__dict__` and reject unknown attributes. Make `Vector3(Vector)`, which adds `z` defaulting to 0, keep the same restriction by listing only its new name in its own `__slots__`.",
+      "starter": "class Vector:\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n\n    def __repr__(self):\n        return f\"Vector({self.x}, {self.y})\"\n\n\nclass Vector3(Vector):\n    def __init__(self, x, y, z=0):\n        super().__init__(x, y)\n        self.z = z\n\n    def __repr__(self):\n        return f\"Vector3({self.x}, {self.y}, {self.z})\"\n",
+      "solution": "class Vector:\n    __slots__ = (\"x\", \"y\")\n\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n\n    def __repr__(self):\n        return f\"Vector({self.x}, {self.y})\"\n\n\nclass Vector3(Vector):\n    __slots__ = (\"z\",)\n\n    def __init__(self, x, y, z=0):\n        super().__init__(x, y)\n        self.z = z\n\n    def __repr__(self):\n        return f\"Vector3({self.x}, {self.y}, {self.z})\"\n",
+      "checks": [
+        {
+          "name": "Vector has no instance dict",
+          "code": "v = Vector(1, 2)\nassert (v.x, v.y) == (1, 2), (v.x, v.y)\nassert not hasattr(v, \"__dict__\"), \"add __slots__ to Vector\""
+        },
+        {
+          "name": "unknown attributes are rejected",
+          "code": "v = Vector(1, 2)\nraised = False\ntry:\n    v.z = 3\nexcept AttributeError:\n    raised = True\nassert raised, \"v.z = 3 should raise AttributeError\""
+        },
+        {
+          "name": "slotted attributes can still change",
+          "code": "v = Vector(1, 2)\nv.x = 5\nassert v.x == 5, v.x"
+        },
+        {
+          "name": "Vector3 keeps the restriction",
+          "code": "w = Vector3(1, 2, 3)\nassert (w.x, w.y, w.z) == (1, 2, 3), (w.x, w.y, w.z)\nassert Vector3(1, 2).z == 0, Vector3(1, 2).z\nassert not hasattr(w, \"__dict__\"), \"give Vector3 its own __slots__\""
+        },
+        {
+          "name": "Vector3 lists only z",
+          "code": "slots = Vector3.__dict__.get(\"__slots__\", ())\nnames = [slots] if isinstance(slots, str) else list(slots)\nassert names == [\"z\"], names"
+        }
+      ],
+      "hints": [
+        "`__slots__` is a class attribute: a tuple of the attribute names instances may have.",
+        "A subclass needs its own `__slots__` too, or Python quietly gives its instances a `__dict__` again. List only the names the subclass adds.",
+        "`__slots__ = (\"x\", \"y\")` in `Vector` and `__slots__ = (\"z\",)` in `Vector3`. Mind the comma: `(\"z\")` is just a string."
+      ],
+      "explanation": "Without `__slots__`, `v.z = 3` quietly adds an entry to the instance's dict, so a typo becomes a silent bug. With slots there is no dict to add to.\n\nSlots are per class. `Vector3` inherits the storage for `x` and `y`, and repeating those names would waste space, so it lists only `z`. If a subclass leaves out `__slots__` entirely, its instances get a `__dict__` again, and both the saving and the protection are gone."
+    },
+    {
+      "id": "enums",
+      "title": "Enums",
+      "body": "# Enums\n\nAn enum is a fixed set of named constants. Each member has a `name` and a `value`, and a member is never mistaken for a plain string or number.\n\n```python\nfrom enum import Enum, auto\n\nclass Status(Enum):\n    DRAFT = auto()\n    LIVE = auto()\n    ARCHIVED = auto()\n\ns = Status.LIVE\nprint(s, s.name, s.value)\nprint(Status[\"DRAFT\"], Status(3))\nprint([m.name for m in Status])\nprint(s is Status.LIVE, s == 2)\n```\n\n- `Status[\"DRAFT\"]` looks a member up by name and `Status(3)` by value. Unknown input raises `KeyError` or `ValueError`.\n- Each member exists once, so `is` and `==` agree. Iteration follows definition order.\n- A member never equals its raw value: `Status.LIVE == 2` is false. `StrEnum` and `IntEnum` members do equal their values, which helps when they travel through JSON or a database.\n- An enum can have methods, which receive the member as `self`.\n- Any name assigned in the class body becomes a member, so keep helper tables inside methods.",
+      "task": "Write an enum `Light` with `RED`, `YELLOW` and `GREEN`, valued `\"red\"`, `\"yellow\"` and `\"green\"`, and a method `next()` that follows the cycle red, green, yellow, red. Write `parse_light(text)` returning the member whose value matches `text` ignoring case and surrounding spaces, or `None`.",
+      "starter": "from enum import Enum\n\n\nclass Light(Enum):\n    RED = \"red\"\n    YELLOW = \"yellow\"\n    GREEN = \"green\"\n\n    def next(self):\n        members = list(Light)\n        i = members.index(self)\n        return members[(i + 1) % len(members)]\n\n\ndef parse_light(text):\n    return Light[text]\n",
+      "solution": "from enum import Enum\n\n\nclass Light(Enum):\n    RED = \"red\"\n    YELLOW = \"yellow\"\n    GREEN = \"green\"\n\n    def next(self):\n        following = {\n            Light.RED: Light.GREEN,\n            Light.GREEN: Light.YELLOW,\n            Light.YELLOW: Light.RED,\n        }\n        return following[self]\n\n\ndef parse_light(text):\n    try:\n        return Light(text.strip().lower())\n    except ValueError:\n        return None\n",
+      "checks": [
+        {
+          "name": "members and values",
+          "code": "import enum\nassert issubclass(Light, enum.Enum), \"Light should be an Enum\"\ngot = [(m.name, m.value) for m in Light]\nassert got == [(\"RED\", \"red\"), (\"YELLOW\", \"yellow\"), (\"GREEN\", \"green\")], got"
+        },
+        {
+          "name": "cycles red, green, yellow",
+          "code": "assert Light.RED.next() is Light.GREEN, Light.RED.next()\nassert Light.GREEN.next() is Light.YELLOW, Light.GREEN.next()\nassert Light.YELLOW.next() is Light.RED, Light.YELLOW.next()"
+        },
+        {
+          "name": "parses values in any case",
+          "code": "assert parse_light(\" Red \") is Light.RED, parse_light(\" Red \")\nassert parse_light(\"GREEN\") is Light.GREEN, parse_light(\"GREEN\")\nassert parse_light(\"yellow\") is Light.YELLOW, parse_light(\"yellow\")"
+        },
+        {
+          "name": "unknown text gives None",
+          "code": "assert parse_light(\"blue\") is None, parse_light(\"blue\")\nassert parse_light(\"\") is None, parse_light(\"\")"
+        }
+      ],
+      "hints": [
+        "`Light(\"red\")` looks a member up by its value, and raises `ValueError` when there is none.",
+        "Clean the text with `strip()` and `lower()` before the lookup, and catch the `ValueError`. For `next`, a dict from each member to the following one is clearer than index arithmetic.",
+        "In `next`: `return {Light.RED: Light.GREEN, Light.GREEN: Light.YELLOW, Light.YELLOW: Light.RED}[self]`. In `parse_light`: `try: return Light(text.strip().lower())` and `except ValueError: return None`."
+      ],
+      "explanation": "`Light[text]` looks up names, not values, and raises for anything unexpected. `Light(value)` is the value lookup, and catching its `ValueError` turns bad input into `None`.\n\nThe cycle is not the definition order, so stepping through `list(Light)` gives the wrong next light. Spelling the transitions out makes the rule visible. The table lives inside the method because a dict assigned in the class body would become a member itself, and the members do not exist yet while the body runs."
+    },
+    {
       "id": "protocols-and-duck-typing",
       "title": "Protocols and duck typing",
       "body": "# Protocols and duck typing\n\nPython does not ask what class an object is. It asks whether the object has the attribute you are about to use. That is duck typing: if it has `.read()`, it can be read.\n\n```python\ndef shout(thing):\n    return thing.text().upper()\n```\n\nAny object with a `text` method works, and no shared base class is needed.\n\n## Writing the contract down\n\n`typing.Protocol` names the shape you expect, so type checkers can verify it. Classes do not inherit from it.\n\n```python\nfrom typing import Protocol\nfrom typing import runtime_checkable\n\n@runtime_checkable\nclass HasText(Protocol):\n    def text(self) -> str: ...\n\nclass Note:\n    def text(self):\n        return \"hi\"\n\nisinstance(Note(), HasText)  # True\n```\n\n`runtime_checkable` allows `isinstance`, but it only checks that the method name exists. It does not look at parameters or return types.",
@@ -155,6 +475,154 @@
         "`class Renderer(Protocol):` with `def render(self) -> str: ...`, and `return \"\\n\".join(i.render() for i in items)`."
       ],
       "explanation": "`render_all` never names a class, so it accepts anything with a `render` method, including classes written later.\n\nA protocol adds a checkable contract without forcing a shared base class. Use one when you want tools to catch a missing method before the code runs. `isinstance` against a protocol only confirms the name exists, so it is not a full proof."
+    },
+    {
+      "id": "abstract-base-classes",
+      "title": "Abstract base classes",
+      "body": "# Abstract base classes\n\nA protocol describes a shape from the outside. An abstract base class, or ABC, is a real parent class that subclasses must complete. Python refuses to create an instance while any abstract method is still missing.\n\n```python\nfrom abc import ABC, abstractmethod\n\nclass Shape(ABC):\n    @abstractmethod\n    def area(self): ...\n\n    def describe(self):\n        return f\"area {self.area():.1f}\"\n\nclass Square(Shape):\n    def __init__(self, side):\n        self.side = side\n\n    def area(self):\n        return self.side ** 2\n\nprint(Square(3).describe())\ntry:\n    Shape()\nexcept TypeError as e:\n    print(e)\n```\n\n- The error comes when the object is created, not later when the missing method is finally called.\n- Ordinary methods such as `describe` are inherited and may call the abstract ones.\n- `collections.abc` has ABCs for containers. Subclass `Mapping`, write `__getitem__`, `__len__` and `__iter__`, and you get `get`, `keys`, `items`, `in` and `==` for free.\n\nUse an ABC when subclasses should share code and must fill in specific methods. Use a protocol when unrelated classes only need to match a shape.",
+      "task": "Make `Storage` an abstract base class with abstract `load(key)` and `save(key, value)`, keeping its concrete `update(key, fn)`, which saves `fn(old value)` and returns it. `MemoryStorage(Storage)` keeps values in a dict, and its `load` raises `KeyError` for a missing key.",
+      "starter": "class Storage:\n    def load(self, key):\n        raise NotImplementedError\n\n    def save(self, key, value):\n        raise NotImplementedError\n\n    def update(self, key, fn):\n        value = fn(self.load(key))\n        self.save(key, value)\n        return value\n\n\nclass MemoryStorage(Storage):\n    def __init__(self):\n        self._data = {}\n\n    def load(self, key):\n        return self._data[key]\n\n    def save(self, key, value):\n        self._data[key] = value\n",
+      "solution": "from abc import ABC, abstractmethod\n\n\nclass Storage(ABC):\n    @abstractmethod\n    def load(self, key): ...\n\n    @abstractmethod\n    def save(self, key, value): ...\n\n    def update(self, key, fn):\n        value = fn(self.load(key))\n        self.save(key, value)\n        return value\n\n\nclass MemoryStorage(Storage):\n    def __init__(self):\n        self._data = {}\n\n    def load(self, key):\n        return self._data[key]\n\n    def save(self, key, value):\n        self._data[key] = value\n",
+      "checks": [
+        {
+          "name": "Storage cannot be created",
+          "code": "raised = False\ntry:\n    Storage()\nexcept TypeError:\n    raised = True\nassert raised, \"Storage() should raise TypeError\""
+        },
+        {
+          "name": "an incomplete subclass cannot be created",
+          "code": "class OnlyLoad(Storage):\n    def load(self, key):\n        return 1\nraised = False\ntry:\n    OnlyLoad()\nexcept TypeError:\n    raised = True\nassert raised, \"a subclass without save should raise TypeError when created\""
+        },
+        {
+          "name": "exactly load and save are abstract",
+          "code": "got = sorted(getattr(Storage, \"__abstractmethods__\", ()))\nassert got == [\"load\", \"save\"], got"
+        },
+        {
+          "name": "memory storage works",
+          "code": "s = MemoryStorage()\ns.save(\"a\", 1)\nassert s.load(\"a\") == 1, s.load(\"a\")\nassert isinstance(s, Storage), \"MemoryStorage should subclass Storage\"\nraised = False\ntry:\n    s.load(\"missing\")\nexcept KeyError:\n    raised = True\nassert raised, \"loading a missing key should raise KeyError\""
+        },
+        {
+          "name": "update is shared",
+          "code": "s = MemoryStorage()\ns.save(\"n\", 2)\ngot = s.update(\"n\", lambda v: v * 10)\nassert got == 20, got\nassert s.load(\"n\") == 20, s.load(\"n\")"
+        }
+      ],
+      "hints": [
+        "Inherit from `ABC` and put `@abstractmethod` above each method that subclasses must write.",
+        "An abstract method's body can be just `...`. `update` stays an ordinary method: it calls `self.load` and `self.save`, whatever the subclass made them.",
+        "`from abc import ABC, abstractmethod`, `class Storage(ABC):`, then `@abstractmethod` above `def load(self, key): ...` and above `def save(self, key, value): ...`."
+      ],
+      "explanation": "Raising `NotImplementedError` only fails when someone finally calls the missing method, which may be deep inside a running program. `@abstractmethod` moves the failure to the moment an incomplete object is created, with an error naming what is missing.\n\n`update` is written once, in terms of `load` and `save`, and every storage gets it. That split, where the base class owns the steps and subclasses fill in the details, is the main reason to write an ABC rather than a protocol."
+    },
+    {
+      "id": "composition-and-mixins",
+      "title": "Composition and mixins",
+      "body": "# Composition and mixins\n\nInheritance says \"is a\": a square is a shape. Composition says \"has a\": a car has an engine, stored as an attribute, and the car hands work to it. Prefer composition by default. Parts can be swapped at runtime or in tests, and a change to one part does not ripple through a hierarchy.\n\n```python\nimport json\n\nclass JsonMixin:\n    def to_json(self):\n        return json.dumps(vars(self))\n\nclass Point(JsonMixin):\n    def __init__(self, x, y):\n        self.x, self.y = x, y\n\nclass Engine:\n    def start(self):\n        return \"vroom\"\n\nclass Car:\n    def __init__(self, engine):\n        self.engine = engine\n\n    def start(self):\n        return self.engine.start()\n\nprint(Point(1, 2).to_json())\nprint(Car(Engine()).start())\n```\n\n## Mixins\n\nA mixin is a small class that adds one capability and is never used alone. It has no `__init__`, relies only on what its host provides, and is listed first: `class User(JsonMixin, Base)`. Mixins are where multiple inheritance stays simple, because each one adds methods without competing for state.",
+      "task": "Finish `ReprMixin`, whose repr shows the class name and every instance attribute as keyword arguments, like `Item(name='pen', price=2)`, and `EqualityMixin`, under which objects of the same class are equal when their attributes are. Change `Notifier` to receive a sender object in `__init__`, anything with `send(text)`, instead of inheriting from `EmailSender`.",
+      "starter": "class ReprMixin:\n    def __repr__(self):\n        return type(self).__name__ + \"()\"\n\n\nclass EqualityMixin:\n    pass\n\n\nclass Item(ReprMixin, EqualityMixin):\n    def __init__(self, name, price):\n        self.name = name\n        self.price = price\n\n\nclass EmailSender:\n    def send(self, text):\n        print(\"email:\", text)\n\n\nclass Notifier(EmailSender):\n    def notify(self, user, text):\n        self.send(f\"{user}: {text}\")\n",
+      "solution": "class ReprMixin:\n    def __repr__(self):\n        fields = \", \".join(f\"{k}={v!r}\" for k, v in vars(self).items())\n        return f\"{type(self).__name__}({fields})\"\n\n\nclass EqualityMixin:\n    def __eq__(self, other):\n        if type(other) is not type(self):\n            return NotImplemented\n        return vars(self) == vars(other)\n\n\nclass Item(ReprMixin, EqualityMixin):\n    def __init__(self, name, price):\n        self.name = name\n        self.price = price\n\n\nclass EmailSender:\n    def send(self, text):\n        print(\"email:\", text)\n\n\nclass Notifier:\n    def __init__(self, sender):\n        self.sender = sender\n\n    def notify(self, user, text):\n        self.sender.send(f\"{user}: {text}\")\n",
+      "checks": [
+        {
+          "name": "repr from the mixin",
+          "code": "got = repr(Item(\"pen\", 2))\nassert got == \"Item(name='pen', price=2)\", got"
+        },
+        {
+          "name": "the repr mixin fits any class",
+          "code": "class Tag(ReprMixin):\n    def __init__(self):\n        self.label = \"x\"\ngot = repr(Tag())\nassert got == \"Tag(label='x')\", got"
+        },
+        {
+          "name": "equality from the mixin",
+          "code": "assert Item(\"pen\", 2) == Item(\"pen\", 2), \"same attributes should be equal\"\nassert Item(\"pen\", 2) != Item(\"pen\", 3), \"different prices should differ\"\nassert (Item(\"pen\", 2) == \"pen\") is False, \"an Item never equals a str\""
+        },
+        {
+          "name": "the notifier uses the sender it is given",
+          "code": "class FakeSender:\n    def __init__(self):\n        self.sent = []\n    def send(self, text):\n        self.sent.append(text)\nfake = FakeSender()\nNotifier(fake).notify(\"ada\", \"hi\")\nassert fake.sent == [\"ada: hi\"], fake.sent"
+        },
+        {
+          "name": "the notifier holds a sender instead of being one",
+          "code": "assert EmailSender not in Notifier.__mro__, \"Notifier should not inherit from EmailSender\""
+        }
+      ],
+      "hints": [
+        "`vars(self)` is the dict of an instance's attributes, in the order they were set.",
+        "In `__eq__`, return `NotImplemented` unless `type(other) is type(self)`, then compare `vars(self) == vars(other)`. `Notifier.__init__` just stores the sender.",
+        "`fields = \", \".join(f\"{k}={v!r}\" for k, v in vars(self).items())` and `return f\"{type(self).__name__}({fields})\"`. In `notify`, call `self.sender.send(f\"{user}: {text}\")`."
+      ],
+      "explanation": "Inheriting from `EmailSender` welded `Notifier` to one way of sending. A test could not swap in a fake without patching, and adding text messages would mean another subclass. Holding the sender as an attribute makes it a choice made by whoever builds the `Notifier`.\n\nThe mixins read only `vars(self)` and `type(self)`, so they fit any class and need no setup. That is what keeps mixins safe: small, stateless, one job each."
+    },
+    {
+      "id": "descriptors",
+      "title": "Descriptors",
+      "body": "# Descriptors\n\n`property` is built on a general hook. A descriptor is an object, stored on a class, that defines `__get__` and often `__set__`. Reading or assigning that attribute on an instance calls those methods instead.\n\n```python\nclass Positive:\n    def __set_name__(self, owner, name):\n        self.name = name\n\n    def __get__(self, obj, owner=None):\n        if obj is None:\n            return self\n        return obj.__dict__[self.name]\n\n    def __set__(self, obj, value):\n        if value <= 0:\n            raise ValueError(self.name)\n        obj.__dict__[self.name] = value\n\nclass Box:\n    width = Positive()\n    height = Positive()\n\n    def __init__(self, w, h):\n        self.width, self.height = w, h\n\nprint(Box(2, 3).height, vars(Box(2, 3)))\n```\n\n- `__set_name__` runs once, when the class is created, and tells the descriptor its attribute name.\n- `__get__` receives `obj=None` when the attribute is read on the class itself. Returning the descriptor then keeps introspection working.\n- A descriptor with `__set__` takes priority over the instance's `__dict__`, so storing the value there under the same name is safe.\n\nOne descriptor class gives the same rule to any number of attributes, where properties need a getter and setter each. Functions, `classmethod` and `staticmethod` are descriptors too.",
+      "task": "Write a descriptor `Typed(kind)` that stores each value in the instance's `__dict__` under the attribute's own name, raises `TypeError` for a value that is not an instance of `kind`, and returns itself when read from the class. `Person(name, age)` uses `name = Typed(str)` and `age = Typed(int)`.",
+      "starter": "class Typed:\n    def __init__(self, kind):\n        self.kind = kind\n\n    def __get__(self, obj, owner=None):\n        return self.value\n\n    def __set__(self, obj, value):\n        if not isinstance(value, self.kind):\n            raise TypeError(f\"expected {self.kind.__name__}\")\n        self.value = value\n\n\nclass Person:\n    name = Typed(str)\n    age = Typed(int)\n\n    def __init__(self, name, age):\n        self.name = name\n        self.age = age\n",
+      "solution": "class Typed:\n    def __init__(self, kind):\n        self.kind = kind\n\n    def __set_name__(self, owner, name):\n        self.name = name\n\n    def __get__(self, obj, owner=None):\n        if obj is None:\n            return self\n        return obj.__dict__[self.name]\n\n    def __set__(self, obj, value):\n        if not isinstance(value, self.kind):\n            raise TypeError(f\"{self.name} must be {self.kind.__name__}\")\n        obj.__dict__[self.name] = value\n\n\nclass Person:\n    name = Typed(str)\n    age = Typed(int)\n\n    def __init__(self, name, age):\n        self.name = name\n        self.age = age\n",
+      "checks": [
+        {
+          "name": "accepts the right types",
+          "code": "p = Person(\"Ada\", 36)\nassert (p.name, p.age) == (\"Ada\", 36), (p.name, p.age)"
+        },
+        {
+          "name": "rejects the wrong types",
+          "code": "raised = False\ntry:\n    Person(\"Ada\", \"36\")\nexcept TypeError:\n    raised = True\nassert raised, \"Person('Ada', '36') should raise TypeError\"\np = Person(\"Ada\", 36)\nraised = False\ntry:\n    p.age = 3.5\nexcept TypeError:\n    raised = True\nassert raised, \"p.age = 3.5 should raise TypeError\"\nassert p.age == 36, p.age"
+        },
+        {
+          "name": "each instance keeps its own values",
+          "code": "a = Person(\"A\", 1)\nb = Person(\"B\", 2)\nassert (a.name, a.age) == (\"A\", 1), (a.name, a.age)"
+        },
+        {
+          "name": "values live in the instance",
+          "code": "got = vars(Person(\"Ada\", 1))\nassert got == {\"name\": \"Ada\", \"age\": 1}, got"
+        },
+        {
+          "name": "the class sees the descriptor",
+          "code": "assert isinstance(Person.age, Typed), type(Person.age)\nassert Person.age.kind is int, Person.age.kind"
+        },
+        {
+          "name": "works in any class",
+          "code": "class Item:\n    price = Typed(float)\ni = Item()\ni.price = 2.5\nassert i.price == 2.5, i.price\nraised = False\ntry:\n    i.price = \"cheap\"\nexcept TypeError:\n    raised = True\nassert raised, \"price should only accept floats\""
+        }
+      ],
+      "hints": [
+        "Storing the value on the descriptor, as `self.value`, shares it between every instance, because there is one descriptor per class attribute.",
+        "Add `__set_name__(self, owner, name)` to learn the attribute name, then read and write `obj.__dict__[self.name]`.",
+        "In `__get__`: `if obj is None: return self`, then `return obj.__dict__[self.name]`. In `__set__`: raise `TypeError` unless `isinstance(value, self.kind)`, then `obj.__dict__[self.name] = value`."
+      ],
+      "explanation": "A descriptor lives on the class, so one `Typed` object serves `age` for every `Person`. Keeping the value on `self` meant the last assignment won for everyone. The per-instance home for data is the instance's own `__dict__`.\n\nBecause `Typed` defines `__set__`, Python consults it before the instance dict on every lookup, so no assignment can skip the check. `__set_name__` saves repeating the name by hand, as in `age = Typed(int, \"age\")`."
+    },
+    {
+      "id": "init-subclass-and-metaclasses",
+      "title": "Class hooks and metaclasses",
+      "body": "# Class hooks and metaclasses\n\nA class can react whenever it is subclassed. Python calls `__init_subclass__` on the parent with the new class as `cls`, and passes it any keyword arguments from the class line.\n\n```python\nclass Plugin:\n    registry = {}\n\n    def __init_subclass__(cls, key, **kw):\n        super().__init_subclass__(**kw)\n        Plugin.registry[key] = cls\n\nclass Csv(Plugin, key=\"csv\"):\n    pass\n\nclass Json(Plugin, key=\"json\"):\n    pass\n\nprint(Plugin.registry)\n```\n\nThis covers most needs: registering plugins, checking that a subclass defines what it must, or filling in defaults.\n\n## Metaclasses\n\n```python\nclass Tracked(type):\n    def __init__(cls, name, bases, ns):\n        super().__init__(name, bases, ns)\n        print(\"created\", name)\n\nclass Model(metaclass=Tracked):\n    pass\n\nprint(type(Model).__name__, type(int))\n```\n\nClasses are objects too, and the type of a class is its metaclass, normally `type`. A metaclass subclasses `type` and controls how classes are built; `ABC` and `Enum` rely on one. Reach for a metaclass only when `__init_subclass__` or a class decorator cannot do the job, because metaclasses are hard to combine.",
+      "task": "Give `Command` an `__init_subclass__` that takes a keyword `name` and registers each subclass in `Command.registry`, raising `TypeError` if the subclass has no `run` method or the name is already taken. `dispatch(name)` creates the registered command and returns its `run()` result, raising `KeyError` for unknown names.",
+      "starter": "class Command:\n    registry = {}\n\n    def __init_subclass__(cls, name, **kwargs):\n        super().__init_subclass__(**kwargs)\n        Command.registry[name] = cls\n\n\ndef dispatch(name):\n    return Command.registry[name]().run()\n",
+      "solution": "class Command:\n    registry = {}\n\n    def __init_subclass__(cls, name, **kwargs):\n        super().__init_subclass__(**kwargs)\n        if not callable(getattr(cls, \"run\", None)):\n            raise TypeError(f\"{cls.__name__} needs a run method\")\n        if name in Command.registry:\n            raise TypeError(f\"command {name!r} already exists\")\n        Command.registry[name] = cls\n\n\ndef dispatch(name):\n    command = Command.registry[name]\n    return command().run()\n",
+      "checks": [
+        {
+          "name": "subclasses register themselves",
+          "code": "class Hello(Command, name=\"hello\"):\n    def run(self):\n        return \"hi\"\nassert Command.registry.get(\"hello\") is Hello, Command.registry"
+        },
+        {
+          "name": "dispatch runs the command",
+          "code": "class Add(Command, name=\"add\"):\n    def run(self):\n        return 2 + 2\nassert dispatch(\"add\") == 4, dispatch(\"add\")"
+        },
+        {
+          "name": "unknown names raise KeyError",
+          "code": "raised = False\ntry:\n    dispatch(\"no-such-command\")\nexcept KeyError:\n    raised = True\nassert raised, \"dispatch of an unknown name should raise KeyError\""
+        },
+        {
+          "name": "run is required",
+          "code": "raised = False\ntry:\n    class Broken(Command, name=\"broken\"):\n        pass\nexcept TypeError:\n    raised = True\nassert raised, \"a command without run should raise TypeError\"\nassert \"broken\" not in Command.registry, sorted(Command.registry)"
+        },
+        {
+          "name": "names are unique",
+          "code": "class First(Command, name=\"dup\"):\n    def run(self):\n        return 1\nraised = False\ntry:\n    class Second(Command, name=\"dup\"):\n        def run(self):\n            return 2\nexcept TypeError:\n    raised = True\nassert raised, \"a second command named 'dup' should raise TypeError\"\nassert Command.registry[\"dup\"] is First, Command.registry[\"dup\"]"
+        }
+      ],
+      "hints": [
+        "`__init_subclass__(cls, name, **kwargs)` runs as each subclass is created, and raising there stops the class from being created at all.",
+        "Check before registering: `getattr(cls, \"run\", None)` must be callable, and `name` must not already be a key of `Command.registry`.",
+        "`if not callable(getattr(cls, \"run\", None)): raise TypeError(...)`, then `if name in Command.registry: raise TypeError(...)`, and only then `Command.registry[name] = cls`."
+      ],
+      "explanation": "Validating in `__init_subclass__` turns a broken plugin into an error at the line that defines it, rather than a crash the first time someone dispatches to it. Checking the name stops a later class from silently replacing an earlier one.\n\nEvery subclass shares the single `registry` dict defined on `Command`. A metaclass could do the same job, but this hook needs no new type and combines freely with other base classes."
     },
     {
       "id": "iterators-and-generators",
@@ -197,6 +665,146 @@
       "explanation": "Counting in a local variable inside `__iter__` keeps the position out of the object, so two loops over one `Countdown` cannot interfere.\n\n`yield from flatten(item)` passes along everything the inner call produces. A generator holds one frame per nesting level, so memory use follows the depth rather than the number of items."
     },
     {
+      "id": "generator-send-and-yield-from",
+      "title": "Sending into generators",
+      "body": "# Sending into generators\n\n`yield` is an expression. `gen.send(value)` resumes a paused generator and makes the waiting `yield` evaluate to `value`, so data can flow in as well as out.\n\n```python\ndef averager():\n    total = count = 0\n    average = None\n    while True:\n        value = yield average\n        total += value\n        count += 1\n        average = total / count\n\navg = averager()\nnext(avg)  # run to the first yield\nprint(avg.send(10), avg.send(20))\n```\n\nA new generator has not reached a `yield` yet, so start it with `next(gen)`, which is the same as `gen.send(None)`. `gen.close()` raises `GeneratorExit` at the paused `yield` so cleanup code runs.\n\n## yield from\n\n`yield from inner` passes along more than values. It forwards `send` calls to `inner`, and it evaluates to whatever `inner` returns. A generator's `return x` stops it, and `x` travels in `StopIteration.value`.\n\n```python\ndef inner():\n    n = yield \"send me a number\"\n    return n * 2\n\ndef outer():\n    result = yield from inner()\n    yield f\"doubled: {result}\"\n\ng = outer()\nprint(next(g))\nprint(g.send(21))\n```",
+      "task": "Write a generator `running_max()` that yields the largest number sent to it so far, and `None` before the first. Write a generator `with_result(gen)` that passes on everything `gen` yields, forwards sent values to it, and then yields `gen`'s return value.",
+      "starter": "def running_max():\n    best = None\n    while True:\n        yield best\n\n\ndef with_result(gen):\n    for item in gen:\n        yield item\n",
+      "solution": "def running_max():\n    best = None\n    while True:\n        value = yield best\n        if best is None or value > best:\n            best = value\n\n\ndef with_result(gen):\n    result = yield from gen\n    yield result\n",
+      "checks": [
+        {
+          "name": "starts with None",
+          "code": "g = running_max()\ngot = next(g)\nassert got is None, got"
+        },
+        {
+          "name": "tracks the maximum",
+          "code": "g = running_max()\nnext(g)\ngot = [g.send(v) for v in [3, 1, 7, 7, 2]]\nassert got == [3, 3, 7, 7, 7], got"
+        },
+        {
+          "name": "negative numbers",
+          "code": "g = running_max()\nnext(g)\ngot = [g.send(v) for v in [-5, -9, -1]]\nassert got == [-5, -5, -1], got"
+        },
+        {
+          "name": "passes items on, then the result",
+          "code": "def numbers():\n    yield 1\n    yield 2\n    return \"done\"\ngot = list(with_result(numbers()))\nassert got == [1, 2, \"done\"], got"
+        },
+        {
+          "name": "forwards sent values",
+          "code": "def echo():\n    word = yield \"ready\"\n    return word.upper()\nw = with_result(echo())\nassert next(w) == \"ready\", \"first value\"\ngot = w.send(\"hi\")\nassert got == \"HI\", got"
+        }
+      ],
+      "hints": [
+        "Inside the loop, `value = yield best` both hands out the current maximum and receives the next number.",
+        "Start `best` at `None`, not 0, or negative numbers break. For `with_result`, a `for` loop can neither forward `send` nor see the return value.",
+        "`if best is None or value > best: best = value`, and `result = yield from gen` followed by `yield result`."
+      ],
+      "explanation": "`for item in gen` drives `gen` with `next`, so a value sent to the outer generator never reaches the inner one, and the return value is lost inside the `StopIteration` that the loop swallows. `yield from` is full delegation: values out, sends in, and the return value back.\n\nStarting the maximum at 0 would report 0 for a stream of negative numbers. `None` says that there is no answer yet, and the first value always replaces it."
+    },
+    {
+      "id": "itertools-toolkit",
+      "title": "The itertools module",
+      "body": "# The itertools module\n\n`itertools` builds lazy iterators that combine like pipes. Nothing is computed until something loops over the result.\n\n```python\nfrom itertools import (\n    accumulate, batched, chain,\n    groupby, islice, pairwise)\n\nprint(list(chain([1, 2], [3])))\nprint(list(accumulate([1, 2, 3])))\nprint(list(pairwise(\"abc\")))\nprint(list(batched(range(5), 2)))\nprint(list(islice(\"abcdef\", 1, 4)))\nfor key, grp in groupby(\"aabccc\"):\n    print(key, len(list(grp)))\n```\n\n- `chain` joins iterables, and `islice` slices any iterator, even an endless one such as `count()`.\n- `accumulate` yields running totals, or running results of any two-argument function, such as `max`.\n- `pairwise` yields neighbouring pairs, and `batched` yields tuples of n items with a shorter last one.\n- `groupby` groups only consecutive items with equal keys. Sort by the same key first if you want one group per key.\n- `product`, `permutations` and `combinations` replace nested loops over choices.\n\nThese functions accept any iterable and never need `len` or indexing, so they also work on generators and files.",
+      "task": "Using `itertools`, write `runs(text)` returning `(char, count)` pairs for each run of repeated characters, `increases(nums)` counting the neighbouring pairs where the second number is larger, `peaks(nums)` returning the running maximum as a list, and `pairings(names)` returning every unordered pair as a list of tuples in input order. Each must accept any iterable.",
+      "starter": "def runs(text):\n    return [(ch, text.count(ch)) for ch in dict.fromkeys(text)]\n\n\ndef increases(nums):\n    count = 0\n    for i in range(len(nums) - 1):\n        if nums[i + 1] > nums[i]:\n            count += 1\n    return count\n\n\ndef peaks(nums):\n    return [max(nums)] * len(nums)\n\n\ndef pairings(names):\n    return [(a, b) for a in names for b in names if a != b]\n",
+      "solution": "from itertools import accumulate, combinations, groupby, pairwise\n\n\ndef runs(text):\n    return [(ch, len(list(group))) for ch, group in groupby(text)]\n\n\ndef increases(nums):\n    return sum(b > a for a, b in pairwise(nums))\n\n\ndef peaks(nums):\n    return list(accumulate(nums, max))\n\n\ndef pairings(names):\n    return list(combinations(names, 2))\n",
+      "checks": [
+        {
+          "name": "runs of characters",
+          "code": "got = runs(\"aabccc\")\nassert got == [(\"a\", 2), (\"b\", 1), (\"c\", 3)], got\ngot = runs(\"abab\")\nassert got == [(\"a\", 1), (\"b\", 1), (\"a\", 1), (\"b\", 1)], got\nassert runs(\"\") == [], runs(\"\")"
+        },
+        {
+          "name": "counts increases",
+          "code": "assert increases([1, 3, 2, 5, 6]) == 3, increases([1, 3, 2, 5, 6])\nassert increases([4]) == 0, increases([4])\nassert increases([]) == 0, increases([])"
+        },
+        {
+          "name": "running maximum",
+          "code": "got = peaks([3, 1, 4, 1, 5])\nassert got == [3, 3, 4, 4, 5], got\nassert peaks([]) == [], peaks([])"
+        },
+        {
+          "name": "unordered pairs",
+          "code": "got = pairings([\"a\", \"b\", \"c\"])\nassert got == [(\"a\", \"b\"), (\"a\", \"c\"), (\"b\", \"c\")], got\nassert pairings([\"a\"]) == [], pairings([\"a\"])"
+        },
+        {
+          "name": "accepts any iterable",
+          "code": "assert runs(iter(\"aab\")) == [(\"a\", 2), (\"b\", 1)], \"runs of an iterator\"\nassert increases(x for x in [1, 2, 3]) == 2, \"increases of a generator\"\nassert peaks(x for x in [2, 1, 3]) == [2, 2, 3], \"peaks of a generator\"\nassert pairings(iter(\"xy\")) == [(\"x\", \"y\")], \"pairings of an iterator\""
+        }
+      ],
+      "hints": [
+        "Each function has a matching tool: `groupby`, `pairwise`, `accumulate` and `combinations`.",
+        "`groupby(text)` yields `(key, group)` with the group as an iterator, so count it with `len(list(group))`. `accumulate` takes a function as its second argument, and `max` is one.",
+        "`[(ch, len(list(g))) for ch, g in groupby(text)]`, `sum(b > a for a, b in pairwise(nums))`, `list(accumulate(nums, max))` and `list(combinations(names, 2))`."
+      ],
+      "explanation": "The index-based versions need `len` and `nums[i]`, which generators do not have, and `text.count` counts every occurrence rather than each run. The itertools versions walk the input once, in order, so they work for any iterable.\n\n`sum(b > a ...)` adds booleans, which count as 0 and 1. `combinations` keeps input order and never pairs an item with itself, which is exactly what an unordered pair means."
+    },
+    {
+      "id": "comprehensions-and-walrus",
+      "title": "Comprehensions and the walrus",
+      "body": "# Comprehensions and the walrus\n\nA comprehension inside another builds a list of lists. Two `for` clauses in one comprehension flatten instead.\n\n```python\ngrid = [[1, 2, 3], [4, 5, 6]]\nflat = [x for row in grid for x in row]\ncols = [[row[i] for row in grid]\n        for i in range(3)]\nprint(flat)\nprint(cols)\n\nsquares = (x * x for x in range(4))\nprint(sum(squares), sum(squares))\nprint({len(w): w for w in [\"ab\", \"cd\"]})\n```\n\n- A generator expression is lazy and runs once. The second `sum` finds it already empty, and a function that loops over its argument twice gets the same surprise.\n- In a dict comprehension a repeated key keeps the last value.\n- The loop variable stays inside the comprehension. In a class body, a comprehension cannot see the class's own names, except in its first `for`.\n\n## The walrus operator\n\n`:=` assigns a name and returns the value in one expression. It saves computing something twice, as in `while (line := f.readline()):`. In a comprehension the name binds in the surrounding scope.\n\n```python\nimport re\n\nwords = [\"a1\", \"b\", \"c22\"]\nnums = [int(m[0]) for w in words\n        if (m := re.search(r\"\\d+\", w))]\nprint(nums)\n```",
+      "task": "Write `transpose(matrix)` returning the columns of a list of equal-length rows as lists, using a comprehension inside a comprehension (`[]` for an empty matrix). Write `spread(values)` returning the largest minus the smallest value of any iterable, including a generator. Write `valid_numbers(items)` returning, as one comprehension, the results of the given `to_int` that are not `None`, calling `to_int` once per item.",
+      "starter": "def to_int(text):\n    try:\n        return int(text)\n    except ValueError:\n        return None\n\n\ndef transpose(matrix):\n    if not matrix:\n        return []\n    return [row[i] for i in range(len(matrix[0])) for row in matrix]\n\n\ndef spread(values):\n    return max(values) - min(values)\n\n\ndef valid_numbers(items):\n    return [to_int(s) for s in items if to_int(s)]\n",
+      "solution": "def to_int(text):\n    try:\n        return int(text)\n    except ValueError:\n        return None\n\n\ndef transpose(matrix):\n    if not matrix:\n        return []\n    return [[row[i] for row in matrix] for i in range(len(matrix[0]))]\n\n\ndef spread(values):\n    values = list(values)\n    return max(values) - min(values)\n\n\ndef valid_numbers(items):\n    return [n for s in items if (n := to_int(s)) is not None]\n",
+      "checks": [
+        {
+          "name": "transpose builds rows",
+          "code": "got = transpose([[1, 2, 3], [4, 5, 6]])\nassert got == [[1, 4], [2, 5], [3, 6]], got\nassert transpose([[7]]) == [[7]], transpose([[7]])\nassert transpose([]) == [], transpose([])"
+        },
+        {
+          "name": "spread of a list",
+          "code": "assert spread([3, 9, 4]) == 6, spread([3, 9, 4])\nassert spread([5]) == 0, spread([5])"
+        },
+        {
+          "name": "spread of a generator",
+          "code": "got = spread(x * 2 for x in [1, 5, 3])\nassert got == 8, got"
+        },
+        {
+          "name": "keeps valid numbers, zero included",
+          "code": "got = valid_numbers([\"1\", \"x\", \" 7 \", \"-3\", \"0\"])\nassert got == [1, 7, -3, 0], got"
+        },
+        {
+          "name": "calls to_int once per item",
+          "code": "real_to_int = to_int\ncalls = []\ndef to_int(text):\n    calls.append(text)\n    return real_to_int(text)\ntry:\n    valid_numbers([\"1\", \"x\", \"2\"])\nfinally:\n    to_int = real_to_int\nassert calls == [\"1\", \"x\", \"2\"], calls"
+        }
+      ],
+      "hints": [
+        "For `transpose`, the outer comprehension makes one row per column index, and the inner one collects that column from every row.",
+        "A generator can be read only once, so `max` and then `min` over it cannot both work: make a list first. In `valid_numbers`, `(n := to_int(s))` stores the result and hands it to the test.",
+        "`[[row[i] for row in matrix] for i in range(len(matrix[0]))]`, `values = list(values)`, and `[n for s in items if (n := to_int(s)) is not None]`."
+      ],
+      "explanation": "Two `for` clauses in a single comprehension produce one flat list. To get rows, the inner loop must be a comprehension of its own, one per column. `[list(col) for col in zip(*matrix)]` is a shorter spelling of the same idea.\n\n`max(values)` used up the generator, so `min` saw nothing and raised `ValueError`. Calling `to_int(s)` in both the filter and the result does the work twice, and `if to_int(s)` also throws away 0. Put a one-shot iterable in a list when you need two passes, and let the walrus keep a value you need twice."
+    },
+    {
+      "id": "collections-toolkit",
+      "title": "The collections module",
+      "body": "# The collections module\n\nYou have met `Counter`. The rest of `collections` holds more containers for jobs that plain lists and dicts do awkwardly.\n\n```python\nfrom collections import (\n    Counter, defaultdict, deque, namedtuple)\n\nstock = Counter(apple=3, pear=1)\nsold = Counter(apple=1, pear=2)\nprint(stock - sold, stock + sold)\n\nspent = defaultdict(int)\norders = [(\"ann\", 5), (\"bo\", 2), (\"ann\", 1)]\nfor name, amount in orders:\n    spent[name] += amount\nprint(dict(spent))\n\nrecent = deque(\"abcde\", maxlen=3)\nrecent.appendleft(\"z\")\nprint(recent)\n\nPoint = namedtuple(\"Point\", \"x y\")\np = Point(1, 2)\nprint(p.x, p._replace(y=5), p._asdict())\n```\n\n- Counters add and subtract, and the result drops any count that falls to zero or below, which suits stock and shopping lists.\n- `defaultdict` calls its factory for a missing key: `int` gives 0 for totals, `list` an empty group, `set` an empty set.\n- `deque` adds and removes at both ends in constant time, where `list.pop(0)` shifts every item. With `maxlen`, items fall off the far end.\n- `namedtuple` is a tuple with field names. `_replace` returns a changed copy and `_asdict` a dict.",
+      "task": "Write `shortfall(needed, have)` returning a dict of how many of each item in the list `needed` are still missing after using the list `have`, with no zero entries. Write `totals(pairs)` summing the amounts of `(name, amount)` pairs per name into a plain dict. Write `tail(items, n)` returning the last `n` items of any iterable as a list. Define `Card = namedtuple(\"Card\", \"rank suit\")`.",
+      "starter": "def shortfall(needed, have):\n    return {item: needed.count(item) - have.count(item) for item in needed}\n\n\ndef totals(pairs):\n    result = {}\n    for name, amount in pairs:\n        result[name] = amount\n    return result\n\n\ndef tail(items, n):\n    return items[-n:]\n\n\nCard = tuple\n",
+      "solution": "from collections import Counter, defaultdict, deque, namedtuple\n\nCard = namedtuple(\"Card\", \"rank suit\")\n\n\ndef shortfall(needed, have):\n    return dict(Counter(needed) - Counter(have))\n\n\ndef totals(pairs):\n    sums = defaultdict(int)\n    for name, amount in pairs:\n        sums[name] += amount\n    return dict(sums)\n\n\ndef tail(items, n):\n    return list(deque(items, maxlen=n))\n",
+      "checks": [
+        {
+          "name": "shortfall",
+          "code": "got = shortfall([\"egg\", \"egg\", \"milk\", \"flour\"], [\"egg\", \"flour\", \"flour\"])\nassert got == {\"egg\": 1, \"milk\": 1}, got\nassert shortfall([\"a\"], [\"a\", \"b\"]) == {}, shortfall([\"a\"], [\"a\", \"b\"])"
+        },
+        {
+          "name": "totals per name",
+          "code": "got = totals([(\"ann\", 5), (\"bo\", 2), (\"ann\", 1)])\nassert got == {\"ann\": 6, \"bo\": 2}, got\nassert type(got) is dict, f\"return a plain dict, not {type(got).__name__}\"\nassert totals([]) == {}, totals([])"
+        },
+        {
+          "name": "tail of any iterable",
+          "code": "got = tail(iter(range(10)), 3)\nassert got == [7, 8, 9], got\nassert tail([1], 3) == [1], tail([1], 3)\nassert tail([1, 2], 0) == [], tail([1, 2], 0)"
+        },
+        {
+          "name": "Card is a namedtuple",
+          "code": "c = Card(\"Q\", \"H\")\nassert (c.rank, c.suit) == (\"Q\", \"H\"), c\nassert c == (\"Q\", \"H\"), c\nassert Card._fields == (\"rank\", \"suit\"), Card._fields\nassert c._replace(rank=\"K\") == (\"K\", \"H\"), c._replace(rank=\"K\")"
+        }
+      ],
+      "hints": [
+        "`Counter(a) - Counter(b)` keeps only positive counts. `defaultdict(int)` starts every new key at 0, so `+=` just works.",
+        "A `deque` with `maxlen=n` keeps only the last `n` items it is given, and it accepts any iterable.",
+        "`dict(Counter(needed) - Counter(have))`, `sums[name] += amount` then `return dict(sums)`, `list(deque(items, maxlen=n))`, and `Card = namedtuple(\"Card\", \"rank suit\")`."
+      ],
+      "explanation": "Counting with `list.count` inside a loop is slow and keeps zero and negative entries. Counter subtraction does the bookkeeping and drops what is no longer needed. Slicing with `items[-n:]` fails on iterators, and with `n` of 0 it returns everything, because `-0` is just 0.\n\n`defaultdict(int)` removes the first-time branch, the one the starter got wrong by assigning instead of adding. Returning `dict(sums)` hands back a plain dict, so a caller's lookup of a missing name raises instead of quietly adding a zero."
+    },
+    {
       "id": "context-managers",
       "title": "Context managers",
       "body": "# Context managers\n\n`with` guarantees cleanup, whichever way a block ends. An object supports it by defining `__enter__` and `__exit__`.\n\n```python\nclass Timer:\n    def __enter__(self):\n        return self\n\n    def __exit__(self, kind, err, tb):\n        print(\"done\")\n        return False  # do not swallow\n```\n\n`__exit__` receives details of any exception. A true return value suppresses it, so usually return `False`.\n\n## The short form\n\n`contextlib.contextmanager` turns a generator into a context manager. Code before `yield` is the setup. Code after it is the cleanup.\n\n```python\nfrom contextlib import contextmanager\n\n@contextmanager\ndef tag(out, name):\n    out.append(f\"<{name}>\")\n    try:\n        yield\n    finally:\n        out.append(f\"</{name}>\")\n```\n\nThe `try`/`finally` matters. An exception inside the `with` block is raised at the `yield`, so without `finally` your cleanup would be skipped.",
@@ -235,6 +843,78 @@
         "`had_key = key in settings`, `old = settings.get(key)`, set the value, then `try: yield`, and `finally:` restore `old` if `had_key`, otherwise `del settings[key]`."
       ],
       "explanation": "An exception raised in the `with` block appears at the `yield`, so `finally` is what guarantees restoration. No `except` means the exception keeps travelling to the caller.\n\nTesting `key in settings` separately from reading the value keeps \"missing\" distinct from \"stored as `None`\"."
+    },
+    {
+      "id": "exception-chaining-and-groups",
+      "title": "Exception chaining and groups",
+      "body": "# Exception chaining and groups\n\nWhen you catch one error and raise another, record why. `raise New(...) from err` stores the original in `__cause__`, and the traceback shows both, with the original as the direct cause.\n\n```python\nclass ConfigError(Exception):\n    pass\n\ndef port(text):\n    try:\n        return int(text)\n    except ValueError as err:\n        raise ConfigError(text) from err\n\ntry:\n    port(\"http\")\nexcept ConfigError as e:\n    print(e, \"caused by\", repr(e.__cause__))\n```\n\nRaising inside `except` without `from` still keeps the first error, in `__context__`, but reports it as a second failure that happened while handling the first. `raise ... from None` hides it.\n\n## Several errors at once\n\n`ExceptionGroup(message, errors)` carries a list of exceptions, for example every problem found in a form. Each `except*` clause takes the matching part of the group, and anything left unhandled is raised again.\n\n```python\nerrors = [ValueError(\"age\"),\n          KeyError(\"name\")]\ntry:\n    raise ExceptionGroup(\"form\", errors)\nexcept* ValueError as eg:\n    print(\"values:\", eg.exceptions)\nexcept* KeyError as eg:\n    print(\"keys:\", eg.exceptions)\n```",
+      "task": "Write `load_port(config)` returning `int(config[\"port\"])` and raising `ConfigError(\"bad port\")` chained with `from` to the original `KeyError` or `ValueError`. Write `validate(user)` that collects `KeyError(\"name\")` when `\"name\"` is missing and `ValueError(\"age\")` when `\"age\"` is missing or not a non-negative int, raises them together as `ExceptionGroup(\"invalid user\", errors)`, and returns `True` when there are none.",
+      "starter": "class ConfigError(Exception):\n    pass\n\n\ndef load_port(config):\n    try:\n        return int(config[\"port\"])\n    except (KeyError, ValueError):\n        raise ConfigError(\"bad port\")\n\n\ndef validate(user):\n    if \"name\" not in user:\n        raise KeyError(\"name\")\n    age = user.get(\"age\")\n    if not isinstance(age, int) or age < 0:\n        raise ValueError(\"age\")\n    return True\n",
+      "solution": "class ConfigError(Exception):\n    pass\n\n\ndef load_port(config):\n    try:\n        return int(config[\"port\"])\n    except (KeyError, ValueError) as err:\n        raise ConfigError(\"bad port\") from err\n\n\ndef validate(user):\n    errors = []\n    if \"name\" not in user:\n        errors.append(KeyError(\"name\"))\n    age = user.get(\"age\")\n    if not isinstance(age, int) or age < 0:\n        errors.append(ValueError(\"age\"))\n    if errors:\n        raise ExceptionGroup(\"invalid user\", errors)\n    return True\n",
+      "checks": [
+        {
+          "name": "a valid port",
+          "code": "assert load_port({\"port\": \"8080\"}) == 8080, load_port({\"port\": \"8080\"})"
+        },
+        {
+          "name": "a missing port is chained",
+          "code": "cause = \"no ConfigError\"\ntry:\n    load_port({})\nexcept ConfigError as e:\n    cause = e.__cause__\nassert isinstance(cause, KeyError), repr(cause)"
+        },
+        {
+          "name": "a bad number is chained",
+          "code": "cause = \"no ConfigError\"\ntry:\n    load_port({\"port\": \"http\"})\nexcept ConfigError as e:\n    cause = e.__cause__\nassert isinstance(cause, ValueError), repr(cause)"
+        },
+        {
+          "name": "a valid user",
+          "code": "assert validate({\"name\": \"Ada\", \"age\": 36}) is True, \"a valid user should return True\""
+        },
+        {
+          "name": "collects every problem",
+          "code": "got = \"no ExceptionGroup\"\ntry:\n    validate({\"age\": -1})\nexcept ExceptionGroup as eg:\n    got = sorted(type(e).__name__ for e in eg.exceptions)\nassert got == [\"KeyError\", \"ValueError\"], got"
+        },
+        {
+          "name": "one problem is still a group",
+          "code": "got = \"no ExceptionGroup\"\ntry:\n    validate({\"name\": \"Ada\", \"age\": \"36\"})\nexcept ExceptionGroup as eg:\n    got = [repr(e) for e in eg.exceptions]\nassert got == [\"ValueError('age')\"], got"
+        }
+      ],
+      "hints": [
+        "`raise ConfigError(\"bad port\") from err` needs the caught exception bound, as in `except (KeyError, ValueError) as err:`.",
+        "In `validate`, append exceptions to a list instead of raising the first one, then raise once at the end if the list is not empty.",
+        "`errors = []`, then `errors.append(KeyError(\"name\"))` and `errors.append(ValueError(\"age\"))` as needed, `if errors: raise ExceptionGroup(\"invalid user\", errors)`, and `return True`."
+      ],
+      "explanation": "Without `from`, the original error is only the `__context__`, and the traceback reads as if a second bug broke the handler. `from err` states that the `ConfigError` happened because of `err`, and code can inspect `__cause__` for the detail.\n\nRaising at the first problem makes a user fix one field, submit, and meet the next. Collecting them into an `ExceptionGroup` reports everything at once, and callers can still handle each kind separately with `except*`."
+    },
+    {
+      "id": "structural-pattern-matching",
+      "title": "Pattern matching",
+      "body": "# Pattern matching\n\n`match` tries each `case` from top to bottom and runs the first one that fits. A pattern can test shape and type and pull out parts in the same step.\n\n```python\ndef describe(cmd):\n    match cmd:\n        case [\"go\", direction]:\n            return f\"going {direction}\"\n        case [\"take\", *items] if items:\n            return f\"taking {len(items)}\"\n        case {\"say\": str(text)}:\n            return f\"saying {text}\"\n        case int() | float() as n:\n            return f\"number {n}\"\n        case _:\n            return \"unknown\"\n\nprint(describe([\"go\", \"north\"]))\nprint(describe([\"take\", \"a\", \"b\"]))\nprint(describe({\"say\": \"hi\", \"to\": \"x\"}))\nprint(describe(3.5), describe(\"go\"))\n```\n\n- A sequence pattern checks the length, and `*rest` collects the remainder. Strings never match sequence patterns.\n- A mapping pattern checks only the keys it names, so extra keys are fine.\n- `str(text)` checks the type and binds the value. `Point(x=0, y=y)` matches the attributes of an object.\n- `|` tries alternatives, `if` adds a guard, and `as` names the whole match.\n- A bare name always matches and binds. To compare with a constant, use a literal or a dotted name such as `Color.RED`.\n- `case _:` catches everything else.",
+      "task": "Write `evaluate(expr, env)` for small expression trees: an int or float is itself, `(\"neg\", x)` is minus `x`, `(\"add\", a, b)` and `(\"mul\", a, b)` combine their evaluated parts, and `{\"var\": name}` is `env[name]`. Anything else raises `ValueError`.",
+      "starter": "def evaluate(expr, env):\n    if isinstance(expr, (int, float)):\n        return expr\n    if expr[0] == \"add\":\n        return evaluate(expr[1], env) + evaluate(expr[2], env)\n    if expr[0] == \"mul\":\n        return evaluate(expr[1], env) * evaluate(expr[2], env)\n    raise ValueError(expr)\n",
+      "solution": "def evaluate(expr, env):\n    match expr:\n        case int() | float():\n            return expr\n        case (\"neg\", x):\n            return -evaluate(x, env)\n        case (\"add\", a, b):\n            return evaluate(a, env) + evaluate(b, env)\n        case (\"mul\", a, b):\n            return evaluate(a, env) * evaluate(b, env)\n        case {\"var\": str(name)}:\n            return env[name]\n        case _:\n            raise ValueError(f\"bad expression: {expr!r}\")\n",
+      "checks": [
+        {
+          "name": "numbers are themselves",
+          "code": "assert evaluate(3, {}) == 3, evaluate(3, {})\nassert evaluate(2.5, {}) == 2.5, evaluate(2.5, {})"
+        },
+        {
+          "name": "operators nest",
+          "code": "got = evaluate((\"add\", 1, (\"mul\", 2, 3)), {})\nassert got == 7, got\ngot = evaluate((\"neg\", (\"add\", 1, 1)), {})\nassert got == -2, got"
+        },
+        {
+          "name": "variables come from env",
+          "code": "got = evaluate({\"var\": \"x\"}, {\"x\": 10})\nassert got == 10, got\ngot = evaluate((\"mul\", {\"var\": \"x\"}, 2), {\"x\": 3})\nassert got == 6, got"
+        },
+        {
+          "name": "anything else raises ValueError",
+          "code": "for bad in [(\"add\", 1), (\"pow\", 2, 3), \"7\", [], {\"name\": \"x\"}]:\n    raised = False\n    try:\n        evaluate(bad, {})\n    except ValueError:\n        raised = True\n    assert raised, f\"evaluate({bad!r}, {{}}) should raise ValueError\""
+        }
+      ],
+      "hints": [
+        "Put the number case first, `case int() | float():`, then one tuple pattern per operator, such as `case (\"add\", a, b):`.",
+        "A mapping pattern, `case {\"var\": str(name)}:`, matches the variable form. Each operator case calls `evaluate` on its parts and passes `env` along.",
+        "Finish with `case _: raise ValueError(...)`. Negation is `case (\"neg\", x): return -evaluate(x, env)`."
+      ],
+      "explanation": "Indexing with `expr[0]` assumes the shape before checking it, so a short tuple raised `IndexError` and a dict raised `KeyError`. Each `case` checks the length and the tag together, and anything that fits no pattern falls through to one clear error.\n\nThe patterns read like the data they accept, so adding an operator means adding one case. A sequence pattern written with parentheses still matches lists, so `[\"add\", 1, 2]` works too."
     },
     {
       "id": "decorators",
@@ -309,6 +989,42 @@
       "explanation": "Each call to `running_total` runs its body once, creating a new `total` and a new `add` bound to it. The function object carries a reference to that variable in `__closure__`, which is why the value survives after `running_total` returns.\n\n`nonlocal` tells Python that the assignment targets the enclosing variable. A module-level total would be shared by every counter."
     },
     {
+      "id": "functools-toolkit",
+      "title": "The functools module",
+      "body": "# The functools module\n\n`functools` holds tools that take functions and return new ones.\n\n```python\nfrom functools import (\n    lru_cache, partial, reduce)\n\nparse_hex = partial(int, base=16)\nprint(parse_hex(\"ff\"))\nprint(reduce(lambda a, b: a * b, [2, 3, 4]))\n\n@lru_cache(maxsize=None)\ndef fib(n):\n    if n < 2:\n        return n\n    return fib(n - 1) + fib(n - 2)\n\nprint(fib(80), fib.cache_info().hits)\n```\n\n- `partial` fixes some arguments now and leaves the rest for later.\n- `reduce` folds an iterable into one value, two items at a time. Give it a start value for empty input. `sum`, `max` or a loop is often clearer.\n- `lru_cache` remembers results by argument, so arguments must be hashable. `cache` is the same without a size limit.\n\n## Choosing by type\n\n```python\nfrom functools import singledispatch\n\n@singledispatch\ndef show(x):\n    return repr(x)\n\n@show.register\ndef _(x: list):\n    return \" | \".join(map(show, x))\n\nprint(show([1, \"a\", [2]]))\n```\n\n`singledispatch` picks an implementation from the type of the first argument. New types can be registered later, without editing a chain of `isinstance` checks.",
+      "task": "Define `parse_binary` with `partial`, so `parse_binary(\"101\")` is 5. Write `product(nums)` with `reduce`, returning 1 for an empty list. Write `grid_paths(rows, cols)`, the number of right-or-down routes across a grid (1 when either side is 1), cached with `lru_cache`. Write `describe(value)` with `singledispatch`: `\"int 5\"` for ints, `\"text 'hi'\"` for strings and `\"other\"` for anything else.",
+      "starter": "from functools import reduce\n\n\ndef parse_binary(text):\n    return int(text)\n\n\ndef product(nums):\n    return reduce(lambda a, b: a * b, nums)\n\n\ndef grid_paths(rows, cols):\n    if rows == 1 or cols == 1:\n        return 1\n    return grid_paths(rows - 1, cols) + grid_paths(rows, cols - 1)\n\n\ndef describe(value):\n    if isinstance(value, int):\n        return f\"int {value}\"\n    return \"other\"\n",
+      "solution": "import operator\nfrom functools import lru_cache, partial, reduce, singledispatch\n\nparse_binary = partial(int, base=2)\n\n\ndef product(nums):\n    return reduce(operator.mul, nums, 1)\n\n\n@lru_cache(maxsize=None)\ndef grid_paths(rows, cols):\n    if rows == 1 or cols == 1:\n        return 1\n    return grid_paths(rows - 1, cols) + grid_paths(rows, cols - 1)\n\n\n@singledispatch\ndef describe(value):\n    return \"other\"\n\n\n@describe.register\ndef describe_int(value: int):\n    return f\"int {value}\"\n\n\n@describe.register\ndef describe_str(value: str):\n    return f\"text {value!r}\"\n",
+      "checks": [
+        {
+          "name": "parse_binary is a partial",
+          "code": "import functools\nassert parse_binary(\"101\") == 5, parse_binary(\"101\")\nassert isinstance(parse_binary, functools.partial), \"make parse_binary with partial(int, ...)\""
+        },
+        {
+          "name": "product",
+          "code": "assert product([2, 3, 4]) == 24, product([2, 3, 4])\nassert product([]) == 1, product([])\nassert product(x for x in [5]) == 5, \"product of a generator\""
+        },
+        {
+          "name": "grid paths",
+          "code": "assert grid_paths(1, 5) == 1, grid_paths(1, 5)\nassert grid_paths(3, 3) == 6, grid_paths(3, 3)\nassert grid_paths(2, 4) == 4, grid_paths(2, 4)"
+        },
+        {
+          "name": "grid paths are cached",
+          "code": "assert hasattr(grid_paths, \"cache_info\"), \"decorate grid_paths with lru_cache\"\ngrid_paths.cache_clear()\nassert grid_paths(18, 18) == 2333606220, grid_paths(18, 18)\nassert grid_paths.cache_info().hits > 0, grid_paths.cache_info()"
+        },
+        {
+          "name": "describe dispatches on type",
+          "code": "assert describe(5) == \"int 5\", describe(5)\nassert describe(\"hi\") == \"text 'hi'\", describe(\"hi\")\nassert describe(2.5) == \"other\", describe(2.5)\nassert describe(None) == \"other\", describe(None)\nassert hasattr(describe, \"register\"), \"use @singledispatch\""
+        }
+      ],
+      "hints": [
+        "`partial(int, base=2)` is a new callable, with no `def` needed. `reduce` takes an optional third argument, the starting value.",
+        "Put `@lru_cache(maxsize=None)` above `grid_paths`. `@singledispatch` marks the fallback, and `@describe.register` above a function with an annotated parameter adds one case per type.",
+        "`reduce(operator.mul, nums, 1)`, then `@describe.register` above `def describe_int(value: int): return f\"int {value}\"`, and the same for `str` with `f\"text {value!r}\"`."
+      ],
+      "explanation": "Without a start value, `reduce` has nothing to return for an empty list and raises `TypeError`. With 1, the identity for multiplication, the empty product is 1, as in mathematics.\n\nThe uncached `grid_paths` recomputes the same smaller grids again and again, so its running time grows exponentially. With `lru_cache` each `(rows, cols)` pair is worked out once. `singledispatch` keeps each type's rule in its own function, so supporting another type means registering one more function rather than editing a branch."
+    },
+    {
       "id": "typing",
       "title": "Typing",
       "body": "# Typing\n\nAnnotations describe what a function expects. Python does not enforce them at runtime. Tools such as type checkers and editors read them, and so do people.\n\n```python\ndef lengths(\n    words: list[str],\n) -> dict[str, int]:\n    return {w: len(w) for w in words}\n```\n\n- `list[str]`, `dict[str, int]` and `tuple[int, int]` describe contents.\n- `int | None` means either one.\n- `type UserId = int` creates a named alias.\n\n## Generic functions\n\nA type parameter links an input type to an output type:\n\n```python\ndef last[T](items: list[T]) -> T:\n    return items[-1]\n```\n\nNow a checker knows that `last([\"a\"])` is a `str`.\n\n## Lazy annotations\n\nSince Python 3.14, annotations are evaluated only when something asks for them, so a class can name itself in its own methods without quotes. `typing.get_type_hints(fn)` returns the evaluated annotations.",
@@ -343,6 +1059,42 @@
         "`def first_or_none[T](items: list[T]) -> T | None:` with `return items[0] if items else None`, and `type Scores = dict[str, int]`."
       ],
       "explanation": "Annotations do not change how the code runs, which is why the empty-list bug needed a real fix. They do let a checker warn callers that the result might be `None`.\n\nThe type parameter ties the element type to the return type. `items[0] if items else None` tests whether the list is empty rather than whether its first value is falsy, so `[0]` still returns `0`."
+    },
+    {
+      "id": "generic-classes",
+      "title": "Generic classes",
+      "body": "# Generic classes\n\nThe typing lesson made functions generic. Classes can take type parameters too, so a container promises that what comes out has the type of what went in.\n\n```python\nclass Stack[T]:\n    def __init__(self) -> None:\n        self._items: list[T] = []\n\n    def push(self, item: T) -> None:\n        self._items.append(item)\n\n    def pop(self) -> T:\n        return self._items.pop()\n\ns = Stack[int]()\ns.push(3)\nprint(s.pop(), Stack.__type_params__)\n```\n\n`Stack[int]` tells a type checker that this stack holds ints, so `s.push(\"x\")` is flagged before the code runs. At runtime nothing is checked.\n\n## Bounds and the older spelling\n\n`[T: Hashable]` limits `T` to subtypes of a type, and `[T: (int, str)]` to exactly those types. Code written before Python 3.12 declares type variables with `TypeVar` and inherits from `Generic`:\n\n```python\nfrom typing import Generic, TypeVar\n\nN = TypeVar(\"N\", bound=float)\n\nclass Box(Generic[N]):\n    def __init__(self, item: N) -> None:\n        self.item = item\n\nprint(Box(2.5).item, N.__bound__)\n```",
+      "task": "Write a generic class `Queue[T]` with `put(item: T) -> None`, `get() -> T` returning items first in, first out (raising `IndexError` when empty), and `__len__`. Then write `Labelled` in the older style: `L = TypeVar(\"L\")` and `class Labelled(Generic[L])` whose `__init__(self, label: str, value: L)` stores both.",
+      "starter": "class Queue:\n    def __init__(self):\n        self.items = []\n\n    def put(self, item):\n        self.items.append(item)\n\n    def get(self):\n        return self.items.pop()\n\n    def __len__(self):\n        return len(self.items)\n\n\nclass Labelled:\n    def __init__(self, label, value):\n        self.label = label\n        self.value = value\n",
+      "solution": "from collections import deque\nfrom typing import Generic, TypeVar\n\n\nclass Queue[T]:\n    def __init__(self) -> None:\n        self._items: deque[T] = deque()\n\n    def put(self, item: T) -> None:\n        self._items.append(item)\n\n    def get(self) -> T:\n        return self._items.popleft()\n\n    def __len__(self) -> int:\n        return len(self._items)\n\n\nL = TypeVar(\"L\")\n\n\nclass Labelled(Generic[L]):\n    def __init__(self, label: str, value: L) -> None:\n        self.label = label\n        self.value = value\n",
+      "checks": [
+        {
+          "name": "Queue takes a type parameter",
+          "code": "params = getattr(Queue, \"__type_params__\", ())\nassert len(params) == 1, \"write class Queue[T]:\""
+        },
+        {
+          "name": "first in, first out",
+          "code": "q = Queue[int]()\nq.put(1)\nq.put(2)\nq.put(3)\ngot = q.get()\nassert got == 1, got\nassert len(q) == 2, len(q)"
+        },
+        {
+          "name": "an empty queue raises IndexError",
+          "code": "q = Queue()\nraised = False\ntry:\n    q.get()\nexcept IndexError:\n    raised = True\nassert raised, \"get() on an empty queue should raise IndexError\""
+        },
+        {
+          "name": "methods are annotated with T",
+          "code": "import typing\nT = Queue.__type_params__[0]\ngot = typing.get_type_hints(Queue.put)\nassert got == {\"item\": T, \"return\": type(None)}, got\ngot = typing.get_type_hints(Queue.get)\nassert got == {\"return\": T}, got"
+        },
+        {
+          "name": "Labelled uses TypeVar and Generic",
+          "code": "import typing\nassert isinstance(L, typing.TypeVar), \"define L = TypeVar('L')\"\nassert Labelled.__parameters__ == (L,), Labelled.__parameters__\nitem = Labelled(\"size\", 3)\nassert (item.label, item.value) == (\"size\", 3), (item.label, item.value)\nhints = typing.get_type_hints(Labelled.__init__)\nhints.pop(\"return\", None)\nassert hints == {\"label\": str, \"value\": L}, hints"
+        }
+      ],
+      "hints": [
+        "Write the type parameter after the class name, `class Queue[T]:`, and use `T` in the method annotations.",
+        "`collections.deque` has `append` and `popleft`, so the oldest item comes out first. The older style needs `L = TypeVar(\"L\")` and `class Labelled(Generic[L]):`.",
+        "`def put(self, item: T) -> None:` appends, `def get(self) -> T:` returns `self._items.popleft()`, and `Labelled.__init__(self, label: str, value: L)` stores both values."
+      ],
+      "explanation": "`list.pop()` takes from the end, so the plain class behaved as a stack. A queue takes from the front, and `deque.popleft` does that in constant time, raising `IndexError` when empty, just as the task asks.\n\nThe type parameter changes nothing at runtime, but it lets a checker know that a `Queue[str]` returns strings from `get`. `TypeVar` with `Generic` is the same idea in the older syntax, which you will meet in a lot of existing code."
     }
   ]
 }

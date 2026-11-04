@@ -120,12 +120,15 @@ const courses = readdirSync(coursesDirectory).filter(file => /^\d+-.+\.json$/.te
   for (const field of ['id', 'title', 'summary', 'kind']) if (typeof course[field] !== 'string') throw new Error(`${file}: missing ${field}.`);
   return { id: course.id, title: course.title, summary: course.summary, kind: course.kind, order: parseInt(file), lessons: course.lessons.map(lesson => {
     for (const field of ['id', 'title', 'body', 'task', 'starter', 'solution']) if (typeof lesson[field] !== 'string') throw new Error(`${file}/${lesson.id}: missing ${field}.`);
-    const used = imports([lesson.starter, lesson.solution, ...lesson.checks.map(check => check.code)].join('\n'));
+    const source = [lesson.starter, lesson.solution, ...lesson.checks.map(check => check.code)].join('\n');
+    const used = imports(source);
+    // Pyodide imports threading but cannot start a thread, so those lessons run only in the app.
+    const threads = /\b(threading|concurrent\.futures|to_thread|ThreadPoolExecutor)\b/.test(source) ? ['threads'] : [];
     return {
       id: lesson.id, title: lesson.title, ...(lesson.level ? { level: lesson.level } : {}), ...(lesson.minutes ? { minutes: lesson.minutes } : {}),
       sections: sections(lesson.body, lesson.title), task: lesson.task, starter: lesson.starter, solution: lesson.solution,
       checks: lesson.checks.map(check => ({ name: check.name, code: check.code })), hints: lesson.hints ?? [], explanation: lesson.explanation ?? '',
-      imports: used, packages: used.filter(name => hosted.some(item => lock.packages[item].imports.includes(name))), missing: used.filter(name => !importable.has(name)),
+      imports: used, packages: used.filter(name => hosted.some(item => lock.packages[item].imports.includes(name))), missing: [...used.filter(name => !importable.has(name)), ...threads],
     };
   }) };
 });
