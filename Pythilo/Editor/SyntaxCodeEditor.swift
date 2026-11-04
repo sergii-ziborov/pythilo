@@ -1309,7 +1309,10 @@ fileprivate final class EditorKeyboardAccessoryView: UIView {
         completeButton.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         for symbol in symbols {
-            let button = accessoryButton(title: symbol, systemImage: nil, tint: .label)
+            // The indent key inserts four spaces, which would draw as a blank key.
+            let button = symbol.allSatisfy({ $0 == " " })
+                ? accessoryButton(title: nil, systemImage: "arrow.right.to.line", tint: .label, accessibilityLabel: "Tab")
+                : accessoryButton(title: symbol, systemImage: nil, tint: .label)
             button.addAction(UIAction { _ in onInsert(symbol) }, for: .touchUpInside)
             stack.addArrangedSubview(button)
         }
