@@ -52,8 +52,12 @@ open source (see [License](#license)).
 
 ### Learn
 
-- **36 lessons** from values and names to typing, tools, the web and data, and **20
-  interview tasks** with a timer and hints.
+- **168 lessons in 12 courses**: Python foundations and Python deeper (30 each), clean
+  code, testing, the tools around Python, architecture, concurrency and async, the web,
+  data, machine learning with PyTorch, language models from the inside, and working
+  with AI tools. Plus **20 interview tasks** with a timer and hints.
+- PyTorch 2.15 runs on the device ([torch-ios](https://github.com/sergii-ziborov/torch-ios)):
+  the machine learning lessons train real networks offline.
 - Every exercise is checked by running your code on the device. When a check fails it
   says what happened: `describe(3) returned None, expected 'int: 3'. Is a return missing?`
 - Reading and coding take turns on the whole screen on a phone, and sit side by side on
@@ -147,7 +151,8 @@ The tests run inside the app, against the embedded interpreter:
 xcodebuild -project Pythilo.xcodeproj -scheme Pythilo -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
-`python3 scripts/verify-lessons.py` checks the course on the Mac. For TestFlight,
+`python3 scripts/verify-lessons.py` checks the courses on the Mac (`--only <course id>` for
+one course; put a python3 with torch, pytest and pydantic first on `PATH` to run every lesson). For TestFlight,
 `scripts/testflight.sh` archives and uploads, and `scripts/testflight-finish.mjs` waits
 for Apple, then adds the notes and the testers.
 

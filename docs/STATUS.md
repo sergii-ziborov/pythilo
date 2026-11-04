@@ -54,7 +54,8 @@ boundary, and the app says so.
 
 | Item | State |
 | --- | --- |
-| 36 lessons and 20 interview tasks | Every solution passes on the embedded interpreter |
+| 168 lessons in 12 courses and 20 interview tasks | Every solution passes on the Mac (`scripts/verify-lessons.py`) and inside the app on the simulator (`testEveryBundledLessonSolutionPassesOnTheDevice`); starters fail their checks |
+| PyTorch on the device | torch-ios conformance suite matches a Mac on 203 groups of operations in the simulator (`testPyTorchMatchesTheReferenceBuild`); not yet run on a physical iPhone |
 | Learn screens: path, course timeline, lesson read and code modes, check sheet | Checked on the simulator. Drawn on the canvas, iPad lesson included |
 | Failed checks say what came back and what was expected | Checked against every lesson's starter code on the Mac |
 | Long lines wrap in the lesson editor, the tail indented under its own code | Checked by screenshot |
@@ -70,7 +71,7 @@ The relay keeps rooms in memory and only ever sees encrypted text.
 | --- | --- |
 | App: share a project as a room, join by link or `pythilo://`, edits both ways, remote cursors, end room | Checked against a local relay, by tests and by hand |
 | App as a runtime host: check, run and test for a browser or an AI client, asked each time or allowed for the room, result says where it ran | Checked: a browser and the MCP bridge each ran pytest on the simulator |
-| Website: home, lessons that run and check in Pyodide, playground, rooms, Connect AI | Checked in a browser against the local server. 56 lessons' solutions pass the app's own checker in Pyodide; Flask's lesson says it needs the app |
+| Website: home, lessons that run and check in Pyodide, playground, rooms, Connect AI | Checked in a browser against the local server. Every lesson the browser can run passes the app's own checker in Pyodide; lessons that need torch, Flask, threads or packages Pyodide lacks say they need the app |
 | Browser "Run on" another device in the room | Checked: browser to simulator |
 | MCP bridge `pythilo`: 15 tools, revision conflicts, runtime requests | 58 tests, and checked against the live room. Not on npm yet |
 | MCP served by the app on the local network | Checked, as before |
