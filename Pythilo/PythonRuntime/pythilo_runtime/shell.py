@@ -69,6 +69,10 @@ def run_line(line, root):
     if handler is None:
         print(f"pythilo: command not found: {command}. Type help to see what is available.", file=sys.stderr)
         return {"status": "failed", "code": 127}
+    if command in _USAGE and args in (["-h"], ["--help"], ["--version"]):
+        # The file commands are small built-ins, not the programs they are named after.
+        print(f"usage: {_USAGE[command]}" if args != ["--version"] else f"{command}: built into Pythilo")
+        return {"status": "finished", "code": 0}
     try:
         if redirect:
             mode, target = redirect
@@ -499,6 +503,13 @@ def _django_admin(args):
 def _uvicorn(args):
     import uvicorn
 
+    if args in (["--version"], ["-v"]):
+        print(f"uvicorn {uvicorn.__version__}")
+        return 0
+    if args in (["--help"], ["-h"]):
+        print("usage: uvicorn module:app [--host 127.0.0.1] [--port 8000]")
+        return 0
+
     target = None
     options = {"host": "127.0.0.1", "port": 8000}
     iterator = iter(args)
@@ -544,6 +555,29 @@ def repl():
     namespace = runner.main_module_for("<stdin>").__dict__
     sys.path.insert(0, "")
     code.InteractiveConsole(namespace).interact(banner=banner, exitmsg="")
+
+
+_USAGE = {
+    "ls": "ls [-a] [-l] [path...]",
+    "cd": "cd [folder]   (cd alone goes to the project)",
+    "pwd": "pwd",
+    "cat": "cat file...",
+    "head": "head [-n count] file",
+    "tail": "tail [-n count] file",
+    "wc": "wc file...   (lines, words, bytes)",
+    "grep": "grep [-i] [-n] [-r] pattern [path...]",
+    "find": "find [path] [-name pattern]",
+    "touch": "touch file...",
+    "mkdir": "mkdir [-p] folder...",
+    "rm": "rm [-r] [-f] path...",
+    "rmdir": "rmdir folder...",
+    "mv": "mv source target",
+    "cp": "cp [-r] source target",
+    "echo": "echo text...   (> file and >> file write it to a file)",
+    "env": "env   (NAME=value command sets a variable)",
+    "which": "which command...",
+    "help": "help",
+}
 
 
 _COMMANDS = {

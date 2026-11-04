@@ -74,7 +74,14 @@ final class RuntimeGateTests: XCTestCase {
     }
 
     func testPythonAndPipAnswerHelpAndVersion() async throws {
-        for (line, expected) in [("python --version", "Python 3.14"), ("python -V", "Python 3.14"), ("python --help", "python -m module"), ("pip --version", "pip 26")] {
+        let cases = [
+            ("python --version", "Python 3.14"), ("python -V", "Python 3.14"), ("python --help", "python -m module"),
+            ("pip --version", "pip 26"), ("pip -v", "pip 26"), ("pip --help", "pip install"),
+            ("pytest --version", "pytest"), ("npm --version", "npm"), ("npm --help", "npm install"),
+            ("django-admin --version", "6."), ("flask --version", "Flask"), ("uvicorn --version", "uvicorn"),
+            ("ls --help", "usage: ls"), ("grep --help", "usage: grep"), ("cd --version", "built into Pythilo"),
+        ]
+        for (line, expected) in cases {
             let outcome = try await shell(line)
             XCTAssertEqual(outcome.status, "finished", "\(line): \(outputText())")
             XCTAssertTrue(outputText().contains(expected), "\(line): \(outputText())")

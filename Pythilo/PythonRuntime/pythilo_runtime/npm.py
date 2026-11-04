@@ -458,7 +458,7 @@ def main(args, root):
             print("npm run is handled by the app's terminal, which builds with esbuild.")
             return 1
         print(USAGE)
-        return 0 if command == "help" else 1
+        return 0 if command in ("help", "-h", "--help") else 1
     except NpmError as error:
         print(f"npm: {error}", file=__import__("sys").stderr)
         return 1

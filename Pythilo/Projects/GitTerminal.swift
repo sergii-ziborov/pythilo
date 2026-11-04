@@ -144,7 +144,9 @@ enum GitTerminal {
                 return ""
             }
             throw GitFailure("git config handles user.name and user.email here.")
-        case "--version", "version":
+        case "help", "--help", "-h":
+            return usage
+        case "--version", "-v", "version":
             return "Pythilo Git, libgit2 1.9.7"
         default:
             throw GitFailure("\(command) is not available here. \(usage)")
