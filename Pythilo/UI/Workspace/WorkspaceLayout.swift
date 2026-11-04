@@ -47,16 +47,18 @@ final class KeyboardObserver {
 
     init() {
         let center = NotificationCenter.default
-        tokens.append(center.addObserver(forName: UIResponder.keyboardWillChangeFrameNotification, object: nil, queue: .main) { [weak self] note in
-            let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue ?? .zero
-            MainActor.assumeIsolated { self?.update(frame) }
-        })
-        tokens.append(center.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.isVisible = false
-                self?.height = 0
-            }
-        })
+        // Every notice is read by where the keyboard ends up. When the terminal's
+        // field is disabled and enabled again in one moment (a server restarting
+        // around a command), a hide notice can land after the next show; the
+        // did-change notice then settles the real state, so the panel never
+        // keeps the dock's gap under a keyboard that is up.
+        for name in [UIResponder.keyboardWillChangeFrameNotification, UIResponder.keyboardDidChangeFrameNotification,
+                     UIResponder.keyboardWillHideNotification, UIResponder.keyboardDidShowNotification] {
+            tokens.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue ?? .zero
+                MainActor.assumeIsolated { self?.update(frame) }
+            })
+        }
         tokens.append(center.addObserver(forName: .GCKeyboardDidConnect, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.hasHardwareKeyboard = true }
         })
@@ -66,6 +68,7 @@ final class KeyboardObserver {
     }
 
     private func update(_ frame: CGRect) {
+        guard frame != .zero else { return }
         let screenHeight = UIApplication.shared.connectedScenes
             .compactMap { ($0 as? UIWindowScene)?.screen.bounds.height }.first ?? 0
         let covered = max(0, screenHeight - frame.minY)

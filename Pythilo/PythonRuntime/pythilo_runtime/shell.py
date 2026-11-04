@@ -36,6 +36,16 @@ are not available. `>` and `>>` redirect a built-in command's output to a file.
 """
 
 
+PYTHON_HELP = """usage: python [file.py | -m module | -c code] [args]
+  python              interactive Python
+  python file.py      run a file (manage.py too)
+  python -m module    run a module: pip, pytest, http.server, json.tool...
+  python -c code      run a line of code
+  python --version    the Python version (-V)
+Other options are not available: there is one interpreter, inside the app.
+"""
+
+
 def run_line(line, root):
     try:
         words = shlex.split(line, posix=True)
@@ -394,8 +404,11 @@ def _python(args):
     if not args:
         repl()
         return 0
-    if args[0] in ("-V", "--version"):
+    if args[0] in ("-V", "-VV", "--version"):
         print(f"Python {sys.version.split()[0]}")
+        return 0
+    if args[0] in ("-h", "-?", "--help"):
+        print(PYTHON_HELP, end="")
         return 0
     if args[0] == "-m":
         if len(args) < 2:
@@ -410,7 +423,7 @@ def _python(args):
         exec(compile(args[1], "<string>", "exec"), module.__dict__)
         return 0
     if args[0].startswith("-"):
-        raise ShellError(f"option {args[0]} is not supported here")
+        raise ShellError(f"option {args[0]} is not supported here. python --help lists what works")
     path, rest = args[0], args[1:]
     if os.path.basename(path) == "manage.py":
         rest = _adapt_manage_py(rest)

@@ -235,7 +235,6 @@ struct TerminalPanel: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .focused($focused)
-                    .disabled(!acceptsInput)
                     .padding(.horizontal, 12)
                     .frame(height: 44)
                     .background(AppTheme.background, in: RoundedRectangle(cornerRadius: 10))
@@ -278,6 +277,13 @@ struct TerminalPanel: View {
     }
 
     private func submit() {
+        // The field stays editable while a program runs: disabling it would drop
+        // the keyboard and bring it back each time a server restarts. A line
+        // typed meanwhile waits in the field until Enter can run it.
+        guard acceptsInput else {
+            focused = true
+            return
+        }
         let text = line
         line = ""
         historyIndex = nil

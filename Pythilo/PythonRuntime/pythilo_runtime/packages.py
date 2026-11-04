@@ -32,6 +32,11 @@ def pip(args, site):
         print("Pure-Python wheels install from PyPI. Compiled packages only work if Pythilo bundles them.")
         return 0
     command, *rest = args
+    if command in ("-V", "--version"):
+        import pip
+
+        print(f"pip {pip.__version__} (Python {sys.version.split()[0]}), installing into {site}")
+        return 0
     os.makedirs(site, exist_ok=True)
     if command == "install":
         return _install(rest, site)

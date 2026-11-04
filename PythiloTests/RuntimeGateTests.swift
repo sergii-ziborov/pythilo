@@ -66,6 +66,21 @@ final class RuntimeGateTests: XCTestCase {
         XCTAssertEqual(RunSession.withoutTerminalColors("plain [31m"), "plain [31m")
     }
 
+    func testTerminalUndoesTheKeyboardsSmartPunctuation() {
+        // What the iOS keyboard makes of `python --version` and `echo "a b"`.
+        XCTAssertEqual(WorkspaceModel.plainCommand("python \u{2014}version"), "python --version")
+        XCTAssertEqual(WorkspaceModel.plainCommand("echo \u{201C}a b\u{201D}"), "echo \"a b\"")
+        XCTAssertEqual(WorkspaceModel.plainCommand("echo 1990\u{2013}2000"), "echo 1990\u{2013}2000")
+    }
+
+    func testPythonAndPipAnswerHelpAndVersion() async throws {
+        for (line, expected) in [("python --version", "Python 3.14"), ("python -V", "Python 3.14"), ("python --help", "python -m module"), ("pip --version", "pip 26")] {
+            let outcome = try await shell(line)
+            XCTAssertEqual(outcome.status, "finished", "\(line): \(outputText())")
+            XCTAssertTrue(outputText().contains(expected), "\(line): \(outputText())")
+        }
+    }
+
     func testPrintAndFileAndVersion() async throws {
         let outcome = try await run("""
         import sys, os

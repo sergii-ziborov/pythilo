@@ -517,13 +517,22 @@ final class WorkspaceModel {
         )
     }
 
+    /// The iOS keyboard turns `--` into a dash and straight quotes into curly
+    /// ones, which no command understands. A dash that starts a word was two
+    /// hyphens; curly double quotes come in pairs, so they can be put back too.
+    static func plainCommand(_ line: String) -> String {
+        var text = line.replacingOccurrences(of: "\u{201C}", with: "\"").replacingOccurrences(of: "\u{201D}", with: "\"")
+        text = text.replacingOccurrences(of: #"(^|\s)[\x{2014}\x{2013}]"#, with: "$1--", options: .regularExpression)
+        return text
+    }
+
     private var runnablePath: String? {
         if let selectedPath, selectedPath.hasSuffix(".py") { return selectedPath }
         return Self.firstEntry(in: tree).flatMap { $0.hasSuffix(".py") ? $0 : nil }
     }
 
     func runTerminal(_ line: String) {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let trimmed = Self.plainCommand(line).trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         saveAll()
         session.noteTerminal("\(terminalDirectory.lastPathComponent) $ \(trimmed)\n", kind: .input)
