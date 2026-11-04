@@ -79,10 +79,13 @@ struct PlaygroundView: View {
                 }
             }
             .sheet(isPresented: $joining) {
-                JoinRoomSheet(initialLink: joinLink) { room in
+                JoinRoomSheet(initialLink: joinLink, onJoined: { room in
                     joining = false
                     path = [.room(room.id)]
-                }
+                }, onSnapshot: { snapshot in
+                    joining = false
+                    if let project = try? snapshot.createProject(in: store) { onOpen(project) }
+                })
             }
             #if DEBUG
             .task {
@@ -464,6 +467,8 @@ struct LeftOutList: View {
 struct JoinRoomSheet: View {
     var initialLink: String?
     let onJoined: (PlaygroundRoom) -> Void
+    /// A link that carries the files themselves opens as a new project, no room needed.
+    var onSnapshot: ((ShareSnapshot) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var rooms = PlaygroundRooms.shared
     @State private var text = ""
@@ -529,6 +534,17 @@ struct JoinRoomSheet: View {
     private func join() {
         guard !joining else { return }
         failure = nil
+        if let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)), let onSnapshot {
+            do {
+                if let snapshot = try ShareSnapshot.from(url: url) {
+                    onSnapshot(snapshot)
+                    return
+                }
+            } catch {
+                failure = error.localizedDescription
+                return
+            }
+        }
         let link: PlaygroundLink
         do {
             link = try PlaygroundLink.parse(text, origin: rooms.origin)

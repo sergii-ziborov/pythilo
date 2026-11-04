@@ -31,6 +31,7 @@ struct RootView: View {
     @State private var workspace: WorkspaceModel?
     @State private var showingSettings = false
     @State private var incomingRoomLink: String?
+    @State private var linkFailure: String?
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -46,7 +47,26 @@ struct RootView: View {
             WorkspaceView(model: model) { workspace = nil }
         }
         .sheet(isPresented: $showingSettings) { SettingsView() }
+        .alert("Cannot open this link", isPresented: Binding(get: { linkFailure != nil }, set: { if !$0 { linkFailure = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(linkFailure ?? "")
+        }
         .onOpenURL { url in
+            // A link with the files in it opens them as a new project.
+            do {
+                if let snapshot = try ShareSnapshot.from(url: url) {
+                    workspace?.saveAll()
+                    workspace = nil
+                    let project = try snapshot.createProject(in: store)
+                    section = .projects
+                    open(project)
+                    return
+                }
+            } catch {
+                linkFailure = error.localizedDescription
+                return
+            }
             guard url.scheme?.lowercased() == "pythilo" else { return }
             incomingRoomLink = url.absoluteString
             workspace?.saveAll()

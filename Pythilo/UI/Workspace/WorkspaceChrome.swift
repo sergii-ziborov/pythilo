@@ -168,6 +168,19 @@ struct FileTabsBar: View {
     }
 }
 
+/// Presents the system share sheet, or an alert, over whatever is on screen.
+@MainActor
+func presentOverTopScreen(_ controller: UIViewController) {
+    let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first { $0.activationState == .foregroundActive }
+    var top = scene?.windows.first { $0.isKeyWindow }?.rootViewController
+    while let presented = top?.presentedViewController { top = presented }
+    if let popover = controller.popoverPresentationController, let view = top?.view {
+        popover.sourceView = view
+        popover.sourceRect = CGRect(x: view.bounds.midX, y: 60, width: 1, height: 1)
+    }
+    top?.present(controller, animated: true)
+}
+
 struct WorkspaceProjectMenu: View {
     @Bindable var model: WorkspaceModel
     let onGit: () -> Void
@@ -184,6 +197,8 @@ struct WorkspaceProjectMenu: View {
             }
             Button("Git", systemImage: "arrow.triangle.branch", action: onGit)
             Button("Share with an AI client or person", systemImage: "person.2", action: onShareRoom)
+            Button("Share as a link", systemImage: "link") { shareSnapshotLink() }
+                .accessibilityIdentifier("share-snapshot-link")
             Divider()
             Button("Debug", systemImage: "ladybug") {
                 model.panel = .debug
@@ -213,6 +228,23 @@ struct WorkspaceProjectMenu: View {
         }
         .accessibilityLabel("Project actions")
         .accessibilityIdentifier("project-menu")
+    }
+
+    /// The project's text files, packed into a link that opens them in the
+    /// website's Playground or in Pythilo. No server keeps a copy.
+    private func shareSnapshotLink() {
+        model.saveAll()
+        do {
+            let snapshot = try ShareSnapshot.of(project: model.project.url, main: model.selectedPath)
+            let link = try snapshot.webLink()
+            let note = "\(snapshot.files.count) file\(snapshot.files.count == 1 ? "" : "s") from \(snapshot.name), in a Pythilo link"
+            _ = note
+            presentOverTopScreen(UIActivityViewController(activityItems: [link], applicationActivities: nil))
+        } catch {
+            let alert = UIAlertController(title: "Cannot make a link", message: error.localizedDescription, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .cancel))
+            presentOverTopScreen(alert)
+        }
     }
 }
 

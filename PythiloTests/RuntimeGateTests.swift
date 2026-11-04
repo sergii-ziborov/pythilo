@@ -123,6 +123,39 @@ final class RuntimeGateTests: XCTestCase {
         XCTAssertTrue(outputText().contains("background jobs"), outputText())
     }
 
+    func testShareLinksMatchTheWebsiteFormat() throws {
+        // Made by the website's own code path (fflate deflateSync, base64url).
+        let fromWeb = "VYzBCoJAEIZfZZguGmLocW9BHrt09iK5woI7LttahgjRi_QOQdBjrG_UrJ6a0_z_fN-MeEWRJUiVliiwlrrDBHWliFNlzC6sqblz2ahWXlCMf7XAxnYauEp7p1pQ2nTWgbupsyzJWEUuWkKUZ3FcEv8JemBXvZbNSkdDLEoCHitdbwkG2EK-GKdifzgWqa6Z34B_zQ__9W__mZ98nqYf"
+        let opened = try XCTUnwrap(ShareSnapshot.from(url: XCTUnwrap(URL(string: "https://pythilo.com/playground/#code=\(fromWeb)"))))
+        XCTAssertEqual(opened.name, "demo")
+        XCTAssertEqual(opened.main, "app/main.py")
+        XCTAssertEqual(opened.files["app/util.py"], "def twice(x):\n    return x * 2\n")
+        XCTAssertEqual(opened.files["README.md"], "# Привет\n")
+
+        // The app's links open in the app and come back unchanged.
+        let again = try XCTUnwrap(ShareSnapshot.from(url: opened.appLink()))
+        XCTAssertEqual(again, opened)
+        XCTAssertTrue(try opened.webLink().absoluteString.hasPrefix("https://pythilo.com/playground/#code="))
+
+        // Not a share link, a damaged one, and one that escapes its folder.
+        XCTAssertNil(try ShareSnapshot.from(url: XCTUnwrap(URL(string: "https://pythilo.com/learn/"))))
+        XCTAssertThrowsError(try ShareSnapshot.decode(String(fromWeb.prefix(40))))
+        let escape = ShareSnapshot(name: "x", main: "../evil.py", files: ["../evil.py": "print(1)"])
+        XCTAssertThrowsError(try ShareSnapshot.decode(escape.payload()))
+
+        // A project folder becomes a link without its tool folders or .env.
+        let folder = root.appending(path: "shareme")
+        try FileManager.default.createDirectory(at: folder.appending(path: ".pythilo"), withIntermediateDirectories: true)
+        try "print('hi')\n".write(to: folder.appending(path: "main.py"), atomically: true, encoding: .utf8)
+        try "SECRET=1\n".write(to: folder.appending(path: ".env"), atomically: true, encoding: .utf8)
+        try "{}".write(to: folder.appending(path: ".pythilo/environment.json"), atomically: true, encoding: .utf8)
+        let packed = try ShareSnapshot.of(project: folder, main: nil)
+        XCTAssertEqual(Set(packed.files.keys), ["main.py"])
+        let store = ProjectStore(root: root.appending(path: "store"))
+        let made = try packed.createProject(in: store)
+        XCTAssertEqual(try String(contentsOf: made.url.appending(path: "main.py"), encoding: .utf8), "print('hi')\n")
+    }
+
     func testPrintAndFileAndVersion() async throws {
         let outcome = try await run("""
         import sys, os
