@@ -65,7 +65,8 @@ export default function Home() {
             <li>Projects with many files and nested folders, kept as ordinary folders you also see in the Files app.</li>
             <li>An editor made for touch: a key bar with Python symbols, completion from Jedi that knows your own modules, and problems from pyflakes as you type.</li>
             <li>A debugger with breakpoints, stepping, the call stack, variables and an evaluate field. It also stops inside threads, request handlers and async code.</li>
-            <li>A terminal built into the app: files, <code>python</code>, <code>pip</code>, <code>pytest</code>, <code>git</code> and <code>npm</code>, with history and Ctrl-C.</li>
+            <li>A terminal that reads lines like bash, with pipes, redirects and about 60 built-in commands, plus <code>python</code>, <code>pip</code>, <code>pytest</code>, <code>sqlite3</code>, <code>git</code> and <code>npm</code>.</li>
+            <li>Tap a SQLite database to browse its tables, filter and edit rows, read the schema and run SQL.</li>
           </ul>
           <Link href="/guide/editor/" className="arrow-link">The editor and the key bar</Link>
         </div>

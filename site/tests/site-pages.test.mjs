@@ -30,7 +30,7 @@ test('every guide page exists and every screenshot file is there', () => {
 test('placeholders for undecided facts stay marked, never invented', () => {
   const info = readFileSync(join(site, 'lib', 'site-info.ts'), 'utf8');
   assert.doesNotMatch(info, /@gmail\.com/, 'no personal address on the site');
-  for (const page of ['app/legal/terms/page.tsx', 'app/legal/privacy/page.tsx', 'app/pricing/page.tsx', 'app/guide/sqlite/page.tsx']) {
+  for (const page of ['app/legal/terms/page.tsx', 'app/legal/privacy/page.tsx', 'app/pricing/page.tsx']) {
     assert.match(readFileSync(join(site, page), 'utf8'), /Placeholder/, page);
   }
 });

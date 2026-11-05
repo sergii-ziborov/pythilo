@@ -47,6 +47,7 @@ export default function PrivacyPage() {
       ["clone, fetch, pull or push with Git", "The Git server whose address you entered", "Repository data, your commits (which carry the Git name and email you set), and, for private repositories, the username and token you saved for that host"],
       ["run your own code or use the terminal to fetch something", "Whatever your code or command contacts", "Whatever your code or command sends"],
       ["open your local site in the web preview", "Your server on this device; the page may load resources from the internet (for example, FastAPI's /docs loads Swagger UI from a CDN)", "Ordinary web requests made by the page"],
+      ["share a project as a link", "Nothing: the files are packed into the link itself, after the #, which browsers do not send to servers. Whoever you send the link to can read the files", "Nothing, until you send the link to someone"],
       ["create or join a shared room", "Our relay at pythilo.com", <>Encrypted room data. See <a href="#rooms">Shared rooms</a></>],
       ["connect an AI client", "Nothing on the internet; the client on your computer connects to the device over your local network", <>See <a href="#mcp">AI clients</a></>],
     ]} />

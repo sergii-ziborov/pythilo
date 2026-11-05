@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Playground and shared rooms", descri
 export default function Page() {
   return <>
     <GuideHeader slug="rooms" />
-    <Toc items={[["playground", "The Playground tab"], ["share", "Share a project"], ["what", "What a room carries"], ["join", "Join with a link"], ["in-room", "In a room"], ["running", "Running code for others"], ["end", "Ending a room"], ["privacy", "Privacy"]]} />
+    <Toc items={[["playground", "The Playground tab"], ["share", "Share a project"], ["what", "What a room carries"], ["link", "Share as a link"], ["join", "Join with a link"], ["in-room", "In a room"], ["running", "Running code for others"], ["end", "Ending a room"], ["privacy", "Privacy"]]} />
 
     <h2 id="playground">The Playground tab</h2>
     <p><span className="ui">Playground</span> is where you work on one project with another person or an AI client. Editing and running code are separate permissions. It has <span className="ui">Share a project</span>, <span className="ui">Join with a link</span>, the <Link href="/guide/connect-ai/">AI client over MCP</Link> card, and your active rooms with who is in them and when they end. Inside a project, <span className="ui">⋯</span> › <span className="ui">Share with an AI client or person</span> leads to the same places.</p>
@@ -34,8 +34,11 @@ export default function Page() {
     ]} />
     <p><code>.git</code>, <code>.pythilo</code> and caches are never included.</p>
 
+    <h2 id="link">Share as a link</h2>
+    <p>For a quick, one-off share there is no need for a room. <span className="ui">⋯</span> › <span className="ui">Share as a link</span> packs the project&apos;s text files into a single link, compressed into the part after <code>#</code>, so no server keeps a copy. Opened in a browser, it shows the code in the <Link href="/playground/">playground</Link> on pythilo.com, ready to run; opened on a device with Pythilo, or pasted into <span className="ui">Join with a link</span>, it becomes a new project. <code>.env</code> files, <code>.git</code> and <code>.pythilo</code> are left out, and a project too large for a link says so: share a live room instead.</p>
+
     <h2 id="join">Join with a link</h2>
-    <p>Paste a room link into <span className="ui">Join with a link</span> and tap <span className="ui">Join room</span>, or open the link on the device and choose Pythilo. Joining makes a new project on this device with the room&apos;s files. Nothing runs until you press Run, or allow someone else to. Links look like <code>https://pythilo.com/playground/room/…/#key=…</code>; everything after <code>#</code> is needed, and it never leaves your device in a request. A room that has ended cannot be joined.</p>
+    <p>Paste a room link (or a shared project link) into <span className="ui">Join with a link</span> and tap <span className="ui">Join room</span>, or open the link on the device and choose Pythilo. Joining makes a new project on this device with the room&apos;s files. Nothing runs until you press Run, or allow someone else to. Links look like <code>https://pythilo.com/playground/room/…/#key=…</code>; everything after <code>#</code> is needed, and it never leaves your device in a request. A room that has ended cannot be joined.</p>
 
     <h2 id="in-room">In a room</h2>
     <p>Edits go both ways as you type, and you see the others&apos; cursors with their names. The room screen shows its revision and when it closes, <span className="ui">In the room</span> with each person&apos;s access (Owner, Can edit, Can view) and the file they are editing, the permissions, <span className="ui">Recent runs on this iPhone</span>, and <span className="ui">Copy link</span>, <span className="ui">Connect AI</span> and <span className="ui">Open in the editor</span>. Your name in rooms is set in <Link href="/guide/settings/">Settings</Link>. <span className="ui">Git commit and push</span> is always yours alone.</p>

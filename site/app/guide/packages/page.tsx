@@ -26,7 +26,8 @@ export default function Page() {
     <ul>
       <li>pip installs <strong>pure-Python</strong> packages. A package that needs compiled code only works if Pythilo bundles it; iOS runs only code signed into the app. When an install fails, nothing is changed and pip&apos;s full message is in the terminal.</li>
       <li><code>pip install -r requirements.txt</code> works the same way.</li>
-      <li><code>pip uninstall</code>, <code>pip list</code> (project packages marked <em>project</em>, the rest <em>bundled</em>), <code>pip show</code> and <code>pip freeze</code> work as usual.</li>
+      <li><code>pip uninstall</code>, <code>pip list</code> (project packages marked <em>project</em>, the rest <em>bundled</em>; <code>-o</code> for outdated ones), <code>pip show</code> (<code>-f</code> lists files), <code>pip freeze</code> and <code>pip check</code> work as usual.</li>
+      <li><code>pip download</code> fetches wheels without installing them, and <code>pip index versions name</code> lists the versions on PyPI.</li>
       <li>Options that would install somewhere else, such as <code>--user</code>, <code>--target</code>, <code>--prefix</code> or <code>-e</code>, are refused: packages always go to the project.</li>
     </ul>
 
