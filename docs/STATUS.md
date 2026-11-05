@@ -196,3 +196,11 @@ checks were already passing. The example now uses a single-quoted Python string
 around the JSON object. A new Pyodide regression test executes every example in
 the four practical courses; all 77 site tests pass, including all 32 new examples.
 Build 17 packages this reading-only correction.
+
+The JSON-example correction was deployed at 19:59:41 UTC as image
+`sha256:271aa96e03669d5a892ba84ef6d9de3fd4416a1be423bbcbd24b306ed9b80083`,
+receipt `pythilo-learning-example-fix-deploy-20261105-v4`. The public lesson serves
+the corrected code and the full public smoke test passes. Build 17 was archived,
+its corrected course file checked against source, and uploaded successfully; Apple
+processing and final TestFlight notes are followed by `scripts/testflight-finish.mjs`
+with `build/notes-17.json`. Build 16 remains available in internal beta testing.

@@ -131,3 +131,9 @@ The final follow-up deployed at 19:31:52 UTC uses image
 receipt `pythilo-learning-expansion-final-deploy-20261105-v3`. It adds the direct
 browser-lab link on the home page and documents lab storage in the privacy policy.
 The public smoke test passed again after this deployment.
+
+The JSON-example correction deployed at 19:59:41 UTC uses image
+`sha256:271aa96e03669d5a892ba84ef6d9de3fd4416a1be423bbcbd24b306ed9b80083`,
+receipt `pythilo-learning-example-fix-deploy-20261105-v4`. All 77 site tests pass,
+including execution of all 32 new reading examples in Pyodide. Public HTML confirms
+the corrected JSON string and the public smoke test passed after deployment.
