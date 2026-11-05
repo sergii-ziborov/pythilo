@@ -52,10 +52,11 @@ open source (see [License](#license)).
 
 ### Learn
 
-- **168 lessons in 12 courses**: Python foundations and Python deeper (30 each), clean
+- **204 lessons in 13 courses**: Python foundations and Python deeper (30 each), clean
   code, testing, the tools around Python, architecture, concurrency and async, the web,
-  data, machine learning with PyTorch, language models from the inside, and working
-  with AI tools. Plus **20 interview tasks** with a timer and hints.
+  data, the mathematics of neural networks, machine learning with PyTorch (30), language
+  models from the inside, and working with AI tools, from on-device models to evals.
+  Plus **20 interview tasks** with a timer and hints.
 - PyTorch 2.15 runs on the device ([torch-ios](https://github.com/sergii-ziborov/torch-ios)):
   the machine learning lessons train real networks offline.
 - Every exercise is checked by running your code on the device. When a check fails it

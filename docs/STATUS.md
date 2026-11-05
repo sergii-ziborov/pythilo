@@ -54,7 +54,7 @@ boundary, and the app says so.
 
 | Item | State |
 | --- | --- |
-| 168 lessons in 12 courses and 20 interview tasks | Every solution passes on the Mac (`scripts/verify-lessons.py`) and inside the app on the simulator (`testEveryBundledLessonSolutionPassesOnTheDevice`); starters fail their checks |
+| 204 lessons in 13 courses and 20 interview tasks | Every solution passes on the Mac (`scripts/verify-lessons.py`) and inside the app on the simulator (`testEveryBundledLessonSolutionPassesOnTheDevice`); starters fail their checks |
 | PyTorch on the device | torch-ios conformance suite matches a Mac on 203 groups of operations in the simulator (`testPyTorchMatchesTheReferenceBuild`); not yet run on a physical iPhone |
 | Learn screens: path, course timeline, lesson read and code modes, check sheet | Checked on the simulator. Drawn on the canvas, iPad lesson included |
 | Failed checks say what came back and what was expected | Checked against every lesson's starter code on the Mac |

@@ -1,0 +1,472 @@
+{
+  "id": "math",
+  "title": "The mathematics of neural networks",
+  "summary": "Vectors, matrices, derivatives, backprop, softmax, probability, eigenvalues, optimizers and initialisation in NumPy.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "vectors-and-norms",
+      "title": "Vectors and norms",
+      "body": "# Vectors and norms\n\nTo a neural network, everything is a vector: a list of numbers. An image is its pixels, a word is its embedding, and a layer's output is one number per unit. NumPy stores a vector as a one-dimensional array, and arithmetic works element by element.\n\nThe length of a vector is its norm. The usual one, the L2 norm, is the square root of the sum of squares, Pythagoras in any number of dimensions. The L1 norm adds absolute values instead. The distance between two vectors is the norm of their difference.\n\n```python\nimport numpy as np\n\nv = np.array([3.0, 4.0])\nprint(np.sqrt(np.sum(v ** 2)))  # 5.0\nprint(np.sum(np.abs(v)))        # 7.0\nprint(np.linalg.norm(v))        # 5.0\nprint(v / np.linalg.norm(v))    # [0.6 0.8]\n```\n\nDividing a vector by its norm gives a unit vector: same direction, length 1. Models normalise vectors this way before comparing directions. The zero vector has no direction, so it cannot be normalised.\n",
+      "task": "Write `l2_norm(v)` returning the L2 norm of a list or array as a float, without `np.linalg.norm`. Write `normalize(v)` returning a NumPy array of length 1 in the same direction, raising `ValueError` for the zero vector, and `distance(a, b)` returning the L2 distance between two vectors.",
+      "starter": "import numpy as np\n\n\ndef l2_norm(v):\n    return float(np.sum(np.abs(v)))\n\n\ndef normalize(v):\n    v = np.asarray(v, dtype=float)\n    return v / l2_norm(v)\n\n\ndef distance(a, b):\n    return l2_norm(np.asarray(a) - np.asarray(b))\n",
+      "solution": "import numpy as np\n\n\ndef l2_norm(v):\n    v = np.asarray(v, dtype=float)\n    return float(np.sqrt(np.sum(v ** 2)))\n\n\ndef normalize(v):\n    v = np.asarray(v, dtype=float)\n    length = l2_norm(v)\n    if length == 0:\n        raise ValueError(\"the zero vector has no direction\")\n    return v / length\n\n\ndef distance(a, b):\n    return l2_norm(np.asarray(a, dtype=float) - np.asarray(b, dtype=float))\n",
+      "checks": [
+        {
+          "name": "the L2 norm",
+          "code": "got = l2_norm([3, 4])\nassert abs(got - 5.0) < 1e-12, got\ngot = l2_norm([1, 2, 2])\nassert abs(got - 3.0) < 1e-12, got\nassert isinstance(l2_norm([1.0]), float), type(l2_norm([1.0]))"
+        },
+        {
+          "name": "a unit vector",
+          "code": "import numpy as np\ngot = normalize([0, 3, 4])\nassert np.allclose(got, [0, 0.6, 0.8]), got\ngot = normalize(np.array([2.0, -2.0, 1.0]))\nassert abs(np.sqrt(np.sum(got ** 2)) - 1) < 1e-12, got"
+        },
+        {
+          "name": "the zero vector",
+          "code": "raised = False\ntry:\n    normalize([0.0, 0.0])\nexcept ValueError:\n    raised = True\nassert raised, 'normalize([0, 0]) did not raise ValueError'"
+        },
+        {
+          "name": "distance",
+          "code": "got = distance([1, 1], [4, 5])\nassert abs(got - 5.0) < 1e-12, got\ngot = distance([2, 2], [2, 2])\nassert got == 0.0, got"
+        }
+      ],
+      "hints": [
+        "Square each element, add them up, take the square root.",
+        "`np.sqrt(np.sum(v ** 2))` after `v = np.asarray(v, dtype=float)`; wrap it in `float(...)`.",
+        "In `normalize`, compute the length first and `raise ValueError(...)` when it is 0, then return `v / length`."
+      ],
+      "explanation": "Adding absolute values gives the L1 norm, which is a real norm but a different one: for `[3, 4]` it says 7, not 5, so the vector it divides by does not come out with length 1. When a lesson or a paper says the norm without a qualifier, it means L2.\n\nDividing by zero in NumPy does not raise: it warns and fills the result with `nan`, which then spreads silently through every later calculation. Checking for the zero vector and raising is how you keep a bad input from turning into a page of `nan` far away from its cause."
+    },
+    {
+      "id": "dot-products-and-projections",
+      "title": "Dot products and projections",
+      "body": "# Dot products and projections\n\nThe dot product multiplies two vectors element by element and adds the results: `a @ b`. It is the most common operation in a neural network, because every unit of a layer computes one dot product of its weights with its input.\n\nGeometrically, `a @ b` equals `|a| |b| cos(angle)`. Dividing by both lengths leaves the cosine: 1 for the same direction, 0 for perpendicular vectors, -1 for opposite ones. Embedding search ranks results by this cosine similarity.\n\n```python\nimport numpy as np\n\na = np.array([2.0, 1.0])\nb = np.array([1.0, 0.0])\nprint(a @ b)  # 2.0\ncos = a @ b / (np.linalg.norm(a)\n               * np.linalg.norm(b))\nprint(round(cos, 3))  # 0.894\np = (a @ b) / (b @ b) * b\nprint(p, a - p)  # [2. 0.] [0. 1.]\n```\n\nThe projection of `a` onto `b` is the part of `a` that points along `b`: `(a @ b) / (b @ b)` times `b`. What is left, `a` minus the projection, is perpendicular to `b`.\n",
+      "task": "Write `cosine(a, b)` returning the cosine similarity as a float, `project(a, b)` returning the projection of `a` onto `b` as an array, and `orthogonal_part(a, b)` returning `a` minus that projection.",
+      "starter": "import numpy as np\n\n\ndef cosine(a, b):\n    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)\n    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))\n\n\ndef project(a, b):\n    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)\n    return (a @ b) / np.linalg.norm(b) * b\n\n\ndef orthogonal_part(a, b):\n    return np.asarray(a, dtype=float) - project(a, b)\n",
+      "solution": "import numpy as np\n\n\ndef cosine(a, b):\n    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)\n    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))\n\n\ndef project(a, b):\n    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)\n    return (a @ b) / (b @ b) * b\n\n\ndef orthogonal_part(a, b):\n    return np.asarray(a, dtype=float) - project(a, b)\n",
+      "checks": [
+        {
+          "name": "cosine similarity",
+          "code": "got = cosine([1, 0], [0, 3])\nassert abs(got) < 1e-12, got\ngot = cosine([1, 2], [2, 4])\nassert abs(got - 1) < 1e-12, got\ngot = cosine([1, 1], [-1, -1])\nassert abs(got + 1) < 1e-12, got"
+        },
+        {
+          "name": "projection onto a long vector",
+          "code": "import numpy as np\ngot = project([2, 1], [3, 0])\nassert np.allclose(got, [2, 0]), got\ngot = project([1, 1, 0], [0, 0, 5])\nassert np.allclose(got, [0, 0, 0]), got"
+        },
+        {
+          "name": "the rest is perpendicular",
+          "code": "import numpy as np\na, b = np.array([3.0, -1.0, 2.0]), np.array([1.0, 2.0, 2.0])\nrest = orthogonal_part(a, b)\nassert abs(rest @ b) < 1e-12, rest @ b\nassert np.allclose(rest + project(a, b), a), rest"
+        },
+        {
+          "name": "projecting twice changes nothing",
+          "code": "import numpy as np\na, b = np.array([4.0, 1.0]), np.array([2.0, 2.0])\nonce = project(a, b)\ntwice = project(once, b)\nassert np.allclose(once, twice), (once, twice)"
+        }
+      ],
+      "hints": [
+        "The projection's length along `b` is `(a @ b) / |b|`, and the direction is `b / |b|`.",
+        "Multiply those together and the two `|b|` factors become `b @ b`.",
+        "`return (a @ b) / (b @ b) * b`."
+      ],
+      "explanation": "Dividing by `|b|` once gives the right answer only when `b` already has length 1. The scalar `(a @ b) / |b|` is the length of the projection; to turn it into a vector you multiply by the unit vector `b / |b|`, which divides by `|b|` a second time. With `b = [3, 0]` the starter's projection is three times too long.\n\nTwo properties make a projection easy to test: what remains is perpendicular to `b`, and projecting a second time changes nothing. Checking such properties, rather than one hand-computed answer, catches mistakes in any direction."
+    },
+    {
+      "id": "matrices-as-maps",
+      "title": "Matrices as maps",
+      "body": "# Matrices as maps\n\nA matrix `W` with `m` rows and `n` columns turns a vector of size `n` into one of size `m`: each output is the dot product of one row with the input. A dense layer is exactly this, plus a bias vector `b` of size `m`: `W @ x + b`.\n\n```python\nimport numpy as np\n\nW = np.array([[1.0, 0.0, 2.0],\n              [0.0, 1.0, -1.0]])\nb = np.array([0.5, 0.0])\nx = np.array([1.0, 2.0, 3.0])\nprint(W.shape, x.shape)  # (2, 3) (3,)\nprint(W @ x + b)  # [ 7.5 -1. ]\n```\n\nShapes are the first thing to check. The columns of `W` must match the input, and its rows decide the output. Composing two layers multiplies their matrices: a `(4, 2)` matrix after a `(2, 3)` one maps 3 numbers to 4.\n\nA layer from `n` inputs to `m` outputs has `m` times `n` weights and `m` biases. Counting parameters this way tells you how big a model is before you build it.\n",
+      "task": "Write `layer(W, b, x)` returning `W @ x + b`, raising `ValueError` when `W`'s columns do not match the size of `x` or `b`'s size does not match `W`'s rows. Write `param_count(sizes)` returning the number of weights and biases in a stack of dense layers with those sizes, so `[3, 4, 2]` means 3 to 4 to 2.",
+      "starter": "import numpy as np\n\n\ndef layer(W, b, x):\n    return W @ x + b\n\n\ndef param_count(sizes):\n    return sum(a * b for a, b in zip(sizes, sizes[1:]))\n",
+      "solution": "import numpy as np\n\n\ndef layer(W, b, x):\n    W, b, x = np.asarray(W), np.asarray(b), np.asarray(x)\n    rows, columns = W.shape\n    if columns != x.shape[0]:\n        raise ValueError(f\"W has {columns} columns but x has size {x.shape[0]}\")\n    if rows != b.shape[0]:\n        raise ValueError(f\"W has {rows} rows but b has size {b.shape[0]}\")\n    return W @ x + b\n\n\ndef param_count(sizes):\n    return sum(n_in * n_out + n_out for n_in, n_out in zip(sizes, sizes[1:]))\n",
+      "checks": [
+        {
+          "name": "computes the layer",
+          "code": "import numpy as np\nW = np.array([[1.0, 2.0], [3.0, 4.0], [0.0, 1.0]])\ngot = layer(W, np.array([1.0, 0.0, -1.0]), np.array([1.0, 1.0]))\nassert np.allclose(got, [4, 7, 0]), got"
+        },
+        {
+          "name": "rejects mismatched shapes",
+          "code": "import numpy as np\nW = np.ones((2, 3))\nfor b, x in [(np.ones(2), np.ones(2)), (np.ones(1), np.ones(3)), (np.ones(3), np.ones(3))]:\n    raised = False\n    try:\n        layer(W, b, x)\n    except ValueError:\n        raised = True\n    assert raised, f'no ValueError for b {b.shape}, x {x.shape}'"
+        },
+        {
+          "name": "counts biases too",
+          "code": "got = param_count([3, 4, 2])\nassert got == 26, got\ngot = param_count([784, 128, 10])\nassert got == 101770, got"
+        },
+        {
+          "name": "one layer and none",
+          "code": "got = param_count([5, 1])\nassert got == 6, got\ngot = param_count([7])\nassert got == 0, got"
+        }
+      ],
+      "hints": [
+        "NumPy already refuses a wrong column count, but it happily broadcasts a bias of the wrong size in some cases. Check `W.shape` against both yourself.",
+        "Each layer from `n_in` to `n_out` has `n_in * n_out` weights and `n_out` biases.",
+        "`sum(n_in * n_out + n_out for n_in, n_out in zip(sizes, sizes[1:]))`."
+      ],
+      "explanation": "NumPy raises for `W @ x` with mismatched sizes, but adding a bias broadcasts: a bias of size 1, or a wrong-shaped one that happens to line up, slips through and produces numbers of the wrong meaning. A clear error naming both shapes, raised where the mistake happens, saves a long hunt later.\n\nForgetting the biases undercounts by one parameter per unit. For `784 -> 128 -> 10`, the classic digit classifier, that is 138 of 101,770, small here, but the habit of counting exactly matters when you estimate memory for a real model."
+    },
+    {
+      "id": "batches-of-vectors",
+      "title": "Batches of vectors",
+      "body": "# Batches of vectors\n\nNetworks process many examples at once. A batch is a matrix `X` of shape `(n, d)`: one row per example. To apply a layer to every row, multiply by the transpose: `X @ W.T + b`. The result has shape `(n, m)`, and `b` of shape `(m,)` is broadcast, added to every row.\n\n```python\nimport numpy as np\n\nX = np.array([[1.0, 0.0],\n              [0.0, 1.0],\n              [1.0, 1.0]])\nW = np.array([[2.0, 0.0],\n              [0.0, 3.0],\n              [1.0, -1.0]])\nb = np.array([0.0, 1.0, 0.0])\nprint(X @ W.T + b)  # shape (3, 3)\n```\n\n## Broadcasting pairs\n\nAdding a size-1 axis lines arrays up for every pair: `A[:, None, :] - B[None, :, :]` has shape `(n, m, d)`, all differences between rows of `A` and rows of `B`. Summing the squares over the last axis gives every squared distance with no Python loop. Attention, nearest neighbours and clustering all start this way.\n",
+      "task": "Write `batch_layer(X, W, b)` applying the layer `W @ x + b` to every row of `X`, returning shape `(n, m)`. Write `pairwise_sq_distances(A, B)` returning the `(n, m)` matrix whose entry `[i, j]` is the squared L2 distance between row `i` of `A` and row `j` of `B`, without Python loops.",
+      "starter": "import numpy as np\n\n\ndef batch_layer(X, W, b):\n    return X @ W + b\n\n\ndef pairwise_sq_distances(A, B):\n    return np.sum((A - B) ** 2, axis=1)\n",
+      "solution": "import numpy as np\n\n\ndef batch_layer(X, W, b):\n    return X @ W.T + b\n\n\ndef pairwise_sq_distances(A, B):\n    differences = A[:, None, :] - B[None, :, :]\n    return np.sum(differences ** 2, axis=-1)\n",
+      "checks": [
+        {
+          "name": "same as one row at a time",
+          "code": "import numpy as np\nrng = np.random.default_rng(0)\nX, W, b = rng.normal(size=(5, 3)), rng.normal(size=(4, 3)), rng.normal(size=4)\ngot = batch_layer(X, W, b)\nassert got.shape == (5, 4), got.shape\nwant = np.array([W @ x + b for x in X])\nassert np.allclose(got, want), got"
+        },
+        {
+          "name": "squared distances",
+          "code": "import numpy as np\nA = np.array([[0.0, 0.0], [1.0, 1.0]])\nB = np.array([[3.0, 4.0], [1.0, 0.0], [0.0, 0.0]])\ngot = pairwise_sq_distances(A, B)\nassert got.shape == (2, 3), got.shape\nassert np.allclose(got, [[25, 1, 0], [13, 1, 2]]), got"
+        },
+        {
+          "name": "matches a loop",
+          "code": "import numpy as np\nrng = np.random.default_rng(1)\nA, B = rng.normal(size=(4, 5)), rng.normal(size=(6, 5))\ngot = pairwise_sq_distances(A, B)\nwant = np.array([[np.sum((a - c) ** 2) for c in B] for a in A])\nassert np.allclose(got, want), got"
+        }
+      ],
+      "hints": [
+        "`W` has shape `(m, d)` and each row of `X` has size `d`; which side of `@` must `d` be on?",
+        "For distances, give `A` a new middle axis and `B` a new first axis, so their difference broadcasts to `(n, m, d)`.",
+        "`X @ W.T + b`, and `np.sum((A[:, None, :] - B[None, :, :]) ** 2, axis=-1)`."
+      ],
+      "explanation": "`X @ W` only works when `W` is square, and even then it computes the wrong thing: it multiplies by the transpose of the layer. With a non-square layer it fails on shapes, which is the kinder outcome. Writing the shapes next to each other, `(n, d) @ (d, m)`, shows which matrix needs the transpose.\n\n`A - B` subtracts row `i` of `A` from row `i` of `B` only, and only when both have the same number of rows. The extra `None` axes are what pair every row with every other row; the price is an `(n, m, d)` array in memory, which is fine for batches but worth knowing for large ones."
+    },
+    {
+      "id": "numerical-derivatives",
+      "title": "Derivatives",
+      "body": "# Derivatives\n\nThe derivative of `f` at `x` is the slope of `f` there: how much the output changes per unit change of the input, for a very small change. Training a network is nothing more than following such slopes downhill.\n\nYou can estimate a derivative from two values of `f`. The forward difference `(f(x + h) - f(x)) / h` is the slope of a short line to the right. The central difference `(f(x + h) - f(x - h)) / (2 h)` looks both ways, and its error shrinks with `h` squared instead of `h`.\n\n```python\ndef f(x):\n    return x ** 3\n\nx, h = 2.0, 1e-3\nforward = (f(x + h) - f(x)) / h\ncentral = (f(x + h) - f(x - h)) / (2 * h)\nprint(forward - 12)  # about 6e-3\nprint(central - 12)  # about 1e-6\n```\n\nDo not make `h` too small: below about `1e-8`, rounding in floating point swamps the difference. Around `1e-5` the central difference is accurate to many digits, which is why it is the standard way to test hand-written gradients.\n",
+      "task": "Write `forward_difference(f, x, h=1e-5)` and `central_difference(f, x, h=1e-5)` returning the two estimates of the derivative of `f` at `x` as floats.",
+      "starter": "def forward_difference(f, x, h=1e-5):\n    return (f(x + h) - f(x)) / h\n\n\ndef central_difference(f, x, h=1e-5):\n    return (f(x + h) - f(x)) / h\n",
+      "solution": "def forward_difference(f, x, h=1e-5):\n    return (f(x + h) - f(x)) / h\n\n\ndef central_difference(f, x, h=1e-5):\n    return (f(x + h) - f(x - h)) / (2 * h)\n",
+      "checks": [
+        {
+          "name": "slope of a line",
+          "code": "got = central_difference(lambda x: 3 * x + 1, 5.0)\nassert abs(got - 3) < 1e-6, got\ngot = forward_difference(lambda x: 3 * x + 1, 5.0)\nassert abs(got - 3) < 1e-6, got"
+        },
+        {
+          "name": "forward is first-order",
+          "code": "got = forward_difference(lambda x: x ** 3, 2.0, h=1e-3)\nassert 5e-3 < got - 12 < 7e-3, got"
+        },
+        {
+          "name": "central is second-order",
+          "code": "got = central_difference(lambda x: x ** 3, 2.0, h=1e-3)\nassert abs(got - 12) < 2e-6, got"
+        },
+        {
+          "name": "works for any function",
+          "code": "import math\ngot = central_difference(math.sin, 0.5)\nassert abs(got - math.cos(0.5)) < 1e-9, got\ngot = central_difference(math.exp, 1.0)\nassert abs(got - math.e) < 1e-8, got"
+        }
+      ],
+      "hints": [
+        "The central difference evaluates `f` on both sides of `x`.",
+        "The two points are `x + h` and `x - h`, so they are `2 * h` apart.",
+        "`return (f(x + h) - f(x - h)) / (2 * h)`."
+      ],
+      "explanation": "The forward difference is right on average but leans toward the side it looks at: for a curve, the error is about `h / 2` times the second derivative. With `h = 1e-3` and `x ** 3` at 2 that is about `6e-3`, far too much to tell a correct gradient from a slightly wrong one.\n\nThe central difference cancels that leaning term, because the curve bends the same amount on both sides. Its error falls with `h ** 2`, so the same `h` is a thousand times more accurate. It costs two calls of `f` per input, which is why it is a test for gradients, not a way to train."
+    },
+    {
+      "id": "chain-rule",
+      "title": "The chain rule",
+      "body": "# The chain rule\n\nA network is a chain of functions: a product, then an activation, then a loss. The chain rule says the derivative of a chain is the product of the derivatives of its links, each taken at the value that flowed into it.\n\nFor `L = (s - y) ** 2` with `s = sigmoid(z)` and `z = w * x`, the links are `dL/ds = 2 (s - y)`, `ds/dz = s (1 - s)` and `dz/dw = x`. Multiply them.\n\n```python\nimport math\n\ndef sigmoid(z):\n    return 1 / (1 + math.exp(-z))\n\nw, x, y = 0.5, 2.0, 1.0\nz = w * x\ns = sigmoid(z)\ndL_ds = 2 * (s - y)\nds_dz = s * (1 - s)\ndz_dw = x\nprint(dL_ds * ds_dz * dz_dw)\n```\n\nCompute forward first and keep every intermediate value, then multiply the local derivatives on the way back. That order, forward then backward, is exactly what backpropagation does at scale.\n",
+      "task": "Write `sigmoid(z)` and `loss_and_grad(w, x, y)` returning the pair `(L, dL_dw)` as floats for `L = (sigmoid(w * x) - y) ** 2`, using the chain rule.",
+      "starter": "import math\n\n\ndef sigmoid(z):\n    return 1 / (1 + math.exp(-z))\n\n\ndef loss_and_grad(w, x, y):\n    s = sigmoid(w * x)\n    loss = (s - y) ** 2\n    return loss, 2 * (s - y) * x\n",
+      "solution": "import math\n\n\ndef sigmoid(z):\n    return 1 / (1 + math.exp(-z))\n\n\ndef loss_and_grad(w, x, y):\n    z = w * x\n    s = sigmoid(z)\n    loss = (s - y) ** 2\n    dL_ds = 2 * (s - y)\n    ds_dz = s * (1 - s)\n    dz_dw = x\n    return loss, dL_ds * ds_dz * dz_dw\n",
+      "checks": [
+        {
+          "name": "sigmoid",
+          "code": "got = sigmoid(0)\nassert abs(got - 0.5) < 1e-12, got\ngot = sigmoid(2) + sigmoid(-2)\nassert abs(got - 1) < 1e-12, got"
+        },
+        {
+          "name": "the loss",
+          "code": "import math\ngot, _ = loss_and_grad(0.5, 2.0, 1.0)\nwant = (1 / (1 + math.exp(-1)) - 1) ** 2\nassert abs(got - want) < 1e-12, got"
+        },
+        {
+          "name": "matches a numerical derivative",
+          "code": "for w, x, y in [(0.5, 2.0, 1.0), (-1.0, 0.3, 0.0), (2.0, -1.5, 1.0)]:\n    h = 1e-5\n    want = (loss_and_grad(w + h, x, y)[0] - loss_and_grad(w - h, x, y)[0]) / (2 * h)\n    got = loss_and_grad(w, x, y)[1]\n    assert abs(got - want) < 1e-7, (w, x, y, got, want)"
+        }
+      ],
+      "hints": [
+        "There are three links: the square, the sigmoid and the product `w * x`.",
+        "The sigmoid's derivative is `s * (1 - s)`, where `s` is its output.",
+        "`2 * (s - y) * s * (1 - s) * x`."
+      ],
+      "explanation": "Skipping the middle link treats the sigmoid as if it passed changes through unchanged. It does not: near 0 it passes a quarter of a change, and far from 0 almost nothing. The starter's gradient points the right way but is several times too large, and it never shrinks when the sigmoid saturates.\n\nComparing with a central difference, as the third check does, is the routine way to catch a missing link. Every framework's autograd is the chain rule applied mechanically, and its developers test it exactly like this."
+    },
+    {
+      "id": "gradients-and-gradient-checking",
+      "title": "Gradients and gradient checking",
+      "body": "# Gradients and gradient checking\n\nA loss depends on many parameters at once. Its gradient is the vector of partial derivatives, one per parameter: how the loss changes when only that one parameter moves. The gradient points uphill, the direction of steepest increase, so gradient descent steps against it.\n\nA numerical gradient moves each coordinate in turn by `h` in both directions and takes the central difference. It costs two evaluations per parameter, far too slow for training, and exactly right for checking an analytic gradient on a small case.\n\n```python\nimport numpy as np\n\ndef f(x):\n    return x[0] ** 2 + 3 * x[0] * x[1]\n\nx = np.array([1.0, 2.0])\ngrad = np.zeros_like(x)\nfor i in range(len(x)):\n    e = np.zeros_like(x)\n    e[i] = 1e-5\n    grad[i] = (f(x + e) - f(x - e)) / 2e-5\nprint(grad)  # [8. 3.]\n```\n\nCompare the two gradients with a relative error, the size of their difference over the size of both. Below about `1e-7` they agree; above `1e-3` something is wrong.\n",
+      "task": "Write `numerical_gradient(f, x, h=1e-5)` returning the central-difference gradient of `f` at the float array `x`, leaving `x` unchanged. Write `relative_error(a, b)` returning `|a - b| / max(|a| + |b|, 1e-12)` with L2 norms, as a float.",
+      "starter": "import numpy as np\n\n\ndef numerical_gradient(f, x, h=1e-5):\n    grad = np.zeros_like(x)\n    for i in range(len(x)):\n        x[i] += h\n        up = f(x)\n        x[i] -= h\n        down = f(x)\n        grad[i] = (up - down) / (2 * h)\n    return grad\n\n\ndef relative_error(a, b):\n    a, b = np.asarray(a), np.asarray(b)\n    return float(np.linalg.norm(a - b) / max(np.linalg.norm(a) + np.linalg.norm(b), 1e-12))\n",
+      "solution": "import numpy as np\n\n\ndef numerical_gradient(f, x, h=1e-5):\n    x = np.array(x, dtype=float)\n    grad = np.zeros_like(x)\n    for i in range(len(x)):\n        step = np.zeros_like(x)\n        step[i] = h\n        grad[i] = (f(x + step) - f(x - step)) / (2 * h)\n    return grad\n\n\ndef relative_error(a, b):\n    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)\n    scale = max(np.linalg.norm(a) + np.linalg.norm(b), 1e-12)\n    return float(np.linalg.norm(a - b) / scale)\n",
+      "checks": [
+        {
+          "name": "gradient of a sum of squares",
+          "code": "import numpy as np\nx = np.array([1.0, -2.0, 0.5])\ngot = numerical_gradient(lambda v: np.sum(v ** 2), x)\nassert np.allclose(got, 2 * x, atol=1e-6), got"
+        },
+        {
+          "name": "a cross term",
+          "code": "import numpy as np\ngot = numerical_gradient(lambda v: v[0] ** 2 + 3 * v[0] * v[1], np.array([1.0, 2.0]))\nassert np.allclose(got, [8, 3], atol=1e-6), got"
+        },
+        {
+          "name": "leaves x alone",
+          "code": "import numpy as np\nx = np.array([0.1, 0.2, 0.3])\nbefore = x.copy()\nnumerical_gradient(lambda v: float(np.prod(v)), x)\nassert np.array_equal(x, before), x"
+        },
+        {
+          "name": "relative error",
+          "code": "got = relative_error([1.0, 0.0], [1.0, 0.0])\nassert got == 0.0, got\ngot = relative_error([1.0, 0.0], [0.0, 1.0])\nassert abs(got - 2 ** 0.5 / 2) < 1e-12, got\ngot = relative_error([0.0], [0.0])\nassert got == 0.0, got"
+        }
+      ],
+      "hints": [
+        "Moving `x[i]` up by `h` and then down by `h` does not take you to `x - h`.",
+        "Build a fresh step vector for each coordinate and evaluate `f(x + step)` and `f(x - step)`, which leave `x` untouched.",
+        "`step = np.zeros_like(x); step[i] = h; grad[i] = (f(x + step) - f(x - step)) / (2 * h)`."
+      ],
+      "explanation": "The starter changes `x` in place: it adds `h`, then subtracts `h`, which is back at `x`, not at `x - h`. So it computes a forward difference, divided by `2 h`: half the gradient. Editing in place also risks leaving the caller's array changed by rounding, and that array is often the model's real weights.\n\nCreating `x + step` builds a new array each time. That is slower, which does not matter for a check, and it makes the function safe to point at real parameters. The relative error is the right yardstick because gradients can be tiny or huge; an absolute tolerance would be too strict for one and too loose for the other."
+    },
+    {
+      "id": "activation-derivatives",
+      "title": "Activations and their slopes",
+      "body": "# Activations and their slopes\n\nEvery activation has a simple derivative, best written in terms of its own output:\n\n- sigmoid: `s (1 - s)`, at most 0.25, at `z = 0`\n- tanh: `1 - t ** 2`, at most 1\n- ReLU: 1 where the input is positive, 0 elsewhere\n\nIn a deep network, backpropagation multiplies one such slope per layer. Ten sigmoid layers multiply ten numbers no larger than 0.25, so the gradient reaching the first layer is at most `0.25 ** 10`, about one in a million. That is the vanishing gradient problem.\n\n```python\nimport numpy as np\n\nz = np.linspace(-4, 4, 5)\ns = 1 / (1 + np.exp(-z))\nt = np.tanh(z)\nprint(np.round(s * (1 - s), 3))\nprint(np.round(1 - t ** 2, 3))\nprint((z > 0).astype(float))\nprint(0.25 ** 10)\n```\n\nReLU's slope is exactly 1 for active units, so it passes gradients through deep stacks unchanged. That, more than anything, is why it replaced the sigmoid in hidden layers.\n",
+      "task": "Write `sigmoid_grad(z)`, `tanh_grad(z)` and `relu_grad(z)` returning the element-wise derivatives for a NumPy array `z` (ReLU's slope at exactly 0 is 0). Write `stacked_sigmoid_slope(z, depth)`: the derivative of the sigmoid applied `depth` times in a row, at `z`, as a float, by the chain rule.",
+      "starter": "import numpy as np\n\n\ndef sigmoid(z):\n    return 1 / (1 + np.exp(-z))\n\n\ndef sigmoid_grad(z):\n    s = sigmoid(z)\n    return s * (1 - s)\n\n\ndef tanh_grad(z):\n    return 1 - np.tanh(z)\n\n\ndef relu_grad(z):\n    return (z >= 0).astype(float)\n\n\ndef stacked_sigmoid_slope(z, depth):\n    return float(sigmoid_grad(z) ** depth)\n",
+      "solution": "import numpy as np\n\n\ndef sigmoid(z):\n    return 1 / (1 + np.exp(-z))\n\n\ndef sigmoid_grad(z):\n    s = sigmoid(z)\n    return s * (1 - s)\n\n\ndef tanh_grad(z):\n    return 1 - np.tanh(z) ** 2\n\n\ndef relu_grad(z):\n    return (np.asarray(z) > 0).astype(float)\n\n\ndef stacked_sigmoid_slope(z, depth):\n    slope = 1.0\n    for _ in range(depth):\n        slope *= sigmoid_grad(z)\n        z = sigmoid(z)\n    return float(slope)\n",
+      "checks": [
+        {
+          "name": "sigmoid and tanh slopes",
+          "code": "import numpy as np\nz = np.array([-1.0, 0.0, 2.0])\ngot = sigmoid_grad(z)\nassert np.allclose(got[1], 0.25), got\ngot = tanh_grad(z)\nwant = (np.tanh(z + 1e-6) - np.tanh(z - 1e-6)) / 2e-6\nassert np.allclose(got, want, atol=1e-8), got"
+        },
+        {
+          "name": "ReLU slope",
+          "code": "import numpy as np\ngot = relu_grad(np.array([-2.0, 0.0, 3.0]))\nassert np.array_equal(got, [0.0, 0.0, 1.0]), got"
+        },
+        {
+          "name": "a stack of sigmoids",
+          "code": "import numpy as np\ndef stack(z, depth):\n    for _ in range(depth):\n        z = 1 / (1 + np.exp(-z))\n    return z\nfor z, depth in [(0.0, 1), (0.0, 3), (1.5, 5)]:\n    want = (stack(z + 1e-6, depth) - stack(z - 1e-6, depth)) / 2e-6\n    got = stacked_sigmoid_slope(z, depth)\n    assert abs(got - want) < 1e-8, (z, depth, got, want)"
+        },
+        {
+          "name": "the gradient vanishes",
+          "code": "got = stacked_sigmoid_slope(0.0, 10)\nassert got < 0.25 ** 10, got\nassert got > 0, got"
+        }
+      ],
+      "hints": [
+        "Differentiate `tanh` with its own output: if `t = tanh(z)`, the slope is `1 - t ** 2`.",
+        "In the stack, each sigmoid sees the output of the previous one, not the original `z`.",
+        "Loop `depth` times: multiply `slope` by `sigmoid_grad(z)`, then set `z = sigmoid(z)`."
+      ],
+      "explanation": "Raising one slope to the power `depth` assumes every layer sees the same input. It does not: the second sigmoid sees `sigmoid(z)`, a number between 0 and 1, and its slope there is smaller. The chain rule takes each link's derivative at the value that actually reached it, which is why backpropagation must remember the forward pass.\n\nFor ReLU, the slope at exactly 0 is undefined; frameworks pick 0, and so should you, so that dead units stay dead in a consistent way. The tanh slope `1 - tanh(z)` is a typo with a real cost: it can go negative and flips the direction of learning."
+    },
+    {
+      "id": "backprop-by-hand",
+      "title": "Backpropagation by hand",
+      "body": "# Backpropagation by hand\n\nA two-layer network: `h = tanh(W1 @ x + b1)`, then `out = w2 @ h + b2`, with loss `L = 0.5 (out - y) ** 2`. Backpropagation walks back through it, one link at a time, reusing what the forward pass stored.\n\n```python\nimport numpy as np\n\nrng = np.random.default_rng(0)\nW1 = rng.normal(size=(3, 2))\nb1 = np.zeros(3)\nw2 = rng.normal(size=3)\nx, y = np.array([1.0, -1.0]), 0.5\nh = np.tanh(W1 @ x + b1)\nout = w2 @ h\nd_out = out - y          # dL/dout\nd_w2 = d_out * h\nd_h = d_out * w2\nd_pre = d_h * (1 - h ** 2)\nd_W1 = np.outer(d_pre, x)\nprint(d_W1.shape, d_w2.round(3))\n```\n\nEach gradient has the shape of its parameter. A weight matrix's gradient is the outer product of the gradient arriving at its output and the input it saw, `np.outer(d_pre, x)`. A bias's gradient is just the gradient arriving at its output.\n",
+      "task": "Write `backward(params, x, y)` for the network above, where `params` is a dict with `W1`, `b1`, `w2` and `b2` (a float). Return the dict of gradients of `L` with the same keys and shapes (`b2`'s as a float). `forward(params, x)` is given.",
+      "starter": "import numpy as np\n\n\ndef forward(params, x):\n    h = np.tanh(params[\"W1\"] @ x + params[\"b1\"])\n    return params[\"w2\"] @ h + params[\"b2\"], h\n\n\ndef backward(params, x, y):\n    out, h = forward(params, x)\n    d_out = out - y\n    d_h = d_out * params[\"w2\"]\n    return {\n        \"W1\": np.outer(d_h, x),\n        \"b1\": d_h,\n        \"w2\": d_out * h,\n        \"b2\": float(d_out),\n    }\n",
+      "solution": "import numpy as np\n\n\ndef forward(params, x):\n    h = np.tanh(params[\"W1\"] @ x + params[\"b1\"])\n    return params[\"w2\"] @ h + params[\"b2\"], h\n\n\ndef backward(params, x, y):\n    out, h = forward(params, x)\n    d_out = out - y\n    d_h = d_out * params[\"w2\"]\n    d_pre = d_h * (1 - h ** 2)\n    return {\n        \"W1\": np.outer(d_pre, x),\n        \"b1\": d_pre,\n        \"w2\": d_out * h,\n        \"b2\": float(d_out),\n    }\n",
+      "checks": [
+        {
+          "name": "shapes",
+          "code": "import numpy as np\nrng = np.random.default_rng(0)\nparams = {'W1': rng.normal(size=(4, 3)), 'b1': rng.normal(size=4), 'w2': rng.normal(size=4), 'b2': 0.1}\ngot = backward(params, rng.normal(size=3), 1.0)\nassert sorted(got) == ['W1', 'b1', 'b2', 'w2'], sorted(got)\nassert got['W1'].shape == (4, 3) and got['b1'].shape == (4,), (got['W1'].shape, got['b1'].shape)\nassert got['w2'].shape == (4,) and isinstance(got['b2'], float), got['b2']"
+        },
+        {
+          "name": "output layer gradients",
+          "code": "import numpy as np\nparams = {'W1': np.eye(2), 'b1': np.zeros(2), 'w2': np.array([1.0, 2.0]), 'b2': 0.0}\nx = np.array([0.5, -0.5])\ngot = backward(params, x, 0.0)\nh = np.tanh(x)\nout = params['w2'] @ h\nassert abs(got['b2'] - out) < 1e-12, got['b2']\nassert np.allclose(got['w2'], out * h), got['w2']"
+        },
+        {
+          "name": "matches numerical gradients",
+          "code": "import numpy as np\nrng = np.random.default_rng(3)\nparams = {'W1': rng.normal(size=(3, 2)), 'b1': rng.normal(size=3), 'w2': rng.normal(size=3), 'b2': 0.2}\nx, y = np.array([0.7, -1.2]), 0.4\ngot = backward(params, x, y)\ndef loss():\n    return 0.5 * (forward(params, x)[0] - y) ** 2\nfor name in ['W1', 'b1', 'w2']:\n    array = params[name]\n    want = np.zeros_like(array)\n    for i in np.ndindex(array.shape):\n        old = array[i]\n        array[i] = old + 1e-6\n        up = loss()\n        array[i] = old - 1e-6\n        down = loss()\n        array[i] = old\n        want[i] = (up - down) / 2e-6\n    assert np.allclose(got[name], want, atol=1e-6), (name, got[name], want)"
+        }
+      ],
+      "hints": [
+        "Between `d_h` and the first layer's parameters there is one more link: the tanh.",
+        "The tanh's local derivative is `1 - h ** 2`, using the stored output `h`.",
+        "`d_pre = d_h * (1 - h ** 2)`, then `W1`'s gradient is `np.outer(d_pre, x)` and `b1`'s is `d_pre`."
+      ],
+      "explanation": "The starter's output layer is right, so the gradients for `w2` and `b2` pass, but it sends the gradient straight from `h` into `W1` as if tanh were not there. The numerical check catches it at once. Skipping an activation's derivative is the most common mistake in hand-written backprop, and the second most common is using the input of the activation instead of its output.\n\nThe pattern generalises to any depth: keep every layer's output on the way forward, and on the way back multiply by each local derivative in turn. Autograd does exactly this bookkeeping for you, and knowing it lets you read shapes and debug gradients when something goes wrong."
+    },
+    {
+      "id": "probability-basics",
+      "title": "Expectation, variance and likelihood",
+      "body": "# Expectation, variance and likelihood\n\nA random variable takes values with given probabilities. Its expectation is the probability-weighted average of its values; its variance is the expected squared distance from that average. A sample mean from many draws approaches the expectation.\n\n```python\nimport numpy as np\n\nvalues = np.array([0.0, 1.0, 10.0])\nprobs = np.array([0.5, 0.4, 0.1])\nmean = values @ probs\nvar = ((values - mean) ** 2) @ probs\nprint(mean, var)  # 1.4 8.44\nrng = np.random.default_rng(0)\ndraws = rng.choice(values, 10000, p=probs)\nprint(draws.mean().round(2))\n```\n\n## Likelihood\n\nA model predicts a distribution, and training maximises the probability of the data it sees, the likelihood. In practice you minimise the negative log-likelihood. For a Gaussian with mean `mu` and spread `sigma`, it is `0.5 log(2 pi sigma ** 2) + (y - mu) ** 2 / (2 sigma ** 2)`. With `sigma` fixed, only the squared error depends on `mu`: mean squared error is Gaussian likelihood in disguise.\n",
+      "task": "Write `expectation(values, probs)` and `variance(values, probs)`, raising `ValueError` when the probabilities are negative or do not sum to 1 (within `1e-9`). Write `gaussian_nll(y, mu, sigma)` returning the mean negative log-likelihood of the array `y` under a Gaussian, as a float.",
+      "starter": "import math\nimport numpy as np\n\n\ndef expectation(values, probs):\n    return float(np.asarray(values) @ np.asarray(probs))\n\n\ndef variance(values, probs):\n    values = np.asarray(values, dtype=float)\n    return float((values ** 2) @ np.asarray(probs))\n\n\ndef gaussian_nll(y, mu, sigma):\n    y = np.asarray(y, dtype=float)\n    return float(np.mean((y - mu) ** 2 / (2 * sigma ** 2)))\n",
+      "solution": "import math\nimport numpy as np\n\n\ndef _checked(values, probs):\n    values = np.asarray(values, dtype=float)\n    probs = np.asarray(probs, dtype=float)\n    if np.any(probs < 0) or abs(probs.sum() - 1) > 1e-9:\n        raise ValueError(\"probabilities must be non-negative and sum to 1\")\n    return values, probs\n\n\ndef expectation(values, probs):\n    values, probs = _checked(values, probs)\n    return float(values @ probs)\n\n\ndef variance(values, probs):\n    values, probs = _checked(values, probs)\n    mean = values @ probs\n    return float(((values - mean) ** 2) @ probs)\n\n\ndef gaussian_nll(y, mu, sigma):\n    y = np.asarray(y, dtype=float)\n    terms = 0.5 * math.log(2 * math.pi * sigma ** 2) + (y - mu) ** 2 / (2 * sigma ** 2)\n    return float(np.mean(terms))\n",
+      "checks": [
+        {
+          "name": "expectation and variance",
+          "code": "got = expectation([0, 1, 10], [0.5, 0.4, 0.1])\nassert abs(got - 1.4) < 1e-12, got\ngot = variance([0, 1, 10], [0.5, 0.4, 0.1])\nassert abs(got - 8.44) < 1e-12, got\ngot = variance([3, 3], [0.2, 0.8])\nassert abs(got) < 1e-12, got"
+        },
+        {
+          "name": "rejects bad probabilities",
+          "code": "for probs in ([0.5, 0.6], [1.5, -0.5]):\n    raised = False\n    try:\n        expectation([1, 2], probs)\n    except ValueError:\n        raised = True\n    assert raised, f'no ValueError for probabilities {probs}'"
+        },
+        {
+          "name": "Gaussian negative log-likelihood",
+          "code": "import math\ngot = gaussian_nll([0.0], 0.0, 1.0)\nassert abs(got - 0.5 * math.log(2 * math.pi)) < 1e-12, got\ngot = gaussian_nll([1.0, 3.0], 2.0, 2.0)\nwant = 0.5 * math.log(8 * math.pi) + 1 / 8\nassert abs(got - want) < 1e-12, got"
+        },
+        {
+          "name": "the sample mean is the best mu",
+          "code": "import numpy as np\nrng = np.random.default_rng(0)\ny = rng.normal(2.0, 0.5, size=200)\nbest = gaussian_nll(y, y.mean(), 0.5)\nassert best < gaussian_nll(y, y.mean() + 0.05, 0.5), best\nassert best < gaussian_nll(y, y.mean() - 0.05, 0.5), best"
+        }
+      ],
+      "hints": [
+        "Variance is the expectation of the squared distance from the mean, not of the squared value.",
+        "Check `np.any(probs < 0)` and `abs(probs.sum() - 1) > 1e-9` once, in a helper both functions use.",
+        "`mean = values @ probs; return float(((values - mean) ** 2) @ probs)`, and the NLL adds `0.5 * math.log(2 * math.pi * sigma ** 2)` to every term."
+      ],
+      "explanation": "The expected square `E[X ** 2]` is only the variance when the mean is 0. In general variance is `E[X ** 2] - E[X] ** 2`, or, more stably, the expected squared distance from the mean. Dropping the log term of the likelihood keeps the best `mu` the same but gives wrong values, and it matters as soon as `sigma` is learned too.\n\nSeeing losses as negative log-likelihoods explains the common ones: squared error assumes Gaussian noise, and cross-entropy, in the next lesson, is the likelihood of a categorical distribution."
+    },
+    {
+      "id": "softmax-and-cross-entropy",
+      "title": "Softmax and cross-entropy",
+      "body": "# Softmax and cross-entropy\n\nA classifier outputs one score per class, called logits. Softmax turns them into probabilities: exponentiate each, divide by the sum. Cross-entropy is the negative log of the probability given to the correct class.\n\nExponentials overflow: `exp(1000)` is infinite. Softmax does not change when you subtract the same number from every logit, so subtract the largest and the biggest exponent becomes `exp(0) = 1`. For the loss, use the log-sum-exp form: `-log p[t]` equals `logsumexp(z) - z[t]`, which never takes the log of a zero.\n\n```python\nimport numpy as np\n\nz = np.array([1000.0, 999.0, 0.0])\ne = np.exp(z - z.max())\np = e / e.sum()\nprint(p.round(4))\nlse = z.max() + np.log(e.sum())\nprint(lse - z[1])  # loss for class 1\n```\n\nThe gradient of this loss with respect to the logits is the simplest in deep learning: `p` minus the one-hot vector of the target. It is large where the model is confidently wrong and 0 where it is perfectly right.\n",
+      "task": "Write `softmax(z)` for a 1-D array, stable for large logits, `cross_entropy(z, target)` returning `-log softmax(z)[target]` as a float through log-sum-exp, and `cross_entropy_grad(z, target)` returning its gradient with respect to `z`.",
+      "starter": "import numpy as np\n\n\ndef softmax(z):\n    e = np.exp(z)\n    return e / e.sum()\n\n\ndef cross_entropy(z, target):\n    return float(-np.log(softmax(z)[target]))\n\n\ndef cross_entropy_grad(z, target):\n    grad = softmax(z)\n    grad[target] -= 1\n    return grad\n",
+      "solution": "import numpy as np\n\n\ndef softmax(z):\n    z = np.asarray(z, dtype=float)\n    e = np.exp(z - z.max())\n    return e / e.sum()\n\n\ndef cross_entropy(z, target):\n    z = np.asarray(z, dtype=float)\n    top = z.max()\n    log_sum_exp = top + np.log(np.sum(np.exp(z - top)))\n    return float(log_sum_exp - z[target])\n\n\ndef cross_entropy_grad(z, target):\n    grad = softmax(z)\n    grad[target] -= 1\n    return grad\n",
+      "checks": [
+        {
+          "name": "probabilities",
+          "code": "import numpy as np\ngot = softmax(np.array([0.0, np.log(3.0)]))\nassert np.allclose(got, [0.25, 0.75]), got"
+        },
+        {
+          "name": "large logits",
+          "code": "import numpy as np, warnings\nwith warnings.catch_warnings():\n    warnings.simplefilter('ignore')\n    got = softmax(np.array([1000.0, 1000.0, 0.0]))\nassert np.allclose(got, [0.5, 0.5, 0.0]), got"
+        },
+        {
+          "name": "cross-entropy",
+          "code": "import math, numpy as np, warnings\ngot = cross_entropy(np.array([0.0, 0.0, 0.0, 0.0]), 2)\nassert abs(got - math.log(4)) < 1e-12, got\nwith warnings.catch_warnings():\n    warnings.simplefilter('ignore')\n    got = cross_entropy(np.array([0.0, 800.0]), 0)\nassert abs(got - 800.0) < 1e-9, got"
+        },
+        {
+          "name": "gradient is p minus one-hot",
+          "code": "import numpy as np\nz = np.array([0.5, -1.0, 2.0])\ngot = cross_entropy_grad(z, 1)\nwant = np.zeros(3)\nfor i in range(3):\n    e = np.zeros(3)\n    e[i] = 1e-6\n    want[i] = (cross_entropy(z + e, 1) - cross_entropy(z - e, 1)) / 2e-6\nassert np.allclose(got, want, atol=1e-7), (got, want)\nassert abs(got.sum()) < 1e-12, got.sum()"
+        }
+      ],
+      "hints": [
+        "`np.exp(1000)` is `inf`, and `inf / inf` is `nan`. Shift the logits first.",
+        "Subtract `z.max()` before exponentiating; for the loss, `logsumexp(z) = top + log(sum(exp(z - top)))`.",
+        "`return float(top + np.log(np.sum(np.exp(z - top))) - z[target])`."
+      ],
+      "explanation": "The direct formula is mathematically right and numerically broken: with logits in the hundreds, the exponentials overflow to infinity and softmax returns `nan`. Even after fixing softmax, `-log(p[target])` fails when `p[target]` rounds to 0, giving an infinite loss instead of 800.\n\nShifting by the maximum and working in log space costs nothing and removes both problems. That is why frameworks offer cross-entropy on logits, such as `nn.CrossEntropyLoss`, and why you should pass logits to it, not probabilities."
+    },
+    {
+      "id": "eigenvectors-and-svd",
+      "title": "Eigenvectors and the SVD",
+      "body": "# Eigenvectors and the SVD\n\nAn eigenvector of a square matrix `A` is a direction that `A` only stretches: `A @ v = lam v`, with the eigenvalue `lam` the stretch. Multiply any vector by `A` over and over, normalising each time, and it turns toward the eigenvector with the largest eigenvalue. This is power iteration.\n\n```python\nimport numpy as np\n\nA = np.array([[2.0, 1.0], [1.0, 2.0]])\nv = np.ones(2) + np.array([1.0, 0.0])\nfor _ in range(50):\n    v = A @ v\n    v = v / np.linalg.norm(v)\nprint(v.round(3), (v @ A @ v).round(3))\nprint(np.linalg.eigvalsh(A))  # [1. 3.]\n```\n\n## The singular value decomposition\n\nAny matrix, square or not, factors as `U @ diag(S) @ Vt`, with orthonormal `U` and `Vt` and singular values `S` from largest to smallest. Keeping only the first `k` gives the best rank-`k` approximation, and the error left over is the root of the sum of the squared dropped singular values. Low-rank fine-tuning methods such as LoRA rely on weight updates being well approximated this way.\n",
+      "task": "Write `power_iteration(A, steps=200)` for a symmetric matrix, starting from `np.ones`, returning `(value, vector)`: the largest eigenvalue as a float (as `v @ A @ v`) and its unit eigenvector. Write `low_rank(M, k)` returning the best rank-`k` approximation of `M`, using `np.linalg.svd(M, full_matrices=False)`.",
+      "starter": "import numpy as np\n\n\ndef power_iteration(A, steps=200):\n    v = np.ones(A.shape[0])\n    for _ in range(steps):\n        v = A @ v\n        v = v / np.linalg.norm(v)\n    return float(v @ A @ v), v\n\n\ndef low_rank(M, k):\n    U, S, Vt = np.linalg.svd(M, full_matrices=False)\n    return U[:, :k] @ Vt[:k]\n",
+      "solution": "import numpy as np\n\n\ndef power_iteration(A, steps=200):\n    v = np.ones(A.shape[0])\n    for _ in range(steps):\n        v = A @ v\n        v = v / np.linalg.norm(v)\n    return float(v @ A @ v), v\n\n\ndef low_rank(M, k):\n    U, S, Vt = np.linalg.svd(M, full_matrices=False)\n    return U[:, :k] @ np.diag(S[:k]) @ Vt[:k]\n",
+      "checks": [
+        {
+          "name": "largest eigenvalue",
+          "code": "import numpy as np\nA = np.array([[4.0, 1.0, 0.0], [1.0, 3.0, 1.0], [0.0, 1.0, 2.0]])\nvalue, vector = power_iteration(A)\nwant = np.linalg.eigvalsh(A)[-1]\nassert abs(value - want) < 1e-8, (value, want)\nassert abs(np.linalg.norm(vector) - 1) < 1e-12, vector\nassert np.allclose(A @ vector, value * vector, atol=1e-6), vector"
+        },
+        {
+          "name": "low rank keeps the shape and the rank",
+          "code": "import numpy as np\nrng = np.random.default_rng(0)\nM = rng.normal(size=(6, 4))\ngot = low_rank(M, 2)\nassert got.shape == (6, 4), got.shape\nassert np.linalg.matrix_rank(got) == 2, np.linalg.matrix_rank(got)"
+        },
+        {
+          "name": "full rank gives M back",
+          "code": "import numpy as np\nrng = np.random.default_rng(1)\nM = rng.normal(size=(3, 5))\ngot = low_rank(M, 3)\nassert np.allclose(got, M), got"
+        },
+        {
+          "name": "the error is the dropped singular values",
+          "code": "import numpy as np\nrng = np.random.default_rng(2)\nM = rng.normal(size=(5, 5))\nS = np.linalg.svd(M, compute_uv=False)\ngot = np.linalg.norm(M - low_rank(M, 2))\nwant = np.sqrt(np.sum(S[2:] ** 2))\nassert abs(got - want) < 1e-9, (got, want)"
+        }
+      ],
+      "hints": [
+        "`np.linalg.svd` returns the singular values as a 1-D array `S`, separate from `U` and `Vt`.",
+        "Each kept direction is scaled by its singular value: you need `diag(S[:k])` between the two factors.",
+        "`U[:, :k] @ np.diag(S[:k]) @ Vt[:k]`, or `(U[:, :k] * S[:k]) @ Vt[:k]`."
+      ],
+      "explanation": "Leaving out `S` keeps the right directions but gives each one length 1, so the result has the right rank and the wrong size: it never reproduces `M`, even with every direction kept. The singular values carry all the scale; the factors `U` and `Vt` only rotate.\n\nPower iteration is how many large-scale methods find the dominant direction without a full decomposition, using nothing but matrix-vector products. The SVD's error rule, the Eckart-Young theorem, is what makes low-rank compression predictable: you can read off, from the singular values alone, how much you lose by keeping `k` of them."
+    },
+    {
+      "id": "learning-rate-and-curvature",
+      "title": "Learning rate and curvature",
+      "body": "# Learning rate and curvature\n\nNear a minimum, a loss looks like a bowl: `f(x) = 0.5 x @ A @ x`, with `A` symmetric. Its gradient is `A @ x`, and the matrix `A`, the Hessian, holds the curvature. Its eigenvalues are the curvatures along its eigenvectors.\n\nOne gradient step is `x - lr A x`. Along an eigenvector with eigenvalue `lam`, that multiplies the coordinate by `1 - lr lam`. When `|1 - lr lam|` is below 1 the coordinate shrinks; above 1 it grows every step and training diverges. So the learning rate must stay below `2 / lam_max`.\n\n```python\nimport numpy as np\n\nA = np.diag([1.0, 20.0])\nx0 = np.array([1.0, 1.0])\nfor lr in (0.05, 0.11):\n    x = x0.copy()\n    for _ in range(50):\n        x = x - lr * (A @ x)\n    print(lr, np.abs(x).round(4))\n```\n\nThe steepest direction caps the step size, while the flattest decides how many steps you need. Their ratio, the condition number, is why some losses train slowly at any learning rate.\n",
+      "task": "Write `max_stable_lr(A)` returning `2 / lam_max` for a symmetric matrix as a float (use `np.linalg.eigvalsh`). Write `converges(A, lr)` returning whether gradient descent on `0.5 x @ A @ x` shrinks every direction, and `descend(A, x0, lr, steps)` returning `x` after that many steps.",
+      "starter": "import numpy as np\n\n\ndef max_stable_lr(A):\n    return float(2 / np.linalg.eigvalsh(A)[0])\n\n\ndef converges(A, lr):\n    return lr < max_stable_lr(A)\n\n\ndef descend(A, x0, lr, steps):\n    x = np.array(x0, dtype=float)\n    for _ in range(steps):\n        x = x - lr * (A @ x)\n    return x\n",
+      "solution": "import numpy as np\n\n\ndef max_stable_lr(A):\n    return float(2 / np.linalg.eigvalsh(A)[-1])\n\n\ndef converges(A, lr):\n    factors = 1 - lr * np.linalg.eigvalsh(A)\n    return bool(np.all(np.abs(factors) < 1))\n\n\ndef descend(A, x0, lr, steps):\n    x = np.array(x0, dtype=float)\n    for _ in range(steps):\n        x = x - lr * (A @ x)\n    return x\n",
+      "checks": [
+        {
+          "name": "the largest eigenvalue sets the limit",
+          "code": "import numpy as np\ngot = max_stable_lr(np.diag([1.0, 20.0]))\nassert abs(got - 0.1) < 1e-12, got\ngot = max_stable_lr(np.array([[2.0, 1.0], [1.0, 2.0]]))\nassert abs(got - 2 / 3) < 1e-12, got"
+        },
+        {
+          "name": "converges or not",
+          "code": "import numpy as np\nA = np.diag([1.0, 20.0])\nassert converges(A, 0.09), 'lr 0.09 should converge'\nassert not converges(A, 0.11), 'lr 0.11 should diverge'\nassert not converges(A, 0.0), 'lr 0 never shrinks anything'"
+        },
+        {
+          "name": "agrees with descent",
+          "code": "import numpy as np\nA = np.array([[3.0, 1.0], [1.0, 5.0]])\nx0 = np.array([1.0, -1.0])\nfor lr in (0.1, 0.3, 0.4):\n    end = np.linalg.norm(descend(A, x0, lr, 200))\n    assert (end < 1e-3) == converges(A, lr), (lr, end)"
+        }
+      ],
+      "hints": [
+        "`np.linalg.eigvalsh` returns the eigenvalues in ascending order.",
+        "Every factor `1 - lr * lam` must have absolute value below 1, including for the smallest `lam`.",
+        "`max_stable_lr` uses `eigvalsh(A)[-1]`; `converges` returns `bool(np.all(np.abs(1 - lr * eigvalsh(A)) < 1))`."
+      ],
+      "explanation": "`eigvalsh` sorts ascending, so index 0 is the smallest curvature. Using it allows a learning rate twenty times too large for the steep direction, which then explodes. The limit always comes from the steepest direction.\n\nA learning rate of 0, or any rate where a flat direction's factor is exactly 1, also fails to converge: nothing explodes, but nothing shrinks either. Thinking in eigenvalues explains learning-rate warmup, adaptive optimizers and normalisation layers: all of them are ways of living with very different curvatures in one model."
+    },
+    {
+      "id": "momentum-and-adam",
+      "title": "Momentum and Adam",
+      "body": "# Momentum and Adam\n\nPlain gradient descent zigzags across a narrow valley: the steep direction caps the learning rate, and the flat one barely moves. Two improvements dominate in practice.\n\nMomentum keeps a running velocity, `v = beta v + g`, and steps `x - lr v`. Consistent gradients add up and speed the flat direction; alternating ones cancel.\n\nAdam keeps running averages of the gradient, `m`, and of its square, `s`, and steps by `lr m / (sqrt(s) + eps)`, so every coordinate moves about `lr` regardless of its scale. Both averages start at 0 and are too small at first, so Adam divides them by `1 - beta ** t` at step `t`, which is bias correction.\n\n```python\nimport numpy as np\n\ng = np.array([0.01, 100.0])\nm = 0.1 * g\ns = 0.001 * g ** 2\nprint(m / (np.sqrt(s) + 1e-8))\nm_hat = m / (1 - 0.9)\ns_hat = s / (1 - 0.999)\nprint(m_hat / (np.sqrt(s_hat) + 1e-8))\n```\n\nWithout the correction the first steps are three times too large. With it, the first step moves every coordinate by `lr`, whatever its gradient.\n",
+      "task": "Write `momentum_step(x, v, g, lr, beta=0.9)` returning the new `(x, v)`, and `adam_step(x, m, s, g, t, lr, b1=0.9, b2=0.999, eps=1e-8)` returning the new `(x, m, s)` with bias correction, where `t` counts steps from 1. Use NumPy arrays and do not change the arguments in place.",
+      "starter": "import numpy as np\n\n\ndef momentum_step(x, v, g, lr, beta=0.9):\n    v = beta * v + g\n    return x - lr * v, v\n\n\ndef adam_step(x, m, s, g, t, lr, b1=0.9, b2=0.999, eps=1e-8):\n    m = b1 * m + (1 - b1) * g\n    s = b2 * s + (1 - b2) * g ** 2\n    return x - lr * m / (np.sqrt(s) + eps), m, s\n",
+      "solution": "import numpy as np\n\n\ndef momentum_step(x, v, g, lr, beta=0.9):\n    v = beta * v + g\n    return x - lr * v, v\n\n\ndef adam_step(x, m, s, g, t, lr, b1=0.9, b2=0.999, eps=1e-8):\n    m = b1 * m + (1 - b1) * g\n    s = b2 * s + (1 - b2) * g ** 2\n    m_hat = m / (1 - b1 ** t)\n    s_hat = s / (1 - b2 ** t)\n    return x - lr * m_hat / (np.sqrt(s_hat) + eps), m, s\n",
+      "checks": [
+        {
+          "name": "one momentum step",
+          "code": "import numpy as np\nx, v = momentum_step(np.array([1.0, 1.0]), np.array([0.5, 0.0]), np.array([1.0, 2.0]), 0.1)\nassert np.allclose(v, [1.45, 2.0]), v\nassert np.allclose(x, [0.855, 0.8]), x"
+        },
+        {
+          "name": "Adam's first step is lr per coordinate",
+          "code": "import numpy as np\nz = np.zeros(3)\nx, m, s = adam_step(np.zeros(3), z, z, np.array([0.001, -5.0, 300.0]), 1, 0.01)\nassert np.allclose(x, [-0.01, 0.01, -0.01], atol=1e-6), x\nassert np.allclose(m, [0.0001, -0.5, 30.0]), m"
+        },
+        {
+          "name": "Adam later steps",
+          "code": "import numpy as np\nx, m, s = np.array([1.0]), np.zeros(1), np.zeros(1)\nfor t in range(1, 4):\n    x, m, s = adam_step(x, m, s, np.array([2.0]), t, 0.1)\nassert np.allclose(x, [0.7], atol=1e-6), x"
+        },
+        {
+          "name": "both beat plain descent on a narrow valley",
+          "code": "import numpy as np\nA = np.diag([1.0, 50.0])\nx0 = np.array([1.0, 1.0])\nplain = x0.copy()\nx, v = x0.copy(), np.zeros(2)\na, m, s = x0.copy(), np.zeros(2), np.zeros(2)\nfor t in range(1, 101):\n    plain = plain - 0.02 * (A @ plain)\n    x, v = momentum_step(x, v, A @ x, 0.02)\n    a, m, s = adam_step(a, m, s, A @ a, t, 0.05)\nf = lambda p: 0.5 * p @ A @ p\nassert f(x) < f(plain) / 10, (f(x), f(plain))\nassert f(a) < f(plain), (f(a), f(plain))"
+        }
+      ],
+      "hints": [
+        "At step 1, `m` is `0.1 * g` and `s` is `0.001 * g ** 2`: both far smaller than `g` and `g ** 2`.",
+        "Divide `m` by `1 - b1 ** t` and `s` by `1 - b2 ** t` before the step, but return the uncorrected `m` and `s`.",
+        "`m_hat = m / (1 - b1 ** t)`, `s_hat = s / (1 - b2 ** t)`, `x - lr * m_hat / (np.sqrt(s_hat) + eps)`."
+      ],
+      "explanation": "Without bias correction the first step is `lr * 0.1 / sqrt(0.001)`, about `3.16 lr`, in every coordinate. Early steps too large by a factor of three can push a fresh network into a bad region before the averages warm up. The corrected values are only used for the step; the running averages themselves stay uncorrected, or the correction would compound.\n\nOn the narrow valley, momentum lets the flat direction build speed while the steep one oscillates and damps out, and Adam rescales each coordinate so the curvature difference matters far less. AdamW, the usual choice for transformers, is Adam with weight decay applied directly to the weights rather than through the gradient."
+    },
+    {
+      "id": "initialization-variance",
+      "title": "Initialisation and variance",
+      "body": "# Initialisation and variance\n\nThe variance of a sum of independent terms is the sum of their variances. A unit computes `w @ x` over `n` inputs; if each weight has variance `v` and each input variance 1, the output has variance `n v`. Choose `v = 1 / n` and the signal keeps its size from layer to layer. Too small, and it shrinks to nothing after a few layers; too large, and it explodes.\n\nReLU zeroes half of its inputs, halving the second moment, so ReLU networks use `v = 2 / n`, which is He initialisation, standard deviation `sqrt(2 / n)`. Xavier initialisation, `sqrt(2 / (n_in + n_out))`, balances the forward and backward passes for tanh.\n\n```python\nimport numpy as np\n\nrng = np.random.default_rng(0)\nx = rng.normal(size=(1000, 256))\nfor std in (0.01, np.sqrt(2 / 256)):\n    h = x\n    for _ in range(10):\n        W = rng.normal(0, std, (256, 256))\n        h = np.maximum(h @ W, 0)\n    print(round(std, 3), h.std().round(4))\n```\n\nFrameworks pick these scales for you, but a custom layer or a very deep stack is where knowing them pays off.\n",
+      "task": "Write `he_std(fan_in)` and `xavier_std(fan_in, fan_out)` as floats. Write `relu_stack_stds(x, width, depth, std_fn, seed)`: starting from the batch `x`, apply `depth` layers `h = relu(h @ W)` with `W` of shape `(h.shape[1], width)` drawn from `np.random.default_rng(seed)` normal with standard deviation `std_fn(fan_in)`, and return the list of each layer's pre-activation standard deviations (of `h @ W`).",
+      "starter": "import numpy as np\n\n\ndef he_std(fan_in):\n    return float(np.sqrt(1 / fan_in))\n\n\ndef xavier_std(fan_in, fan_out):\n    return float(np.sqrt(2 / (fan_in + fan_out)))\n\n\ndef relu_stack_stds(x, width, depth, std_fn, seed):\n    rng = np.random.default_rng(seed)\n    h, stds = x, []\n    for _ in range(depth):\n        fan_in = h.shape[1]\n        W = rng.normal(0, std_fn(fan_in), (fan_in, width))\n        z = h @ W\n        stds.append(float(z.std()))\n        h = np.maximum(z, 0)\n    return stds\n",
+      "solution": "import numpy as np\n\n\ndef he_std(fan_in):\n    return float(np.sqrt(2 / fan_in))\n\n\ndef xavier_std(fan_in, fan_out):\n    return float(np.sqrt(2 / (fan_in + fan_out)))\n\n\ndef relu_stack_stds(x, width, depth, std_fn, seed):\n    rng = np.random.default_rng(seed)\n    h, stds = x, []\n    for _ in range(depth):\n        fan_in = h.shape[1]\n        W = rng.normal(0, std_fn(fan_in), (fan_in, width))\n        z = h @ W\n        stds.append(float(z.std()))\n        h = np.maximum(z, 0)\n    return stds\n",
+      "checks": [
+        {
+          "name": "the scales",
+          "code": "got = he_std(8)\nassert abs(got - 0.5) < 1e-12, got\ngot = xavier_std(30, 20)\nassert abs(got - 0.2) < 1e-12, got"
+        },
+        {
+          "name": "He keeps the signal alive",
+          "code": "import numpy as np\nx = np.random.default_rng(0).normal(size=(500, 128))\ngot = relu_stack_stds(x, 128, 12, he_std, seed=1)\nassert len(got) == 12, len(got)\nassert 0.5 < got[-1] / got[0] < 2, got"
+        },
+        {
+          "name": "a fixed small scale vanishes",
+          "code": "import numpy as np\nx = np.random.default_rng(0).normal(size=(200, 128))\ngot = relu_stack_stds(x, 128, 8, lambda n: 0.01, seed=2)\nassert got[-1] < 1e-6, got"
+        },
+        {
+          "name": "the first layer has variance near 2",
+          "code": "import numpy as np\nx = np.random.default_rng(3).normal(size=(2000, 64))\ngot = relu_stack_stds(x, 64, 1, he_std, seed=4)[0]\nassert abs(got ** 2 - 2) < 0.2, got"
+        }
+      ],
+      "hints": [
+        "With `1 / n`, each ReLU layer halves the variance, so after 12 layers the signal is `2 ** -6` of its size in variance.",
+        "He initialisation doubles the variance to make up for the half that ReLU zeroes.",
+        "`he_std` returns `float(np.sqrt(2 / fan_in))`."
+      ],
+      "explanation": "`sqrt(1 / n)` is the right scale for a linear layer, or for tanh near 0, but ReLU throws away the negative half of every pre-activation. Each layer then loses half the second moment, and twelve layers shrink the standard deviation by a factor of 8. Gradients shrink the same way on the way back, so the early layers barely learn.\n\nVariance arithmetic is enough to predict this before training anything. The same reasoning explains why residual connections scale their branches, and why normalisation layers, which reset the variance at every layer, made very deep networks trainable."
+    }
+  ]
+}

@@ -93,7 +93,7 @@ test("the checker's messages are the app's: a failing starter explains what came
 });
 
 test("course content is built from the app's files, and lessons needing missing packages say so", () => {
-  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "ml", "llm", "ai", "interview"]);
+  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview"]);
   const all = courses.flatMap(course => course.lessons);
   assert.ok(all.every(lesson => lesson.sections[0].chip === "Idea" && lesson.checks.length && lesson.starter));
   const lessonsOf = id => courses.find(course => course.id === id).lessons;

@@ -39,10 +39,11 @@ EXPECTED_COURSES = {
     "7-async": ("async", "path", 12),
     "8-web": ("web", "path", 5),
     "9-data": ("data", "path", 4),
-    "10-ml": ("ml", "path", 18),
-    "11-llm": ("llm", "path", 9),
-    "12-ai": ("ai", "path", 3),
-    "13-interview": ("interview", "interview", 20),
+    "10-math": ("math", "path", 15),
+    "11-ml": ("ml", "path", 30),
+    "12-llm": ("llm", "path", 9),
+    "13-ai": ("ai", "path", 12),
+    "14-interview": ("interview", "interview", 20),
 }
 INTERVIEW_LEVELS = {"Easy": 7, "Medium": 9, "Hard": 4}
 REQUIRED_TEXT_FIELDS = ("id", "title", "body", "task", "starter", "solution", "explanation")
