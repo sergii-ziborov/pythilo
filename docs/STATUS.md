@@ -249,3 +249,10 @@ Public smoke checks passed, and browser verification showed the 100-task catalog
 eight articles and a causal attention replay with the correct final matrix and
 all checks passing. App build 18 is being uploaded separately through TestFlight;
 review submission remains explicitly prohibited.
+
+A website-only follow-up at 22:27:50 UTC provides PNG covers for all eight blog
+posts and matching Open Graph/Twitter/RSS metadata. Targeted asset tests, the
+production build, individual public article/image/feed checks and the full public
+smoke test pass. Current serving image:
+`sha256:d6d956f87350ad3e21c2d43fa8317ba600685d0a997f4a2cc3960f2e4f7c8252`;
+receipt `pythilo-blog-share-covers-deploy-20261105-v4`.

@@ -157,3 +157,15 @@ checked the 100-task catalog, eight-post blog, and a causal mask worked answer
 through the final matrix and passing checks. Local responsive checks covered
 390 px blog and Lab layouts. Evidence is in `build/verification/` and
 `build/logs/intelligence100-public-smoke.log`.
+
+A follow-up for link-preview compatibility deployed at 22:27:50 UTC on
+5 November 2026, image
+`sha256:d6d956f87350ad3e21c2d43fa8317ba600685d0a997f4a2cc3960f2e4f7c8252`,
+receipt `pythilo-blog-share-covers-deploy-20261105-v4`, source revision
+`sha256:08c65fdc389325d62b56d821b95f52b8814ed46c8e363ca6da253a854bb4e25a`.
+All eight articles now use PNG covers for Open Graph, Twitter metadata and RSS;
+SVG design sources and the existing WebP illustrations are retained. The target
+blog test and production build pass. Production checks fetched every article and
+image, verified matching metadata, PNG signatures/dimensions/MIME and all eight
+RSS enclosure types. The full public smoke check passes again. The app binary
+and lesson/Lab content are unchanged by this follow-up.
