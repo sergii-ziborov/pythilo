@@ -67,7 +67,7 @@ await sse.stop();
 const gone = await fetch(`${origin}/api/playground/rooms/${room.id}/`, { headers: { Authorization: 'Bearer ' + room.view } });
 check(gone.status === 410, 'a closed room is gone');
 
-const pages = [['/', 'Real Python, '], ['/learn/', 'Python foundations'], ['/learn/deeper/functions-that-return-functions/', 'Changing a captured variable'], ['/playground/', 'Preparing the editor'], ['/ai/', 'claude mcp add --transport stdio pythilo -- npx -y pythilo']];
+const pages = [['/', 'Real Python, '], ['/learn/', 'Python foundations'], ['/learn/deeper/functions-that-return-functions/', 'Changing a captured variable'], ['/playground/', 'Preparing the editor'], ['/guide/', 'Pythilo guide'], ['/guide/learn/', 'Q-learning'], ['/pricing/', 'US$9.99'], ['/support/', 'Support and contact'], ['/legal/privacy/', 'eight days'], ['/legal/terms/', 'one-time purchase'], ['/legal/licenses/', 'CPython'], ['/blog/', 'News from Python and PyTorch'], ['/ai/', 'claude mcp add --transport stdio pythilo -- npx -y --package=https://pythilo.com/downloads/pythilo-0.1.0.tgz pythilo']];
 for (const [path, text] of pages) {
   const response = await fetch(origin + path), body = await response.text();
   check(response.ok && body.replaceAll('&#x27;', "'").includes(text), `${path} renders (${response.status})`);

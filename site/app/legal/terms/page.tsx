@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Toc } from "@/components/guide/doc";
-import { ContactEmail, Placeholder } from "@/components/site/placeholder";
+import { ContactEmail } from "@/components/site/placeholder";
 import { APPLE_EULA, GOVERNING_LAW, LEGAL_UPDATED, OWNER, PRICE, formatDay } from "@/lib/site-info";
 
 export const metadata: Metadata = { title: "Terms of Use", description: "The terms for using the Pythilo app for iPhone and iPad, the pythilo.com website, its lessons, playground and shared rooms." };
@@ -27,7 +27,7 @@ export default function TermsPage() {
     <p>Pythilo is in beta and offered through Apple&apos;s TestFlight. Apple&apos;s TestFlight terms also apply while you test it. Beta builds are pre-release: they may contain bugs, change or remove features, lose data, and stop working when a build expires. Keep copies of work that matters, for example by committing and pushing it with Git or copying it out with the Files app. Feedback you send us may be used to improve Pythilo without obligation to you.</p>
 
     <h2 id="price">4. Price and payment</h2>
-    <p>Pythilo is free while it is in beta. {PRICE ? <>{PRICE}</> : <>The price of the App Store release has not been decided. <Placeholder>price and how it is charged (paid app or in-app purchase)</Placeholder></>} Any purchase will be made through the App Store and handled by Apple under its terms, including refunds. We will state any price on the <Link href="/pricing/">Pricing</Link> page and in the App Store before you pay. The website is free.</p>
+    <p>Pythilo is free while it is in beta. The planned App Store price is {PRICE}, as a one-time purchase for the full app, with local pricing and taxes shown by Apple. Any purchase will be made through the App Store and handled by Apple under its terms, including refunds. We will state any price on the <Link href="/pricing/">Pricing</Link> page and in the App Store before you pay. The website is free.</p>
 
     <h2 id="services">5. The website and shared rooms</h2>
     <p>The website, its in-browser lessons and playground, the room relay and the Pythilo MCP bridge are offered free of charge, as they are, and may change or stop at any time. Rooms are temporary by design: they last only as long as the owner chose, at most 24 hours, are kept only in the relay&apos;s memory, and end if the relay restarts. Do not use rooms to store anything; keep your own copy. We may limit how many rooms, participants and how much data a room or a network may use, and we may end rooms that break these terms.</p>
@@ -64,10 +64,10 @@ export default function TermsPage() {
     <p>We may update these terms as Pythilo changes. We will post the new terms here with a new date before they take effect. If a change materially reduces your rights, we will also say so in the app or on the website. If you keep using Pythilo after the change, the new terms apply; if you do not agree, stop using it.</p>
 
     <h2 id="law">16. Governing law and disputes</h2>
-    <p>These terms are governed by the laws of {GOVERNING_LAW ?? <Placeholder>country or state whose law governs these terms</Placeholder>}, without regard to its conflict-of-laws rules, and disputes go to the courts of {GOVERNING_LAW ?? <Placeholder>place of the competent courts</Placeholder>}. If you are a consumer, you keep the protection of the mandatory laws of the country where you live and may also bring proceedings there. Before going to court, please contact us so we can try to resolve the issue informally.</p>
+    <p>{GOVERNING_LAW ? <>These terms are governed by the laws of {GOVERNING_LAW}, without regard to its conflict-of-laws rules. </> : null}If you are a consumer, you keep the protection of the mandatory laws of the country where you live and may also bring proceedings there. Before going to court, please contact us so we can try to resolve the issue informally.</p>
     <p>If any part of these terms is found unenforceable, the rest stays in effect. These terms, the Standard EULA and the policies they link to are the whole agreement between you and us about Pythilo.</p>
 
     <h2 id="contact">17. Contact</h2>
-    <p>{OWNER}. Email: <ContactEmail />. See <Link href="/support/">Support</Link> for help with the app.</p>
+    <p>{OWNER}. Contact: <ContactEmail />. See <Link href="/support/">Support</Link> for help with the app.</p>
   </>;
 }

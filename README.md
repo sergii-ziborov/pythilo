@@ -1,7 +1,7 @@
 # Pythilo
 
-**Real Python on your iPhone and iPad.** Pythilo is an IDE, a course and a set of
-algorithm labs in one app. CPython 3.14 runs on the device itself: your code, your
+**Real Python on your iPhone and iPad.** Pythilo is an IDE, a course and 22 interactive
+algorithm and machine learning labs in one app. CPython 3.14 runs on the device itself: your code, your
 tests, your Django site and your debugger session never leave the phone, and none of
 it needs a network.
 
@@ -15,7 +15,7 @@ open source (see [License](#license)).
   <img src="docs/screenshots/checks.png" width="200" alt="Checks that say what came back">
 </p>
 <p align="center">
-  <img src="docs/screenshots/labs.png" width="200" alt="The four labs">
+  <img src="docs/screenshots/labs.png" width="200" alt="An earlier overview of the algorithm labs">
   <img src="docs/screenshots/graph-lab.png" width="200" alt="Graph Explorer tracing a BFS">
   <img src="docs/screenshots/dp-lab.png" width="200" alt="Dynamic Programming counting repeated calls">
   <img src="docs/screenshots/room.png" width="200" alt="A shared room">
@@ -66,8 +66,10 @@ open source (see [License](#license)).
 
 ### Labs
 
-Four labs that trace **your own code** while it runs, then measure it on the device.
-Correctness first, then time.
+22 labs that trace **your own code** while it runs, then measure it on the device.
+Correctness first, then time. The catalogue now covers Basics, Data structures,
+Algorithms and Machine learning, from binary search and linked lists to gradient
+descent, neural networks and Q-learning. For example:
 
 - **Sorting Bench**: every read and write your sort makes, on four kinds of input.
 - **Graph Explorer**: your BFS, DFS or Dijkstra expanding a grid, tree or random graph,
@@ -86,9 +88,9 @@ Correctness first, then time.
 - **Shared rooms** put a project in front of a browser or an AI client by link, with
   live edits and cursors, end-to-end encrypted so the relay only sees ciphertext. Code
   runs where someone asks it to, and every result says where: this browser, or an
-  iPhone whose owner allowed it. The relay is built and tested; it is not hosted yet.
+  iPhone whose owner allowed it. The relay is live at https://pythilo.com.
 - **A website** with the same lessons running in the browser on Pyodide, a playground
-  and rooms. Built and tested locally; it goes live with the relay.
+  and rooms. Live at [pythilo.com](https://pythilo.com), with the guide, pricing, support and legal pages.
 
 ### Every shape
 

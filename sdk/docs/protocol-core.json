@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
   "sha256": {
-    "dist/cli.mjs": "a19063473927f1e14ffedc0fc614d37d9b48d1c646e61a4ab852bcdc0785fde4"
+    "dist/cli.mjs": "fd5e236d242ae3b349eea3ec363df1ee9adf7d700291f514332a879ae0abe9f4"
   },
   "requires": "Node.js 22+",
   "source": "src/cli.ts and src/core",
@@ -72,7 +72,7 @@
       },
       {
         "file": "test/support/relay.ts",
-        "sha256": "cdd6d3f4aa67aa92d2d82331fd9b6806e1b28d3284da06a605a6a6e197f1f70d",
+        "sha256": "cf7d9b8d23e3681a191797ed3326b7116763312efceced7087f5c2fc32389091",
         "donor": "test/support/relay.ts",
         "donorSHA256": "779ddb66801d2362fdaea0dc555f387868be63882de8235a59cdd5bba8c03aaf",
         "adaptations": "x-pythilo-codecs; GET /healthz."

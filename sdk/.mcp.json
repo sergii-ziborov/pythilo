@@ -4,7 +4,8 @@
       "command": "npx",
       "args": [
         "-y",
-        "pythilo@0.1.0"
+        "--package=https://pythilo.com/downloads/pythilo-0.1.0.tgz",
+        "pythilo"
       ]
     }
   }

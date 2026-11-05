@@ -39,7 +39,7 @@ export function ConnectAIDialog({ link, created, projectName, sharing, share, li
       <pre>{command}</pre>
       <label className="check-row"><input type="checkbox" checked={checkout} onChange={event => setCheckout(event.target.checked)} />From a checkout</label>
       {checkout ? <label className="field">Folder that holds <code>sdk/</code><input value={path} onChange={event => setPath(event.target.value)} spellCheck={false} autoCapitalize="off" /></label> : null}
-      <p className="field-note">{checkout ? "Build it first with pnpm in sdk/. The client starts the bridge with Node 22 or newer." : <>The <code>pythilo</code> package is not on npm yet. Until it is, use From a checkout.</>}{client === "claude-desktop" ? " Add this to claude_desktop_config.json and restart Claude Desktop." : ""}</p>
+      <p className="field-note">{checkout ? "Run npm ci --ignore-scripts and npm run build in sdk/. Use the absolute folder path. Node.js 22 or newer is required." : <>Requires Node.js 22 or newer. Downloads the official Pythilo bridge from pythilo.com.</>}{client === "claude-desktop" ? " Add this to claude_desktop_config.json and restart Claude Desktop." : ""}</p>
     </section>
     <section className="connect-step">
       <div className="label">2 · Paste this into the chat</div>

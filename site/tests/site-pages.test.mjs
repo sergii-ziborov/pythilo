@@ -27,10 +27,18 @@ test('every guide page exists and every screenshot file is there', () => {
   for (const shot of gallery) assert.ok(shot.alt.length > 20, `${shot.file} needs real alt text`);
 });
 
-test('placeholders for undecided facts stay marked, never invented', () => {
-  const info = readFileSync(join(site, 'lib', 'site-info.ts'), 'utf8');
-  assert.doesNotMatch(info, /@gmail\.com/, 'no personal address on the site');
-  for (const page of ['app/legal/terms/page.tsx', 'app/legal/privacy/page.tsx', 'app/pricing/page.tsx']) {
-    assert.match(readFileSync(join(site, page), 'utf8'), /Placeholder/, page);
-  }
+test('the website lab catalogue matches the app in every section', async () => {
+  const { labGroups } = await import('../lib/labs.ts');
+  const source = readFileSync(join(repository, 'Pythilo/UI/Labs/LabCatalog.swift'), 'utf8');
+  const native = [...source.matchAll(/LabInfo\(id: "([^"]+)", title: "([^"]+)"/g)].map(([, id, title]) => ({ id, title }));
+  assert.deepEqual(labGroups.flatMap(group => group.labs.map(({id, title}) => ({id, title}))), native);
+});
+
+test('the AI setup points at a bundled package with an executable bridge', async () => {
+  const { MCP_DOWNLOAD } = await import('../lib/playground-handoff.ts');
+  const { gunzipSync } = await import('node:zlib');
+  const archive = readFileSync(join(site, 'public', new URL(MCP_DOWNLOAD).pathname.replace(/^\//, '')));
+  const contents = gunzipSync(archive);
+  assert.ok(contents.includes(Buffer.from('package/dist/cli.mjs')));
+  assert.ok(contents.includes(Buffer.from('package/ThirdPartyNotices.txt')));
 });

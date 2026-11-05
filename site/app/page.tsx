@@ -5,6 +5,8 @@ import { PythonCode } from "@/components/python-code";
 import { Gallery } from "@/components/site/gallery";
 import { DeviceShot } from "@/components/site/phone";
 import { courses } from "@/lib/courses";
+import { labCount, labGroups } from "@/lib/labs";
+import { PRICE } from "@/lib/site-info";
 import { PYODIDE_VERSION } from "@/lib/python-runtime";
 import { gallery, shots } from "@/lib/shots";
 import "./site.css";
@@ -52,7 +54,7 @@ export default function Home() {
         <div><strong>3.14</strong><span>CPython, embedded and offline</span></div>
         <div><strong>{lessons}</strong><span>lessons in {path.length} courses</span></div>
         <div><strong>{tasks}</strong><span>timed interview tasks</span></div>
-        <div><strong>4</strong><span>labs that trace your own code</span></div>
+        <div><strong>{labCount}</strong><span>labs that trace your own code</span></div>
         <div><strong>0</strong><span>accounts, trackers or ads</span></div>
       </section>
 
@@ -122,12 +124,9 @@ export default function Home() {
         <div className="feature-text">
           <span className="label">Labs</span>
           <h2 id="f-labs">Watch your algorithm work, then time it</h2>
-          <p>Four labs trace your own code while it runs, then measure it on the device. Correctness first, then time.</p>
+          <p>{labCount} labs cover basics, data structures, algorithms and machine learning. Trace your own code, replay each step, then see how it scales on the device.</p>
           <ul className="ticks">
-            <li><strong>Sorting Bench</strong>: every read and write your sort makes, on four kinds of input.</li>
-            <li><strong>Graph Explorer</strong>: your BFS, DFS or Dijkstra expanding a grid, tree or random graph, step by step.</li>
-            <li><strong>Search &amp; Hashing</strong>: build a hash table and watch buckets fill and keys collide.</li>
-            <li><strong>Dynamic Programming</strong>: how many calls a recursion repeats, and what a cache saves.</li>
+            {labGroups.map(group => <li key={group.title}><strong>{group.title}</strong>: {group.labs.map(lab => lab.title).join(", ")}.</li>)}
           </ul>
           <Link href="/guide/learn/#labs" className="arrow-link">How the labs work</Link>
         </div>
@@ -196,7 +195,7 @@ export default function Home() {
       <section id="app" className="band" aria-labelledby="f-get">
         <div>
           <h2 id="f-get">Free while in beta</h2>
-          <p>Pythilo is in beta on TestFlight. There is nothing to pay while it is in beta, and no account to make. The price for the App Store release has not been decided yet.</p>
+          <p>Pythilo is in beta on TestFlight. There is nothing to pay while it is in beta, and no account to make. The planned App Store price is {PRICE}, paid once.</p>
         </div>
         <div className="button-row"><Link href="/pricing/" className="big-button primary">Pricing and beta</Link><Link href="/support/" className="big-button">Support</Link></div>
       </section>

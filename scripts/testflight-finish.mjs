@@ -55,11 +55,12 @@ for (const [locale, whatsNew] of Object.entries(notes)) {
 }
 
 const groups = await call("GET", `/betaGroups?filter[app]=${APP}&filter[name]=${encodeURIComponent(GROUP_NAME)}&limit=5`);
-const group = groups.data[0]?.id ?? (await call("POST", "/betaGroups", { data: { type: "betaGroups",
+const groupRecord = groups.data[0] ?? (await call("POST", "/betaGroups", { data: { type: "betaGroups",
   attributes: { name: GROUP_NAME, isInternalGroup: true, hasAccessToAllBuilds: true },
-  relationships: { app: { data: { type: "apps", id: APP } } } } })).data.id;
+  relationships: { app: { data: { type: "apps", id: APP } } } } })).data;
+const group = groupRecord.id;
 const inGroup = await call("GET", `/betaGroups/${group}/builds?limit=200`);
-if (!inGroup.data.some((b) => b.id === build)) {
+if (!groupRecord.attributes.hasAccessToAllBuilds && !inGroup.data.some((b) => b.id === build)) {
   try {
     await call("POST", `/betaGroups/${group}/relationships/builds`, { data: [{ type: "builds", id: build }] });
   } catch (error) {

@@ -22,7 +22,7 @@ const args = process.argv.slice(2);
 const usage = () => { process.stderr.write("Pythilo MCP: use --help, --version, doctor [--json] [--relay <origin>], or start with [--name <name>] [--relay <origin>].\n"); process.exitCode = 1; };
 if (args.length === 1 && args[0] === "--help") {
   process.stdout.write(`Pythilo SDK + MCP · ${SDK_VERSION}\nShared, encrypted, temporary Python rooms for AI clients and people.\n\nRun without arguments as an MCP stdio server: pythilo [--name <name>] [--relay <origin>].
-A room link carries its relay. Creating a room needs PYTHILO_RELAY or --relay <origin>; local development uses http://127.0.0.1:3212.
+A room link carries its relay. Creating a room uses https://pythilo.com by default. Set PYTHILO_RELAY or --relay <origin> for another relay; local development uses http://127.0.0.1:3212.
 Python runs only on a host in the room, the Pythilo app on iPhone or iPad (CPython) or a browser (Pyodide), after its owner allows it.
 Diagnostics: pythilo doctor [--json] [--relay <origin>]. It opens no room, reads no source and changes no setting.
 Library: import { Pythilo } from "pythilo";\nNode.js 22 or newer.\n`);

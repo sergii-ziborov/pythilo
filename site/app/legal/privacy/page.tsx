@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Table, Toc } from "@/components/guide/doc";
-import { ContactEmail, Placeholder } from "@/components/site/placeholder";
+import { ContactEmail } from "@/components/site/placeholder";
 import { LEGAL_UPDATED, LOG_RETENTION, OWNER, formatDay } from "@/lib/site-info";
 
 export const metadata: Metadata = { title: "Privacy Policy", description: "How the Pythilo app for iPhone and iPad and the pythilo.com website handle your data: no account, no analytics, no ads, and end-to-end encrypted rooms." };
@@ -79,7 +79,7 @@ export default function PrivacyPage() {
 
     <h2 id="website">The website</h2>
     <p>pythilo.com offers lessons and a playground that run Python in your browser with Pyodide, the room relay, the guide and this information. It has no account, no cookies, no analytics, no advertising, and loads no fonts, scripts or images from other sites: everything, including Pyodide, is served from pythilo.com. Python you run on the site runs in your browser, not on our server; like any program it can make its own network requests.</p>
-    <p>The site is served from a server we rent from Hetzner Online GmbH. Its domain&apos;s DNS is hosted by Vercel Inc.</p>
+    <p>The site is served from a server we rent from Hetzner Online GmbH. Its domain&apos;s DNS is hosted by Vercel Inc. Support, privacy and security emails are forwarded by Forward Email to our Gmail inbox; Forward Email and Google process messages you choose to send under their own policies.</p>
 
     <h2 id="browser-storage">Website: storage in your browser</h2>
     <p>The site saves the following in your browser&apos;s own storage so your work survives a reload. It is not sent to us, and you can delete it at any time by clearing this site&apos;s data in your browser.</p>
@@ -91,13 +91,13 @@ export default function PrivacyPage() {
     <p>A room link contains its key. In a browser, the full link sits in the address bar and your history; anyone who gets it can join the room until it ends.</p>
 
     <h2 id="logs">Website: server logs</h2>
-    <p>The web server records a standard access log for page and file requests: your IP address, the date and time, the page requested, the response status and size, the referring page and your browser&apos;s user-agent string. Requests to the room relay and to room pages are <strong>not</strong> written to the access log. An error log records problems with requests, which can include the IP address. We use logs only to keep the site running and secure, and we do not combine them with other data. Logs are kept for {LOG_RETENTION ?? <Placeholder>log retention period</Placeholder>}.</p>
+    <p>The web server records a standard access log for page and file requests: your IP address, the date and time, the page path requested, the response status and size, request duration and your browser&apos;s user-agent string. Query strings and referring pages are not stored. Requests to the room relay and to room pages are <strong>not</strong> written to the access log. An error log records problems with requests, which can include the IP address. We use logs only to keep the site running and secure, and we do not combine them with other data. Logs are kept for {LOG_RETENTION}.</p>
 
     <h2 id="bases">Legal bases</h2>
     <p>Where the EU or UK General Data Protection Regulation applies, we process the data described here because it is necessary to provide what you ask for (delivering rooms you create or join, Article 6(1)(b)), and for our legitimate interests in running a secure and reliable service and preventing abuse (server logs and rate limits, Article 6(1)(f)). Data shared with us through TestFlight is processed for our legitimate interest in fixing and improving the app.</p>
 
     <h2 id="sharing">Who we share data with</h2>
-    <p>We do not sell or rent personal data, and we do not share it for advertising. The only parties that process data for us are our hosting provider (Hetzner Online GmbH) and DNS provider (Vercel Inc.), as needed to run the website and relay. We may disclose information if the law requires it, and only what we hold, which for rooms is encrypted text we cannot read.</p>
+    <p>We do not sell or rent personal data, and we do not share it for advertising. Our hosting provider (Hetzner Online GmbH) and DNS provider (Vercel Inc.) process the technical data needed to run the website and relay. If you email us, Forward Email delivers the message to our Gmail inbox, operated by Google; do not include secrets or private room links unless needed for your request. We may disclose information if the law requires it, and only what we hold, which for rooms is encrypted text we cannot read.</p>
 
     <h2 id="retention">How long we keep data</h2>
     <ul>

@@ -3,9 +3,10 @@ import Link from "next/link";
 import { GuideHeader, Note, Pager, Table, Toc } from "@/components/guide/doc";
 import { DeviceShot } from "@/components/site/phone";
 import { courses } from "@/lib/courses";
+import { labCount, labGroups } from "@/lib/labs";
 import { shots } from "@/lib/shots";
 
-export const metadata: Metadata = { title: "Courses, labs and interview practice", description: "How Pythilo's Python courses work on iPhone and iPad: lessons, checks that run your code, hints, Debug in a project, timed interview tasks and four algorithm labs." };
+export const metadata: Metadata = { title: "Courses, labs and interview practice", description: "How Pythilo's Python courses work on iPhone and iPad: lessons, checks that run your code, hints, Debug in a project, timed interview tasks and 22 interactive labs." };
 
 export default function Page() {
   const path = courses.filter(course => course.kind !== "interview");
@@ -45,13 +46,14 @@ export default function Page() {
     <p>{interview ? <>{interview.lessons.length} tasks, marked Easy, Medium or Hard. </> : null}A task opens straight in the code view with a countdown timer in the toolbar, set to the task&apos;s time. Hints work as in lessons, and <span className="ui">Test</span> runs real tests against your solution.</p>
 
     <h2 id="labs">Labs</h2>
-    <p>The <span className="ui">Labs</span> tab has four labs that trace your own code while it runs, then measure it on the device. Correctness first, then time. Timings come from this device: they suggest a growth rate, they do not prove Big O.</p>
-    <Table head={["Lab", "You write", "You see"]} rows={[
-      [<strong key="l">Sorting Bench</strong>, <><code>my_sort(items)</code></>, <><span className="ui">Trace</span> steps through every read and write your sort makes. <span className="ui">Measure</span> times it on random, sorted, reversed and duplicate-heavy input, five runs each, median in milliseconds.</>],
-      [<strong key="l">Graph Explorer</strong>, "BFS, DFS or Dijkstra", <>Your search expanding a grid, a tree, or a sparse or dense random graph, step by step. A DFS is judged as any valid depth-first order, not one fixed answer.</>],
-      [<strong key="l">Search &amp; Hashing</strong>, <>A <code>Table</code> class with <code>put</code> and <code>get</code></>, <><span className="ui">Run 400 keys</span> fills it with words, sequential, random or deliberately colliding keys, then shows the buckets, comparisons per lookup and the longest bucket, and times yours against a <code>dict</code>.</>],
-      [<strong key="l">Dynamic Programming</strong>, "Stairs, coins or edit distance", <>How many calls a plain recursion makes and how many repeat, what <code>@cache</code> saves, and a table filling cell by cell.</>],
-    ]} />
+    <p>The <span className="ui">Labs</span> tab has {labCount} labs in four sections. Write the Python yourself and choose <span className="ui">Trace</span> to run it and record what changes. The step player lets you play, pause, go back, or jump to a step while the editor highlights the line that ran.</p>
+    {labGroups.map(group => <section key={group.title} aria-label={group.title}>
+      <h3>{group.title}</h3>
+      <Table head={["Lab", "What you explore"]} rows={group.labs.map(lab => [<strong key={lab.id}>{lab.title}</strong>, lab.summary])} />
+    </section>)}
+    <h3>How it scales</h3>
+    <p>For labs with growing inputs, <span className="ui">How it scales</span> checks correctness and then times the code without the tracer. The chart compares input size with runtime and explains the observed growth. Results come from this device; they suggest a growth rate and do not prove Big O. Labs that follow a fixed training run instead show its learning steps.</p>
+    <p>Sorting Bench compares random, sorted, reversed and duplicate-heavy input. Graph Explorer accepts any valid DFS order. Search &amp; Hashing counts comparisons made by the keys themselves, and Dynamic Programming shows repeated recursive calls and what a cache saves.</p>
     <figure><DeviceShot shot={shots.graphLab} /><DeviceShot shot={shots.dpLab} /><figcaption>Graph Explorer tracing a BFS, and Dynamic Programming counting repeated calls.</figcaption></figure>
 
     <h2 id="web">On the website</h2>

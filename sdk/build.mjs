@@ -10,7 +10,7 @@ const versionSource = await readFile(path.join(root, "src/version.ts"), "utf8");
 if (!versionSource.includes(`SDK_VERSION = "${packageInfo.version}"`)) throw new Error("CLI and package versions must match.");
 // package.json is the one version source. The plugin's install files are generated.
 const writeJSON = (file, value) => writeFile(path.join(root, file), JSON.stringify(value, null, 2) + "\n");
-const npxArgs = ["-y", `pythilo@${packageInfo.version}`];
+const npxArgs = ["-y", `--package=https://pythilo.com/downloads/pythilo-${packageInfo.version}.tgz`, "pythilo"];
 await writeJSON(".mcp.json", { mcpServers: { pythilo: { command: "npx", args: npxArgs } } });
 const plugin = JSON.parse(await readFile(path.join(root, ".claude-plugin/plugin.json"), "utf8"));
 await writeJSON(".claude-plugin/plugin.json", { ...plugin, version: packageInfo.version });

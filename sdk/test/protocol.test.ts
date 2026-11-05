@@ -37,7 +37,7 @@ test("doctor refuses unknown flags without starting a server, and help names it"
 test("one package.json version generates the plugin's install files", async () => {
   const version = JSON.parse(await readFile("package.json", "utf8")).version;
   const read = async (file: string) => JSON.parse(await readFile(file, "utf8"));
-  assert.deepEqual((await read(".mcp.json")).mcpServers.pythilo.args, ["-y", `pythilo@${version}`]);
+  assert.deepEqual((await read(".mcp.json")).mcpServers.pythilo.args, ["-y", `--package=https://pythilo.com/downloads/pythilo-${version}.tgz`, "pythilo"]);
   assert.equal((await read(".claude-plugin/plugin.json")).version, version);
 });
 
@@ -82,7 +82,7 @@ test("an invalid relay stops the server before it speaks MCP and never echoes cr
   }
 });
 
-test("doctor --json --relay checks a live relay's /healthz and room route", async () => {
+test("doctor --json --relay checks a live relay's /healthz/ and room route", async () => {
   const { origin, close } = await startRelay();
   try {
     const { stdout } = await promisify(execFile)(process.execPath, [path.resolve("dist/cli.mjs"), "doctor", "--json", "--relay", origin], { env: cleanEnvironment() });

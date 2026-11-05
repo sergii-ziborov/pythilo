@@ -13,6 +13,7 @@ const NAV: { href: string; label: string; id: Section }[] = [
   { href: "/guide/", label: "Guide", id: "guide" },
   { href: "/learn/", label: "Learn", id: "learn" },
   { href: "/playground/", label: "Playground", id: "playground" },
+  { href: "/ai/", label: "Connect AI", id: "ai" },
   { href: "/pricing/", label: "Pricing", id: "pricing" },
   { href: "/blog/", label: "Blog", id: "blog" },
 ];
@@ -30,7 +31,6 @@ export function SiteHeader({ current }: { current?: Section }) {
           <summary aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg></summary>
           <div className="site-menu-panel">
             {links}
-            <Link href="/ai/" aria-current={current === "ai" ? "page" : undefined}>Connect AI</Link>
             <a href={APP_URL} className="pill-button primary">Get the app</a>
           </div>
         </details>

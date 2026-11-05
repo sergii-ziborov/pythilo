@@ -1,5 +1,5 @@
 // The relay routes over loopback HTTP, with the real PlaygroundRooms class, as the
-// site serves them under /api/playground/rooms/ and /healthz. It reports what clients actually sent.
+// site serves them under /api/playground/rooms/ and /healthz/. It reports what clients actually sent.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { PlaygroundError, PlaygroundRooms, ROOM_LIMITS, roomCodec, validatePacket } from "./rooms";
@@ -62,7 +62,7 @@ export async function startRelay(rooms = new PlaygroundRooms(), hooks: Hooks = {
     const body = (maximum?: number) => limitedJSON(request, maximum) as Promise<any>;
     try {
       res.setHeader("Content-Type", "application/json");
-      if (url.pathname === "/healthz" && req.method === "GET") { res.end(JSON.stringify({ ok: true })); seen.status = 200; return; }
+      if (url.pathname === "/healthz/" && req.method === "GET") { res.end(JSON.stringify({ ok: true })); seen.status = 200; return; }
       if (url.pathname === "/api/playground/rooms/" && req.method === "POST") {
         const value = await body();
         if (Object.keys(value).some(key => !["snapshot", "lifetimeSeconds", "codec"].includes(key))) throw new PlaygroundError("Unexpected request field.");

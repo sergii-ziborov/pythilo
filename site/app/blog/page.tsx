@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export default function BlogIndex() {
   const posts = allPosts();
   return <>
-    <SiteHeader />
+    <SiteHeader current="blog" />
     <main className="page blog-index">
       <section className="blog-intro">
         <div className="label">Blog</div>

@@ -1,12 +1,13 @@
 export const HANDOFF_SCHEMA = "pythilo-handoff-v1";
 export const MCP_PACKAGE = "pythilo";
+export const MCP_DOWNLOAD = "https://pythilo.com/downloads/pythilo-0.1.0.tgz";
 
 export type AIClient = "claude-code" | "claude-desktop" | "codex";
 export const aiClients: Record<AIClient, string> = { "claude-code": "Claude Code", "claude-desktop": "Claude Desktop", codex: "Codex" };
 
-/** The one-time setup for each client, from npm or from a local checkout of `sdk/`. */
+/** The one-time setup for each client, from the official download or a local checkout of `sdk/`. */
 export function setupCommand(client: AIClient, checkout?: string): string {
-  const command = checkout ? ["node", `${checkout.replace(/\/+$/, "")}/sdk/dist/cli.mjs`] : ["npx", "-y", MCP_PACKAGE];
+  const command = checkout ? ["node", `${checkout.replace(/\/+$/, "")}/sdk/dist/cli.mjs`] : ["npx", "-y", `--package=${MCP_DOWNLOAD}`, MCP_PACKAGE];
   if (client === "claude-code") return `claude mcp add --transport stdio pythilo -- ${command.join(" ")}`;
   if (client === "codex") return `codex mcp add pythilo -- ${command.join(" ")}`;
   return JSON.stringify({ mcpServers: { pythilo: { command: command[0], args: command.slice(1) } } }, null, 2);

@@ -12,8 +12,9 @@ or another agent, and ask a device or browser in the room to check, run or test 
 The relay only passes ciphertext along. It never runs code, and neither does this bridge.
 
 > **Not on npm yet.** The package name `pythilo` is free on npm but nothing is published.
-> Until it is, use the from-a-checkout commands below; the `npx -y pythilo` forms and the
-> Claude Code plugin start working once the package is published.
+> Use the official site-hosted package now:
+> `npx -y --package=https://pythilo.com/downloads/pythilo-0.1.0.tgz pythilo`.
+> Building from the checkout below also works.
 
 ## Build from a checkout
 
@@ -31,7 +32,7 @@ with no runtime npm dependencies.
 
 ## The relay
 
-There is no production relay yet, and none is built in.
+The production relay is https://pythilo.com and is used by default.
 
 - A **room link carries its relay**: `<origin>/playground/room/<id>/#key=…&access=…&expires=…&mode=edit|view`.
   Joining uses that origin. Links must be https, except plain http for a loopback relay
@@ -54,16 +55,15 @@ From a checkout:
 claude mcp add --transport stdio pythilo -- node /path/to/pythilo/sdk/dist/cli.mjs --relay http://127.0.0.1:3212
 ```
 
-Once published:
+Official download:
 
 ```sh
-claude mcp add --transport stdio pythilo -- npx -y pythilo
+claude mcp add --transport stdio pythilo -- npx -y --package=https://pythilo.com/downloads/pythilo-0.1.0.tgz pythilo
 ```
 
 Set `PYTHILO_RELAY` in the environment instead of `--relay` if you prefer; without either,
 the bridge uses `https://pythilo.com`. This folder is also a Claude Code plugin
-(`.claude-plugin/`, with a `pythilo-rooms` skill). Its `.mcp.json` runs `npx -y pythilo@0.1.0`,
-so it needs the published package. Then, instead of `claude mcp add`:
+(`.claude-plugin/`, with a `pythilo-rooms` skill). Its `.mcp.json` uses the same official site-hosted archive. Then, instead of `claude mcp add`:
 
 ```text
 /plugin marketplace add /path/to/pythilo/sdk
@@ -86,7 +86,7 @@ so it needs the published package. Then, instead of `claude mcp add`:
 }
 ```
 
-Once published, use `"command": "npx", "args": ["-y", "pythilo"]`. Claude Desktop does not
+For the official download, use `"command": "npx", "args": ["-y", "--package=https://pythilo.com/downloads/pythilo-0.1.0.tgz", "pythilo"]`. Claude Desktop does not
 read your shell profile; if it cannot find `node`, give its absolute path (`which node`).
 
 ### Codex
@@ -100,7 +100,7 @@ args = ["/path/to/pythilo/sdk/dist/cli.mjs"]
 env = { PYTHILO_RELAY = "http://127.0.0.1:3212" }
 ```
 
-Once published, `command = "npx"` and `args = ["-y", "pythilo"]`.
+For the official download, use `command = "npx"` and `args = ["-y", "--package=https://pythilo.com/downloads/pythilo-0.1.0.tgz", "pythilo"]`.
 
 ### Tools
 

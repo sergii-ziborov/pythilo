@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
-import { Placeholder } from "@/components/site/placeholder";
 import { PRICE } from "@/lib/site-info";
 import "../site.css";
 
@@ -28,6 +27,7 @@ export default function PricingPage() {
             <li>Every course, lab and interview task</li>
             <li>Shared rooms and AI clients</li>
           </ul>
+          <div className="button-row"><Link href="/support/#beta" className="big-button primary">Request a beta invitation</Link></div>
           <p className="muted" style={{ margin: 0, fontSize: 14.5, lineHeight: "21px" }}>The beta is on Apple&apos;s TestFlight. Testers are invited; the public App Store release is still to come. Builds expire after a while and are replaced by newer ones.</p>
         </div>
         <div className="price-card">
@@ -46,7 +46,7 @@ export default function PricingPage() {
       <section className="band" aria-labelledby="release">
         <div>
           <h2 id="release">After the beta</h2>
-          <p>{PRICE ?? <>The price for the App Store release has not been decided yet. <Placeholder>App Store price and model</Placeholder></>} It will be shown here and on the App Store before you pay anything, and any purchase goes through Apple.</p>
+          <p>The planned App Store price is <strong>{PRICE}</strong>, paid once for the full app. Local prices and taxes may vary. It will be shown here and on the App Store before you pay anything, and any purchase goes through Apple.</p>
         </div>
       </section>
 
@@ -55,7 +55,7 @@ export default function PricingPage() {
         <div className="faq">
           <details><summary>How do I join the beta?</summary><div><p>Pythilo is tested through Apple&apos;s TestFlight. Testers install TestFlight from the App Store and open their invitation. If you would like to test, <Link href="/support/">get in touch</Link>.</p></div></details>
           <details><summary>Will my projects survive when the app leaves beta?</summary><div><p>Your projects are ordinary folders on your device, visible in the Files app. Keep a copy of anything important, for example by pushing it with Git, as beta builds can have bugs.</p></div></details>
-          <details><summary>Is there a subscription or an account?</summary><div><p>There is no account at all, in the app or on the website. How the App Store release will be priced has not been decided.</p></div></details>
+          <details><summary>Is there a subscription or an account?</summary><div><p>There is no account at all, in the app or on the website. The planned App Store release is a one-time purchase, with no subscription.</p></div></details>
           <details><summary>Do I need a network connection?</summary><div><p>No. Python, the bundled packages, the courses and the labs all work offline. The network is used only when you install packages, use a Git remote, or share a room.</p></div></details>
           <details><summary>Which devices does it run on?</summary><div><p>iPhone and iPad with iOS 18 or later, including the folding iPhone.</p></div></details>
         </div>

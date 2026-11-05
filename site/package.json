@@ -9,7 +9,8 @@
     "start": "next start -H 127.0.0.1 -p 3212",
     "check": "node scripts/prepare-assets.mjs --content-only && tsc --noEmit",
     "test": "node scripts/prepare-assets.mjs --content-only && node --experimental-wasm-jspi --experimental-strip-types --no-warnings=ExperimentalWarning --test tests/*.test.mjs",
-    "bridge": "node scripts/build-playground-bridge.mjs"
+    "bridge": "node scripts/build-playground-bridge.mjs",
+    "prepare-mcp": "node scripts/prepare-mcp-download.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.4",

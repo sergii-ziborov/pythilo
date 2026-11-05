@@ -39,6 +39,7 @@ Check live DNS with `vercel dns ls pythilo.com --scope serhii-bddc` before retir
 cd site
 pnpm install
 pnpm test && pnpm check && pnpm build
+npm run prepare-mcp                           # builds the official SDK download
 node scripts/prepare-server-release.mjs        # writes site/release/
 sh hetzner/deploy.sh                           # stage the reviewed Linux image
 # Hostwatch MCP: deployment_preview, then deployment_update on the node/target above.
@@ -59,7 +60,8 @@ route (3212 belongs to Crabrix there). `PYTHILO_HOST`, `PYTHILO_SSH_KEY` and
 Node base must exist on that node. Review the Linux sharp pin when upgrading it.
 
 The smoke test creates a room, streams it, posts an update and presence, ends the room,
-and loads `/`, `/learn/`, a lesson, `/playground/` and the Pyodide files.
+and loads the home, guide, pricing, support, legal, blog, lessons, playground,
+Connect AI and Pyodide files.
 
 Optional: set `NEXT_PUBLIC_APP_STORE_URL` at build time to point "Get the
 app" at the App Store page. Without it, the button opens the beta section of the pricing page.
@@ -81,3 +83,37 @@ pnpm dev                                   # http://127.0.0.1:3212
 
 Production mode locally: `pnpm build && SITE_ORIGIN=http://127.0.0.1:3212 node .next/standalone/server.js`
 after copying `public/` and `.next/static/` next to it, or simply `pnpm start`.
+
+## Support email
+
+Vercel DNS holds MX records for mx1.forwardemail.net and mx2.forwardemail.net, plus
+Forward Email aliases for support, privacy and security at pythilo.com, to the
+owner-approved Gmail destination. SPF includes spf.forwardemail.net. Website routing
+records are unchanged. Forwarding is inbound only; replies are sent from Gmail.
+
+The website price is US$9.99 for the planned one-time App Store purchase; the
+TestFlight beta remains free and invitation-only. Do not link to an App Store listing
+or public TestFlight signup before one is available.
+
+## Page cache across releases
+
+The Hostwatch profile mounts `/srv/apps/pythilo/cache/route-cache` at
+`/app/.next/server/route-cache` so the container can keep its root filesystem
+read-only. Next.js 16 response keys do not include a build ID. Reusing that mount
+without a version check can serve a previous release's HTML and RSC even though
+the serving image and its compiled pages are new.
+
+`instrumentation.ts` now checks `.next/BUILD_ID` before the server handles requests.
+On a different or unmarked build, `lib/site-route-cache.ts` moves old response
+entries into `.pythilo-previous-builds/` inside that mount and records the new ID.
+A restart of the same build keeps its current cache. The archived entries are
+derived page responses, retained for inspection; they contain no room storage.
+The lifecycle is covered by `tests/site-route-cache.test.mjs`. Always check the
+actual home-page text after deployment, in addition to container health.
+
+Release verified 5 November 2026: image
+`sha256:d73afdeea48a9bb729121e594bd2c51f3022cb06fe17a925540dd7e6b2c7720f`,
+Hostwatch deployment `pythilo-site-cache-guard-deploy-20261105-v4`. All public smoke
+checks passed; the browser displayed the new home on desktop and mobile, with no
+horizontal overflow at 390 px. Local checks passed: 75 site tests, 59 SDK tests,
+TypeScript and production build. The public SDK archive also passed `pythilo doctor`.

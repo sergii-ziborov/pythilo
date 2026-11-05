@@ -73,10 +73,20 @@ The relay keeps rooms in memory and only ever sees encrypted text.
 | App as a runtime host: check, run and test for a browser or an AI client, asked each time or allowed for the room, result says where it ran | Checked: a browser and the MCP bridge each ran pytest on the simulator |
 | Website: home, lessons that run and check in Pyodide, playground, rooms, Connect AI | Checked in a browser against the local server. Every lesson the browser can run passes the app's own checker in Pyodide; lessons that need torch, Flask, threads or packages Pyodide lacks say they need the app |
 | Browser "Run on" another device in the room | Checked: browser to simulator |
-| MCP bridge `pythilo`: 15 tools, revision conflicts, runtime requests | 58 tests, and checked against the live room. Not on npm yet |
+| MCP bridge `pythilo`: 15 tools, revision conflicts, runtime requests | 59 tests; the official archive at `https://pythilo.com/downloads/pythilo-0.1.0.tgz` passes `doctor` against production. Not published to npm |
 | MCP served by the app on the local network | Checked, as before |
-| Hosting the relay and website | Not done: no domain or server chosen. `site/DEPLOY.md` is ready for one |
+| Hosting the relay and website | Live at https://pythilo.com on the Helsinki node. Website completion and release checks are recorded in `site/DEPLOY.md` |
 | A browser host only runs while its tab is visible; `asyncio.run` in the browser needs Chrome or Edge | Known limits |
+
+Website completion was published on 5 November 2026 through Hostwatch. The live
+home, 15-page guide, lesson catalog, playground, Connect AI, pricing, support and
+legal pages now match the app's 204 lessons, 20 interview tasks and 22 labs. The
+mounted Next.js page cache is versioned on startup so old HTML cannot hide a new
+release. All 75 site tests and the public production smoke checks passed, including
+encrypted room updates, presence, view-only access and owner close. Browser checks
+covered Python execution, lesson checks, live edits, desktop and mobile layouts.
+Support, privacy and security aliases use Forward Email with Vercel DNS; the SMTP
+server accepts all three recipients. Inbox delivery was not tested with a message.
 
 ## Screens
 
@@ -104,6 +114,13 @@ App Store release:
 - Crashes inside the prebuilt Python and NumPy frameworks will not symbolicate, because
   those frameworks come without dSYMs.
 
+Build **15** (0.1.0) became `VALID` on 5 November 2026 and is `IN_BETA_TESTING` for
+the existing internal group. The finish script now respects groups that already
+receive all builds automatically. The App Store 1.0 draft remains
+`PREPARE_FOR_SUBMISSION` with manual release: text, links, categories, review
+contacts, age answers, US$9.99 price and all eight screenshots are saved. Every
+screenshot reports `COMPLETE`. No App Review or Beta App Review was requested.
+
 ## Machine learning (section 19)
 
 PyTorch 2.15 is bundled, built from source by
@@ -120,6 +137,6 @@ Engine, with timings and an agreement check against the CPU, and a sample model
 (`scripts/make-sample-model.py`). Checked on the simulator, which has no Neural Engine,
 so the Neural Engine numbers still need a physical device.
 
-## Not started
+## Release model
 
-- StoreKit purchase (section 4, P6): waits for the choice between a free download with one unlock and a paid app. A first App Store listing is drafted in `docs/app-store/listing.md`, holding only checked claims
+- Release model confirmed 5 November 2026: a paid app at US$9.99, with regional prices from Apple. No StoreKit unlock is needed. The TestFlight beta stays free; App Review has not been requested. App Store text is in `docs/app-store/en-US.json`, with screenshots alongside it.

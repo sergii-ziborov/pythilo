@@ -11,7 +11,7 @@ export const guidePages: GuidePage[] = [
   { slug: "sqlite", group: "Tools", title: "SQLite", summary: "Browse, filter and edit tables with a tap, run SQL, and the sqlite3 shell in the terminal." },
   { slug: "git", group: "Tools", title: "Git", summary: "A real .git folder: changes, commits, branches, merge, rebase, clone and HTTPS tokens." },
   { slug: "notebooks", group: "Tools", title: "Notebooks", summary: "Open and save .ipynb files, run cells, rich output and what is not Jupyter." },
-  { slug: "learn", group: "Learn", title: "Courses, labs and interview practice", summary: "Lessons, checks, hints, Debug in a project, the four labs and timed tasks." },
+  { slug: "learn", group: "Learn", title: "Courses, labs and interview practice", summary: "Lessons, checks, hints, Debug in a project, 22 labs and timed tasks." },
   { slug: "rooms", group: "Together", title: "Playground and shared rooms", summary: "Share a project by link, join one, permissions for editing and running code." },
   { slug: "connect-ai", group: "Together", title: "Connect an AI client", summary: "Let Claude Code, Codex or any MCP client work on one project, with your permission." },
   { slug: "settings", group: "Reference", title: "Settings", summary: "Every setting, what it changes, and where Pythilo keeps it." },

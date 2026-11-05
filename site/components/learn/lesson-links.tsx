@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { forgetAll, useProgress } from "./progress";
 
-export type LessonLink = { course: string; id: string; title: string; meta?: string };
+export type LessonLink = { course: string; id: string; title: string; appRequired?: boolean; meta?: string };
 
 /** Lesson rows with a check for those passed in this browser. */
 export function LessonLinks({ lessons }: { lessons: LessonLink[] }) {
@@ -10,7 +10,7 @@ export function LessonLinks({ lessons }: { lessons: LessonLink[] }) {
   return <ol className="lesson-list">{lessons.map((lesson, index) => {
     const done = !!progress?.[`${lesson.course}/${lesson.id}`];
     return <li key={lesson.id}><Link href={`/learn/${lesson.course}/${lesson.id}/`}>
-      <span className={`lesson-number${done ? " done" : ""}`} aria-label={done ? "Passed" : undefined}>{done ? "✓" : index + 1}</span>{lesson.title}{lesson.meta ? <span className="lesson-meta">{lesson.meta}</span> : null}
+      <span className={`lesson-number${done ? " done" : ""}`} aria-label={done ? "Passed" : undefined}>{done ? "✓" : index + 1}</span>{lesson.title}{lesson.appRequired ? <span className="lesson-meta">App required</span> : null}{lesson.meta ? <span className="lesson-meta">{lesson.meta}</span> : null}
     </Link></li>;
   })}</ol>;
 }

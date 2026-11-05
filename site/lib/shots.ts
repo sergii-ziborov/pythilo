@@ -17,7 +17,7 @@ export const shots = {
   check: phone("check", "Checks that say what came back", "describe(3) returned None, expected 'int: 3'. Is a return missing?", "The check sheet listing five failed checks, each saying what came back and what was expected"),
   graphLab: phone("graph-lab", "Graph Explorer", "Your own BFS, DFS or Dijkstra, traced step by step on a grid, tree or random graph.", "Graph Explorer tracing a breadth-first search on a grid"),
   dpLab: phone("dp-lab", "Dynamic Programming", "How many calls a recursion repeats, and what a cache saves.", "The Dynamic Programming lab showing 177 calls, 11 distinct, for ways(10)"),
-  labs: phone("labs", "Four labs", "Sorting, graphs, hashing and dynamic programming, measured on this device.", "The Labs screen listing Sorting Bench, Graph Explorer, Search and Hashing, and Dynamic Programming"),
+  labs: phone("labs", "Explore algorithms", "Write Python and trace how it works on this device.", "An earlier Labs overview showing Sorting Bench, Graph Explorer, Search and Hashing, and Dynamic Programming"),
   room: phone("room", "Rooms, with permission", "Someone asks to run code on your iPhone. You decide: deny, or run once.", "A shared room in dark mode where Ada asks to run python main.py on this iPhone, with Deny and Run once"),
   share: phone("share", "Share a project", "Choose how long the room lasts and who may edit. The relay only sees encrypted text.", "The Share sheet in dark mode with room length, edit or view, and run permissions"),
   playground: phone("playground", "Playground", "Share a project, join with a link, or connect an AI client on your network.", "The Playground tab with Share a project, Join with a link and AI client over MCP"),

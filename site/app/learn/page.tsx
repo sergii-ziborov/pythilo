@@ -13,14 +13,14 @@ export default function LearnPage() {
     <main className="page">
       <section className="learn-intro">
         <h1>Learn Python</h1>
-        <p>Every lesson runs in this browser with {BROWSER_RUNTIME}. Read a part, try the examples, then write the solution and check it with the same checks the app uses.</p>
+        <p>Read every lesson here and run browser-compatible exercises with {BROWSER_RUNTIME}. Read a part, try the examples, then write the solution and check it with the same checks the app uses. Exercises that need PyTorch, threads or unavailable packages are marked App required.</p>
         <ProgressNote />
       </section>
       {courses.map(course => <section key={course.id} className="course-section" aria-labelledby={`course-${course.id}`}>
         <div className={`label${course.kind === "interview" ? " practice" : ""}`}>{courseLabel(course)}</div>
         <h2 id={`course-${course.id}`}><Link href={`/learn/${course.id}/`} style={{ color: "inherit" }}>{course.title}</Link></h2>
         <p>{course.summary}</p>
-        <LessonLinks lessons={course.lessons.map(lesson => ({ course: course.id, id: lesson.id, title: lesson.title, ...(lesson.level ? { meta: `${lesson.level} · ${lesson.minutes} min` } : {}) }))} />
+        <LessonLinks lessons={course.lessons.map(lesson => ({ course: course.id, id: lesson.id, title: lesson.title, appRequired: lesson.missing.length > 0, ...(lesson.level ? { meta: `${lesson.level} · ${lesson.minutes} min` } : {}) }))} />
       </section>)}
     </main>
     <SiteFooter />

@@ -30,14 +30,16 @@ export default function SupportPage() {
           <li>An AI client cannot connect: the computer must be on the same network, and Pythilo needs the Local Network permission (Settings › Privacy &amp; Security › Local Network on the device).</li>
         </ul>
 
-        <h2 id="beta">Beta feedback</h2>
+        <h2 id="beta">Beta access and feedback</h2>
+        <p>The beta is currently available to invited TestFlight testers. There is no public signup link yet. To request an invitation, use the contact options below. No payment is required during the beta.</p>
         <p>While Pythilo is on TestFlight, the quickest way to report a bug is TestFlight itself: take a screenshot in Pythilo and tap <strong>Share Beta Feedback</strong>, or open the TestFlight app, choose Pythilo and tap <strong>Send Beta Feedback</strong>. Crashes you allow TestFlight to send arrive with the build and device, which helps a lot.</p>
 
         <h2 id="contact">Contact</h2>
-        <p>Email: <ContactEmail />. Please include your device, the iOS version, Pythilo&apos;s build number (from TestFlight), and what you did and saw. For privacy requests, say so in the subject. Do not send room links unless you want us to be able to read that room.</p>
+        <p>Email: <ContactEmail />. Please include your device, iOS version, Pythilo&apos;s build number (from TestFlight), and what you did and saw. For privacy requests, use <a href="mailto:privacy@pythilo.com">privacy@pythilo.com</a>. Do not send room links unless you want us to be able to read the room.</p>
+        <p>You can also <a href="https://github.com/sergii-ziborov/pythilo/issues/new">open a public issue on GitHub</a> for bugs and feature requests. Keep personal information, room keys and security reports out of public issues.</p>
 
         <h2 id="security">Security and abuse</h2>
-        <p>To report a security problem in the app, the website or the relay, or misuse of a room, write to the same address with <em>Security</em> or <em>Abuse</em> in the subject. Please give us a reasonable time to fix a vulnerability before you publish it. See the <Link href="/legal/acceptable-use/">Acceptable Use Policy</Link>.</p>
+        <p>To report a security problem in the app, the website or the relay, or misuse of a room, write to <a href="mailto:security@pythilo.com">security@pythilo.com</a>, or send private feedback through TestFlight. Please give us a reasonable time to fix a vulnerability before you publish it. See the <Link href="/legal/acceptable-use/">Acceptable Use Policy</Link>.</p>
 
         <Note title="Legal">The <Link href="/legal/terms/">Terms of Use</Link>, <Link href="/legal/privacy/">Privacy Policy</Link> and <Link href="/legal/licenses/">open-source licences</Link> cover the app and this website.</Note>
       </main>

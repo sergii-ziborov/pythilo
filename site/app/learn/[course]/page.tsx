@@ -22,10 +22,10 @@ export default async function CoursePage({ params }: { params: Promise<{ course:
       <section className="course-section">
         <nav aria-label="Breadcrumb" className="storage-note"><Link href="/learn/">Learn</Link> / {course.title}</nav>
         <div className={`label${course.kind === "interview" ? " practice" : ""}`}>{courseLabel(course)}</div>
-        <h2 style={{ fontSize: 32, lineHeight: "38px" }}>{course.title}</h2>
+        <h1 style={{ fontSize: 32, lineHeight: "38px", margin: 0 }}>{course.title}</h1>
         <p>{course.summary}</p>
         <ProgressNote />
-        <LessonLinks lessons={course.lessons.map(lesson => ({ course: course.id, id: lesson.id, title: lesson.title, ...(lesson.level ? { meta: `${lesson.level} · ${lesson.minutes} min` } : {}) }))} />
+        <LessonLinks lessons={course.lessons.map(lesson => ({ course: course.id, id: lesson.id, title: lesson.title, appRequired: lesson.missing.length > 0, ...(lesson.level ? { meta: `${lesson.level} · ${lesson.minutes} min` } : {}) }))} />
       </section>
     </main>
     <SiteFooter />

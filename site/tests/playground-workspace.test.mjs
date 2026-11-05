@@ -85,10 +85,10 @@ test("the AI handoff uses its own schema and the setup names the pythilo server"
   const handoff = JSON.parse(text.slice(text.indexOf("{")));
   assert.deepEqual([handoff.schema, handoff.link, handoff.mode, handoff.expiresAt], ["pythilo-handoff-v1", link, "edit", "2026-11-03T00:00:00.000Z"]);
   assert.doesNotMatch(text, /crabrix/i);
-  assert.equal(setupCommand("claude-code"), "claude mcp add --transport stdio pythilo -- npx -y pythilo");
+  assert.equal(setupCommand("claude-code"), "claude mcp add --transport stdio pythilo -- npx -y --package=https://pythilo.com/downloads/pythilo-0.1.0.tgz pythilo");
   assert.equal(setupCommand("claude-code", "/src/pythilo/"), "claude mcp add --transport stdio pythilo -- node /src/pythilo/sdk/dist/cli.mjs");
-  assert.equal(setupCommand("codex"), "codex mcp add pythilo -- npx -y pythilo");
-  assert.deepEqual(JSON.parse(setupCommand("claude-desktop")), { mcpServers: { pythilo: { command: "npx", args: ["-y", "pythilo"] } } });
+  assert.equal(setupCommand("codex"), "codex mcp add pythilo -- npx -y --package=https://pythilo.com/downloads/pythilo-0.1.0.tgz pythilo");
+  assert.deepEqual(JSON.parse(setupCommand("claude-desktop")), { mcpServers: { pythilo: { command: "npx", args: ["-y", "--package=https://pythilo.com/downloads/pythilo-0.1.0.tgz", "pythilo"] } } });
   const masked = maskedLink(link);
   assert.doesNotMatch(masked, /k{43}|e{43}/);
   assert.match(masked, /#key=\[KEY\]&access=\[ACCESS\]&expires=1&mode=edit$/);

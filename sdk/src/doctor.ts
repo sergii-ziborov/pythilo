@@ -112,10 +112,10 @@ export async function runDoctor(options: Options = {}): Promise<DoctorReport> {
   if (origin.protocol === "https:") checks.push(await certificate(origin, timeoutMs));
   else checks.push({ name: "tls", status: "skipped", detail: "This relay uses plain http; only a local relay should." });
   try {
-    const response = await fetch(`${origin.origin}/healthz`, { redirect: "error", cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
+    const response = await fetch(`${origin.origin}/healthz/`, { redirect: "error", cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
     await response.body?.cancel().catch(() => {});
-    checks.push(response.ok ? { name: "relay", status: "ok", detail: `${origin.origin}/healthz answers HTTP ${response.status}.` } : { name: "relay", status: "failed", detail: `${origin.origin}/healthz answered HTTP ${response.status}.` });
-  } catch (error) { checks.push({ name: "relay", status: "failed", detail: `${origin.origin}/healthz could not be reached: ${failure(error)}.${configured.length && !envProxyEnabled ? " Proxy variables are set but unused." : ""}` }); }
+    checks.push(response.ok ? { name: "relay", status: "ok", detail: `${origin.origin}/healthz/ answers HTTP ${response.status}.` } : { name: "relay", status: "failed", detail: `${origin.origin}/healthz/ answered HTTP ${response.status}.` });
+  } catch (error) { checks.push({ name: "relay", status: "failed", detail: `${origin.origin}/healthz/ could not be reached: ${failure(error)}.${configured.length && !envProxyEnabled ? " Proxy variables are set but unused." : ""}` }); }
   // A deliberately unknown room proves the room route answers. No room is created or read.
   try {
     const response = await fetch(`${origin.origin}/api/playground/rooms/${PROBE_ROOM}/`, { redirect: "error", cache: "no-store", signal: AbortSignal.timeout(timeoutMs), headers: { Authorization: "Bearer " + PROBE_TOKEN, "X-Pythilo-Codecs": CLIENT_CODECS } });
