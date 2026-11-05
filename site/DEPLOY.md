@@ -125,3 +125,9 @@ browser labs; 76 site tests, the production build and the expanded public smoke
 checks passed. Lab pages use the same cross-origin isolation as lessons/playground.
 The source overlay includes prepared `content/courses.json` and `content/labs.json`;
 prepare these locally from the shared iOS source before uploading through Hostwatch.
+
+The final follow-up deployed at 19:31:52 UTC uses image
+`sha256:befd00129498ce5cb430cda0976f2659bb2f8c37f3d209ab8bf67598c80c69f2`,
+receipt `pythilo-learning-expansion-final-deploy-20261105-v3`. It adds the direct
+browser-lab link on the home page and documents lab storage in the privacy policy.
+The public smoke test passed again after this deployment.

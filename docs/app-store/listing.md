@@ -30,3 +30,8 @@ separate legal jurisdiction. App Review and release are separate from these save
 Before a future App Review submission, settle the existing export-compliance question
 in `docs/STATUS.md` (bundled OpenSSL and libgit2 HTTPS) and complete Apple's App
 Privacy questionnaire against the final binary and the published privacy policy.
+
+The learning expansion updates the saved draft and beta descriptions to 236 lessons
+in 17 courses, plus 20 interview tasks, and 32 labs. The Learn artwork now says
+236 lessons. Apple's replacement asset is named `03-learn-236.jpg`; its local
+source remains `screenshots/en-US/03-learn.jpg`. All eight assets are COMPLETE.

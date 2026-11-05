@@ -175,3 +175,16 @@ Deployment receipt: `pythilo-learning-expansion-deploy-20261105-v2`. Public smok
 checks passed, including the new course pages and isolated `/labs/` routes. Browser
 checks verified lesson example output and a passing solution, lab starter failures,
 worked-answer success, replay to the final state, saved completion and 390 px layouts.
+
+A final follow-up at 19:31:52 UTC added the home-page link to browser labs and
+included lab drafts/completion in the privacy storage table. Serving image:
+`sha256:befd00129498ce5cb430cda0976f2659bb2f8c37f3d209ab8bf67598c80c69f2`;
+receipt `pythilo-learning-expansion-final-deploy-20261105-v3`. The expanded public
+smoke checks passed again. The signed build 16 archive contains all 18 course
+records (256 lessons/tasks) and byte-identical new lab sources. The public sitemap
+contains every new lesson and lab URL.
+
+App Store and beta descriptions now say 236 lessons, 17 courses and 32 labs. The
+Learn marketing screenshot was refreshed to 236 lessons; all eight Apple assets
+report COMPLETE, with the six iPhone screenshots kept in order. The draft remains
+PREPARE_FOR_SUBMISSION with MANUAL release. No review was requested.
