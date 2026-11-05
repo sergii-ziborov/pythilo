@@ -1,0 +1,11 @@
+FROM docker.io/library/node@sha256:51b1100cc2a83d370c6a60952e3f2989c8a43159d0e38586e090f3b3326efefd
+WORKDIR /app
+COPY --chown=1000:1000 . /app/
+# Replace macOS-native links with the exact matching Linux dependency.
+RUN npm install --prefix /native --omit=dev --no-package-lock --no-audit --no-fund sharp@0.35.5 \
+ && find /app/node_modules -type l -name sharp -exec ln -sfn /native/node_modules/sharp {} \; \
+ && ln -sfn /native/node_modules/sharp /app/node_modules/sharp \
+ && rm -rf /root/.npm
+ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0 NEXT_TELEMETRY_DISABLED=1 SITE_ORIGIN=https://pythilo.com
+USER 1000:1000
+CMD ["node","server.js"]
