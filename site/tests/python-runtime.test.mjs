@@ -130,3 +130,20 @@ test("all browser labs trace actual edited code, accept worked answers and rejec
     }
   }
 });
+
+test("every runnable example in the four new practical courses executes in Pyodide", () => {
+  const practical = courses.filter(course => ["algorithm-patterns", "data-practice", "reliable-python", "ml-practice"].includes(course.id));
+  let checked = 0;
+  const failures = [];
+  for (const course of practical) for (const lesson of course.lessons) {
+    for (const section of lesson.sections) for (const block of parseMarkdown(section.markdown)) {
+      if (block.kind !== "code" || block.language !== "python") continue;
+      const response = JSON.parse(runner.run(JSON.stringify({ "example.py": block.code }), "example.py"));
+      const output = take();
+      if (response.exitCode !== 0) failures.push(`${course.id}/${lesson.id}: ${output.err}`);
+      checked++;
+    }
+  }
+  assert.deepEqual(failures, []);
+  assert.ok(checked >= practical.reduce((total, course) => total + course.lessons.length, 0));
+});

@@ -188,3 +188,11 @@ App Store and beta descriptions now say 236 lessons, 17 courses and 32 labs. The
 Learn marketing screenshot was refreshed to 236 lessons; all eight Apple assets
 report COMPLETE, with the six iPhone screenshots kept in order. The draft remains
 PREPARE_FOR_SUBMISSION with MANUAL release. No review was requested.
+
+Build 16 completed processing at 19:53:58 UTC and is IN_BETA_TESTING for the
+existing internal group (one tester). A subsequent executable-example check found
+a quoting error in the JSON-boundary reading example, while its solution and
+checks were already passing. The example now uses a single-quoted Python string
+around the JSON object. A new Pyodide regression test executes every example in
+the four practical courses; all 77 site tests pass, including all 32 new examples.
+Build 17 packages this reading-only correction.
