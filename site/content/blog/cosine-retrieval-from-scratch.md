@@ -3,7 +3,7 @@ title: Build a tiny vector retriever
 description: Rank vectors by direction, make ties deterministic, and evaluate retrieval before generating answers.
 date: 2026-11-05
 author: Pythilo
-cover: /blog/cosine-retrieval-from-scratch/cover.svg
+cover: /blog/cosine-retrieval-from-scratch/cover.png
 coverAlt: Query → Rank → Inspect on a dark grid with a sequence of colored bars.
 tags: Python, AI
 ---

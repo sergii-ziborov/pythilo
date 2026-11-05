@@ -3,7 +3,7 @@ title: Attention, one query at a time
 description: Calculate attention scores, stable weights and a weighted value vector before adding a causal mask.
 date: 2026-11-05
 author: Pythilo
-cover: /blog/attention-in-small-python/cover.svg
+cover: /blog/attention-in-small-python/cover.png
 coverAlt: Scores → Weights → Values on a dark grid with a sequence of colored bars.
 tags: Python, AI
 ---

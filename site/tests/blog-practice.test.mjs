@@ -13,6 +13,10 @@ test('practice articles have real covers, runnable examples and valid lesson/lab
     assert.ok(post, name);
     assert.ok(post.words >= 300, name);
     assert.ok(existsSync(`public${post.cover}`), name);
+    assert.ok(/\.(png|jpg|jpeg|gif)$/i.test(post.cover), `${name}: cover must work in link previews`);
+    const cover = readFileSync(`public${post.cover}`);
+    assert.equal(cover.toString('hex', 0, 8), '89504e470d0a1a0a');
+    assert.ok(cover.readUInt32BE(16) >= 1200 && cover.readUInt32BE(20) >= 600);
     assert.ok(post.blocks.some(b => b.kind === 'code' && b.language === 'python'), name);
     for (const [,url] of post.body.matchAll(/\]\((\/(?:learn|labs)\/[^)]+)\)/g)) {
       const [,kind,id] = url.split('/');

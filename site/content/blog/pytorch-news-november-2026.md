@@ -3,7 +3,7 @@ title: "PyTorch and neural networks in November 2026: 2.15, the end of TorchScri
 description: "PyTorch 2.15 is out, TorchScript is on its way out, ExecuTorch is now part of PyTorch core, and open models keep getting sparser and smaller. A sourced look at a year of PyTorch releases and at where neural network design is going."
 date: 2026-11-04
 author: Pythilo
-cover: /blog/pytorch-news-november-2026/cover.webp
+cover: /blog/pytorch-news-november-2026/cover.png
 coverAlt: "Abstract illustration: a network of glowing blue, green and yellow nodes narrows upward into a flame shape, fed from below by five stacks of translucent cubes."
 tags: PyTorch, Machine learning, On-device AI, Models
 ---

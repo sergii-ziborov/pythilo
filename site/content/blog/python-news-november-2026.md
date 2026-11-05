@@ -3,7 +3,7 @@ title: "Python in November 2026: 3.15 ships, the JIT stalls, and the tools keep 
 description: "Python 3.15 is out with lazy imports and frozendict, 3.14 is on its tenth bugfix, the JIT's future is uncertain, and uv, Ruff, ty and Pyrefly keep changing how Python projects are built. Here is what changed, with sources."
 date: 2026-11-04
 author: Pythilo
-cover: /blog/python-news-november-2026/cover.webp
+cover: /blog/python-news-november-2026/cover.png
 coverAlt: "Abstract illustration: a yellow ribbon and a blue ribbon twist around each other across a dark navy background, crossed by thin lines of light and surrounded by small translucent tiles of geometric shapes."
 tags: Python, Releases, Tooling, Packaging
 ---

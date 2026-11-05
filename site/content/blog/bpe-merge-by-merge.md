@@ -3,7 +3,7 @@ title: Understand BPE one merge at a time
 description: Count adjacent pairs, resolve ties, and merge non-overlapping occurrences without losing text.
 date: 2026-11-05
 author: Pythilo
-cover: /blog/bpe-merge-by-merge/cover.svg
+cover: /blog/bpe-merge-by-merge/cover.png
 coverAlt: Tokens → Pairs → Merges on a dark grid with a sequence of colored bars.
 tags: Python, AI
 ---

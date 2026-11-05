@@ -3,7 +3,7 @@ title: Temperature, top-p and beam search
 description: Separate probability shaping, candidate filtering and sequence search with deterministic examples.
 date: 2026-11-05
 author: Pythilo
-cover: /blog/decoding-temperature-beams/cover.svg
+cover: /blog/decoding-temperature-beams/cover.png
 coverAlt: Shape · Filter · Search on a dark grid with a sequence of colored bars.
 tags: Python, AI
 ---

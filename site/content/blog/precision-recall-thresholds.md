@@ -3,7 +3,7 @@ title: Accuracy is only the first question
 description: Read a confusion matrix, calculate precision and recall, and choose a threshold on validation data.
 date: 2026-11-05
 author: Pythilo
-cover: /blog/precision-recall-thresholds/cover.svg
+cover: /blog/precision-recall-thresholds/cover.png
 coverAlt: Count The Errors on a dark grid with a sequence of colored bars.
 tags: Python, Machine learning
 ---

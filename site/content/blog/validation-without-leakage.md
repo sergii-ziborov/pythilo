@@ -3,7 +3,7 @@ title: A validation score you can trust
 description: Fit preprocessing on training data, reuse it on validation, and keep the final test separate.
 date: 2026-11-05
 author: Pythilo
-cover: /blog/validation-without-leakage/cover.svg
+cover: /blog/validation-without-leakage/cover.png
 coverAlt: Train → Validate on a dark grid with a sequence of colored bars.
 tags: Python, Machine learning
 ---
