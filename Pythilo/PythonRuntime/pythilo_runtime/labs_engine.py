@@ -75,10 +75,11 @@ def tree(nodes, title=None, binary=False, caption=None):
     return {"type": "tree", "title": title, "caption": caption, "binary": binary, "nodes": nodes}
 
 
-def grid(cells, roles=None, title=None, caption=None):
+def grid(cells, roles=None, title=None, caption=None, heat=None):
+    """heat: optional rows of 0..1 values that tint cells without a role."""
     rows = [[c if isinstance(c, str) else short(c, 4) for c in row] for row in cells]
     return {"type": "grid", "title": title, "caption": caption, "grid": rows,
-            "gridRoles": roles or [[""] * len(row) for row in rows]}
+            "gridRoles": roles or [[""] * len(row) for row in rows], "heat": heat}
 
 
 def stack(items, title=None, roles=None, horizontal=False, ends=None, caption=None):
@@ -250,7 +251,7 @@ MODULES = {
     "linkedlist": "labs_structures", "bst": "labs_structures", "heap": "labs_structures", "trie": "labs_structures",
     "unionfind": "labs_structures", "lru": "labs_structures",
     "queens": "labs_algorithms", "matching": "labs_algorithms", "flood": "labs_algorithms",
-    "descent": "labs_ml", "kmeans": "labs_ml",
+    "descent": "labs_ml", "neural": "labs_ml", "genetic": "labs_ml", "kmeans": "labs_ml", "qlearning": "labs_ml",
 }
 
 
@@ -420,6 +421,12 @@ def scale(job_id, lab_id, variant, what, x_label, sizes, series, check=None, ste
         if slow:
             stopped = f"Stopped growing after n = {n:,}: one run took over {size_limit_ms / 1000:.1f} s."
             break
+        points = rows[0]["points"]
+        if len(points) >= 2 and points[-2][1] > 0.05:
+            predicted = points[-1][1] * points[-1][1] / points[-2][1]
+            if predicted > 2.5 * size_limit_ms:
+                stopped = f"Stopped growing after n = {n:,}: the next size would take about {predicted / 1000:.0f} s per run."
+                break
         if not rows[0]["ok"]:
             break
     for row in rows:
