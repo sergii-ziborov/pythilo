@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadPyodide } from "pyodide";
 import { LESSON_SHIM, RUNNER_SOURCE, SHIM_ROOT } from "../lib/python-runner.ts";
+import { browserLabs, labFiles, readLabResult } from "../lib/browser-labs.ts";
 import { parseInline, parseMarkdown } from "../lib/markdown.ts";
 import { highlightPython } from "../lib/python-highlight.ts";
 
@@ -93,7 +94,7 @@ test("the checker's messages are the app's: a failing starter explains what came
 });
 
 test("course content is built from the app's files, and lessons needing missing packages say so", () => {
-  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview"]);
+  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview", "algorithm-patterns", "data-practice", "reliable-python", "ml-practice"]);
   const all = courses.flatMap(course => course.lessons);
   assert.ok(all.every(lesson => lesson.sections[0].chip === "Idea" && lesson.checks.length && lesson.starter));
   const lessonsOf = id => courses.find(course => course.id === id).lessons;
@@ -111,4 +112,21 @@ test("lesson Markdown keeps sections, fenced Python and inline code", () => {
   assert.deepEqual(parseInline("**a** *b* [c](https://x.test) [d](javascript:x)").map(part => part.kind), ["strong", "text", "em", "text", "link", "text", "text"]);
   const tokens = highlightPython("def f():\n    return 'x'  # c").flat();
   assert.deepEqual(tokens.filter(token => token.className).map(token => [token.text, token.className]), [["def", "py-keyword"], ["f", "py-function"], ["return", "py-keyword"], ["'x'", "py-string"], ["# c", "py-comment"]]);
+});
+
+
+test("all browser labs trace actual edited code, accept worked answers and reject starters in Pyodide", () => {
+  for (const lab of browserLabs) {
+    for (const [source,correct] of [[lab.answer,true],[lab.starter,false]]) {
+      const response=JSON.parse(runner.run(JSON.stringify(labFiles(lab.id,source)), "main.py"));
+      const output=take();
+      assert.equal(response.exitCode,0,`${lab.id}: ${output.err}`);
+      assert.ok(new TextEncoder().encode(output.out).length < 1024*1024, `${lab.id}: trace must fit worker output limit`);
+      const report=readLabResult(output.out);
+      assert.equal(report.correct,correct,`${lab.id}: ${report.message}`);
+      assert.ok(report.checks.length>=3,lab.id);
+      if(correct){assert.equal(report.truncated,false,`${lab.id}: worked example must replay to completion`);assert.ok(report.frames.length>1,lab.id);assert.ok(report.frames.every(frame=>frame.panels.length));}
+      else assert.ok(report.checks.some(check=>!check.ok),lab.id);
+    }
+  }
 });

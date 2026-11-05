@@ -1,0 +1,264 @@
+{
+  "id": "algorithm-patterns",
+  "title": "Algorithm patterns",
+  "summary": "Prefix tables, monotonic stacks, binary-search boundaries, dependency order and memory-efficient dynamic programming.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "prefix-range",
+      "title": "Answer range sums with a prefix table",
+      "body": "# Answer range sums with a prefix table\n\nWhen many questions ask about slices of the same list, adding every slice repeats work. Store a running total before each position. A range then needs two lookups and one subtraction. Keep an initial zero so ranges beginning at index zero follow exactly the same rule as all other ranges.\n\n```python\nvalues = [3, -2, 5]\nprefix = [0, 3, 1, 6]\nprint(prefix[3] - prefix[1])\n```\n\n## Think before coding\n\nThe prefix at position i contains the sum strictly before i. Subtracting two prefixes cancels everything before left. Preparation is linear and each query is constant time. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write range_sums(values, queries). Each (left, right) uses the half-open slice values[left:right], with 0 <= left <= right <= len(values). Return one sum per query without modifying either input.",
+      "starter": "def range_sums(values, queries):\n    pass\n",
+      "solution": "def range_sums(values, queries):\n    prefix = [0]\n    for value in values:\n        prefix.append(prefix[-1] + value)\n    return [prefix[right] - prefix[left] for left, right in queries]\n",
+      "checks": [
+        {
+          "name": "mixed signs",
+          "code": "assert range_sums([3,-2,5], [(0,3),(1,3),(1,1)]) == [6,3,0]\n"
+        },
+        {
+          "name": "empty list",
+          "code": "assert range_sums([], [(0,0)]) == [0]\n"
+        },
+        {
+          "name": "no queries",
+          "code": "assert range_sums([8], []) == []\n"
+        },
+        {
+          "name": "inputs stay intact",
+          "code": "a=[2,4]; q=[(0,2)]; assert range_sums(a,q)==[6]; assert a==[2,4] and q==[(0,2)]\n"
+        }
+      ],
+      "hints": [
+        "Start the prefix table with zero.",
+        "Append the previous total plus the next value.",
+        "For each query subtract prefix[left] from prefix[right]."
+      ],
+      "explanation": "The prefix at position i contains the sum strictly before i. Subtracting two prefixes cancels everything before left. Preparation is linear and each query is constant time."
+    },
+    {
+      "id": "range-updates",
+      "title": "Apply many range updates with differences",
+      "body": "# Apply many range updates with differences\n\nA difference table records where a change starts and where it ends. Instead of touching every cell in every range, add a delta at the left boundary and undo it at the right boundary. One final running sum reconstructs every cell. This is useful when all updates arrive before any answers are needed.\n\n```python\ndifference = [0, 4, 0, -4]\ncurrent = 0\nfor delta in difference:\n    current += delta\n    print(current)\n```\n\n## Think before coding\n\nThe negative boundary cancels a range exactly where it stops. Overlaps add naturally in the difference table. The total work is proportional to the number of updates plus the output size. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write apply_updates(n, updates). Begin with n zeros. For each (left, right, delta), add delta to indices in [left, right). Bounds are valid. Return the final list, including overlapping and negative updates.",
+      "starter": "def apply_updates(n, updates):\n    pass\n",
+      "solution": "def apply_updates(n, updates):\n    difference = [0] * (n + 1)\n    for left, right, delta in updates:\n        difference[left] += delta\n        difference[right] -= delta\n    result = []\n    current = 0\n    for delta in difference[:n]:\n        current += delta\n        result.append(current)\n    return result\n",
+      "checks": [
+        {
+          "name": "overlaps",
+          "code": "assert apply_updates(5,[(0,3,2),(1,5,-1)]) == [2,1,1,-1,-1]\n"
+        },
+        {
+          "name": "empty range",
+          "code": "assert apply_updates(2,[(1,1,9)]) == [0,0]\n"
+        },
+        {
+          "name": "zero size",
+          "code": "assert apply_updates(0,[]) == []\n"
+        },
+        {
+          "name": "no changes",
+          "code": "assert apply_updates(3,[]) == [0,0,0]\n"
+        }
+      ],
+      "hints": [
+        "Allocate one extra boundary cell.",
+        "Add at left and subtract at right.",
+        "Accumulate only the first n differences."
+      ],
+      "explanation": "The negative boundary cancels a range exactly where it stops. Overlaps add naturally in the difference table. The total work is proportional to the number of updates plus the output size."
+    },
+    {
+      "id": "next-warmer",
+      "title": "Resolve pending answers with a monotonic stack",
+      "body": "# Resolve pending answers with a monotonic stack\n\nFor each temperature, find how many days pass before a strictly warmer day. Keeping all unanswered days on a stack avoids restarting a search for every day. The stack holds indices with non-increasing temperatures. A new warmer day resolves as many pending days as it can, and every index is pushed and popped at most once.\n\n```python\npending = [0, 1]\ntemperatures = [20, 18, 22]\nprint(2 - pending[-1])\n```\n\n## Think before coding\n\nThe stack stores questions whose answers are still unknown. Popping an index means the current day is its first warmer day. Although there is a nested loop, no index can be popped twice, giving linear total work. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write warmer_days(temperatures). Return the wait to a strictly warmer future temperature for each position, or zero if none arrives. Equal temperatures do not count as warmer.",
+      "starter": "def warmer_days(temperatures):\n    pass\n",
+      "solution": "def warmer_days(temperatures):\n    waits = [0] * len(temperatures)\n    pending = []\n    for i, temperature in enumerate(temperatures):\n        while pending and temperatures[pending[-1]] < temperature:\n            previous = pending.pop()\n            waits[previous] = i - previous\n        pending.append(i)\n    return waits\n",
+      "checks": [
+        {
+          "name": "pending days",
+          "code": "assert warmer_days([20,18,22,21,23]) == [2,1,2,1,0]\n"
+        },
+        {
+          "name": "equal temperatures",
+          "code": "assert warmer_days([5,5,6]) == [2,1,0]\n"
+        },
+        {
+          "name": "descending",
+          "code": "assert warmer_days([3,2,1]) == [0,0,0]\n"
+        },
+        {
+          "name": "empty",
+          "code": "assert warmer_days([])==[]\n"
+        }
+      ],
+      "hints": [
+        "Store indices, since the answer is a distance.",
+        "Resolve the top while its temperature is strictly lower.",
+        "Unresolved positions keep their initial zero."
+      ],
+      "explanation": "The stack stores questions whose answers are still unknown. Popping an index means the current day is its first warmer day. Although there is a nested loop, no index can be popped twice, giving linear total work."
+    },
+    {
+      "id": "lower-bound",
+      "title": "Find a boundary instead of an exact match",
+      "body": "# Find a boundary instead of an exact match\n\nBinary search can locate the first position where a predicate changes from false to true. Searching for the first value at least a target handles missing values and duplicates without special cases. Use a half-open interval: the answer always lies between left and right, and right may be the length of the list.\n\n```python\nfrom bisect import bisect_left\nprint(bisect_left([2, 4, 4, 9], 4))\n```\n\n## Think before coding\n\nEvery iteration keeps the first valid boundary inside the remaining interval. Moving right to middle preserves a possible answer, while moving left past middle removes only values known to be too small. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Implement lower_bound(items, target) without importing bisect. Return the first index with items[index] >= target in a sorted list, or len(items) if every value is smaller.",
+      "starter": "def lower_bound(items, target):\n    pass\n",
+      "solution": "def lower_bound(items, target):\n    left, right = 0, len(items)\n    while left < right:\n        middle = (left + right) // 2\n        if items[middle] < target:\n            left = middle + 1\n        else:\n            right = middle\n    return left\n",
+      "checks": [
+        {
+          "name": "duplicates",
+          "code": "assert lower_bound([2,4,4,9],4)==1\n"
+        },
+        {
+          "name": "missing value",
+          "code": "assert lower_bound([2,4,9],5)==2\n"
+        },
+        {
+          "name": "outside range",
+          "code": "assert lower_bound([2,4],9)==2 and lower_bound([2,4],0)==0\n"
+        },
+        {
+          "name": "empty",
+          "code": "assert lower_bound([],7)==0\n"
+        }
+      ],
+      "hints": [
+        "Start with right equal to len(items).",
+        "A smaller middle value rules out middle and everything before it.",
+        "Otherwise middle could still be the first valid index."
+      ],
+      "explanation": "Every iteration keeps the first valid boundary inside the remaining interval. Moving right to middle preserves a possible answer, while moving left past middle removes only values known to be too small."
+    },
+    {
+      "id": "dependency-order",
+      "title": "Schedule dependencies with indegrees",
+      "body": "# Schedule dependencies with indegrees\n\nA directed edge from a prerequisite to a dependent task means the prerequisite must run first. Count incoming edges and begin with nodes whose counts are zero. Removing one ready node releases its outgoing edges. If unfinished nodes remain but none is ready, the graph contains a cycle and no valid schedule exists.\n\n```python\nfrom collections import deque\nready = deque([\"parse\"])\nprint(ready.popleft())\n```\n\n## Think before coding\n\nAn indegree of zero proves that every prerequisite has already been removed. A cycle never releases its final incoming edges. The algorithm touches every node and edge once. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write task_order(graph). The dict maps every node to its outgoing neighbours, and every neighbour is also a key. Return any topological ordering, or None for a cycle. Include isolated nodes.",
+      "starter": "def task_order(graph):\n    pass\n",
+      "solution": "def task_order(graph):\n    from collections import deque\n    degree = dict.fromkeys(graph, 0)\n    for neighbours in graph.values():\n        for node in neighbours:\n            degree[node] += 1\n    ready = deque(node for node in graph if degree[node] == 0)\n    result = []\n    while ready:\n        node = ready.popleft()\n        result.append(node)\n        for other in graph[node]:\n            degree[other] -= 1\n            if degree[other] == 0:\n                ready.append(other)\n    return result if len(result) == len(graph) else None\n",
+      "checks": [
+        {
+          "name": "dependency order",
+          "code": "g={'a':['c'],'b':['c'],'c':[]}; r=task_order(g); assert set(r)==set(g) and r.index('a')<r.index('c') and r.index('b')<r.index('c')\n"
+        },
+        {
+          "name": "cycle",
+          "code": "assert task_order({'a':['b'],'b':['a']}) is None\n"
+        },
+        {
+          "name": "isolated",
+          "code": "assert set(task_order({'a':[],'b':[]}))=={'a','b'}\n"
+        },
+        {
+          "name": "empty",
+          "code": "assert task_order({})==[]\n"
+        }
+      ],
+      "hints": [
+        "Count how many prerequisites each node still has.",
+        "Enqueue a node only when its indegree reaches zero.",
+        "Compare the number emitted with the number of nodes."
+      ],
+      "explanation": "An indegree of zero proves that every prerequisite has already been removed. A cycle never releases its final incoming edges. The algorithm touches every node and edge once."
+    },
+    {
+      "id": "rolling-distance",
+      "title": "Reduce edit-distance memory to one row",
+      "body": "# Reduce edit-distance memory to one row\n\nEdit distance compares prefixes of two strings. Each cell depends on the cell above, the cell to its left and the old diagonal. Once a row is complete, earlier rows can be discarded. Keeping one previous row changes memory use from a full rectangle to a single line while preserving the same recurrence.\n\n```python\nprevious = [0, 1, 2]\ncurrent = [1]\nprint(min(previous[1] + 1, 2))\n```\n\n## Think before coding\n\nThe recurrence covers the possible final operations on two prefixes. Row i uses only row i minus one and its own left neighbour. Keeping just those rows gives quadratic time and linear space. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write distance(a, b): the minimum number of single-character insertions, deletions and substitutions to turn a into b. Use rows rather than recursive enumeration.",
+      "starter": "def distance(a, b):\n    pass\n",
+      "solution": "def distance(a, b):\n    previous = list(range(len(b) + 1))\n    for i, left in enumerate(a, 1):\n        current = [i]\n        for j, right in enumerate(b, 1):\n            current.append(min(previous[j] + 1, current[-1] + 1,\n                               previous[j - 1] + (left != right)))\n        previous = current\n    return previous[-1]\n",
+      "checks": [
+        {
+          "name": "classic example",
+          "code": "assert distance('kitten','sitting')==3\n"
+        },
+        {
+          "name": "empty prefixes",
+          "code": "assert distance('', 'abc')==3 and distance('abc','')==3\n"
+        },
+        {
+          "name": "identity",
+          "code": "assert distance('banana','banana')==0\n"
+        },
+        {
+          "name": "symmetry",
+          "code": "assert distance('ab','ba')==distance('ba','ab')==2\n"
+        }
+      ],
+      "hints": [
+        "The initial row is the cost of inserting each prefix of b.",
+        "Begin row i with the cost of deleting i characters.",
+        "Take the minimum of insertion, deletion and match or substitution."
+      ],
+      "explanation": "The recurrence covers the possible final operations on two prefixes. Row i uses only row i minus one and its own left neighbour. Keeping just those rows gives quadratic time and linear space."
+    },
+    {
+      "id": "zero-one-knapsack",
+      "title": "Use descending capacity for 0/1 knapsack",
+      "body": "# Use descending capacity for 0/1 knapsack\n\nEach item may be chosen once. A one-dimensional table stores the best value available at every capacity. Updating capacities from high to low is essential: it makes each transition read the previous item set. Updating upward would reuse the same item repeatedly and solve a different problem.\n\n```python\nbest = [0, 0, 0, 0]\nfor capacity in range(3, 1, -1):\n    best[capacity] = 5\nprint(best)\n```\n\n## Think before coding\n\nDescending updates prevent the current item from appearing in the state used to add it. Skipping and taking cover all valid choices. Complexity is the number of items times the capacity. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write pack(items, capacity). Each item is a (positive_weight, nonnegative_value) pair. Return the greatest total value whose weight fits capacity, choosing each item at most once.",
+      "starter": "def pack(items, capacity):\n    pass\n",
+      "solution": "def pack(items, capacity):\n    best = [0] * (capacity + 1)\n    for weight, value in items:\n        for room in range(capacity, weight - 1, -1):\n            best[room] = max(best[room], best[room - weight] + value)\n    return best[capacity]\n",
+      "checks": [
+        {
+          "name": "best combination",
+          "code": "assert pack([(2,3),(3,4),(4,5)],5)==7\n"
+        },
+        {
+          "name": "no repeated item",
+          "code": "assert pack([(2,3)],4)==3\n"
+        },
+        {
+          "name": "too heavy",
+          "code": "assert pack([(9,100)],3)==0\n"
+        },
+        {
+          "name": "empty capacity",
+          "code": "assert pack([],8)==0 and pack([(1,9)],0)==0\n"
+        }
+      ],
+      "hints": [
+        "Let best[c] mean the best value using capacity at most c.",
+        "Iterate capacities downward for every item.",
+        "Compare skipping the item with taking it once."
+      ],
+      "explanation": "Descending updates prevent the current item from appearing in the state used to add it. Skipping and taking cover all valid choices. Complexity is the number of items times the capacity."
+    },
+    {
+      "id": "stable-merge",
+      "title": "Merge sorted streams without sorting again",
+      "body": "# Merge sorted streams without sorting again\n\nTwo sorted sources already contain most of the ordering information. Compare their next values and advance only the source chosen. Taking the left source on equality preserves its order relative to the right source. The same pattern supports merge sort, sorted file processing and joining ordered event streams.\n\n```python\nleft = [1, 4]\nright = [2, 3]\nprint(left[0] <= right[0])\n```\n\n## Think before coding\n\nEvery comparison consumes one item, so merging takes linear time. The remaining suffix is already sorted after one side is exhausted. Choosing the left item on a tie makes the merge stable. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write merge_sorted(left, right), returning a new sorted list from two already-sorted lists. Preserve duplicates, do not call sorted or list.sort, and do not change the inputs.",
+      "starter": "def merge_sorted(left, right):\n    pass\n",
+      "solution": "def merge_sorted(left, right):\n    result = []\n    i = j = 0\n    while i < len(left) and j < len(right):\n        if left[i] <= right[j]:\n            result.append(left[i]); i += 1\n        else:\n            result.append(right[j]); j += 1\n    return result + left[i:] + right[j:]\n",
+      "checks": [
+        {
+          "name": "interleaved",
+          "code": "assert merge_sorted([1,4,8],[2,3,9])==[1,2,3,4,8,9]\n"
+        },
+        {
+          "name": "duplicates",
+          "code": "assert merge_sorted([1,2,2],[2,2])==[1,2,2,2,2]\n"
+        },
+        {
+          "name": "one empty",
+          "code": "assert merge_sorted([],[3])==[3] and merge_sorted([1],[])==[1]\n"
+        },
+        {
+          "name": "unchanged",
+          "code": "a=[1,3]; b=[2]; assert merge_sorted(a,b)==[1,2,3]; assert a==[1,3] and b==[2]\n"
+        }
+      ],
+      "hints": [
+        "Keep one index per source.",
+        "Append the smaller next value and advance its index.",
+        "When one side ends, append the remaining suffix."
+      ],
+      "explanation": "Every comparison consumes one item, so merging takes linear time. The remaining suffix is already sorted after one side is exhausted. Choosing the left item on a tie makes the merge stable."
+    }
+  ]
+}

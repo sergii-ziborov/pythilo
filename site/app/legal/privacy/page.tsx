@@ -78,13 +78,13 @@ export default function PrivacyPage() {
     <p>Pythilo is distributed by Apple. Apple processes your data under its own privacy policy when you download apps, buy them, or use TestFlight. If you take part in the TestFlight beta, Apple shares with us what TestFlight provides to developers, such as the name and email address you were invited with (for invited testers), the build and device you use, crash reports and usage sessions, and any feedback and screenshots you choose to send. If you allow your device to share analytics with app developers, Apple may also give us aggregated usage and crash data. We use this only to fix and improve Pythilo.</p>
 
     <h2 id="website">The website</h2>
-    <p>pythilo.com offers lessons and a playground that run Python in your browser with Pyodide, the room relay, the guide and this information. It has no account, no cookies, no analytics, no advertising, and loads no fonts, scripts or images from other sites: everything, including Pyodide, is served from pythilo.com. Python you run on the site runs in your browser, not on our server; like any program it can make its own network requests.</p>
+    <p>pythilo.com offers lessons, interactive labs and a playground that run Python in your browser with Pyodide, the room relay, the guide and this information. It has no account, no cookies, no analytics, no advertising, and loads no fonts, scripts or images from other sites: everything, including Pyodide, is served from pythilo.com. Python you run on the site runs in your browser, not on our server; like any program it can make its own network requests.</p>
     <p>The site is served from a server we rent from Hetzner Online GmbH. Its domain&apos;s DNS is hosted by Vercel Inc. Support, privacy and security emails are forwarded by Forward Email to our Gmail inbox; Forward Email and Google process messages you choose to send under their own policies.</p>
 
     <h2 id="browser-storage">Website: storage in your browser</h2>
     <p>The site saves the following in your browser&apos;s own storage so your work survives a reload. It is not sent to us, and you can delete it at any time by clearing this site&apos;s data in your browser.</p>
     <Table head={["Storage", "What"]} rows={[
-      ["Local storage", "Lesson progress and your code for each lesson; your playground display name; whether to keep playground drafts"],
+      ["Local storage", "Lesson and lab progress and your code for each lesson or lab; your playground display name; whether to keep playground drafts"],
       ["IndexedDB", "Up to 32 playground drafts (source code, name, date). Room keys and permissions are never written here"],
       ["Session storage (until the tab closes)", "Owner and view tokens for rooms you created, and which folders you opened"],
     ]} />

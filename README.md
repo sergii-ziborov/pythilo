@@ -1,6 +1,6 @@
 # Pythilo
 
-**Real Python on your iPhone and iPad.** Pythilo is an IDE, a course and 22 interactive
+**Real Python on your iPhone and iPad.** Pythilo is an IDE, a course and 32 interactive
 algorithm and machine learning labs in one app. CPython 3.14 runs on the device itself: your code, your
 tests, your Django site and your debugger session never leave the phone, and none of
 it needs a network.
@@ -52,10 +52,11 @@ open source (see [License](#license)).
 
 ### Learn
 
-- **204 lessons in 13 courses**: Python foundations and Python deeper (30 each), clean
+- **236 lessons in 17 courses**: Python foundations and Python deeper (30 each), clean
   code, testing, the tools around Python, architecture, concurrency and async, the web,
   data, the mathematics of neural networks, machine learning with PyTorch (30), language
-  models from the inside, and working with AI tools, from on-device models to evals.
+  models from the inside, working with AI tools, and four practical courses on
+  algorithm patterns, data processing, reliability and machine learning.
   Plus **20 interview tasks** with a timer and hints.
 - PyTorch 2.15 runs on the device ([torch-ios](https://github.com/sergii-ziborov/torch-ios)):
   the machine learning lessons train real networks offline.
@@ -66,7 +67,9 @@ open source (see [License](#license)).
 
 ### Labs
 
-22 labs that trace **your own code** while it runs, then measure it on the device.
+32 labs that trace **your own code** while it runs, with scaling measurements where
+available. Ten also run in the browser at [pythilo.com/labs](https://pythilo.com/labs/),
+using the same tracer and correctness checks.
 Correctness first, then time. The catalogue now covers Basics, Data structures,
 Algorithms and Machine learning, from binary search and linked lists to gradient
 descent, neural networks and Q-learning. For example:

@@ -54,7 +54,7 @@ boundary, and the app says so.
 
 | Item | State |
 | --- | --- |
-| 204 lessons in 13 courses and 20 interview tasks | Every solution passes on the Mac (`scripts/verify-lessons.py`) and inside the app on the simulator (`testEveryBundledLessonSolutionPassesOnTheDevice`); starters fail their checks |
+| 236 lessons in 17 courses and 20 interview tasks | Every solution passes on the Mac (`scripts/verify-lessons.py`) and inside the app on the simulator (`testEveryBundledLessonSolutionPassesOnTheDevice`); starters fail their checks |
 | PyTorch on the device | torch-ios conformance suite matches a Mac on 203 groups of operations in the simulator (`testPyTorchMatchesTheReferenceBuild`); not yet run on a physical iPhone |
 | Learn screens: path, course timeline, lesson read and code modes, check sheet | Checked on the simulator. Drawn on the canvas, iPad lesson included |
 | Failed checks say what came back and what was expected | Checked against every lesson's starter code on the Mac |
@@ -140,3 +140,38 @@ so the Neural Engine numbers still need a physical device.
 ## Release model
 
 - Release model confirmed 5 November 2026: a paid app at US$9.99, with regional prices from Apple. No StoreKit unlock is needed. The TestFlight beta stays free; App Review has not been requested. App Store text is in `docs/app-store/en-US.json`, with screenshots alongside it.
+
+## Learning expansion (5 November 2026)
+
+Added 32 lessons in Algorithm patterns, Data in practice, Reliable Python and
+Machine learning in practice. Each lesson has prose, a runnable example, a task,
+three progressive hints, an explanation and 3–6 deterministic checks. All 32
+solutions pass locally, all browser-compatible solutions pass in Pyodide, and all
+256 lesson/task solutions pass inside the iOS Simulator.
+
+Added ten labs shared between the website and iOS: Prefix Sums, Monotonic Stack,
+Topological Sort, 0/1 Knapsack, Bellman–Ford, Edit Distance Rows, Linear Regression,
+Logistic Regression, Nearest Neighbours and Decision Stumps. The native catalog
+now has 32 labs. The expansion catalog and starter/answer files are bundled with
+the Python runtime; Swift loads the same metadata that prepares the browser labs.
+
+The new `/labs/` section has an editable Python workspace, real line traces,
+array/variable/chart panels, play/pause/scrubbing, checks, worked answers and local
+saved drafts/completion. No server executes learner code. Browser traces keep up
+to 180 distinct frames; checks still run on the full solution. Comprehension
+internals are omitted so the supplied worked examples replay to completion.
+
+Validation: 76 site tests passed, including every new lab's starter/answer in
+Pyodide and the complete lesson checker. Focused native content tests passed for
+all lesson solutions, all lab answers/starters and the exact 32-lab catalog.
+The first broader native run timed out in the existing Graph Explorer scaling
+test; that test passed on its own (1.96 seconds). The focused content checks
+passed with all new content included. The initial timeout is retained in
+`build/logs/expansion-native-labs.log`.
+
+The expanded website was deployed through Hostwatch on 5 November 2026 at 19:22
+UTC. Serving image: `sha256:57727030bc4db2d93be2290eb4f01617815a3a0c4efb86fa96fbe6572c654803`.
+Deployment receipt: `pythilo-learning-expansion-deploy-20261105-v2`. Public smoke
+checks passed, including the new course pages and isolated `/labs/` routes. Browser
+checks verified lesson example output and a passing solution, lab starter failures,
+worked-answer success, replay to the final state, saved completion and 390 px layouts.

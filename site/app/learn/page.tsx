@@ -16,6 +16,7 @@ export default function LearnPage() {
         <p>Read every lesson here and run browser-compatible exercises with {BROWSER_RUNTIME}. Read a part, try the examples, then write the solution and check it with the same checks the app uses. Exercises that need PyTorch, threads or unavailable packages are marked App required.</p>
         <ProgressNote />
       </section>
+      <section className="course-section" aria-labelledby="new-courses"><div className="label">NEW · 32 LESSONS</div><h2 id="new-courses">Go further with practical Python</h2><p>Four new courses run entirely in this browser. Work through them after the foundations, or choose a topic.</p><div className="new-course-links">{courses.filter(course=>course.order>=15).map(course=><Link key={course.id} href={`/learn/${course.id}/`}><strong>{course.title}</strong><span>{course.summary}</span></Link>)}</div><p><Link href="/labs/">Put the patterns to work in ten interactive labs →</Link></p></section>
       {courses.map(course => <section key={course.id} className="course-section" aria-labelledby={`course-${course.id}`}>
         <div className={`label${course.kind === "interview" ? " practice" : ""}`}>{courseLabel(course)}</div>
         <h2 id={`course-${course.id}`}><Link href={`/learn/${course.id}/`} style={{ color: "inherit" }}>{course.title}</Link></h2>

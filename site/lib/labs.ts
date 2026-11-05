@@ -1,3 +1,4 @@
+import snapshot from "../content/labs.json" with { type: "json" };
 /** App labs, grouped as in Pythilo/UI/Labs/LabCatalog.swift. */
 export const labGroups = [
   { title: "Basics", labs: [
@@ -31,5 +32,9 @@ export const labGroups = [
     { id: "qlearning", title: "Q-learning", summary: "Teach an agent to navigate a maze from rewards." },
   ] },
 ];
+
+for (const group of labGroups) {
+  group.labs.push(...snapshot.labs.filter(lab => lab.section === group.title).map(({id,title,summary}) => ({id,title,summary})));
+}
 
 export const labCount = labGroups.reduce((total, group) => total + group.labs.length, 0);

@@ -23,6 +23,7 @@ const nextConfig: NextConfig = {
       { source: "/playground/room/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }, { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }, { key: "Cache-Control", value: "private, no-store" }] },
       { source: "/playground/:path*", headers: isolated },
       { source: "/learn/:path*", headers: isolated },
+      { source: "/labs/:path*", headers: isolated },
       { source: "/_next/static/:path*", headers: [{ key: "Cross-Origin-Embedder-Policy", value: "require-corp" }] },
       { source: "/pyodide/:path*", headers: [{ key: "Cross-Origin-Embedder-Policy", value: "require-corp" }, { key: "Cross-Origin-Resource-Policy", value: "same-origin" }, { key: "Cache-Control", value: "public, max-age=86400" }] },
     ];

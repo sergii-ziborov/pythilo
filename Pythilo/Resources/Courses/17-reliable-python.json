@@ -1,0 +1,272 @@
+{
+  "id": "reliable-python",
+  "title": "Reliable Python",
+  "summary": "Idempotency, expiry, batching, safe logs, stable identifiers, schema upgrades and database transactions.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "backoff-plan",
+      "title": "Make retry delays predictable and bounded",
+      "body": "# Make retry delays predictable and bounded\n\nRetries need a policy rather than a sleep scattered through the code. A pure function can produce the planned delays without actually waiting or sending requests. Exponential backoff increases the gap after each failure, and a cap prevents unbounded pauses. Random jitter can be added by the caller, using an injected random source when reproducible tests matter.\n\n```python\ndelay = 0.25\nfor attempt in range(3):\n    print(delay)\n    delay = min(1.0, delay * 2)\n```\n\n## Think before coding\n\nA plan is easy to test because it has no clock or network effects. Iterative doubling avoids computing enormous powers after the cap has already been reached. Actual retrying still belongs at the effect boundary. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write retry_delays(attempts, base, cap). Return attempts delays, starting at base and doubling up to cap. attempts must be nonnegative and base and cap must be positive; otherwise raise ValueError. The first delay is also capped.",
+      "starter": "def retry_delays(attempts, base, cap):\n    pass\n",
+      "solution": "def retry_delays(attempts, base, cap):\n    if attempts < 0 or base <= 0 or cap <= 0:\n        raise ValueError('invalid retry policy')\n    delay = min(base, cap)\n    result = []\n    for _ in range(attempts):\n        result.append(delay)\n        delay = min(cap, delay * 2)\n    return result\n",
+      "checks": [
+        {
+          "name": "doubling and cap",
+          "code": "assert retry_delays(5,1,5)==[1,2,4,5,5]\n"
+        },
+        {
+          "name": "cap first delay",
+          "code": "assert retry_delays(2,9,3)==[3,3]\n"
+        },
+        {
+          "name": "zero attempts",
+          "code": "assert retry_delays(0,1,2)==[]\n"
+        },
+        {
+          "name": "invalid policy",
+          "code": "for args in [(-1,1,2),(2,0,2),(2,1,0)]:\n    try: retry_delays(*args)\n    except ValueError: pass\n    else: assert False, (args)\n"
+        }
+      ],
+      "hints": [
+        "Validate the policy before building the list.",
+        "Begin with min(base, cap).",
+        "Append the current delay, then double and cap it."
+      ],
+      "explanation": "A plan is easy to test because it has no clock or network effects. Iterative doubling avoids computing enormous powers after the cap has already been reached. Actual retrying still belongs at the effect boundary."
+    },
+    {
+      "id": "idempotent-events",
+      "title": "Apply a repeated event only once",
+      "body": "# Apply a repeated event only once\n\nA queue may deliver an event more than once. Applying every delivery would double-count work, while marking an event before validating it can lose a legitimate change. An idempotency key identifies the logical operation. For this in-memory exercise, remember processed identifiers together with the current total, and leave both unchanged when validation fails.\n\n```python\nseen = {\"event-1\"}\nprint(\"event-1\" in seen)\n```\n\n## Think before coding\n\nValidation happens before any mutation, so a failed event remains retryable. Duplicate delivery does not repeat its effect. Durable concurrent systems must store the id and effect atomically in a transaction. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write apply_event(total, seen, event_id, amount). amount must have exactly type int; otherwise raise ValueError without changing seen. A new event adds amount and records its id in the supplied set. A duplicate returns total unchanged.",
+      "starter": "def apply_event(total, seen, event_id, amount):\n    pass\n",
+      "solution": "def apply_event(total, seen, event_id, amount):\n    if type(amount) is not int:\n        raise ValueError('integer amount required')\n    if event_id in seen:\n        return total\n    seen.add(event_id)\n    return total + amount\n",
+      "checks": [
+        {
+          "name": "new event",
+          "code": "s=set(); assert apply_event(3,s,'a',4)==7 and s=={'a'}\n"
+        },
+        {
+          "name": "duplicate",
+          "code": "s={'a'}; assert apply_event(7,s,'a',4)==7 and s=={'a'}\n"
+        },
+        {
+          "name": "negative adjustment",
+          "code": "s=set(); assert apply_event(8,s,'refund',-3)==5\n"
+        },
+        {
+          "name": "invalid does not mark",
+          "code": "s=set()\ntry: apply_event(0,s,'x',True)\nexcept ValueError: pass\nelse: assert False, ('bool accepted')\nassert s==set()\n"
+        }
+      ],
+      "hints": [
+        "Validate before mutating the set.",
+        "Check whether the logical event id was already applied.",
+        "Record a new id once and return the adjusted total."
+      ],
+      "explanation": "Validation happens before any mutation, so a failed event remains retryable. Duplicate delivery does not repeat its effect. Durable concurrent systems must store the id and effect atomically in a transaction."
+    },
+    {
+      "id": "bounded-chunks",
+      "title": "Batch an iterator without losing the tail",
+      "body": "# Batch an iterator without losing the tail\n\nBatching reduces overhead, but a final short batch must not disappear. An iterator may be consumed only once, so accumulate at most one batch at a time. Yielding the current list and then allocating a fresh one avoids changing batches the caller already received. Reject a zero batch size instead of looping forever.\n\n```python\nfrom itertools import islice\nsource = iter(range(5))\nprint(list(islice(source, 2)))\n```\n\n## Think before coding\n\nThe generator retains at most one batch beyond the source iterator. A fresh list prevents aliasing between results, and the final condition preserves the incomplete tail without adding an empty batch. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write chunks(values, size) as a generator of lists, each containing at most size items. Keep the final partial batch. For size <= 0, iteration must raise ValueError.",
+      "starter": "def chunks(values, size):\n    pass\n",
+      "solution": "def chunks(values, size):\n    if size <= 0:\n        raise ValueError('positive size required')\n    batch = []\n    for value in values:\n        batch.append(value)\n        if len(batch) == size:\n            yield batch\n            batch = []\n    if batch:\n        yield batch\n",
+      "checks": [
+        {
+          "name": "tail kept",
+          "code": "assert list(chunks(iter(range(5)),2))==[[0,1],[2,3],[4]]\n"
+        },
+        {
+          "name": "exact fit",
+          "code": "assert list(chunks([1,2,3,4],2))==[[1,2],[3,4]]\n"
+        },
+        {
+          "name": "empty",
+          "code": "assert list(chunks([],3))==[]\n"
+        },
+        {
+          "name": "independent batches",
+          "code": "r=list(chunks([1,2,3],1)); r[0].append(9); assert r[1:]==[[2],[3]]\n"
+        },
+        {
+          "name": "invalid size",
+          "code": "try: list(chunks([1],0))\nexcept ValueError: pass\nelse: assert False, (\"zero size\")\n"
+        }
+      ],
+      "hints": [
+        "Hold one list until it reaches size.",
+        "After yielding, assign a new list instead of clearing the old list.",
+        "Yield the remaining list only if it is nonempty."
+      ],
+      "explanation": "The generator retains at most one batch beyond the source iterator. A fresh list prevents aliasing between results, and the final condition preserves the incomplete tail without adding an empty batch."
+    },
+    {
+      "id": "ttl-cache",
+      "title": "Expire cached values using an injected clock",
+      "body": "# Expire cached values using an injected clock\n\nAn expiry rule should not depend on a real sleep in a test. Accept the current time as an argument and keep the cache representation explicit. Here an entry stores its value and absolute expiry. The boundary matters: an entry is expired at the expiry instant, not only after it. A cached None must be distinguishable from a missing entry.\n\n```python\nentry = (None, 10.0)\nprint(9.0 < entry[1])\n```\n\n## Think before coding\n\nAn explicit found flag preserves cached None values. The injected time makes expiry tests immediate and deterministic. A real duration cache should use a monotonic clock to avoid wall-clock adjustments. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write cache_lookup(cache, key, now). Entries are (value, expires_at). Return (True, value) only when present and now < expires_at. Remove expired entries. A missing or expired key returns (False, None).",
+      "starter": "def cache_lookup(cache, key, now):\n    pass\n",
+      "solution": "def cache_lookup(cache, key, now):\n    if key not in cache:\n        return False, None\n    value, expires = cache[key]\n    if now >= expires:\n        del cache[key]\n        return False, None\n    return True, value\n",
+      "checks": [
+        {
+          "name": "live value",
+          "code": "c={'a':(4,10)}; assert cache_lookup(c,'a',9)==(True,4)\n"
+        },
+        {
+          "name": "exact expiry",
+          "code": "c={'a':(4,10)}; assert cache_lookup(c,'a',10)==(False,None) and 'a' not in c\n"
+        },
+        {
+          "name": "cached none",
+          "code": "assert cache_lookup({'a':(None,10)},'a',0)==(True,None)\n"
+        },
+        {
+          "name": "missing",
+          "code": "assert cache_lookup({},'x',3)==(False,None)\n"
+        }
+      ],
+      "hints": [
+        "Membership and the cached value are separate facts.",
+        "Use now >= expires_at for the expired case.",
+        "Delete only expired entries and return a found flag."
+      ],
+      "explanation": "An explicit found flag preserves cached None values. The injected time makes expiry tests immediate and deterministic. A real duration cache should use a monotonic clock to avoid wall-clock adjustments."
+    },
+    {
+      "id": "nested-redaction",
+      "title": "Redact nested data without mutating it",
+      "body": "# Redact nested data without mutating it\n\nLogging a whole decoded request can expose credentials nested below innocent-looking fields. Traverse dictionaries and lists recursively and replace values of sensitive keys. Matching key names without regard to case avoids obvious bypasses. Build new containers so redaction for logging does not silently change the data the application is processing.\n\n```python\ndata = {\"profile\": {\"token\": \"secret\"}}\nprint(data[\"profile\"].keys())\n```\n\n## Think before coding\n\nRecursion follows the data structure rather than a fixed nesting depth. Replacing the whole sensitive value also hides nested credentials under that key. This key-based rule is limited: it cannot detect secrets stored under unrelated names. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write redact(value). Recursively copy dicts and lists; replace values whose string key lowercases to password, token or secret with \"[redacted]\". Other scalar values stay unchanged. Do not modify the original.",
+      "starter": "def redact(value):\n    pass\n",
+      "solution": "def redact(value):\n    if isinstance(value, dict):\n        return {key: '[redacted]' if isinstance(key, str) and key.lower() in {'password','token','secret'} else redact(item) for key, item in value.items()}\n    if isinstance(value, list):\n        return [redact(item) for item in value]\n    return value\n",
+      "checks": [
+        {
+          "name": "nested keys",
+          "code": "assert redact({'x':[{'TOKEN':'abc'}]})=={'x':[{'TOKEN':'[redacted]'}]}\n"
+        },
+        {
+          "name": "ordinary values",
+          "code": "assert redact({'name':'Ada','n':2})=={'name':'Ada','n':2}\n"
+        },
+        {
+          "name": "no mutation",
+          "code": "a={'x':[{'password':'abc'}]}; b=redact(a); assert a['x'][0]['password']=='abc' and b is not a\n"
+        },
+        {
+          "name": "nonstring key",
+          "code": "assert redact({1:'ok'})=={1:'ok'}\n"
+        }
+      ],
+      "hints": [
+        "Handle dictionaries and lists as separate recursive cases.",
+        "Inspect a key before recursing into its value.",
+        "Return new containers and reuse only scalar values."
+      ],
+      "explanation": "Recursion follows the data structure rather than a fixed nesting depth. Replacing the whole sensitive value also hides nested credentials under that key. This key-based rule is limited: it cannot detect secrets stored under unrelated names."
+    },
+    {
+      "id": "canonical-json",
+      "title": "Hash a stable representation of data",
+      "body": "# Hash a stable representation of data\n\nTwo dictionaries can describe the same JSON object even if their insertion orders differ. Hashing a casual string representation would treat them as different. Canonical encoding fixes key order, whitespace and character encoding before hashing. Reject NaN and infinity because they are not JSON numbers, and use a cryptographic digest rather than Python's process-dependent hash.\n\n```python\nimport json\nprint(json.dumps({\"b\":2,\"a\":1},\n                 sort_keys=True))\n```\n\n## Think before coding\n\nThe digest identifies the chosen serialized representation. Key sorting removes insertion-order differences and fixed separators remove formatting choices. This is a local canonicalization policy, not a claim to implement every external canonical JSON standard. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write content_id(value). Encode a JSON-compatible value with sorted keys, separators (\",\", \":\"), ensure_ascii=False, allow_nan=False; UTF-8 encode it and return its SHA-256 hexadecimal digest.",
+      "starter": "def content_id(value):\n    pass\n",
+      "solution": "def content_id(value):\n    import hashlib, json\n    text = json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False)\n    return hashlib.sha256(text.encode('utf-8')).hexdigest()\n",
+      "checks": [
+        {
+          "name": "key order",
+          "code": "assert content_id({'b':2,'a':1})==content_id({'a':1,'b':2})\n"
+        },
+        {
+          "name": "known digest",
+          "code": "import hashlib\nassert content_id({'a':1})==hashlib.sha256(b'{\"a\":1}').hexdigest()\n"
+        },
+        {
+          "name": "changed content",
+          "code": "assert content_id([1,2])!=content_id([2,1]) and len(content_id(None))==64\n"
+        },
+        {
+          "name": "nonfinite rejected",
+          "code": "try: content_id(float('nan'))\nexcept ValueError: pass\nelse: assert False, ('NaN encoded')\n"
+        }
+      ],
+      "hints": [
+        "First produce a deterministic JSON string.",
+        "Encode the string as UTF-8 bytes.",
+        "Use hashlib.sha256(...).hexdigest()."
+      ],
+      "explanation": "The digest identifies the chosen serialized representation. Key sorting removes insertion-order differences and fixed separators remove formatting choices. This is a local canonicalization policy, not a claim to implement every external canonical JSON standard."
+    },
+    {
+      "id": "schema-upgrade",
+      "title": "Upgrade saved records without losing fields",
+      "body": "# Upgrade saved records without losing fields\n\nSaved data outlives the code that wrote it. A version field lets a loader distinguish older shapes from current ones. A migration should preserve unknown fields where possible, avoid mutating the original and reject future versions that it does not understand. Applying the migration to an already-current record should be harmless.\n\n```python\nrecord = {\"version\": 1, \"name\": \"Ada\"}\ncopy = dict(record)\ncopy[\"version\"] = 2\nprint(record[\"version\"])\n```\n\n## Think before coding\n\nVersion-directed migration makes the compatibility contract explicit. Copying protects the caller's data, and preserving unrelated fields prevents accidental loss during a narrow schema change. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write upgrade(record). Missing version means 1. Version 1 renames name to display_name (default \"\"), removes name and sets version to 2. Version 2 returns a shallow copy unchanged. Preserve all other fields. Reject every other version with ValueError.",
+      "starter": "def upgrade(record):\n    pass\n",
+      "solution": "def upgrade(record):\n    result = dict(record)\n    version = result.get('version', 1)\n    if version == 1:\n        result['display_name'] = result.pop('name', '')\n        result['version'] = 2\n    elif version != 2:\n        raise ValueError('unsupported version')\n    return result\n",
+      "checks": [
+        {
+          "name": "old record",
+          "code": "assert upgrade({'name':'Ada','x':3})=={'display_name':'Ada','version':2,'x':3}\n"
+        },
+        {
+          "name": "missing name",
+          "code": "assert upgrade({'version':1})=={'version':2,'display_name':''}\n"
+        },
+        {
+          "name": "current copied",
+          "code": "a={'version':2,'display_name':'A'}; b=upgrade(a); assert b==a and b is not a\n"
+        },
+        {
+          "name": "future rejected",
+          "code": "try: upgrade({'version':3})\nexcept ValueError: pass\nelse: assert False, ('future version accepted')\n"
+        },
+        {
+          "name": "source unchanged",
+          "code": "a={'name':'A'}; upgrade(a); assert a=={'name':'A'}\n"
+        }
+      ],
+      "hints": [
+        "Copy the record before changing fields.",
+        "Use pop with a default for the old name.",
+        "Only versions 1 and 2 have a defined interpretation."
+      ],
+      "explanation": "Version-directed migration makes the compatibility contract explicit. Copying protects the caller's data, and preserving unrelated fields prevents accidental loss during a narrow schema change."
+    },
+    {
+      "id": "sqlite-rollback",
+      "title": "Make a transfer all-or-nothing",
+      "body": "# Make a transfer all-or-nothing\n\nA balance transfer changes two rows that must stay consistent. A database transaction groups them into one commit, and any validation failure should roll everything back. SQLite's connection context manager commits on success and rolls back on an exception. Validate the destination as well as the source before treating the operation as complete.\n\n```python\nimport sqlite3\ncon = sqlite3.connect(\":memory:\")\nwith con:\n    con.execute(\"CREATE TABLE sample(x)\")\n```\n\n## Think before coding\n\nThe transaction makes both updates one unit. Context-manager rollback protects earlier writes if an exception interrupts the operation. Production concurrency rules and stronger monetary validation should be designed around the chosen database. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write transfer(connection, source, target, amount). accounts(id TEXT PRIMARY KEY, balance INTEGER) exists with no pending transaction. Reject amount <= 0, missing accounts, or insufficient funds with ValueError. Move funds atomically, leaving balances unchanged on rejection. A valid same-account transfer is a no-op.",
+      "starter": "def transfer(connection, source, target, amount):\n    pass\n",
+      "solution": "def transfer(connection, source, target, amount):\n    if amount <= 0:\n        raise ValueError('positive amount required')\n    with connection:\n        a = connection.execute('SELECT balance FROM accounts WHERE id=?', (source,)).fetchone()\n        b = connection.execute('SELECT balance FROM accounts WHERE id=?', (target,)).fetchone()\n        if a is None or b is None or a[0] < amount:\n            raise ValueError('invalid transfer')\n        connection.execute('UPDATE accounts SET balance=balance-? WHERE id=?', (amount, source))\n        connection.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (amount, target))\n",
+      "checks": [
+        {
+          "name": "successful transfer",
+          "code": "import sqlite3\nc=sqlite3.connect(':memory:'); c.execute('CREATE TABLE accounts(id TEXT PRIMARY KEY,balance INTEGER)'); c.executemany('INSERT INTO accounts VALUES (?,?)',[('a',10),('b',2)]); c.commit()\ntransfer(c,'a','b',3)\nassert c.execute('SELECT balance FROM accounts ORDER BY id').fetchall()==[(7,),(5,)]\n"
+        },
+        {
+          "name": "rejection unchanged",
+          "code": "try: transfer(c,'a','missing',2)\nexcept ValueError: pass\nelse: assert False, ('missing target')\nassert c.execute('SELECT balance FROM accounts ORDER BY id').fetchall()==[(7,),(5,)]\n"
+        },
+        {
+          "name": "insufficient funds",
+          "code": "try: transfer(c,'a','b',100)\nexcept ValueError: pass\nelse: assert False, ('overdraft')\n"
+        },
+        {
+          "name": "same account",
+          "code": "transfer(c,'a','a',2)\nassert c.execute('SELECT balance FROM accounts WHERE id=?', ('a',)).fetchone()==(7,)\nc.close()\n"
+        }
+      ],
+      "hints": [
+        "Read and validate both accounts inside the connection context.",
+        "Bind all SQL values as parameters.",
+        "Let validation exceptions escape the context so it rolls back."
+      ],
+      "explanation": "The transaction makes both updates one unit. Context-manager rollback protects earlier writes if an exception interrupts the operation. Production concurrency rules and stronger monetary validation should be designed around the chosen database."
+    }
+  ]
+}

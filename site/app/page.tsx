@@ -124,11 +124,11 @@ export default function Home() {
         <div className="feature-text">
           <span className="label">Labs</span>
           <h2 id="f-labs">Watch your algorithm work, then time it</h2>
-          <p>{labCount} labs cover basics, data structures, algorithms and machine learning. Trace your own code, replay each step, then see how it scales on the device.</p>
+          <p>{labCount} labs in the next app build cover basics, data structures, algorithms and machine learning. Trace your own code, replay each step, then see how it scales on the device.</p>
           <ul className="ticks">
             {labGroups.map(group => <li key={group.title}><strong>{group.title}</strong>: {group.labs.map(lab => lab.title).join(", ")}.</li>)}
           </ul>
-          <Link href="/guide/learn/#labs" className="arrow-link">How the labs work</Link>
+          <Link href="/labs/" className="arrow-link">Try ten labs in your browser</Link>
         </div>
         <div className="feature-media"><DeviceShot shot={shots.graphLab} /><DeviceShot shot={shots.dpLab} /></div>
       </section>

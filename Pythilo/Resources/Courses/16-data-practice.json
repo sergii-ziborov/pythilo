@@ -1,0 +1,264 @@
+{
+  "id": "data-practice",
+  "title": "Data in practice",
+  "summary": "Clean real CSV, validate JSON, parameterize SQLite, handle exact prices and process data streams.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "decimal-invoice",
+      "title": "Round money at an explicit boundary",
+      "body": "# Round money at an explicit boundary\n\nBinary floating point cannot represent many decimal prices exactly. Decimal constructed from text preserves the intended value. A billing rule also needs to say when rounding happens: rounding each line can differ from rounding the final total. In this exercise, add exact line amounts first and round the invoice once, using half-up rounding.\n\n```python\nfrom decimal import Decimal\nprint(Decimal(\"0.10\") + Decimal(\"0.20\"))\n```\n\n## Think before coding\n\nThe representation and the rounding policy are separate decisions. Decimal keeps the exact input prices, and one final quantize applies the invoice rule consistently. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write invoice_total(lines). Each line is (unit_price_text, quantity). Sum using Decimal, then quantize once to two decimal places with ROUND_HALF_UP. Return a Decimal, including Decimal(\"0.00\") for no lines.",
+      "starter": "def invoice_total(lines):\n    pass\n",
+      "solution": "def invoice_total(lines):\n    from decimal import Decimal, ROUND_HALF_UP\n    total = sum((Decimal(price) * quantity for price, quantity in lines), Decimal('0'))\n    return total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)\n",
+      "checks": [
+        {
+          "name": "decimal prices",
+          "code": "from decimal import Decimal\nassert invoice_total([('0.10',3),('0.20',1)])==Decimal('0.50')\n"
+        },
+        {
+          "name": "round once",
+          "code": "assert str(invoice_total([('0.005',1),('0.005',1)]))=='0.01'\n"
+        },
+        {
+          "name": "half up",
+          "code": "assert str(invoice_total([('1.005',1)]))=='1.01'\n"
+        },
+        {
+          "name": "empty",
+          "code": "assert str(invoice_total([]))=='0.00'\n"
+        }
+      ],
+      "hints": [
+        "Construct Decimal from the input string, never through float.",
+        "Give sum a Decimal zero start value.",
+        "Quantize the final total with ROUND_HALF_UP."
+      ],
+      "explanation": "The representation and the rounding policy are separate decisions. Decimal keeps the exact input prices, and one final quantize applies the invoice rule consistently."
+    },
+    {
+      "id": "csv-records",
+      "title": "Parse CSV without splitting on commas",
+      "body": "# Parse CSV without splitting on commas\n\nCSV fields can contain commas, quotes and line breaks. Splitting text manually loses that structure. DictReader understands the format and names fields using the header. Normalize only fields whose rules you know: an email is trimmed and lowercased here, while the supplied display name keeps its internal spaces.\n\n```python\nimport csv, io\ntext = \"name,email\\nAda,a@x.test\"\nrows = csv.DictReader(io.StringIO(text))\nprint(next(rows)[\"name\"])\n```\n\n## Think before coding\n\nThe parser handles escaping before normalization begins. Treating parsing and field cleanup as separate steps preserves names containing commas while giving predictable email keys. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write contacts(text). Parse CSV columns name,email; return (trimmed_name, trimmed_lowercase_email) tuples for rows with both values nonempty. Preserve row order and correctly parse quoted commas.",
+      "starter": "def contacts(text):\n    pass\n",
+      "solution": "def contacts(text):\n    import csv, io\n    result = []\n    for row in csv.DictReader(io.StringIO(text)):\n        name = (row.get('name') or '').strip()\n        email = (row.get('email') or '').strip().lower()\n        if name and email:\n            result.append((name, email))\n    return result\n",
+      "checks": [
+        {
+          "name": "normalization",
+          "code": "assert contacts('name,email\\n Ada , A@X.TEST \\n')==[('Ada','a@x.test')]\n"
+        },
+        {
+          "name": "quoted field",
+          "code": "assert contacts('name,email\\n\"Doe, Ada\",a@x.test\\n')==[('Doe, Ada','a@x.test')]\n"
+        },
+        {
+          "name": "skip blanks",
+          "code": "assert contacts('name,email\\n,a@x.test\\nBob,\\n')==[]\n"
+        },
+        {
+          "name": "header only",
+          "code": "assert contacts('name,email\\n')==[]\n"
+        }
+      ],
+      "hints": [
+        "Use csv.DictReader over io.StringIO.",
+        "Missing values can be None; turn them into an empty string before strip.",
+        "Keep a row only after both normalized values are nonempty."
+      ],
+      "explanation": "The parser handles escaping before normalization begins. Treating parsing and field cleanup as separate steps preserves names containing commas while giving predictable email keys."
+    },
+    {
+      "id": "utc-instants",
+      "title": "Compare instants across timezone offsets",
+      "body": "# Compare instants across timezone offsets\n\nA timestamp with an offset identifies an instant, while a naive timestamp is only a wall-clock reading. Comparing timestamp strings can put the same instants in the wrong order. Parse aware datetimes, convert to UTC and compare their actual values. Reject missing offsets so the function never guesses the caller's local timezone.\n\n```python\nfrom datetime import datetime, timezone\ntext = \"2026-01-01T12:00+02:00\"\nx = datetime.fromisoformat(text)\nprint(x.astimezone(timezone.utc).hour)\n```\n\n## Think before coding\n\nConverting an aware datetime preserves the instant and changes the wall-clock representation. Requiring an offset prevents machine-specific timezone settings from changing the answer. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write utc_hour(text): parse an ISO datetime, require a timezone offset, convert it to UTC and return its hour (0–23). Raise ValueError for a naive datetime. A trailing Z is valid.",
+      "starter": "def utc_hour(text):\n    pass\n",
+      "solution": "def utc_hour(text):\n    from datetime import datetime, timezone\n    value = datetime.fromisoformat(text)\n    if value.tzinfo is None:\n        raise ValueError('timezone required')\n    return value.astimezone(timezone.utc).hour\n",
+      "checks": [
+        {
+          "name": "positive offset",
+          "code": "assert utc_hour('2026-01-01T12:30+02:00')==10\n"
+        },
+        {
+          "name": "previous day",
+          "code": "assert utc_hour('2026-01-01T01:00+03:00')==22\n"
+        },
+        {
+          "name": "utc suffix",
+          "code": "assert utc_hour('2026-01-01T08:00Z')==8\n"
+        },
+        {
+          "name": "naive rejected",
+          "code": "try:\n    utc_hour('2026-01-01T12:00')\nexcept ValueError:\n    pass\nelse:\n    assert False, ('naive timestamp accepted')\n"
+        }
+      ],
+      "hints": [
+        "Parse with datetime.fromisoformat.",
+        "Check tzinfo before converting.",
+        "Use timezone.utc and read hour from the converted value."
+      ],
+      "explanation": "Converting an aware datetime preserves the instant and changes the wall-clock representation. Requiring an offset prevents machine-specific timezone settings from changing the answer."
+    },
+    {
+      "id": "stream-totals",
+      "title": "Aggregate an iterator in one pass",
+      "body": "# Aggregate an iterator in one pass\n\nA data source may be a generator that cannot be restarted. Accumulate only the state required for the answer rather than converting every row into a list. For totals by category, a dictionary needs one value per distinct category. This keeps memory tied to the number of groups rather than the number of records.\n\n```python\nfrom collections import defaultdict\ntotals = defaultdict(int)\ntotals[\"books\"] += 3\nprint(dict(totals))\n```\n\n## Think before coding\n\nThe dictionary is sufficient state for a single-pass reduction. Iterating directly supports generators and large sources. Negative adjustments use the same addition rule as positive amounts. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write totals_by_key(rows). Consume an iterable of (key, amount) pairs exactly once and return a plain dict of totals. Include zero totals and support negative amounts.",
+      "starter": "def totals_by_key(rows):\n    pass\n",
+      "solution": "def totals_by_key(rows):\n    totals = {}\n    for key, amount in rows:\n        totals[key] = totals.get(key, 0) + amount\n    return totals\n",
+      "checks": [
+        {
+          "name": "repeated groups",
+          "code": "assert totals_by_key([('a',2),('b',7),('a',-2)])=={'a':0,'b':7}\n"
+        },
+        {
+          "name": "generator",
+          "code": "assert totals_by_key((('x',i) for i in range(4)))=={'x':6}\n"
+        },
+        {
+          "name": "empty iterator",
+          "code": "assert totals_by_key(iter([]))=={}\n"
+        },
+        {
+          "name": "one pass",
+          "code": "class Once:\n    def __init__(self): self.used=False\n    def __iter__(self):\n        assert not self.used\n        self.used=True\n        yield 'a', 4\nassert totals_by_key(Once())=={'a':4}\n"
+        }
+      ],
+      "hints": [
+        "Loop over rows directly.",
+        "Use get(key, 0) for the previous total.",
+        "Do not remove a key when its total becomes zero."
+      ],
+      "explanation": "The dictionary is sufficient state for a single-pass reduction. Iterating directly supports generators and large sources. Negative adjustments use the same addition rule as positive amounts."
+    },
+    {
+      "id": "safe-query",
+      "title": "Keep SQL values out of SQL syntax",
+      "body": "# Keep SQL values out of SQL syntax\n\nInterpolating a user value into SQL lets quotes change the meaning of the query. Parameters transmit values separately from the statement. They also handle empty strings and embedded quotes without manual escaping. An in-memory SQLite database is enough to practise this boundary, and results should have an explicit order so callers receive predictable output.\n\n```python\nimport sqlite3\ncon = sqlite3.connect(\":memory:\")\nrow = con.execute(\"SELECT ?\", (\"O'Neil\",))\nprint(row.fetchone())\n```\n\n## Think before coding\n\nThe SQL statement never changes when the input changes. Using substr gives literal prefix semantics without LIKE escaping, and ORDER BY makes the output deterministic. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write lookup_names(connection, prefix). The connection has people(name TEXT). Return names beginning with the literal prefix, sorted by name. Use a bound parameter. Percent and underscore in the prefix are literal characters, not LIKE wildcards.",
+      "starter": "def lookup_names(connection, prefix):\n    pass\n",
+      "solution": "def lookup_names(connection, prefix):\n    rows = connection.execute('SELECT name FROM people WHERE substr(name, 1, ?) = ? ORDER BY name', (len(prefix), prefix))\n    return [row[0] for row in rows]\n",
+      "checks": [
+        {
+          "name": "sorted prefix",
+          "code": "import sqlite3\nc=sqlite3.connect(':memory:'); c.execute('CREATE TABLE people(name TEXT)'); c.executemany('INSERT INTO people VALUES (?)', [('Ada',),('Al',),('Bob',),('A%',)])\nassert lookup_names(c,'A')==['A%','Ada','Al']\n"
+        },
+        {
+          "name": "wildcards literal",
+          "code": "assert lookup_names(c,'A%')==['A%'] and lookup_names(c,'_')==[]\n"
+        },
+        {
+          "name": "quote stays data",
+          "code": "assert lookup_names(c,\"' OR 1=1 --\")==[]\n"
+        },
+        {
+          "name": "empty prefix",
+          "code": "assert lookup_names(c,'')==['A%','Ada','Al','Bob']; c.close()\n"
+        }
+      ],
+      "hints": [
+        "A parameter represents a value, not an SQL fragment.",
+        "Use substr(name, 1, length) for literal prefix matching.",
+        "Bind both the prefix length and the prefix, then order by name."
+      ],
+      "explanation": "The SQL statement never changes when the input changes. Using substr gives literal prefix semantics without LIKE escaping, and ORDER BY makes the output deterministic."
+    },
+    {
+      "id": "json-boundary",
+      "title": "Validate a decoded JSON value at the boundary",
+      "body": "# Validate a decoded JSON value at the boundary\n\nDecoding JSON proves that the text is valid JSON, not that its shape is suitable for your program. A boundary validator should reject the wrong container, missing fields and misleading scalar types. In Python, bool is a subclass of int, so isinstance alone may accidentally accept True as a numeric identifier. State those rules explicitly.\n\n```python\nimport json\nvalue = json.loads(\"{\"count\": true}\")\nprint(type(value[\"count\"]) is int)\n```\n\n## Think before coding\n\nThe boundary converts loosely structured input into one trustworthy value. Exact integer checking avoids the bool subclass trap. All rejected inputs share a clear ValueError contract. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write parse_count(text). Decode a JSON object and return its count only if that value has exactly type int and is nonnegative. Raise ValueError for invalid JSON, a wrong shape, a missing key, bool, or any other count type. Ignore other keys.",
+      "starter": "def parse_count(text):\n    pass\n",
+      "solution": "def parse_count(text):\n    import json\n    value = json.loads(text)\n    if not isinstance(value, dict) or type(value.get('count')) is not int or value['count'] < 0:\n        raise ValueError('nonnegative integer count required')\n    return value['count']\n",
+      "checks": [
+        {
+          "name": "valid object",
+          "code": "assert parse_count('{\"count\": 0, \"note\": \"ok\"}')==0\n"
+        },
+        {
+          "name": "booleans and shapes",
+          "code": "for text in ['{\"count\":true}','[]','{}','{\"count\":-1}','{\"count\":2.0}']:\n    try: parse_count(text)\n    except ValueError: pass\n    else: assert False, (text)\n"
+        },
+        {
+          "name": "ordinary count",
+          "code": "assert parse_count('{\"count\":123}')==123\n"
+        },
+        {
+          "name": "invalid json",
+          "code": "try: parse_count('{')\nexcept ValueError: pass\nelse: assert False, ('invalid JSON accepted')\n"
+        }
+      ],
+      "hints": [
+        "json.loads can raise ValueError for malformed JSON.",
+        "Check the object shape before accessing its key.",
+        "Use type(value) is int to reject booleans."
+      ],
+      "explanation": "The boundary converts loosely structured input into one trustworthy value. Exact integer checking avoids the bool subclass trap. All rejected inputs share a clear ValueError contract."
+    },
+    {
+      "id": "top-k-stream",
+      "title": "Keep only the largest k values",
+      "body": "# Keep only the largest k values\n\nSorting every value is unnecessary when the answer contains only a few winners. A small min-heap keeps the largest k values seen so far; its smallest value is the easiest winner to replace. Python's heapq.nlargest implements this selection for any iterable. Duplicates still count as separate observations unless the task says otherwise.\n\n```python\nimport heapq\nprint(heapq.nlargest(2, iter([3, 9, 1, 7])))\n```\n\n## Think before coding\n\nA bounded heap avoids retaining and sorting the whole source when k is small. nlargest also accepts iterators directly, and its descending output is part of the public contract. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write largest_values(values, k), returning up to k largest numbers in descending order, preserving duplicates. Accept a one-pass iterable. Return [] when k <= 0.",
+      "starter": "def largest_values(values, k):\n    pass\n",
+      "solution": "def largest_values(values, k):\n    import heapq\n    return heapq.nlargest(k, values) if k > 0 else []\n",
+      "checks": [
+        {
+          "name": "selection",
+          "code": "assert largest_values(iter([3,9,1,7,9]),3)==[9,9,7]\n"
+        },
+        {
+          "name": "oversized k",
+          "code": "assert largest_values([2,1],8)==[2,1]\n"
+        },
+        {
+          "name": "nonpositive",
+          "code": "assert largest_values([4],0)==[] and largest_values([4],-2)==[]\n"
+        },
+        {
+          "name": "negative values",
+          "code": "assert largest_values([-5,-1,-3],2)==[-1,-3]\n"
+        }
+      ],
+      "hints": [
+        "The heapq module already provides selection over an iterable.",
+        "Handle k <= 0 explicitly.",
+        "Do not use a set: repeated values are valid observations."
+      ],
+      "explanation": "A bounded heap avoids retaining and sorting the whole source when k is small. nlargest also accepts iterators directly, and its descending output is part of the public contract."
+    },
+    {
+      "id": "online-mean",
+      "title": "Update a mean without storing all samples",
+      "body": "# Update a mean without storing all samples\n\nA running average can be updated from its previous value and a count. When the next sample arrives, move the mean by one count-th of the difference between the sample and the old mean. The formula avoids retaining observations and is useful for streams. An empty stream has no average, so its result needs a separate contract.\n\n```python\nmean, count = 10.0, 2\ncount += 1\nmean += (16 - mean) / count\nprint(mean)\n```\n\n## Think before coding\n\nThe update is algebraically equivalent to total divided by count. Only the current mean and count are needed between samples. Returning each prefix average makes the evolution visible. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write running_means(values). Consume an iterable once and return the average after each sample. An empty iterable gives []. Use the incremental update rather than repeatedly summing earlier samples.",
+      "starter": "def running_means(values):\n    pass\n",
+      "solution": "def running_means(values):\n    result = []\n    mean = 0.0\n    for count, value in enumerate(values, 1):\n        mean += (value - mean) / count\n        result.append(mean)\n    return result\n",
+      "checks": [
+        {
+          "name": "prefix averages",
+          "code": "assert running_means([2,4,9])==[2.0,3.0,5.0]\n"
+        },
+        {
+          "name": "one-pass input",
+          "code": "assert running_means(iter([10,10,10]))==[10.0,10.0,10.0]\n"
+        },
+        {
+          "name": "empty",
+          "code": "assert running_means([])==[]\n"
+        },
+        {
+          "name": "signed values",
+          "code": "assert running_means([-2,2,6])==[-2.0,0.0,2.0]\n"
+        }
+      ],
+      "hints": [
+        "Use enumerate with a count starting at one.",
+        "Adjust the previous mean by (value - mean) / count.",
+        "Append the new mean after every update."
+      ],
+      "explanation": "The update is algebraically equivalent to total divided by count. Only the current mean and count are needed between samples. Returning each prefix average makes the evolution visible."
+    }
+  ]
+}

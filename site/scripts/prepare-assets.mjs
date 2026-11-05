@@ -136,6 +136,17 @@ writeFileSync(join(content, 'courses.json'), JSON.stringify({ pyodide: version, 
 const checker = readFileSync(checkerFile, 'utf8');
 writeFileSync(join(content, 'lessons-checker.json'), JSON.stringify({ source: checker, sha256: sha256(checker) }) + '\n');
 
+// The new browser labs use the exact tracing engine and files bundled by iOS.
+const labRoot = join(repository, 'Pythilo', 'PythonRuntime', 'pythilo_runtime');
+const labCatalog = JSON.parse(readFileSync(join(labRoot, 'labcode', 'catalog-expansion.json'), 'utf8'));
+writeFileSync(join(content, 'labs.json'), JSON.stringify({
+  labs: labCatalog.map(lab => ({ ...lab,
+    starter: readFileSync(join(labRoot, 'labcode', `${lab.id}.practice.starter.py`), 'utf8'),
+    answer: readFileSync(join(labRoot, 'labcode', `${lab.id}.practice.answer.py`), 'utf8'),
+  })),
+  sources: Object.fromEntries(['labs_engine.py', 'labs_extended.py'].map(file => [file, readFileSync(join(labRoot, file), 'utf8')])),
+}) + '\n');
+
 // Pyodide runs only in a module worker, and the app's bundler starts workers as
 // classic scripts. The worker is therefore bundled here, beside Pyodide.
 const workerFile = join(content, 'worker.json');

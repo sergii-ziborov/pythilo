@@ -31,7 +31,10 @@ test('the website lab catalogue matches the app in every section', async () => {
   const { labGroups } = await import('../lib/labs.ts');
   const source = readFileSync(join(repository, 'Pythilo/UI/Labs/LabCatalog.swift'), 'utf8');
   const native = [...source.matchAll(/LabInfo\(id: "([^"]+)", title: "([^"]+)"/g)].map(([, id, title]) => ({ id, title }));
-  assert.deepEqual(labGroups.flatMap(group => group.labs.map(({id, title}) => ({id, title}))), native);
+  const expanded = JSON.parse(readFileSync(join(repository, 'Pythilo/PythonRuntime/pythilo_runtime/labcode/catalog-expansion.json'), 'utf8'));
+  const web = labGroups.flatMap(group => group.labs.map(({id,title}) => ({id,title})));
+  assert.deepEqual(web.toSorted((a,b)=>a.id.localeCompare(b.id)), [...native,...expanded.map(({id,title})=>({id,title}))].toSorted((a,b)=>a.id.localeCompare(b.id)));
+  for (const lab of expanded) assert.ok(labGroups.find(group=>group.title===lab.section).labs.some(item=>item.id===lab.id));
 });
 
 test('the AI setup points at a bundled package with an executable bridge', async () => {

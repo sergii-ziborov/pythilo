@@ -7,11 +7,12 @@ export function BrandMark({ size = 30 }: { size?: number }) {
   return <span aria-hidden="true" className="brand-mark" style={size !== 30 ? { width: size, height: size, fontSize: Math.round(size * .43) } : undefined}>py</span>;
 }
 
-type Section = "learn" | "playground" | "ai" | "guide" | "pricing" | "blog" | "legal";
+type Section = "learn" | "labs" | "playground" | "ai" | "guide" | "pricing" | "blog" | "legal";
 
 const NAV: { href: string; label: string; id: Section }[] = [
   { href: "/guide/", label: "Guide", id: "guide" },
   { href: "/learn/", label: "Learn", id: "learn" },
+  { href: "/labs/", label: "Labs", id: "labs" },
   { href: "/playground/", label: "Playground", id: "playground" },
   { href: "/ai/", label: "Connect AI", id: "ai" },
   { href: "/pricing/", label: "Pricing", id: "pricing" },
@@ -43,7 +44,7 @@ export function SiteHeader({ current }: { current?: Section }) {
 
 const FOOTER: { title: string; links: [string, string][] }[] = [
   { title: "App", links: [["/", "Overview"], ["/guide/", "Guide"], ["/pricing/", "Pricing"], ["/support/", "Support"]] },
-  { title: "On the web", links: [["/learn/", "Lessons"], ["/playground/", "Playground"], ["/ai/", "Connect AI"], ["/blog/", "Blog"]] },
+  { title: "On the web", links: [["/learn/", "Lessons"], ["/labs/", "Labs"], ["/playground/", "Playground"], ["/ai/", "Connect AI"], ["/blog/", "Blog"]] },
   { title: "Legal", links: [["/legal/terms/", "Terms of Use"], ["/legal/privacy/", "Privacy Policy"], ["/legal/acceptable-use/", "Acceptable use"], ["/legal/licenses/", "Open-source licences"]] },
 ];
 

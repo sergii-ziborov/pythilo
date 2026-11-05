@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One problem inside a lab. Its starter and answer live next to the Python that traces them,
 /// in pythilo_runtime/labcode/<lab>.<variant>.starter.py and .answer.py.
-struct LabVariant: Identifiable, Hashable, Sendable {
+struct LabVariant: Codable, Identifiable, Hashable, Sendable {
     let id: String
     let title: String
     let prompt: String
@@ -10,8 +10,8 @@ struct LabVariant: Identifiable, Hashable, Sendable {
     var scales = true
 }
 
-struct LabInfo: Identifiable, Hashable, Sendable {
-    enum Section: String, CaseIterable, Sendable {
+struct LabInfo: Codable, Identifiable, Hashable, Sendable {
+    enum Section: String, Codable, CaseIterable, Sendable {
         case basics = "Basics"
         case structures = "Data structures"
         case algorithms = "Algorithms"
@@ -29,7 +29,7 @@ struct LabInfo: Identifiable, Hashable, Sendable {
     /// The labs written before the shared engine have screens of their own.
     var isClassic: Bool { variants.isEmpty }
 
-    enum Tint: Sendable { case run, blue, mint, violet, amber, coral }
+    enum Tint: String, Codable, Sendable { case run, blue, mint, violet, amber, coral }
 
     var color: Color {
         switch tint {
@@ -52,6 +52,12 @@ enum LabCatalog {
     }
 
     static func lab(_ id: String) -> LabInfo? { all.first { $0.id == id } }
+
+    private static let expanded: [LabInfo] = {
+        let url = Bundle.main.bundleURL.appending(path: "app/pythilo_runtime/labcode/catalog-expansion.json")
+        guard let data = try? Data(contentsOf: url) else { return [] }
+        return (try? JSONDecoder().decode([LabInfo].self, from: data)) ?? []
+    }()
 
     static let all: [LabInfo] = [
         // Basics
@@ -126,5 +132,5 @@ enum LabCatalog {
         LabInfo(id: "qlearning", title: "Q-learning", summary: "An agent learns a maze from rewards alone", symbol: "figure.walk", tint: .amber, section: .learning, variants: [
             LabVariant(id: "grid", title: "Grid world", prompt: "update(Q, state, action, reward, next_state, alpha, gamma) nudges Q[state][action] toward reward + gamma × the best value of the next state.", file: "qlearning.py", scales: false),
         ]),
-    ]
+    ] + expanded
 }

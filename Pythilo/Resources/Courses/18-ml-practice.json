@@ -1,0 +1,276 @@
+{
+  "id": "ml-practice",
+  "title": "Machine learning in practice",
+  "summary": "Fit preprocessing without leakage, interpret metrics, implement neighbours and regression, score splits and stop training.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "fit-standardizer",
+      "title": "Fit preprocessing on training data only",
+      "body": "# Fit preprocessing on training data only\n\nA model evaluation is misleading when preprocessing learns from held-out observations. Compute the mean and population standard deviation on the training values, then reuse those parameters for later values. A constant training feature needs an explicit policy: use a scale of one so it transforms to zero without division by zero.\n\n```python\ntrain = [2.0, 4.0]\nmean, scale = 3.0, 1.0\nprint((10.0 - mean) / scale)\n```\n\n## Think before coding\n\nSeparating fit and transform prevents held-out values from influencing the training representation. The variance here is a population statistic, and a constant feature contributes zero after centering. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write fit_scale(train), returning (mean, population_standard_deviation), with scale 1.0 for a constant feature. Raise ValueError for empty training data. Write transform(values, mean, scale) returning standardized values using the supplied parameters.",
+      "starter": "def fit_scale(train):\n    pass\n",
+      "solution": "def fit_scale(train):\n    if not train:\n        raise ValueError('training values required')\n    mean = sum(train) / len(train)\n    scale = (sum((x - mean) ** 2 for x in train) / len(train)) ** 0.5\n    return mean, scale or 1.0\n\ndef transform(values, mean, scale):\n    return [(x - mean) / scale for x in values]\n",
+      "checks": [
+        {
+          "name": "training parameters",
+          "code": "assert fit_scale([2,4])==(3.0,1.0)\n"
+        },
+        {
+          "name": "reuse parameters",
+          "code": "assert transform([10],*fit_scale([2,4]))==[7.0]\n"
+        },
+        {
+          "name": "constant feature",
+          "code": "assert fit_scale([5,5])==(5.0,1.0) and transform([5],5,1)==[0.0]\n"
+        },
+        {
+          "name": "empty rejected",
+          "code": "try: fit_scale([])\nexcept ValueError: pass\nelse: assert False, (\"empty train\")\n"
+        }
+      ],
+      "hints": [
+        "Use the number of training values as the variance denominator.",
+        "Replace only a zero scale with 1.0.",
+        "transform must never recompute statistics on its own input."
+      ],
+      "explanation": "Separating fit and transform prevents held-out values from influencing the training representation. The variance here is a population statistic, and a constant feature contributes zero after centering."
+    },
+    {
+      "id": "classification-metrics",
+      "title": "Read a confusion matrix before accuracy",
+      "body": "# Read a confusion matrix before accuracy\n\nAccuracy can hide failures when one class is rare. Count true positives, false positives and false negatives, then compute precision and recall from those counts. F1 combines both and is zero when no true positive exists. An empty denominator needs a deliberate convention; this exercise uses zero instead of raising or returning NaN.\n\n```python\ntp, fp, fn = 2, 1, 3\nprint(2 * tp / (2 * tp + fp + fn))\n```\n\n## Think before coding\n\nThe matrix distinguishes missed positives from false alarms. Computing F1 directly avoids a second zero-denominator case from combining precision and recall. Which metric matters depends on the cost of each error. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write binary_metrics(truth, predicted), equal-length lists of 0/1 labels. Return (precision, recall, f1), with zero for any zero denominator.",
+      "starter": "def binary_metrics(truth, predicted):\n    pass\n",
+      "solution": "def binary_metrics(truth, predicted):\n    tp = sum(a == b == 1 for a, b in zip(truth, predicted))\n    fp = sum(a == 0 and b == 1 for a, b in zip(truth, predicted))\n    fn = sum(a == 1 and b == 0 for a, b in zip(truth, predicted))\n    precision = tp / (tp + fp) if tp + fp else 0.0\n    recall = tp / (tp + fn) if tp + fn else 0.0\n    f1 = 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn else 0.0\n    return precision, recall, f1\n",
+      "checks": [
+        {
+          "name": "mixed predictions",
+          "code": "assert binary_metrics([1,1,0,0],[1,0,1,0])==(0.5,0.5,0.5)\n"
+        },
+        {
+          "name": "perfect positives",
+          "code": "assert binary_metrics([1,0],[1,0])==(1.0,1.0,1.0)\n"
+        },
+        {
+          "name": "no predicted positive",
+          "code": "assert binary_metrics([1,0],[0,0])==(0.0,0.0,0.0)\n"
+        },
+        {
+          "name": "empty",
+          "code": "assert binary_metrics([],[])==(0.0,0.0,0.0)\n"
+        }
+      ],
+      "hints": [
+        "Count the three positive-related outcomes independently.",
+        "Precision divides true positives by predicted positives.",
+        "F1 can be computed directly as 2TP / (2TP + FP + FN)."
+      ],
+      "explanation": "The matrix distinguishes missed positives from false alarms. Computing F1 directly avoids a second zero-denominator case from combining precision and recall. Which metric matters depends on the cost of each error."
+    },
+    {
+      "id": "stable-log-loss",
+      "title": "Keep binary log loss finite",
+      "body": "# Keep binary log loss finite\n\nLog loss measures the probability assigned to the correct binary outcome. Taking log of zero is undefined, while extreme confident errors should produce a large penalty. Clip predicted probabilities to a small open interval before applying logarithms. This numerical safeguard does not make an incorrect probability well calibrated; it only gives the computation a defined finite result.\n\n```python\nimport math\np = 0.8\nprint(-math.log(p))\n```\n\n## Think before coding\n\nCorrect confident probabilities have low loss, while confident mistakes have high loss. Clipping prevents log(0) and preserves finite comparisons. The average makes losses comparable across equally defined datasets of different sizes. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write log_loss(labels, probabilities). Inputs are equal-length nonempty sequences, labels are 0/1. Clip each probability to [1e-12, 1-1e-12], return mean binary log loss, and raise ValueError for empty labels.",
+      "starter": "def log_loss(labels, probabilities):\n    pass\n",
+      "solution": "def log_loss(labels, probabilities):\n    import math\n    if not labels:\n        raise ValueError('labels required')\n    total = 0.0\n    for label, probability in zip(labels, probabilities):\n        p = min(1 - 1e-12, max(1e-12, probability))\n        total -= label * math.log(p) + (1 - label) * math.log1p(-p)\n    return total / len(labels)\n",
+      "checks": [
+        {
+          "name": "uniform guesses",
+          "code": "import math\nassert abs(log_loss([0,1],[0.5,0.5])-math.log(2))<1e-10\n"
+        },
+        {
+          "name": "confident errors",
+          "code": "assert 20 < log_loss([1,0],[0,1]) < 30\n"
+        },
+        {
+          "name": "correct confidence",
+          "code": "assert log_loss([1,0],[0.9,0.1]) < log_loss([1,0],[0.6,0.4])\n"
+        },
+        {
+          "name": "empty rejected",
+          "code": "try: log_loss([],[])\nexcept ValueError: pass\nelse: assert False, (\"empty loss\")\n"
+        }
+      ],
+      "hints": [
+        "Clamp before calling either logarithm.",
+        "For label zero use log(1-p); log1p(-p) is numerically useful.",
+        "Average by the number of labels."
+      ],
+      "explanation": "Correct confident probabilities have low loss, while confident mistakes have high loss. Clipping prevents log(0) and preserves finite comparisons. The average makes losses comparable across equally defined datasets of different sizes."
+    },
+    {
+      "id": "nearest-vote",
+      "title": "Classify with nearest neighbours",
+      "body": "# Classify with nearest neighbours\n\nNearest-neighbour classification stores examples rather than fitting weights. Distance chooses nearby observations, and a vote chooses their label. Ties need deterministic rules: equal distances follow training order here, and equal vote counts choose the smaller label. Squared distance is sufficient because square root preserves the order of nonnegative distances.\n\n```python\npoint = (2, 3)\nother = (5, 7)\nprint(sum((a-b)**2\n          for a,b in zip(point, other)))\n```\n\n## Think before coding\n\nSorting indices preserves alignment between features and labels. Stable ordering and an explicit vote tie-break make predictions reproducible. Feature scales strongly affect this distance, so preprocessing is part of the model design. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write nearest_label(points, labels, query, k) for numeric vectors of equal dimension and integer labels. Use up to k nearest points (stable training order for distance ties), majority vote, then smaller label for vote ties. Reject k <= 0 or empty training data.",
+      "starter": "def nearest_label(points, labels, query, k):\n    pass\n",
+      "solution": "def nearest_label(points, labels, query, k):\n    if k <= 0 or not points:\n        raise ValueError('training data and positive k required')\n    order = sorted(range(len(points)), key=lambda i: sum((a-b)**2 for a,b in zip(points[i], query)))\n    counts = {}\n    for i in order[:k]:\n        counts[labels[i]] = counts.get(labels[i], 0) + 1\n    return min(counts, key=lambda label: (-counts[label], label))\n",
+      "checks": [
+        {
+          "name": "nearby vote",
+          "code": "assert nearest_label([[0],[1],[9]],[0,0,1],[2],2)==0\n"
+        },
+        {
+          "name": "vote tie smaller label",
+          "code": "assert nearest_label([[0],[2]],[2,1],[1],2)==1\n"
+        },
+        {
+          "name": "distance tie stable",
+          "code": "assert nearest_label([[0],[2]],[2,1],[1],1)==2\n"
+        },
+        {
+          "name": "oversized k",
+          "code": "assert nearest_label([[0]],[3],[1],8)==3\n"
+        },
+        {
+          "name": "invalid k",
+          "code": "try: nearest_label([[0]],[1],[0],0)\nexcept ValueError: pass\nelse: assert False, (\"invalid k\")\n"
+        }
+      ],
+      "hints": [
+        "Sort indices by squared distance, leaving equal distances stable.",
+        "Count labels of the first k indices.",
+        "Minimize the pair (-vote_count, label)."
+      ],
+      "explanation": "Sorting indices preserves alignment between features and labels. Stable ordering and an explicit vote tie-break make predictions reproducible. Feature scales strongly affect this distance, so preprocessing is part of the model design."
+    },
+    {
+      "id": "linear-step",
+      "title": "Differentiate a regression loss by hand",
+      "body": "# Differentiate a regression loss by hand\n\nA linear model predicts w times x plus b. For mean squared error, each example contributes its residual to both gradients, with an additional x factor for the weight. Compute both gradients from the same old parameters before updating either. Mixing old and new parameters changes the optimization step and can hide a derivative bug.\n\n```python\nx, y, w, b = 2, 5, 1, 0\nerror = w*x + b - y\nprint(2 * error * x)\n```\n\n## Think before coding\n\nBoth partial derivatives come from the same loss surface location. Dividing by the sample count keeps the update scale independent of duplicating a batch. The factor of two follows the unhalved squared-error definition. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write regression_step(xs, ys, w, b, rate). Nonempty xs and ys have equal length. Return (new_w, new_b) after one gradient step on mean squared error, using the factor 2/n in both gradients.",
+      "starter": "def regression_step(xs, ys, w, b, rate):\n    pass\n",
+      "solution": "def regression_step(xs, ys, w, b, rate):\n    errors = [w*x + b - y for x,y in zip(xs,ys)]\n    dw = 2 * sum(error*x for error,x in zip(errors,xs)) / len(xs)\n    db = 2 * sum(errors) / len(xs)\n    return w - rate*dw, b - rate*db\n",
+      "checks": [
+        {
+          "name": "one sample",
+          "code": "a,b=regression_step([2],[5],1,0,0.1); assert abs(a-2.2)<1e-10 and abs(b-0.6)<1e-10\n"
+        },
+        {
+          "name": "batch mean",
+          "code": "a,b=regression_step([1,2],[2,4],0,0,0.1); assert abs(a-1)<1e-10 and abs(b-0.6)<1e-10\n"
+        },
+        {
+          "name": "zero rate",
+          "code": "assert regression_step([2],[9],3,4,0)==(3,4)\n"
+        },
+        {
+          "name": "already fitted",
+          "code": "assert regression_step([1,2],[3,5],2,1,0.1)==(2,1)\n"
+        }
+      ],
+      "hints": [
+        "Store all residuals using the original w and b.",
+        "The weight gradient multiplies each residual by its x.",
+        "Subtract rate times each mean gradient."
+      ],
+      "explanation": "Both partial derivatives come from the same loss surface location. Dividing by the sample count keeps the update scale independent of duplicating a batch. The factor of two follows the unhalved squared-error definition."
+    },
+    {
+      "id": "decision-stump",
+      "title": "Choose a split by weighted impurity",
+      "body": "# Choose a split by weighted impurity\n\nA decision stump makes one threshold comparison. A useful threshold separates labels into purer groups, but group sizes matter: a tiny pure group should not dominate a large mixed group. Gini impurity is one minus the sum of squared class proportions. Weight each side by its share of all examples when scoring a candidate split.\n\n```python\ncounts = [3, 1]\nprint(1 - sum((n/4)**2\n              for n in counts))\n```\n\n## Think before coding\n\nWeighted impurity measures the remaining uncertainty for a randomly selected observation. A threshold with a lower score is better for this criterion. This exercise scores a split; a full tree must also choose features, stopping rules and validation. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write split_gini(values, labels, threshold). Split using value < threshold on the left, all others on the right. Return size-weighted Gini impurity for integer labels. An empty side contributes zero; empty input returns 0.0.",
+      "starter": "def split_gini(values, labels, threshold):\n    pass\n",
+      "solution": "def split_gini(values, labels, threshold):\n    if not labels:\n        return 0.0\n    groups = [[], []]\n    for value,label in zip(values, labels):\n        groups[0 if value < threshold else 1].append(label)\n    score = 0.0\n    for group in groups:\n        if not group:\n            continue\n        counts = {}\n        for label in group:\n            counts[label] = counts.get(label,0) + 1\n        impurity = 1 - sum((n/len(group))**2 for n in counts.values())\n        score += len(group)/len(labels) * impurity\n    return score\n",
+      "checks": [
+        {
+          "name": "perfect separation",
+          "code": "assert split_gini([1,2,3,4],[0,0,1,1],2.5)==0.0\n"
+        },
+        {
+          "name": "mixed groups",
+          "code": "assert split_gini([1,2,3,4],[0,1,0,1],2.5)==0.5\n"
+        },
+        {
+          "name": "empty side",
+          "code": "assert split_gini([1,2],[0,1],9)==0.5\n"
+        },
+        {
+          "name": "weighted groups",
+          "code": "assert abs(split_gini([1,2,3,4],[0,0,1,1],1.5)-1/3)<1e-10\n"
+        },
+        {
+          "name": "empty data",
+          "code": "assert split_gini([],[],2)==0.0\n"
+        }
+      ],
+      "hints": [
+        "Partition labels according to the feature threshold.",
+        "Compute each nonempty group's class proportions.",
+        "Multiply impurity by group_size / total_size before summing."
+      ],
+      "explanation": "Weighted impurity measures the remaining uncertainty for a randomly selected observation. A threshold with a lower score is better for this criterion. This exercise scores a split; a full tree must also choose features, stopping rules and validation."
+    },
+    {
+      "id": "fold-indices",
+      "title": "Build disjoint evaluation folds",
+      "body": "# Build disjoint evaluation folds\n\nCross-validation assigns each observation to a held-out fold while using the remaining observations for training. The key correctness rule is separation: no test index may appear in training for the same fold. A deterministic round-robin assignment makes the mechanics visible without relying on a random shuffle. Real datasets may require grouped or time-aware splits instead.\n\n```python\nindices = list(range(6))\nprint(indices[0::3])\nprint(indices[1::3])\n```\n\n## Think before coding\n\nEvery index has exactly one remainder, so it is held out exactly once. Training excludes the matching remainder. Preprocessing and model selection must still be fitted separately within each training fold. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write folds(n, k), with n >= k >= 2. Return k pairs (train_indices, test_indices). Fold f holds out indices i where i % k == f. Lists must be ascending. Raise ValueError for invalid n or k.",
+      "starter": "def folds(n, k):\n    pass\n",
+      "solution": "def folds(n, k):\n    if k < 2 or n < k:\n        raise ValueError('require n >= k >= 2')\n    return [([i for i in range(n) if i % k != f], [i for i in range(n) if i % k == f]) for f in range(k)]\n",
+      "checks": [
+        {
+          "name": "round robin",
+          "code": "assert folds(5,2)==[([1,3],[0,2,4]),([0,2,4],[1,3])]\n"
+        },
+        {
+          "name": "disjoint and complete",
+          "code": "for train,test in folds(8,3):\n    assert not set(train)&set(test)\n    assert sorted(train+test)==list(range(8))\n"
+        },
+        {
+          "name": "test exactly once",
+          "code": "r=folds(8,3); assert sorted(i for _,test in r for i in test)==list(range(8))\n"
+        },
+        {
+          "name": "invalid folds",
+          "code": "for args in [(1,2),(4,1),(0,0)]:\n    try: folds(*args)\n    except ValueError: pass\n    else: assert False, (args)\n"
+        }
+      ],
+      "hints": [
+        "Use the remainder i % k as the fold assignment.",
+        "For each fold select matching and nonmatching indices separately.",
+        "Generate indices in ascending order rather than sorting later."
+      ],
+      "explanation": "Every index has exactly one remainder, so it is held out exactly once. Training excludes the matching remainder. Preprocessing and model selection must still be fitted separately within each training fold."
+    },
+    {
+      "id": "early-stop-rule",
+      "title": "Track improvements with patience",
+      "body": "# Track improvements with patience\n\nValidation loss can stop improving before training loss does. Early stopping watches a held-out metric and tolerates a bounded number of consecutive non-improvements. A minimum improvement avoids resetting patience for tiny numerical changes. The comparison must be against the best accepted value, and the first observation initializes that value rather than consuming patience.\n\n```python\nbest, loss, min_delta = 0.5, 0.49, 0.02\nprint(loss < best - min_delta)\n```\n\n## Think before coding\n\nPatience measures consecutive failures to improve the accepted best. A genuine improvement resets that run. The function returns the stopping decision; checkpointing the best model is a separate responsibility. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+      "task": "Write stop_epoch(losses, patience, min_delta=0.0). patience is positive. Return the zero-based epoch where consecutive non-improvements first reach patience, or None. Improvement means loss < best - min_delta; the first loss initializes best.",
+      "starter": "def stop_epoch(losses, patience, min_delta=0.0):\n    pass\n",
+      "solution": "def stop_epoch(losses, patience, min_delta=0.0):\n    if patience <= 0 or min_delta < 0:\n        raise ValueError('invalid stopping policy')\n    best = None\n    stale = 0\n    for epoch,loss in enumerate(losses):\n        if best is None or loss < best - min_delta:\n            best, stale = loss, 0\n        else:\n            stale += 1\n            if stale >= patience:\n                return epoch\n    return None\n",
+      "checks": [
+        {
+          "name": "flat loss stops",
+          "code": "assert stop_epoch([1,0.8,0.8,0.9],2)==3\n"
+        },
+        {
+          "name": "new best resets",
+          "code": "assert stop_epoch([1,1,0.8,0.8,0.7],2) is None\n"
+        },
+        {
+          "name": "minimum change",
+          "code": "assert stop_epoch([1,0.99,0.98],2,0.05)==2\n"
+        },
+        {
+          "name": "empty and one",
+          "code": "assert stop_epoch([],2) is None and stop_epoch([4],1) is None\n"
+        },
+        {
+          "name": "invalid policy",
+          "code": "try: stop_epoch([1],0)\nexcept ValueError: pass\nelse: assert False, (\"zero patience\")\n"
+        }
+      ],
+      "hints": [
+        "Keep best unset until the first observation.",
+        "Reset the stale count only on a sufficient improvement.",
+        "Stop after incrementing stale to patience."
+      ],
+      "explanation": "Patience measures consecutive failures to improve the accepted best. A genuine improvement resets that run. The function returns the stopping decision; checkpointing the best model is a separate responsibility."
+    }
+  ]
+}

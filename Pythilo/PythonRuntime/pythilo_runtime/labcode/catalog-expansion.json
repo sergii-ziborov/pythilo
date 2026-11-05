@@ -1,0 +1,182 @@
+[
+  {
+    "id": "prefix",
+    "title": "Prefix Sums",
+    "summary": "Build cumulative totals, then answer ranges with two lookups",
+    "symbol": "sum",
+    "tint": "blue",
+    "section": "Basics",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "range_sums(values, queries) returns sums for half-open ranges [left, right). Build a prefix table once, then watch each query cancel the part before left.",
+        "file": "prefix.py",
+        "scales": false
+      }
+    ],
+    "idea": "prefix[i] is the total before i. The extra zero handles ranges beginning at zero and empty ranges. Trace the table being built, then compare the two boundaries for each query."
+  },
+  {
+    "id": "monostack",
+    "title": "Monotonic Stack",
+    "summary": "Resolve waiting days as a warmer temperature arrives",
+    "symbol": "square.stack.3d.up",
+    "tint": "coral",
+    "section": "Data structures",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "warmer_days(temperatures) gives the number of days until a strictly warmer day, or zero. Use pending indices to avoid restarting a search for every day.",
+        "file": "monostack.py",
+        "scales": false
+      }
+    ],
+    "idea": "The pending stack stores indices whose warmer day has not arrived. Each index enters and leaves once. Equal temperatures stay pending because the question asks for a strictly warmer day."
+  },
+  {
+    "id": "topological",
+    "title": "Topological Sort",
+    "summary": "Release tasks as their final prerequisite is removed",
+    "symbol": "arrow.triangle.branch",
+    "tint": "mint",
+    "section": "Algorithms",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "task_order(graph) returns any valid prerequisite-first order, or None for a cycle. graph maps every node to outgoing neighbours; every neighbour is a key.",
+        "file": "topological.py",
+        "scales": false
+      }
+    ],
+    "idea": "Indegree counts prerequisites that remain. Removing a ready task reduces the counts of its dependants. If no task is ready but some remain, a cycle blocks the schedule."
+  },
+  {
+    "id": "knapsack",
+    "title": "0/1 Knapsack",
+    "summary": "Fill a capacity table without taking an item twice",
+    "symbol": "bag",
+    "tint": "amber",
+    "section": "Algorithms",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "pack(items, capacity) returns the maximum value of items that fit. Each (weight, value) item may be taken once; weights are positive and values nonnegative.",
+        "file": "knapsack.py",
+        "scales": false
+      }
+    ],
+    "idea": "The table records the best value at each capacity. Iterate capacity downward so each transition reads a state that has not used the current item. Trace upward updates to see why they would solve an unbounded problem instead."
+  },
+  {
+    "id": "bellmanford",
+    "title": "Bellman–Ford",
+    "summary": "Relax weighted edges and detect reachable negative cycles",
+    "symbol": "point.3.connected.trianglepath.dotted",
+    "tint": "violet",
+    "section": "Algorithms",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "shortest(n, edges, start) returns distances for nodes 0..n-1, using float(\"inf\") for unreachable nodes. Each edge is (from, to, weight). Return None if a negative cycle is reachable from start.",
+        "file": "bellmanford.py",
+        "scales": false
+      }
+    ],
+    "idea": "One full pass can extend a shortest route by another edge. A simple path has at most n-1 edges. Any reachable edge that can still improve a distance after those passes proves a reachable negative cycle; an unreachable cycle must not invalidate the result."
+  },
+  {
+    "id": "editrows",
+    "title": "Edit Distance Rows",
+    "summary": "Compare prefixes with insertion, deletion and substitution",
+    "symbol": "text.cursor",
+    "tint": "blue",
+    "section": "Algorithms",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "distance(a, b) returns the fewest single-character insertions, deletions and substitutions turning a into b. Keep only the previous row and the current row.",
+        "file": "editrows.py",
+        "scales": false
+      }
+    ],
+    "idea": "Each cell compares two prefixes. Above means delete, left means insert, and the diagonal means match or substitute. Two rows are enough because older rows are never read again."
+  },
+  {
+    "id": "linearfit",
+    "title": "Linear Regression",
+    "summary": "Move a fitted line by following the mean squared-error gradient",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "fit(xs, ys, steps, rate) begins at w=b=0 and returns (w, b) after steps of gradient descent on mean squared error. Compute both gradients from the old parameters; include the factor 2/n.",
+        "file": "linearfit.py",
+        "scales": false
+      }
+    ],
+    "idea": "The gradient tells which parameter direction increases loss. Subtracting it moves downhill. Watch the fitted line and loss curve; a large learning rate can overshoot even when the derivatives are correct."
+  },
+  {
+    "id": "logistic",
+    "title": "Logistic Regression",
+    "summary": "Turn a score into a probability and learn a binary boundary",
+    "symbol": "function",
+    "tint": "mint",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "fit(xs, ys, steps, rate) starts w=b=0 and returns (w, b). Use sigmoid(w*x+b) and gradients mean((p-y)*x), mean(p-y) for binary cross-entropy. Inputs in this lab have moderate scores.",
+        "file": "logistic.py",
+        "scales": false
+      }
+    ],
+    "idea": "The sigmoid maps a real score into (0,1). For binary cross-entropy its derivative with respect to the score is p-y. The trace shows the parameters and mean squared probability residual as a diagnostic, not as the optimized loss."
+  },
+  {
+    "id": "neighbors",
+    "title": "Nearest Neighbours",
+    "summary": "Rank points by distance, then vote with explicit tie rules",
+    "symbol": "circle.grid.3x3",
+    "tint": "blue",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "nearest_label(points, labels, query, k) classifies numeric vectors. Equal distances preserve training order; a tied vote chooses the smaller integer label. k is positive and training data is nonempty.",
+        "file": "neighbors.py",
+        "scales": false
+      }
+    ],
+    "idea": "Squared distance has the same ordering as Euclidean distance. The trace keeps distances, selected indices and votes visible. Feature scales change which points are neighbours; stable tie rules make the outcome reproducible."
+  },
+  {
+    "id": "stump",
+    "title": "Decision Stumps",
+    "summary": "Try thresholds and choose the lowest weighted Gini impurity",
+    "symbol": "arrow.branch",
+    "tint": "amber",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "best_split(values, labels) returns the midpoint between consecutive distinct sorted values with the lowest weighted Gini impurity. Equal scores choose the smaller threshold. Return None when fewer than two distinct values exist.",
+        "file": "stump.py",
+        "scales": false
+      }
+    ],
+    "idea": "A split is useful when it leaves purer groups. Weight each group by its size, then compare candidate midpoints. Scanning thresholds in ascending order and accepting only a lower score gives a deterministic smallest-threshold tie break."
+  }
+]

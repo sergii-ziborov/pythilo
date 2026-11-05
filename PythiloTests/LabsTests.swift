@@ -45,7 +45,9 @@ final class LabsTests: XCTestCase {
     }
 
     func testTheCatalogHasSectionsAndManyLabs() {
-        XCTAssertGreaterThanOrEqual(LabCatalog.all.count, 20)
+        XCTAssertEqual(LabCatalog.all.count, 32)
+        XCTAssertNotNil(LabCatalog.lab("bellmanford"))
+        XCTAssertNotNil(LabCatalog.lab("logistic"))
         for section in LabInfo.Section.allCases {
             XCTAssertGreaterThanOrEqual(LabCatalog.all.filter { $0.section == section }.count, 4, section.rawValue)
         }

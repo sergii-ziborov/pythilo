@@ -117,3 +117,11 @@ Hostwatch deployment `pythilo-site-cache-guard-deploy-20261105-v4`. All public s
 checks passed; the browser displayed the new home on desktop and mobile, with no
 horizontal overflow at 390 px. Local checks passed: 75 site tests, 59 SDK tests,
 TypeScript and production build. The public SDK archive also passed `pythilo doctor`.
+
+The learning expansion was deployed at 19:22 UTC on 5 November 2026 as image
+`sha256:57727030bc4db2d93be2290eb4f01617815a3a0c4efb86fa96fbe6572c654803`,
+receipt `pythilo-learning-expansion-deploy-20261105-v2`. It adds 32 lessons and ten
+browser labs; 76 site tests, the production build and the expanded public smoke
+checks passed. Lab pages use the same cross-origin isolation as lessons/playground.
+The source overlay includes prepared `content/courses.json` and `content/labs.json`;
+prepare these locally from the shared iOS source before uploading through Hostwatch.
