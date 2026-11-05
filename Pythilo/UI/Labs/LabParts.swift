@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 
 /// The editor every lab puts its code in.
@@ -114,5 +115,78 @@ struct LabErrors: View {
         ForEach(session.output.filter { $0.kind == .stderr }) { chunk in
             Text(chunk.text).font(.system(size: 12.5, design: .monospaced)).foregroundStyle(AppTheme.coralInk)
         }
+    }
+}
+
+/// What "How it scales" ran, a chart of time against input size, and a one-line reading of it.
+struct LabScaleCard: View {
+    let result: LabScaleResult
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("HOW IT SCALES").sectionLabel()
+            if !result.what.isEmpty {
+                Text(whatRan).font(.system(size: 13.5)).foregroundStyle(AppTheme.secondary)
+            }
+            if result.series.contains(where: { !$0.points.isEmpty }) {
+                Chart {
+                    ForEach(result.series) { series in
+                        ForEach(Array(series.points.enumerated()), id: \.offset) { _, point in
+                            if point.count == 2 {
+                                LineMark(x: .value(result.x, point[0]), y: .value("ms", point[1]))
+                                    .foregroundStyle(by: .value("code", series.name))
+                                PointMark(x: .value(result.x, point[0]), y: .value("ms", point[1]))
+                                    .foregroundStyle(by: .value("code", series.name))
+                                    .symbolSize(22)
+                            }
+                        }
+                    }
+                }
+                .chartForegroundStyleScale(range: [AppTheme.coral, AppTheme.blue, AppTheme.violet, AppTheme.mint, AppTheme.amber])
+                .chartXAxisLabel(result.x)
+                .chartYAxisLabel("ms")
+                .chartLegend(result.series.count > 1 ? .visible : .hidden)
+                .frame(height: 190)
+                .accessibilityLabel(result.takeaway.isEmpty ? "Time against input size" : result.takeaway)
+            }
+            if !result.takeaway.isEmpty {
+                Text(result.takeaway)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(AppTheme.primary)
+                    .accessibilityIdentifier("lab-takeaway")
+            }
+            if !result.footnote.isEmpty {
+                Text(result.footnote).font(.system(size: 13)).foregroundStyle(AppTheme.secondary)
+            }
+            if !result.stopped.isEmpty {
+                Text(result.stopped).font(.system(size: 13, weight: .semibold)).foregroundStyle(AppTheme.amber)
+            }
+            ForEach(result.series.filter { !$0.ok && !$0.message.isEmpty }) { series in
+                Text("\(series.name): \(series.message)").font(.system(size: 13)).foregroundStyle(AppTheme.coralInk)
+            }
+            Text("Timed on this device without the tracer. The shape suggests a growth rate; it does not prove Big O.")
+                .font(.system(size: 12.5))
+                .foregroundStyle(AppTheme.muted)
+        }
+        .padding(12)
+        .panelCard()
+    }
+
+    private var whatRan: String {
+        let sizes = result.series.flatMap { $0.points.compactMap(\.first) }
+        guard let low = sizes.min(), let high = sizes.max() else { return result.what }
+        let format: (Double) -> String = { $0.formatted(.number.grouping(.automatic).precision(.fractionLength(0))) }
+        let runs = result.runs > 3 ? "at least 3 times (up to \(result.runs) for fast sizes)" : "3 times"
+        return "\(result.what) n goes from \(format(low)) to \(format(high)). Each size runs \(runs), and the chart shows the fastest run in milliseconds."
+    }
+}
+
+/// The second button of every lab: runs the code on growing inputs, without the tracer.
+struct LabScaleButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        LabActionButton(title: "How it scales", action: action)
+            .accessibilityIdentifier("lab-scale")
     }
 }

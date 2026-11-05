@@ -37,20 +37,6 @@ struct DPLabTrace: Decodable, Sendable {
     let writes: [DPLabWrite]
 }
 
-struct DPLabMeasureRow: Decodable, Sendable, Identifiable {
-    let size: Int
-    let milliseconds: Double
-    let calls: Int
-    let correct: Bool
-    var id: Int { size }
-}
-
-struct DPLabMeasure: Decodable, Sendable {
-    let problem: String
-    let rows: [DPLabMeasureRow]
-    let stopped: String
-}
-
 struct DPLabView: View {
     enum Problem: String, CaseIterable { case stairs, coins, edit }
 
@@ -60,7 +46,7 @@ struct DPLabView: View {
     @AppStorage("pythilo.lab.dp.edit") private var editSource = Self.templates[.edit]!
     @State private var trace: DPLabTrace?
     @State private var write = 0.0
-    @State private var measure: DPLabMeasure?
+    @State private var measure: LabScaleResult?
     @State private var bridge = EditorKeyboardBridge()
     private let session = RunSession.shared
 
@@ -74,11 +60,11 @@ struct DPLabView: View {
                 LabCodeBox(source: source, filePath: "dp.py", height: 200, bridge: bridge)
                 HStack(spacing: 8) {
                     LabActionButton(title: "Trace", primary: true, action: runTrace).accessibilityIdentifier("dp-trace")
-                    LabActionButton(title: "Measure", action: runMeasure)
+                    LabScaleButton(action: runMeasure)
                     if session.isBusy { LabActionButton(title: "Stop", action: session.stop) }
                 }
                 if let trace, trace.problem == problem.rawValue { traceView(trace) }
-                if let measure, measure.problem == problem.rawValue { measureView(measure) }
+                if let measure, measure.variant == problem.rawValue { LabScaleCard(result: measure) }
                 LabErrors()
             }
             .padding(16)
@@ -93,7 +79,7 @@ struct DPLabView: View {
                 if kind == "lab_dp_trace", let value = try? JSONDecoder().decode(DPLabTrace.self, from: data) {
                     trace = value
                     write = Double(max(0, value.writes.count - 1))
-                } else if kind == "lab_dp_measure", let value = try? JSONDecoder().decode(DPLabMeasure.self, from: data) {
+                } else if kind == "lab_scale", let value = try? JSONDecoder().decode(LabScaleResult.self, from: data) {
                     measure = value
                 }
             }
@@ -102,7 +88,7 @@ struct DPLabView: View {
         .task {
             if UserDefaults.standard.bool(forKey: "labRun") {
                 try? await Task.sleep(for: .seconds(1.5))
-                runTrace()
+                if UserDefaults.standard.bool(forKey: "labScale") { runMeasure() } else { runTrace() }
             }
         }
         #endif
@@ -125,7 +111,7 @@ struct DPLabView: View {
     private func runMeasure() {
         bridge.dismissKeyboard()
         session.clearOutput()
-        session.submit(["kind": "lab_dp_measure", "problem": problem.rawValue, "source": source.wrappedValue], label: "measure")
+        session.submit(["kind": "lab_dp_measure", "problem": problem.rawValue, "source": source.wrappedValue], label: "scale")
     }
 
     private func traceView(_ trace: DPLabTrace) -> some View {
@@ -198,32 +184,6 @@ struct DPLabView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .panelCard(cornerRadius: 12)
-    }
-
-    private func measureView(_ measure: DPLabMeasure) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("GROWING THE INPUT ON THIS DEVICE").sectionLabel()
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 5) {
-                GridRow {
-                    ForEach([problem == .edit ? "length" : "n", "ms", "calls"], id: \.self) {
-                        Text($0).font(.system(size: 11.5, weight: .semibold)).foregroundStyle(AppTheme.muted)
-                    }
-                }
-                ForEach(measure.rows) { row in
-                    GridRow {
-                        Text("\(row.size)")
-                        Text(row.correct ? String(format: "%.2f", row.milliseconds) : "wrong").foregroundStyle(row.correct ? AppTheme.primary : AppTheme.coralInk)
-                        Text("\(row.calls)")
-                    }
-                    .font(.system(size: 12.5, design: .monospaced))
-                }
-            }
-            if !measure.stopped.isEmpty {
-                Text(measure.stopped).font(.system(size: 13, weight: .semibold)).foregroundStyle(AppTheme.amber)
-            }
-        }
-        .padding(12)
-        .panelCard()
     }
 
     static let prompts: [Problem: String] = [

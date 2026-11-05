@@ -24,22 +24,6 @@ struct GraphLabTrace: Decodable, Sendable {
     let truncated: Bool
 }
 
-struct GraphLabMeasureRow: Decodable, Sendable, Identifiable {
-    let size: Int
-    let edges: Int
-    let median: Double
-    let expansions: Int
-    let examined: Int
-    let correct: Bool
-    let message: String
-    var id: Int { size }
-}
-
-struct GraphLabMeasure: Decodable, Sendable {
-    let topology: String
-    let rows: [GraphLabMeasureRow]
-}
-
 struct GraphLabView: View {
     enum Algorithm: String, CaseIterable { case bfs, dfs, dijkstra }
 
@@ -50,7 +34,7 @@ struct GraphLabView: View {
     @AppStorage("pythilo.lab.graph.dijkstra") private var dijkstraSource = Self.templates[.dijkstra]!
     @State private var trace: GraphLabTrace?
     @State private var step = 0.0
-    @State private var measure: GraphLabMeasure?
+    @State private var measure: LabScaleResult?
     @State private var bridge = EditorKeyboardBridge()
     private let session = RunSession.shared
 
@@ -64,11 +48,11 @@ struct GraphLabView: View {
                 }
                 HStack(spacing: 8) {
                     LabActionButton(title: "Trace", primary: true, action: runTrace).accessibilityIdentifier("graph-trace")
-                    LabActionButton(title: "Measure", action: runMeasure)
+                    LabScaleButton(action: runMeasure)
                     if session.isBusy { LabActionButton(title: "Stop", action: session.stop) }
                 }
                 if let trace, trace.algorithm == algorithm.rawValue { traceView(trace) }
-                if let measure { measureView(measure) }
+                if let measure, measure.variant == algorithm.rawValue { LabScaleCard(result: measure) }
                 Text("The search reads the graph only through graph.neighbors(node), and each call is one step here. In Dijkstra it gives (node, weight) pairs.")
                     .font(.system(size: 13))
                     .foregroundStyle(AppTheme.secondary)
@@ -87,7 +71,7 @@ struct GraphLabView: View {
                 if kind == "lab_graph_trace", let value = try? JSONDecoder().decode(GraphLabTrace.self, from: data) {
                     trace = value
                     step = 0
-                } else if kind == "lab_graph_measure", let value = try? JSONDecoder().decode(GraphLabMeasure.self, from: data) {
+                } else if kind == "lab_scale", let value = try? JSONDecoder().decode(LabScaleResult.self, from: data) {
                     measure = value
                 }
             }
@@ -96,7 +80,7 @@ struct GraphLabView: View {
         .task {
             if UserDefaults.standard.bool(forKey: "labRun") {
                 try? await Task.sleep(for: .seconds(1.5))
-                runTrace()
+                if UserDefaults.standard.bool(forKey: "labScale") { runMeasure() } else { runTrace() }
             }
         }
         #endif
@@ -120,9 +104,7 @@ struct GraphLabView: View {
     private func runMeasure() {
         bridge.dismissKeyboard()
         session.clearOutput()
-        let topology = topology == "dense" ? "dense" : self.topology
-        let sizes = topology == "dense" ? [50, 100, 200] : [200, 800, 3200]
-        session.submit(["kind": "lab_graph_measure", "algorithm": algorithm.rawValue, "source": source.wrappedValue, "topology": topology, "sizes": sizes], label: "measure")
+        session.submit(["kind": "lab_graph_measure", "algorithm": algorithm.rawValue, "source": source.wrappedValue, "topology": topology], label: "scale")
     }
 
     private func traceView(_ trace: GraphLabTrace) -> some View {
@@ -161,37 +143,6 @@ struct GraphLabView: View {
         }
         .font(.system(size: 12))
         .foregroundStyle(AppTheme.muted)
-    }
-
-    private func measureView(_ measure: GraphLabMeasure) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("MEASURED ON THIS DEVICE, \(measure.topology.uppercased()), MEDIAN OF 3").sectionLabel()
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
-                GridRow {
-                    ForEach(["nodes", "edges", "ms", "neighbors()", "edges read"], id: \.self) {
-                        Text($0).font(.system(size: 11.5, weight: .semibold)).foregroundStyle(AppTheme.muted)
-                    }
-                }
-                ForEach(measure.rows) { row in
-                    GridRow {
-                        Text("\(row.size)")
-                        Text("\(row.edges)")
-                        Text(row.correct ? String(format: "%.2f", row.median) : "wrong").foregroundStyle(row.correct ? AppTheme.primary : AppTheme.coralInk)
-                        Text("\(row.expansions)")
-                        Text("\(row.examined)")
-                    }
-                    .font(.system(size: 12.5, design: .monospaced))
-                }
-            }
-            if let wrong = measure.rows.first(where: { !$0.correct }) {
-                Text(wrong.message).font(.system(size: 13)).foregroundStyle(AppTheme.coralInk)
-            }
-            Text("Operation counts and time are separate: counts come from the run, milliseconds from this device's clock.")
-                .font(.system(size: 12.5))
-                .foregroundStyle(AppTheme.muted)
-        }
-        .padding(12)
-        .panelCard()
     }
 
     static let templates: [Algorithm: String] = [

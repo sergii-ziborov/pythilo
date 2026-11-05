@@ -19,6 +19,7 @@ struct HashLabView: View {
     @AppStorage("pythilo.lab.hash") private var source = Self.template
     @AppStorage("pythilo.lab.hash.workload") private var workload = "words"
     @State private var result: HashLabResult?
+    @State private var scale: LabScaleResult?
     @State private var bridge = EditorKeyboardBridge()
     private let session = RunSession.shared
 
@@ -34,9 +35,11 @@ struct HashLabView: View {
                 }
                 HStack(spacing: 8) {
                     LabActionButton(title: "Run 400 keys", primary: true, action: run).accessibilityIdentifier("hash-run")
+                    LabScaleButton(action: runScale)
                     if session.isBusy { LabActionButton(title: "Stop", action: session.stop) }
                 }
                 if let result, result.workload == workload { resultView(result) }
+                if let scale, scale.variant == workload { LabScaleCard(result: scale) }
                 Text("Comparisons are counted by the keys themselves, so the count is right whatever your table does inside.")
                     .font(.system(size: 13))
                     .foregroundStyle(AppTheme.secondary)
@@ -53,6 +56,8 @@ struct HashLabView: View {
             session.onCustom = { kind, data in
                 if kind == "lab_hash", let value = try? JSONDecoder().decode(HashLabResult.self, from: data) {
                     result = value
+                } else if kind == "lab_scale", let value = try? JSONDecoder().decode(LabScaleResult.self, from: data) {
+                    scale = value
                 }
             }
         }
@@ -60,10 +65,16 @@ struct HashLabView: View {
         .task {
             if UserDefaults.standard.bool(forKey: "labRun") {
                 try? await Task.sleep(for: .seconds(1.5))
-                run()
+                if UserDefaults.standard.bool(forKey: "labScale") { runScale() } else { run() }
             }
         }
         #endif
+    }
+
+    private func runScale() {
+        bridge.dismissKeyboard()
+        session.clearOutput()
+        session.submit(["kind": "lab_hash_scale", "source": source, "workload": workload], label: "scale")
     }
 
     private func run() {
@@ -107,7 +118,7 @@ struct HashLabView: View {
             stat(String(format: "%.1f", result.averageProbes), "key comparisons per get", alarming: result.averageProbes > 8)
             stat("\(result.longest)", "longest bucket")
             stat("\(result.empty)", "empty buckets")
-            stat(String(format: "%.1f ms", result.tableMs), String(format: "yours · dict %.2f ms", result.dictMs))
+            stat(String(format: "%.1f ms", result.tableMs), String(format: "400 puts and gets · dict %.2f ms", result.dictMs))
         }
         LabVerdict(correct: result.correct, success: "Every get returned what was put, and a missing key raised KeyError", message: result.message)
     }

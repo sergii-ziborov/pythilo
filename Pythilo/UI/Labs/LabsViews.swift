@@ -13,24 +13,6 @@ struct LabTrace: Decodable, Sendable {
     let truncated: Bool
 }
 
-struct LabCell: Decodable, Sendable {
-    let median: Double
-    let spread: Double
-    let correct: Bool
-}
-
-struct LabRow: Decodable, Sendable, Identifiable {
-    let name: String
-    let cells: [String: LabCell]
-    var id: String { name }
-}
-
-struct LabMeasure: Decodable, Sendable {
-    let id: String
-    let size: Int
-    let rows: [LabRow]
-}
-
 struct LabsView: View {
     @State private var path: [String] = []
 
@@ -38,35 +20,46 @@ struct LabsView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Your own code, traced while it runs and measured on this device. Correctness first, then time.")
+                    Text("Write the code yourself. Trace runs it line by line and draws every step; How it scales then times it on growing inputs.")
                         .font(.system(size: 15))
                         .foregroundStyle(AppTheme.secondary)
                         .padding(.bottom, 4)
-                    lab("Sorting Bench", "Trace your sort read by read, then time it on four inputs", "chart.bar.fill", AppTheme.run, id: "sorting")
-                    lab("Graph Explorer", "Watch your BFS, DFS or Dijkstra expand a grid, tree or random graph", "point.3.connected.trianglepath.dotted", AppTheme.blue, id: "graph")
-                    lab("Search & Hashing", "Build a hash table and see buckets fill and keys collide", "square.stack.3d.up.fill", AppTheme.mint, id: "hash")
-                    lab("Dynamic Programming", "Count repeated calls, add a cache, fill the table cell by cell", "tablecells", AppTheme.violet, id: "dp")
+                    ForEach(LabInfo.Section.allCases, id: \.self) { section in
+                        let labs = LabCatalog.all.filter { $0.section == section }
+                        Text("\(section.rawValue.uppercased()) · \(labs.count)")
+                            .sectionLabel()
+                            .padding(.top, 10)
+                            .padding(.horizontal, 4)
+                            .accessibilityAddTraits(.isHeader)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 10)], spacing: 10) {
+                            ForEach(labs) { lab($0) }
+                        }
+                    }
                     Text("Timings come from this device. They suggest a growth rate; they do not prove Big O.")
                         .font(.system(size: 13))
                         .foregroundStyle(AppTheme.muted)
                         .padding(.horizontal, 4)
+                        .padding(.top, 6)
                 }
                 .padding(.horizontal, 16)
-                .frame(maxWidth: 760)
+                .padding(.bottom, 24)
+                .frame(maxWidth: 980)
                 .frame(maxWidth: .infinity)
             }
             .background(AppTheme.background)
             .navigationTitle("Labs")
-            .navigationDestination(for: String.self) { lab in
-                switch lab {
+            .navigationDestination(for: String.self) { id in
+                switch id {
                 case "graph": GraphLabView()
                 case "hash": HashLabView()
                 case "dp": DPLabView()
-                default: SortingBenchView()
+                case "sorting": SortingBenchView()
+                default:
+                    if let lab = LabCatalog.lab(id), !lab.isClassic { TraceLabView(lab: lab) } else { SortingBenchView() }
                 }
             }
             #if DEBUG
-            // For screenshots: -openLab graph|hash|dp|sorting, -labRun YES.
+            // For screenshots: -openLab <id> [-labVariant <id>] [-labRun YES] [-labAnswer YES] [-labStep 0.6] [-labScale YES].
             .onAppear {
                 if path.isEmpty, let lab = UserDefaults.standard.string(forKey: "openLab") { path = [lab] }
             }
@@ -74,23 +67,24 @@ struct LabsView: View {
         }
     }
 
-    private func lab(_ title: String, _ summary: String, _ symbol: String, _ tint: Color, id: String) -> some View {
-        NavigationLink(value: id) {
+    private func lab(_ info: LabInfo) -> some View {
+        NavigationLink(value: info.id) {
             HStack(spacing: 12) {
-                Image(systemName: symbol).font(.system(size: 19)).foregroundStyle(tint).frame(width: 44, height: 44)
-                    .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
+                Image(systemName: info.symbol).font(.system(size: 19)).foregroundStyle(info.color).frame(width: 44, height: 44)
+                    .background(info.color.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: 16.5, weight: .bold))
-                    Text(summary).font(.system(size: 13.5)).foregroundStyle(AppTheme.muted)
+                    Text(info.title).font(.system(size: 16.5, weight: .bold)).foregroundStyle(AppTheme.primary)
+                    Text(info.summary).font(.system(size: 13.5)).foregroundStyle(AppTheme.muted).multilineTextAlignment(.leading)
                 }
-                Spacer()
+                Spacer(minLength: 0)
                 Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(AppTheme.muted)
             }
             .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
             .panelCard(cornerRadius: 16)
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("lab-\(id)")
+        .accessibilityIdentifier("lab-\(info.id)")
     }
 }
 
@@ -109,7 +103,7 @@ struct SortingBenchView: View {
     @State private var cursor = 0
     @State private var trace: LabTrace?
     @State private var step = 0.0
-    @State private var measure: LabMeasure?
+    @State private var scale: LabScaleResult?
     @State private var traceIsStale = false
     @State private var bridge = EditorKeyboardBridge()
     private let session = RunSession.shared
@@ -136,16 +130,16 @@ struct SortingBenchView: View {
 
                 HStack(spacing: 8) {
                     labButton("Trace", primary: true, action: runTrace).accessibilityIdentifier("lab-trace")
-                    labButton("Measure", action: runMeasure).accessibilityIdentifier("lab-measure")
+                    LabScaleButton(action: runMeasure)
                     if session.isBusy {
                         labButton("Stop", action: session.stop)
                     }
                 }
 
                 if let trace { traceView(trace) }
-                if let measure { measureView(measure) }
+                if let scale { LabScaleCard(result: scale) }
 
-                Text("Times are measured without the tracer. A chart from one device suggests a growth rate. It does not prove Big O.")
+                Text("Trace records every read and write your sort makes to the list. How it scales times it on longer and longer lists.")
                     .font(.system(size: 13))
                     .foregroundStyle(AppTheme.secondary)
 
@@ -158,6 +152,14 @@ struct SortingBenchView: View {
             .frame(maxWidth: .infinity)
         }
         .background(AppTheme.background)
+        #if DEBUG
+        .task {
+            if UserDefaults.standard.bool(forKey: "labRun") {
+                try? await Task.sleep(for: .seconds(1.5))
+                if UserDefaults.standard.bool(forKey: "labScale") { runMeasure() } else { runTrace() }
+            }
+        }
+        #endif
         .navigationTitle("Sorting Bench")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: source) { traceIsStale = trace != nil }
@@ -167,8 +169,8 @@ struct SortingBenchView: View {
                     trace = value
                     step = 0
                     traceIsStale = false
-                } else if kind == "lab_measure", let value = try? JSONDecoder().decode(LabMeasure.self, from: data) {
-                    measure = value
+                } else if kind == "lab_scale", let value = try? JSONDecoder().decode(LabScaleResult.self, from: data) {
+                    scale = value
                 }
             }
         }
@@ -193,7 +195,7 @@ struct SortingBenchView: View {
     private func runMeasure() {
         bridge.dismissKeyboard()
         session.clearOutput()
-        session.submit(["kind": "lab_measure", "source": source, "size": 2000, "runs": 5], label: "measure")
+        session.submit(["kind": "lab_measure", "source": source], label: "scale")
     }
 
     private func traceView(_ trace: LabTrace) -> some View {
@@ -229,32 +231,6 @@ struct SortingBenchView: View {
             }
             if trace.truncated {
                 Text("Stopped recording at \(trace.steps.count) steps.").font(.system(size: 13)).foregroundStyle(AppTheme.muted)
-            }
-        }
-        .padding(12)
-        .panelCard()
-    }
-
-    private func measureView(_ measure: LabMeasure) -> some View {
-        let kinds = ["random", "sorted", "reversed", "duplicates"]
-        return VStack(alignment: .leading, spacing: 6) {
-            Text("MEASURED ON THIS DEVICE, \(measure.size) ITEMS, 5 RUNS, MEDIAN MS").sectionLabel()
-            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
-                GridRow {
-                    Text("")
-                    ForEach(kinds, id: \.self) { Text($0).font(.system(size: 11.5, weight: .semibold)).foregroundStyle(AppTheme.muted) }
-                }
-                ForEach(measure.rows) { row in
-                    GridRow {
-                        Text(row.name).font(.system(size: 12.5, weight: .semibold, design: .monospaced))
-                        ForEach(kinds, id: \.self) { kind in
-                            let cell = row.cells[kind]
-                            Text(cell.map { $0.correct ? String(format: "%.2f", $0.median) : "wrong" } ?? "")
-                                .font(.system(size: 12.5, design: .monospaced))
-                                .foregroundStyle(cell?.correct == false ? AppTheme.coralInk : AppTheme.primary)
-                        }
-                    }
-                }
             }
         }
         .padding(12)

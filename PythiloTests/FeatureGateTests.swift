@@ -239,15 +239,17 @@ final class FeatureGateTests: XCTestCase {
         XCTAssertEqual(trace?.correct, false, "a wrong sort must not look like a sorted one")
     }
 
-    func testSortingBenchMeasures() async throws {
-        var measure: LabMeasure?
+    func testSortingBenchShowsHowItScales() async throws {
+        var scale: LabScaleResult?
         session.onCustom = { kind, data in
-            if kind == "lab_measure" { measure = try? JSONDecoder().decode(LabMeasure.self, from: data) }
+            if kind == "lab_scale" { scale = try? JSONDecoder().decode(LabScaleResult.self, from: data) }
         }
-        session.submit(["kind": "lab_measure", "source": insertion, "size": 300, "runs": 2], label: "m")
-        try await waitUntil(timeout: 60) { measure != nil && self.session.phase == .idle }
-        XCTAssertEqual(measure?.rows.map(\.name), ["your sort", "sorted()"])
-        XCTAssertEqual(measure?.rows.first?.cells["random"]?.correct, true)
+        session.submit(["kind": "lab_measure", "source": insertion, "sizes": [100, 200, 400, 800]], label: "m")
+        try await waitUntil(timeout: 90) { scale != nil && self.session.phase == .idle }
+        XCTAssertEqual(scale?.series.map(\.name), ["your sort, random", "your sort, sorted", "your sort, reversed", "sorted(), random"])
+        XCTAssertEqual(scale?.series.first?.ok, true)
+        XCTAssertFalse(scale?.what.isEmpty ?? true, "it says what it ran")
+        XCTAssertFalse(scale?.takeaway.isEmpty ?? true, "it says what the times suggest")
     }
 
     func testGraphExplorerTracesEachAlgorithmAndJudgesIt() async throws {

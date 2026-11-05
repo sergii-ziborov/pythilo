@@ -89,7 +89,7 @@ def stack(items, title=None, roles=None, horizontal=False, ends=None, caption=No
 
 
 def chain(nodes, pointers, title=None, caption=None):
-    return {"type": "chain", "title": title, "caption": caption, "nodes": nodes,
+    return {"type": "chain", "title": title, "caption": caption, "links": nodes,
             "pointers": [{"name": name, "node": node} for name, node in pointers]}
 
 
