@@ -44,8 +44,8 @@ dependencies) from the Pyodide CDN once, checking each against the SHA-256 in
 The smoke test creates a room, streams it, posts an update and presence, ends the room,
 and loads `/`, `/learn/`, a lesson, `/playground/` and the Pyodide files.
 
-Optional: set `NEXT_PUBLIC_APP_STORE_URL` at build time to point "Get the iPhone
-app" at the App Store page. Without it, the button opens the app section of the home page.
+Optional: set `NEXT_PUBLIC_APP_STORE_URL` at build time to point "Get the
+app" at the App Store page. Without it, the button opens the beta section of the pricing page.
 
 ## Clients
 
