@@ -241,3 +241,11 @@ sources byte for byte. App Store draft and TestFlight metadata say 256 lessons,
 were refreshed, using the actual new native catalog; all eight Apple screenshot
 assets are COMPLETE. The version remains PREPARE_FOR_SUBMISSION with MANUAL
 release. No App Review or Beta App Review submission was made.
+
+The expanded website is live as of 5 November 2026, 22:03:09 UTC (6 November
+locally), through Hostwatch receipt `pythilo-intelligence-100-deploy-20261105-v2`.
+Serving image: `sha256:846c5b24418bf743615979992e849cf6de6d85bac48703a6ea0b2b13c929a749`.
+Public smoke checks passed, and browser verification showed the 100-task catalog,
+eight articles and a causal attention replay with the correct final matrix and
+all checks passing. App build 18 is being uploaded separately through TestFlight;
+review submission remains explicitly prohibited.

@@ -137,3 +137,23 @@ The JSON-example correction deployed at 19:59:41 UTC uses image
 receipt `pythilo-learning-example-fix-deploy-20261105-v4`. All 77 site tests pass,
 including execution of all 32 new reading examples in Pyodide. Public HTML confirms
 the corrected JSON string and the public smoke test passed after deployment.
+
+ML/AI and interview expansion deployed on 5 November 2026 at 22:03:09 UTC
+(6 November in Jerusalem). Serving image:
+`sha256:846c5b24418bf743615979992e849cf6de6d85bac48703a6ea0b2b13c929a749`;
+Hostwatch receipt `pythilo-intelligence-100-deploy-20261105-v2`, source revision
+`sha256:a82911433dfc5a6889c2340eefda86b6aaa2d7e4b93747c421c807de030931b0`.
+
+This release has 256 lessons in 19 courses, 100 interview tasks, 30 browser Labs,
+a full 52-Lab native catalog, and eight blog posts including six new practical
+ML/AI articles. The source overlay contains prepared course/Lab JSON, the new
+Python tracing module, numeric matrix rendering, blog Markdown/SVGs and the real
+native screenshot with ML/AI filters. No dependency or infrastructure changes.
+
+All 80 site tests, TypeScript and the production build pass. Public production
+smoke checks pass for encrypted rooms, the new lesson/task/Lab/article routes,
+worker/Wasm delivery and isolation headers. Browser verification on production
+checked the 100-task catalog, eight-post blog, and a causal mask worked answer
+through the final matrix and passing checks. Local responsive checks covered
+390 px blog and Lab layouts. Evidence is in `build/verification/` and
+`build/logs/intelligence100-public-smoke.log`.
