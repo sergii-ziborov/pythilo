@@ -54,7 +54,7 @@ boundary, and the app says so.
 
 | Item | State |
 | --- | --- |
-| 236 lessons in 17 courses and 20 interview tasks | Every solution passes on the Mac (`scripts/verify-lessons.py`) and inside the app on the simulator (`testEveryBundledLessonSolutionPassesOnTheDevice`); starters fail their checks |
+| 256 lessons in 19 courses and 100 interview tasks | Every solution passes inside the app on the simulator (`testEveryBundledLessonSolutionPassesOnTheDevice`); all 120 lessons/tasks in the expanded courses pass the authoring verifier, including starter failures |
 | PyTorch on the device | torch-ios conformance suite matches a Mac on 203 groups of operations in the simulator (`testPyTorchMatchesTheReferenceBuild`); not yet run on a physical iPhone |
 | Learn screens: path, course timeline, lesson read and code modes, check sheet | Checked on the simulator. Drawn on the canvas, iPad lesson included |
 | Failed checks say what came back and what was expected | Checked against every lesson's starter code on the Mac |
@@ -204,3 +204,40 @@ the corrected code and the full public smoke test passes. Build 17 was archived,
 its corrected course file checked against source, and uploaded successfully; Apple
 processing and final TestFlight notes are followed by `scripts/testflight-finish.mjs`
 with `build/notes-17.json`. Build 16 remains available in internal beta testing.
+
+## ML, AI and interview expansion (5–6 November 2026)
+
+The app now bundles 52 Labs: Basics 5, Data structures 8, Algorithms 10,
+Machine learning 21 and Artificial intelligence 8. Twenty additions cover
+preprocessing, classification metrics, thresholds, validation folds, ridge,
+gradient checks, Adam, mini-batches, Naive Bayes, PCA, silhouette, stable softmax,
+attention, causal masks, nucleus candidates, beam search, BPE, cosine retrieval
+and layer normalization. The shared engine renders numeric matrices as grids.
+The native catalog shows the total, ML/AI filters, search, an empty-result state
+and the installed build number; ML and AI appear first in the unfiltered list.
+
+Interview practice has 100 tasks (35 Easy, 45 Medium, 20 Hard). Existing IDs are
+preserved. The 80 additions include standalone reading examples, progressive
+hints, explanations, ordinary/boundary checks and input-mutation checks. Two
+companion courses add 12 ML and 8 AI lessons, giving 256 path lessons in 19 courses
+and 356 total lesson/task records. The browser shares 30 Labs and the same checks.
+
+The Next.js blog adds six practical articles with original SVG covers, tested
+Python, primary references and links to the corresponding lessons and labs.
+Topics: leakage, precision/recall, attention, vector retrieval, decoding and BPE.
+
+Validation: all 120 lessons/tasks in the expanded course files pass the authoring
+verifier; all 356 bundled solutions pass inside the iOS Simulator. Every native
+Lab answer traces and passes, and every starter fails with readable feedback.
+The UI test opens the 52-lab catalog, selects AI, opens attention, loads the worked
+answer and verifies a successful trace. Its retained screenshots are exported to
+`build/verification/native-52-labs/`. All 80 site tests pass, including all 80 new
+interview examples, all 52 practical course examples, every new blog example and
+all 30 browser Lab answer/starter runs. Local production smoke checks pass.
+
+The signed build 18 archive was checked against the final course JSON and Lab
+sources byte for byte. App Store draft and TestFlight metadata say 256 lessons,
+19 courses, 100 interview tasks and 52 Labs. The Learn and Labs marketing images
+were refreshed, using the actual new native catalog; all eight Apple screenshot
+assets are COMPLETE. The version remains PREPARE_FOR_SUBMISSION with MANUAL
+release. No App Review or Beta App Review submission was made.

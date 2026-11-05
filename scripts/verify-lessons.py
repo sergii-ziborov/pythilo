@@ -30,6 +30,8 @@ TORCH_IMPORT_SECONDS = 20
 
 # File stem -> (course id, kind, number of lessons)
 EXPECTED_COURSES = {
+    "19-ml-evaluation": ("ml-evaluation", "path", 12),
+    "20-ai-building-blocks": ("ai-building-blocks", "path", 8),
     "15-algorithm-patterns": ("algorithm-patterns", "path", 8),
     "16-data-practice": ("data-practice", "path", 8),
     "17-reliable-python": ("reliable-python", "path", 8),
@@ -47,9 +49,9 @@ EXPECTED_COURSES = {
     "11-ml": ("ml", "path", 30),
     "12-llm": ("llm", "path", 9),
     "13-ai": ("ai", "path", 12),
-    "14-interview": ("interview", "interview", 20),
+    "14-interview": ("interview", "interview", 100),
 }
-INTERVIEW_LEVELS = {"Easy": 7, "Medium": 9, "Hard": 4}
+INTERVIEW_LEVELS = {"Easy": 35, "Medium": 45, "Hard": 20}
 REQUIRED_TEXT_FIELDS = ("id", "title", "body", "task", "starter", "solution", "explanation")
 ALLOWED_LESSON_FIELDS = set(REQUIRED_TEXT_FIELDS) | {"level", "minutes", "checks", "hints"}
 FORBIDDEN_IMPORTS = {"multiprocessing", "socket", "subprocess"}

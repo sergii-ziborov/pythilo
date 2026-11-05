@@ -16,6 +16,7 @@ struct LabInfo: Codable, Identifiable, Hashable, Sendable {
         case structures = "Data structures"
         case algorithms = "Algorithms"
         case learning = "Machine learning"
+        case intelligence = "Artificial intelligence"
     }
 
     let id: String

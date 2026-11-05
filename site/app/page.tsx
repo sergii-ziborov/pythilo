@@ -128,7 +128,7 @@ export default function Home() {
           <ul className="ticks">
             {labGroups.map(group => <li key={group.title}><strong>{group.title}</strong>: {group.labs.map(lab => lab.title).join(", ")}.</li>)}
           </ul>
-          <Link href="/labs/" className="arrow-link">Try ten labs in your browser</Link>
+          <Link href="/labs/" className="arrow-link">Try 30 labs in your browser</Link>
         </div>
         <div className="feature-media"><DeviceShot shot={shots.graphLab} /><DeviceShot shot={shots.dpLab} /></div>
       </section>

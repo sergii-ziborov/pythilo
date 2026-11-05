@@ -73,7 +73,7 @@
   },
   {
     "id": "bellmanford",
-    "title": "Bellman–Ford",
+    "title": "Bellman\u2013Ford",
     "summary": "Relax weighted edges and detect reachable negative cycles",
     "symbol": "point.3.connected.trianglepath.dotted",
     "tint": "violet",
@@ -178,5 +178,365 @@
       }
     ],
     "idea": "A split is useful when it leaves purer groups. Weight each group by its size, then compare candidate midpoints. Scanning thresholds in ascending order and accepting only a lower score gives a deterministic smallest-threshold tie break."
+  },
+  {
+    "id": "standardize",
+    "title": "Train-only Standardization",
+    "summary": "Fit the centre and population deviation on training values only.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "idea": "Fit the centre and population deviation on training values only. Reuse both statistics for validation; a constant training column uses scale one.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "normalize(train, values) returns values standardized with the training mean and population standard deviation. train is nonempty. Use scale 1 for a constant column.",
+        "file": "standardize.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "confusion",
+    "title": "Confusion Matrix",
+    "summary": "Rows are actual labels and columns are predicted labels.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "idea": "Rows are actual labels and columns are predicted labels. Trace each sample into its cell, including mistakes hidden by accuracy.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "confusion(actual, predicted, classes) returns a classes by classes count matrix. Labels are integers from 0 to classes-1; input lengths match.",
+        "file": "confusion.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "precisionrecall",
+    "title": "Precision, Recall & F1",
+    "summary": "Count true positives before dividing.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "idea": "Count true positives before dividing. A zero denominator returns zero; accuracy alone hides an imbalanced classifier.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "prf(actual, predicted) returns (precision, recall, F1) for binary 0/1 labels. For each undefined ratio return 0.0.",
+        "file": "precisionrecall.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "threshold",
+    "title": "Threshold Sweep",
+    "summary": "One score can produce different decisions.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "idea": "One score can produce different decisions. Compare F1 at candidate thresholds on validation labels; break equal scores toward the smaller threshold.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "choose_threshold(scores, labels, candidates) returns the candidate with greatest binary F1, choosing the smallest on a tie. A score >= threshold predicts 1; candidates is nonempty.",
+        "file": "threshold.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "crossvalidation",
+    "title": "Cross-validation Folds",
+    "summary": "Partition indices without loss or overlap.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "idea": "Partition indices without loss or overlap. Earlier folds receive the remainder; every validation item is excluded from its training fold.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "folds(n, k) returns k (training_indices, validation_indices) pairs with consecutive validation blocks. 1 <= k <= n. Put extra items in the earliest folds.",
+        "file": "crossvalidation.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "ridge",
+    "title": "Ridge Regression",
+    "summary": "A closed-form one-feature ridge fit shrinks the slope.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "idea": "A closed-form one-feature ridge fit shrinks the slope. Centre the data so the intercept is not penalized; lambda zero recovers least squares.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "ridge(xs, ys, penalty) returns (slope, intercept) minimizing sum squared error + penalty*slope**2. Inputs are nonempty and penalty >= 0. Return slope zero when the denominator is zero.",
+        "file": "ridge.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "gradientcheck",
+    "title": "Numerical Gradient Check",
+    "summary": "Compare a supplied gradient with central finite differences.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "idea": "Compare a supplied gradient with central finite differences. A deliberately wrong derivative must produce a visible error, rather than passing because training loss happens to fall.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "gradient_error(x, epsilon, derivative) returns abs(derivative - numerical_gradient) for f(x)=x**3-2*x. Use the central difference; epsilon > 0.",
+        "file": "gradientcheck.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "adam",
+    "title": "Adam Optimizer",
+    "summary": "Follow first and second moment estimates, then correct their initial bias.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "idea": "Follow first and second moment estimates, then correct their initial bias. This is a scalar teaching implementation with epsilon outside the square root.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "adam_step(w, gradient, m, v, t, lr, beta1, beta2, epsilon) returns (new_w, new_m, new_v). t starts at 1 and epsilon > 0. Apply bias correction to both moments.",
+        "file": "adam.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "minibatch",
+    "title": "Mini-batch SGD",
+    "summary": "Each batch updates the parameter before the next batch is evaluated.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "idea": "Each batch updates the parameter before the next batch is evaluated. Average within a batch, including a shorter final batch.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "epoch(xs, ys, w, lr, batch_size) returns the new scalar w after one ordered epoch minimizing mean squared error for y=w*x, with no intercept. Use gradient 2*mean((w*x-y)*x). batch_size > 0.",
+        "file": "minibatch.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "naivebayes",
+    "title": "Multinomial Naive Bayes",
+    "summary": "Count tokens per class with Laplace smoothing.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "idea": "Count tokens per class with Laplace smoothing. Work in log space to avoid multiplying tiny probabilities; repeated tokens contribute repeatedly.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "log_scores(documents, labels, query, vocabulary) returns log posterior scores (without normalization) for classes 0 and 1. Both classes have documents; vocabulary is nonempty and unique. Ignore query tokens outside vocabulary, use alpha=1 and empirical class priors.",
+        "file": "naivebayes.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "pca",
+    "title": "PCA by Power Iteration",
+    "summary": "Centre a two-dimensional cloud, build its covariance matrix and repeatedly multiply a direction.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "idea": "Centre a two-dimensional cloud, build its covariance matrix and repeatedly multiply a direction. The final unit vector points along the greatest variance; choose a consistent sign.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "principal_axis(points, steps) returns the first principal unit direction for 2D points using power iteration starting at (1,1)/sqrt(2). Centre points, use population covariance, take steps iterations; fall back to the covariance column with the greatest norm if the starting direction is orthogonal; return (0,0) for zero variance and orient x >= 0. Inputs are nonempty.",
+        "file": "pca.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "silhouette",
+    "title": "Silhouette Clustering Score",
+    "summary": "A cluster assignment can be compact yet poorly separated.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "idea": "A cluster assignment can be compact yet poorly separated. Compare each point\u2019s mean distance within its cluster with the nearest other cluster; singletons score zero.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "silhouette(points, labels) returns the mean silhouette for 1D points using absolute distance. There are at least two nonempty clusters. A singleton has score 0; if a=b=0 also use 0.",
+        "file": "silhouette.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "softmax",
+    "title": "Stable Softmax & Temperature",
+    "summary": "Subtract the largest logit before exponentiating.",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Subtract the largest logit before exponentiating. Temperature changes concentration without changing rank, and equal scores share probability.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "softmax(logits, temperature) returns normalized probabilities for finite logits and temperature > 0. Return [] for empty input. Avoid overflow for large logits.",
+        "file": "softmax.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "attention",
+    "title": "Scaled Dot-product Attention",
+    "summary": "A query scores keys; stable softmax turns scores into weights, then a weighted sum mixes values.",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "A query scores keys; stable softmax turns scores into weights, then a weighted sum mixes values. Inspect scores, weights and the output vector.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "attend(query, keys, values) returns one attention output vector using dot products divided by sqrt(len(query)), followed by stable softmax. keys is nonempty, dimensions match, each value has the same width.",
+        "file": "attention.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "causalmask",
+    "title": "Causal Attention Mask",
+    "summary": "An autoregressive position may read its prefix, including itself, but never later tokens.",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "An autoregressive position may read its prefix, including itself, but never later tokens. Mask before softmax and normalize each allowed row.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "causal_weights(scores) takes a square nonempty score matrix and returns row softmax with columns j > i set to probability zero. Use stable exponentials over the unmasked prefix.",
+        "file": "causalmask.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "nucleus",
+    "title": "Nucleus Sampling Candidates",
+    "summary": "Sort by probability and retain the smallest prefix reaching top-p mass.",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Sort by probability and retain the smallest prefix reaching top-p mass. Return renormalized candidates, with original index breaking ties. No random draw is hidden in this lab.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "nucleus(probabilities, p) returns (token_index, renormalized_probability) pairs. Nonnegative probabilities sum to one, 0 < p <= 1; sort descending, break ties by index, stop when cumulative mass reaches p (tolerance 1e-12).",
+        "file": "nucleus.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "beamsearch",
+    "title": "Beam Search",
+    "summary": "Greedy search discards every alternative immediately.",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Greedy search discards every alternative immediately. Keep a bounded set of complete prefixes, sum log probabilities and prune globally after each step.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "beam_search(transitions, start, steps, width) returns the highest log-score token path (including start) after exactly steps expansions. transitions maps a token to (next_token, probability) pairs; all expanded tokens have successors and probabilities > 0. Keep width paths; ties use lexicographic path order.",
+        "file": "beamsearch.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "bpe",
+    "title": "Byte-pair Merge Step",
+    "summary": "A BPE training step counts adjacent token pairs, chooses the most frequent, then merges non-overlapping occurrences left to right.",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "A BPE training step counts adjacent token pairs, chooses the most frequent, then merges non-overlapping occurrences left to right. This is a token-string teaching model, not a production tokenizer.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "merge_pair(tokens) returns (new_tokens, selected_pair) after one BPE merge. Ties choose the lexicographically smallest pair; joining concatenates token strings. With fewer than two tokens, return (a copy, None).",
+        "file": "bpe.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "retrieval",
+    "title": "Cosine Retrieval",
+    "summary": "Vector length should not dominate relevance.",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Vector length should not dominate relevance. Normalize dot products by both norms, give zero vectors score zero, and keep stable indices for tied documents.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "rank_vectors(query, documents, k) returns the top k document indices by descending cosine similarity, breaking ties by smaller index. Empty or zero vectors score 0. Dimensions match and k >= 0.",
+        "file": "retrieval.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "layernorm",
+    "title": "Layer Normalization",
+    "summary": "Normalize within one token\u2019s feature vector, using population variance and epsilon inside the square root.",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Normalize within one token\u2019s feature vector, using population variance and epsilon inside the square root. Learned gain and bias then restore useful scale.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "layer_norm(values, gain, bias, epsilon) returns per-feature gain*(x-mean)/sqrt(variance+epsilon)+bias. Inputs are nonempty with matching widths; epsilon > 0.",
+        "file": "layernorm.py",
+        "scales": false
+      }
+    ]
   }
 ]

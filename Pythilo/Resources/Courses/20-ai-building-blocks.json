@@ -1,0 +1,232 @@
+{
+  "id": "ai-building-blocks",
+  "title": "AI: building blocks",
+  "summary": "Eight hands-on lessons in attention, decoding, tokenization, retrieval and normalization.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "practice-softmax",
+      "title": "Stable Softmax & Temperature",
+      "body": "# Stable Softmax & Temperature\n\nSubtract the largest logit before exponentiating. Temperature changes concentration without changing rank, and equal scores share probability.\n\n```python\nimport math\nlogits = [1000, 1000]\nweights = [math.exp(x-max(logits)) for x in logits]\nprint([x/sum(weights) for x in weights])\n```\n\n## From arithmetic to an experiment\n\nSubtract the largest logit before exponentiating. Temperature changes concentration without changing rank, and equal scores share probability. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "softmax(logits, temperature) returns normalized probabilities for finite logits and temperature > 0. Return [] for empty input. Avoid overflow for large logits.",
+      "starter": "def softmax(logits, temperature):\n    pass\n",
+      "solution": "def softmax(logits, temperature):\n    import math\n    if not logits:\n        return []\n    maximum = max(logits)\n    weights = [math.exp((x-maximum)/temperature) for x in logits]\n    total = sum(weights)\n    probabilities = [weight / total for weight in weights]\n    return probabilities\n",
+      "checks": [
+        {
+          "name": "large equal logits",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = softmax([1000, 1000], 1)\nassert equivalent(got, [0.5, 0.5]), got\n"
+        },
+        {
+          "name": "temperature changes spread",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = softmax([0, 2], 2)\nassert equivalent(got, [0.2689414213699951, 0.7310585786300049]), got\n"
+        },
+        {
+          "name": "empty and single",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = softmax([], 1)\nassert equivalent(got, []), got\n"
+        }
+      ],
+      "hints": [
+        "Subtract the largest logit before exponentiating.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Subtract the largest logit before exponentiating. Temperature changes concentration without changing rank, and equal scores share probability. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-attention",
+      "title": "Scaled Dot-product Attention",
+      "body": "# Scaled Dot-product Attention\n\nA query scores keys; stable softmax turns scores into weights, then a weighted sum mixes values. Inspect scores, weights and the output vector.\n\n```python\nweights = [0.25, 0.75]\nvalues = [[2, 0], [0, 2]]\nprint([sum(w*v[j] for w,v in zip(weights, values)) for j in range(2)])\n```\n\n## From arithmetic to an experiment\n\nA query scores keys; stable softmax turns scores into weights, then a weighted sum mixes values. Inspect scores, weights and the output vector. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "attend(query, keys, values) returns one attention output vector using dot products divided by sqrt(len(query)), followed by stable softmax. keys is nonempty, dimensions match, each value has the same width.",
+      "starter": "def attend(query, keys, values):\n    pass\n",
+      "solution": "def attend(query, keys, values):\n    import math\n    scores = [sum(q*k for q,k in zip(query,key)) / math.sqrt(len(query)) for key in keys]\n    maximum = max(scores)\n    weights = [math.exp(score-maximum) for score in scores]\n    total = sum(weights)\n    weights = [weight/total for weight in weights]\n    output = [sum(weight*value[j] for weight,value in zip(weights,values)) for j in range(len(values[0]))]\n    return output\n",
+      "checks": [
+        {
+          "name": "unequal relevance",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = attend([1], [[0], [1]], [[2, 0], [0, 2]])\nassert equivalent(got, [0.5378828427399902, 1.4621171572600098]), got\n"
+        },
+        {
+          "name": "uniform query",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = attend([0, 0], [[1, 2], [3, 4]], [[2], [4]])\nassert equivalent(got, [3]), got\n"
+        },
+        {
+          "name": "scale and overflow",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = attend([1000, 1000], [[1, 1]], [[7, 8]])\nassert equivalent(got, [7, 8]), got\n"
+        }
+      ],
+      "hints": [
+        "A query scores keys; stable softmax turns scores into weights, then a weighted sum mixes values.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "A query scores keys; stable softmax turns scores into weights, then a weighted sum mixes values. Inspect scores, weights and the output vector. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-causalmask",
+      "title": "Causal Attention Mask",
+      "body": "# Causal Attention Mask\n\nAn autoregressive position may read its prefix, including itself, but never later tokens. Mask before softmax and normalize each allowed row.\n\n```python\nrow = 1\nprint([column <= row for column in range(3)])\n```\n\n## From arithmetic to an experiment\n\nAn autoregressive position may read its prefix, including itself, but never later tokens. Mask before softmax and normalize each allowed row. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "causal_weights(scores) takes a square nonempty score matrix and returns row softmax with columns j > i set to probability zero. Use stable exponentials over the unmasked prefix.",
+      "starter": "def causal_weights(scores):\n    pass\n",
+      "solution": "def causal_weights(scores):\n    import math\n    matrix = []\n    for i, row in enumerate(scores):\n        maximum = max(row[:i+1])\n        weights = [math.exp(value-maximum) if j <= i else 0.0 for j,value in enumerate(row)]\n        total = sum(weights)\n        matrix.append([weight/total for weight in weights])\n    return matrix\n",
+      "checks": [
+        {
+          "name": "future hidden",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = causal_weights([[0, 9], [0, 0]])\nassert equivalent(got, [[1, 0], [0.5, 0.5]]), got\n"
+        },
+        {
+          "name": "single token",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = causal_weights([[1000]])\nassert equivalent(got, [[1]]), got\n"
+        },
+        {
+          "name": "large future ignored",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = causal_weights([[0, 10000, 10000], [0, 0, 10000], [0, 0, 0]])\nassert equivalent(got, [[1, 0, 0], [0.5, 0.5, 0], [0.3333333333333333, 0.3333333333333333, 0.3333333333333333]]), got\n"
+        }
+      ],
+      "hints": [
+        "An autoregressive position may read its prefix, including itself, but never later tokens.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "An autoregressive position may read its prefix, including itself, but never later tokens. Mask before softmax and normalize each allowed row. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-nucleus",
+      "title": "Nucleus Sampling Candidates",
+      "body": "# Nucleus Sampling Candidates\n\nSort by probability and retain the smallest prefix reaching top-p mass. Return renormalized candidates, with original index breaking ties. No random draw is hidden in this lab.\n\n```python\nprobabilities = [0.6, 0.3]\nmass = sum(probabilities)\nprint([p/mass for p in probabilities])\n```\n\n## From arithmetic to an experiment\n\nSort by probability and retain the smallest prefix reaching top-p mass. Return renormalized candidates, with original index breaking ties. No random draw is hidden in this lab. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "nucleus(probabilities, p) returns (token_index, renormalized_probability) pairs. Nonnegative probabilities sum to one, 0 < p <= 1; sort descending, break ties by index, stop when cumulative mass reaches p (tolerance 1e-12).",
+      "starter": "def nucleus(probabilities, p):\n    pass\n",
+      "solution": "def nucleus(probabilities, p):\n    ordered = sorted(enumerate(probabilities), key=lambda pair: (-pair[1], pair[0]))\n    chosen = []\n    mass = 0.0\n    for index, probability in ordered:\n        chosen.append((index, probability))\n        mass += probability\n        if mass >= p - 1e-12:\n            break\n    return [(index, probability/mass) for index,probability in chosen]\n",
+      "checks": [
+        {
+          "name": "smallest prefix",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = nucleus([0.1, 0.6, 0.3], 0.8)\nassert equivalent(got, [[1, 0.6666666666666666], [2, 0.3333333333333333]]), got\n"
+        },
+        {
+          "name": "tie by index",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = nucleus([0.5, 0.5], 0.5)\nassert equivalent(got, [[0, 1]]), got\n"
+        },
+        {
+          "name": "full mass",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = nucleus([0.2, 0.8, 0], 1)\nassert equivalent(got, [[1, 0.8], [0, 0.2]]), got\n"
+        }
+      ],
+      "hints": [
+        "Sort by probability and retain the smallest prefix reaching top-p mass.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Sort by probability and retain the smallest prefix reaching top-p mass. Return renormalized candidates, with original index breaking ties. No random draw is hidden in this lab. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-beamsearch",
+      "title": "Beam Search",
+      "body": "# Beam Search\n\nGreedy search discards every alternative immediately. Keep a bounded set of complete prefixes, sum log probabilities and prune globally after each step.\n\n```python\nimport math\ngreedy_path = math.log(0.6)+math.log(0.5)\nalternative = math.log(0.4)+math.log(1.0)\nprint(alternative > greedy_path)\n```\n\n## From arithmetic to an experiment\n\nGreedy search discards every alternative immediately. Keep a bounded set of complete prefixes, sum log probabilities and prune globally after each step. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "beam_search(transitions, start, steps, width) returns the highest log-score token path (including start) after exactly steps expansions. transitions maps a token to (next_token, probability) pairs; all expanded tokens have successors and probabilities > 0. Keep width paths; ties use lexicographic path order.",
+      "starter": "def beam_search(transitions, start, steps, width):\n    pass\n",
+      "solution": "def beam_search(transitions, start, steps, width):\n    import math\n    beam = [(0.0, (start,))]\n    for _ in range(steps):\n        candidates = []\n        for score, path in beam:\n            for token, probability in transitions[path[-1]]:\n                candidates.append((score+math.log(probability), path+(token,)))\n        beam = sorted(candidates, key=lambda item: (-item[0], item[1]))[:width]\n    return list(beam[0][1])\n",
+      "checks": [
+        {
+          "name": "alternative beats greedy",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = beam_search({'s': [['a', 0.6], ['b', 0.4]], 'a': [['x', 0.5], ['z', 0.5]], 'b': [['y', 1]]}, 's', 2, 2)\nassert equivalent(got, ['s', 'b', 'y']), got\n"
+        },
+        {
+          "name": "width one",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = beam_search({'s': [['b', 0.4], ['a', 0.6]]}, 's', 1, 1)\nassert equivalent(got, ['s', 'a']), got\n"
+        },
+        {
+          "name": "zero steps",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = beam_search({}, 's', 0, 2)\nassert equivalent(got, ['s']), got\n"
+        }
+      ],
+      "hints": [
+        "Greedy search discards every alternative immediately.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Greedy search discards every alternative immediately. Keep a bounded set of complete prefixes, sum log probabilities and prune globally after each step. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-bpe",
+      "title": "Byte-pair Merge Step",
+      "body": "# Byte-pair Merge Step\n\nA BPE training step counts adjacent token pairs, chooses the most frequent, then merges non-overlapping occurrences left to right. This is a token-string teaching model, not a production tokenizer.\n\n```python\ntokens = [\"a\", \"a\", \"a\"]\nprint(list(zip(tokens, tokens[1:])))\nprint([\"aa\", \"a\"])\n```\n\n## From arithmetic to an experiment\n\nA BPE training step counts adjacent token pairs, chooses the most frequent, then merges non-overlapping occurrences left to right. This is a token-string teaching model, not a production tokenizer. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "merge_pair(tokens) returns (new_tokens, selected_pair) after one BPE merge. Ties choose the lexicographically smallest pair; joining concatenates token strings. With fewer than two tokens, return (a copy, None).",
+      "starter": "def merge_pair(tokens):\n    pass\n",
+      "solution": "def merge_pair(tokens):\n    if len(tokens) < 2:\n        return list(tokens), None\n    counts = {}\n    for pair in zip(tokens, tokens[1:]):\n        counts[pair] = counts.get(pair, 0) + 1\n    pair = min(counts, key=lambda p: (-counts[p], p))\n    result = []\n    i = 0\n    while i < len(tokens):\n        if i+1 < len(tokens) and (tokens[i], tokens[i+1]) == pair:\n            result.append(tokens[i]+tokens[i+1])\n            i += 2\n        else:\n            result.append(tokens[i])\n            i += 1\n    return result, pair\n",
+      "checks": [
+        {
+          "name": "repeated pair",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = merge_pair(['l', 'o', 'l', 'o', 'w'])\nassert equivalent(got, [['lo', 'lo', 'w'], ['l', 'o']]), got\n"
+        },
+        {
+          "name": "overlapping occurrences",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = merge_pair(['a', 'a', 'a'])\nassert equivalent(got, [['aa', 'a'], ['a', 'a']]), got\n"
+        },
+        {
+          "name": "no pair",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = merge_pair(['x'])\nassert equivalent(got, [['x'], None]), got\n"
+        }
+      ],
+      "hints": [
+        "A BPE training step counts adjacent token pairs, chooses the most frequent, then merges non-overlapping occurrences left to right.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "A BPE training step counts adjacent token pairs, chooses the most frequent, then merges non-overlapping occurrences left to right. This is a token-string teaching model, not a production tokenizer. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-retrieval",
+      "title": "Cosine Retrieval",
+      "body": "# Cosine Retrieval\n\nVector length should not dominate relevance. Normalize dot products by both norms, give zero vectors score zero, and keep stable indices for tied documents.\n\n```python\nimport math\nquery, document = [1, 0], [10, 0]\ndot = sum(a*b for a,b in zip(query, document))\nprint(dot / (math.hypot(*query)*math.hypot(*document)))\n```\n\n## From arithmetic to an experiment\n\nVector length should not dominate relevance. Normalize dot products by both norms, give zero vectors score zero, and keep stable indices for tied documents. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "rank_vectors(query, documents, k) returns the top k document indices by descending cosine similarity, breaking ties by smaller index. Empty or zero vectors score 0. Dimensions match and k >= 0.",
+      "starter": "def rank_vectors(query, documents, k):\n    pass\n",
+      "solution": "def rank_vectors(query, documents, k):\n    import math\n    qnorm = math.sqrt(sum(x*x for x in query))\n    scores = []\n    for index, vector in enumerate(documents):\n        norm = math.sqrt(sum(x*x for x in vector))\n        score = sum(a*b for a,b in zip(query,vector))/(qnorm*norm) if qnorm*norm else 0.0\n        scores.append((index, score))\n    scores.sort(key=lambda item: (-item[1], item[0]))\n    return [index for index,score in scores[:k]]\n",
+      "checks": [
+        {
+          "name": "length invariant",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = rank_vectors([1, 0], [[0, 1], [10, 0], [1, 0], [-1, 0]], 3)\nassert equivalent(got, [1, 2, 0]), got\n"
+        },
+        {
+          "name": "zero query ties",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = rank_vectors([0, 0], [[2, 3], [0, 0]], 2)\nassert equivalent(got, [0, 1]), got\n"
+        },
+        {
+          "name": "no requested results",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = rank_vectors([1], [[1]], 0)\nassert equivalent(got, []), got\n"
+        }
+      ],
+      "hints": [
+        "Vector length should not dominate relevance.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Vector length should not dominate relevance. Normalize dot products by both norms, give zero vectors score zero, and keep stable indices for tied documents. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-layernorm",
+      "title": "Layer Normalization",
+      "body": "# Layer Normalization\n\nNormalize within one token\u2019s feature vector, using population variance and epsilon inside the square root. Learned gain and bias then restore useful scale.\n\n```python\nimport math\nvalues = [1, 3]\nmean, variance, epsilon = 2, 1, 3\nprint([(x-mean)/math.sqrt(variance+epsilon) for x in values])\n```\n\n## From arithmetic to an experiment\n\nNormalize within one token\u2019s feature vector, using population variance and epsilon inside the square root. Learned gain and bias then restore useful scale. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "layer_norm(values, gain, bias, epsilon) returns per-feature gain*(x-mean)/sqrt(variance+epsilon)+bias. Inputs are nonempty with matching widths; epsilon > 0.",
+      "starter": "def layer_norm(values, gain, bias, epsilon):\n    pass\n",
+      "solution": "def layer_norm(values, gain, bias, epsilon):\n    import math\n    mean = sum(values) / len(values)\n    variance = sum((value-mean)**2 for value in values) / len(values)\n    scale = math.sqrt(variance + epsilon)\n    output = [g*(value-mean)/scale+b for value,g,b in zip(values,gain,bias)]\n    return output\n",
+      "checks": [
+        {
+          "name": "gain and bias",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = layer_norm([1, 3], [2, 2], [1, 1], 3)\nassert equivalent(got, [0, 2]), got\n"
+        },
+        {
+          "name": "constant values",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = layer_norm([5, 5], [3, 4], [1, 2], 0.001)\nassert equivalent(got, [1, 2]), got\n"
+        },
+        {
+          "name": "one feature",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = layer_norm([7], [2], [3], 1e-05)\nassert equivalent(got, [3]), got\n"
+        }
+      ],
+      "hints": [
+        "Normalize within one token\u2019s feature vector, using population variance and epsilon inside the square root.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Normalize within one token\u2019s feature vector, using population variance and epsilon inside the square root. Learned gain and bias then restore useful scale. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    }
+  ]
+}

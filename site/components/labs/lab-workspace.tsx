@@ -20,7 +20,8 @@ function Chart({ panel }: {panel: LabPanel}) {
 }
 function Panel({panel}: {panel: LabPanel}) {
   return <section className="lab-panel"><h3>{panel.title ?? 'State'}</h3>
-    {panel.type==='array' ? <div className="lab-array">{panel.cells?.map((cell,i)=><div key={i}><small>{i}</small><code>{cell || '∅'}</code></div>)}</div> : panel.type==='vars' ? <dl className="lab-vars">{panel.pairs?.map(([name,value],i)=><div key={i}><dt>{name}</dt><dd><code>{value}</code></dd></div>)}</dl> : <Chart panel={panel} />}
+    {panel.type==='grid' ? <div className="lab-matrix"><table aria-label={panel.title ?? 'Matrix'}><tbody>{panel.grid?.map((row,i)=><tr key={i}>{row.map((cell,j)=><td key={j}><code>{cell}</code></td>)}</tr>)}</tbody></table></div> : null}
+    {panel.type==='array' ? <div className="lab-array">{panel.cells?.map((cell,i)=><div key={i}><small>{i}</small><code>{cell || '∅'}</code></div>)}</div> : panel.type==='vars' ? <dl className="lab-vars">{panel.pairs?.map(([name,value],i)=><div key={i}><dt>{name}</dt><dd><code>{value}</code></dd></div>)}</dl> : panel.type==='grid' ? null : <Chart panel={panel} />}
   </section>;
 }
 export function LabWorkspace({lab}: {lab: BrowserLab}) {

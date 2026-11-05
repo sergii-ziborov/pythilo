@@ -6,7 +6,7 @@ import { courses } from "@/lib/courses";
 import { labCount, labGroups } from "@/lib/labs";
 import { shots } from "@/lib/shots";
 
-export const metadata: Metadata = { title: "Courses, labs and interview practice", description: "How Pythilo's Python courses work on iPhone and iPad: lessons, checks that run your code, hints, Debug in a project, timed interview tasks and 22 interactive labs." };
+export const metadata: Metadata = { title: "Courses, labs and interview practice", description: "How Pythilo's Python courses work on iPhone and iPad: lessons, checks that run your code, hints, Debug in a project, timed interview tasks and 52 interactive labs." };
 
 export default function Page() {
   const path = courses.filter(course => course.kind !== "interview");
@@ -46,8 +46,8 @@ export default function Page() {
     <p>{interview ? <>{interview.lessons.length} tasks, marked Easy, Medium or Hard. </> : null}A task opens straight in the code view with a countdown timer in the toolbar, set to the task&apos;s time. Hints work as in lessons, and <span className="ui">Test</span> runs real tests against your solution.</p>
 
     <h2 id="labs">Labs</h2>
-    <p>The <span className="ui">Labs</span> tab in the next build has {labCount} labs in four sections. Write the Python yourself and choose <span className="ui">Trace</span> to run it and record what changes. The step player lets you play, pause, go back, or jump to a step while the editor highlights the line that ran.</p>
-    <p>Ten labs also run here on the website, with an editor, checks and step-by-step replay. <Link href="/labs/">Open the browser labs</Link>.</p>
+    <p>The <span className="ui">Labs</span> tab has {labCount} labs in five sections. Write the Python yourself and choose <span className="ui">Trace</span> to run it and record what changes. The step player lets you play, pause, go back, or jump to a step while the editor highlights the line that ran.</p>
+    <p>Thirty labs also run here on the website, with an editor, checks and step-by-step replay. <Link href="/labs/">Open the browser labs</Link>.</p>
     {labGroups.map(group => <section key={group.title} aria-label={group.title}>
       <h3>{group.title}</h3>
       <Table head={["Lab", "What you explore"]} rows={group.labs.map(lab => [<strong key={lab.id}>{lab.title}</strong>, lab.summary])} />

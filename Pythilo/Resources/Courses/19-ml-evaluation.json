@@ -1,0 +1,352 @@
+{
+  "id": "ml-evaluation",
+  "title": "ML: evaluation and optimization",
+  "summary": "Twelve experiments in honest preprocessing, metrics, validation, optimization and unsupervised learning.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "practice-standardize",
+      "title": "Train-only Standardization",
+      "body": "# Train-only Standardization\n\nFit the centre and population deviation on training values only. Reuse both statistics for validation; a constant training column uses scale one.\n\n```python\ntrain = [0, 2]\nmean = sum(train) / len(train)\nprint([(value-mean) / 1 for value in [1, 3]])\n```\n\n## From arithmetic to an experiment\n\nFit the centre and population deviation on training values only. Reuse both statistics for validation; a constant training column uses scale one. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "normalize(train, values) returns values standardized with the training mean and population standard deviation. train is nonempty. Use scale 1 for a constant column.",
+      "starter": "def normalize(train, values):\n    pass\n",
+      "solution": "def normalize(train, values):\n    import math\n    mean = sum(train) / len(train)\n    variance = sum((x - mean) ** 2 for x in train) / len(train)\n    scale = math.sqrt(variance) or 1.0\n    result = [(x - mean) / scale for x in values]\n    return result\n",
+      "checks": [
+        {
+          "name": "reuse training statistics",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = normalize([0, 2], [1, 3])\nassert equivalent(got, [0, 2]), got\n"
+        },
+        {
+          "name": "constant column",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = normalize([5, 5], [5, 8])\nassert equivalent(got, [0, 3]), got\n"
+        },
+        {
+          "name": "empty validation",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = normalize([2], [])\nassert equivalent(got, []), got\n"
+        }
+      ],
+      "hints": [
+        "Fit the centre and population deviation on training values only.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Fit the centre and population deviation on training values only. Reuse both statistics for validation; a constant training column uses scale one. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-confusion",
+      "title": "Confusion Matrix",
+      "body": "# Confusion Matrix\n\nRows are actual labels and columns are predicted labels. Trace each sample into its cell, including mistakes hidden by accuracy.\n\n```python\nmatrix = [[0, 0], [0, 0]]\nmatrix[0][1] += 1\nprint(matrix)\n```\n\n## From arithmetic to an experiment\n\nRows are actual labels and columns are predicted labels. Trace each sample into its cell, including mistakes hidden by accuracy. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "confusion(actual, predicted, classes) returns a classes by classes count matrix. Labels are integers from 0 to classes-1; input lengths match.",
+      "starter": "def confusion(actual, predicted, classes):\n    pass\n",
+      "solution": "def confusion(actual, predicted, classes):\n    matrix = [[0] * classes for _ in range(classes)]\n    for truth, guess in zip(actual, predicted):\n        matrix[truth][guess] += 1\n    return matrix\n",
+      "checks": [
+        {
+          "name": "off-diagonal errors",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = confusion([0, 0, 1, 1], [0, 1, 1, 1], 2)\nassert equivalent(got, [[1, 1], [0, 2]]), got\n"
+        },
+        {
+          "name": "unseen class",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = confusion([2, 0], [1, 0], 3)\nassert equivalent(got, [[1, 0, 0], [0, 0, 0], [0, 1, 0]]), got\n"
+        },
+        {
+          "name": "no samples",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = confusion([], [], 2)\nassert equivalent(got, [[0, 0], [0, 0]]), got\n"
+        }
+      ],
+      "hints": [
+        "Rows are actual labels and columns are predicted labels.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Rows are actual labels and columns are predicted labels. Trace each sample into its cell, including mistakes hidden by accuracy. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-precisionrecall",
+      "title": "Precision, Recall & F1",
+      "body": "# Precision, Recall & F1\n\nCount true positives before dividing. A zero denominator returns zero; accuracy alone hides an imbalanced classifier.\n\n```python\ntp, fp, fn = 2, 1, 3\nprint(tp / (tp+fp))\nprint(tp / (tp+fn))\n```\n\n## From arithmetic to an experiment\n\nCount true positives before dividing. A zero denominator returns zero; accuracy alone hides an imbalanced classifier. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "prf(actual, predicted) returns (precision, recall, F1) for binary 0/1 labels. For each undefined ratio return 0.0.",
+      "starter": "def prf(actual, predicted):\n    pass\n",
+      "solution": "def prf(actual, predicted):\n    tp = sum(a == p == 1 for a, p in zip(actual, predicted))\n    fp = sum(a == 0 and p == 1 for a, p in zip(actual, predicted))\n    fn = sum(a == 1 and p == 0 for a, p in zip(actual, predicted))\n    precision = tp / (tp + fp) if tp + fp else 0.0\n    recall = tp / (tp + fn) if tp + fn else 0.0\n    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0\n    return precision, recall, f1\n",
+      "checks": [
+        {
+          "name": "different denominators",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = prf([1, 1, 0, 0], [1, 0, 1, 1])\nassert equivalent(got, [0.3333333333333333, 0.5, 0.4]), got\n"
+        },
+        {
+          "name": "no predicted positives",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = prf([1, 0], [0, 0])\nassert equivalent(got, [0, 0, 0]), got\n"
+        },
+        {
+          "name": "perfect",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = prf([0, 1], [0, 1])\nassert equivalent(got, [1, 1, 1]), got\n"
+        }
+      ],
+      "hints": [
+        "Count true positives before dividing.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Count true positives before dividing. A zero denominator returns zero; accuracy alone hides an imbalanced classifier. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-threshold",
+      "title": "Threshold Sweep",
+      "body": "# Threshold Sweep\n\nOne score can produce different decisions. Compare F1 at candidate thresholds on validation labels; break equal scores toward the smaller threshold.\n\n```python\nscores = [0.2, 0.6, 0.9]\nprint([int(score >= 0.5) for score in scores])\n```\n\n## From arithmetic to an experiment\n\nOne score can produce different decisions. Compare F1 at candidate thresholds on validation labels; break equal scores toward the smaller threshold. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "choose_threshold(scores, labels, candidates) returns the candidate with greatest binary F1, choosing the smallest on a tie. A score >= threshold predicts 1; candidates is nonempty.",
+      "starter": "def choose_threshold(scores, labels, candidates):\n    pass\n",
+      "solution": "def choose_threshold(scores, labels, candidates):\n    best, best_f1 = None, -1.0\n    for threshold in sorted(candidates):\n        predictions = [int(score >= threshold) for score in scores]\n        tp = sum(a == p == 1 for a, p in zip(labels, predictions))\n        fp = sum(a == 0 and p == 1 for a, p in zip(labels, predictions))\n        fn = sum(a == 1 and p == 0 for a, p in zip(labels, predictions))\n        f1 = 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn else 0.0\n        if f1 > best_f1:\n            best, best_f1 = threshold, f1\n    return best\n",
+      "checks": [
+        {
+          "name": "validation choice",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = choose_threshold([0.1, 0.4, 0.6, 0.9], [0, 1, 1, 1], [0.3, 0.5, 0.8])\nassert equivalent(got, 0.3), got\n"
+        },
+        {
+          "name": "deterministic tie",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = choose_threshold([0.8], [1], [0.5, 0.2])\nassert equivalent(got, 0.2), got\n"
+        },
+        {
+          "name": "zero positives",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = choose_threshold([0.1], [0], [0.5, 0.7])\nassert equivalent(got, 0.5), got\n"
+        }
+      ],
+      "hints": [
+        "One score can produce different decisions.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "One score can produce different decisions. Compare F1 at candidate thresholds on validation labels; break equal scores toward the smaller threshold. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-crossvalidation",
+      "title": "Cross-validation Folds",
+      "body": "# Cross-validation Folds\n\nPartition indices without loss or overlap. Earlier folds receive the remainder; every validation item is excluded from its training fold.\n\n```python\nindices = list(range(5))\nvalidation = indices[:3]\ntraining = indices[3:]\nprint(training, validation)\n```\n\n## From arithmetic to an experiment\n\nPartition indices without loss or overlap. Earlier folds receive the remainder; every validation item is excluded from its training fold. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "folds(n, k) returns k (training_indices, validation_indices) pairs with consecutive validation blocks. 1 <= k <= n. Put extra items in the earliest folds.",
+      "starter": "def folds(n, k):\n    pass\n",
+      "solution": "def folds(n, k):\n    result = []\n    start = 0\n    for fold in range(k):\n        size = n // k + (fold < n % k)\n        stop = start + size\n        validation = list(range(start, stop))\n        training = list(range(start)) + list(range(stop, n))\n        result.append((training, validation))\n        start = stop\n    return result\n",
+      "checks": [
+        {
+          "name": "uneven split",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = folds(5, 2)\nassert equivalent(got, [[[3, 4], [0, 1, 2]], [[0, 1, 2], [3, 4]]]), got\n"
+        },
+        {
+          "name": "leave one out",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = folds(3, 3)\nassert equivalent(got, [[[1, 2], [0]], [[0, 2], [1]], [[0, 1], [2]]]), got\n"
+        },
+        {
+          "name": "single fold",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = folds(2, 1)\nassert equivalent(got, [[[], [0, 1]]]), got\n"
+        }
+      ],
+      "hints": [
+        "Partition indices without loss or overlap.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Partition indices without loss or overlap. Earlier folds receive the remainder; every validation item is excluded from its training fold. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-ridge",
+      "title": "Ridge Regression",
+      "body": "# Ridge Regression\n\nA closed-form one-feature ridge fit shrinks the slope. Centre the data so the intercept is not penalized; lambda zero recovers least squares.\n\n```python\nnumerator, spread = 4, 2\nprint(numerator / spread)\nprint(numerator / (spread+2))\n```\n\n## From arithmetic to an experiment\n\nA closed-form one-feature ridge fit shrinks the slope. Centre the data so the intercept is not penalized; lambda zero recovers least squares. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "ridge(xs, ys, penalty) returns (slope, intercept) minimizing sum squared error + penalty*slope**2. Inputs are nonempty and penalty >= 0. Return slope zero when the denominator is zero.",
+      "starter": "def ridge(xs, ys, penalty):\n    pass\n",
+      "solution": "def ridge(xs, ys, penalty):\n    mx, my = sum(xs) / len(xs), sum(ys) / len(ys)\n    numerator = sum((x-mx)*(y-my) for x,y in zip(xs,ys))\n    denominator = sum((x-mx)**2 for x in xs) + penalty\n    w = numerator / denominator if denominator else 0.0\n    b = my - w * mx\n    return w, b\n",
+      "checks": [
+        {
+          "name": "shrink slope",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = ridge([0, 2], [1, 5], 2)\nassert equivalent(got, [1, 2]), got\n"
+        },
+        {
+          "name": "ordinary least squares",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = ridge([0, 2], [1, 5], 0)\nassert equivalent(got, [2, 1]), got\n"
+        },
+        {
+          "name": "constant feature",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = ridge([3, 3], [2, 4], 0)\nassert equivalent(got, [0, 3]), got\n"
+        }
+      ],
+      "hints": [
+        "A closed-form one-feature ridge fit shrinks the slope.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "A closed-form one-feature ridge fit shrinks the slope. Centre the data so the intercept is not penalized; lambda zero recovers least squares. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-gradientcheck",
+      "title": "Numerical Gradient Check",
+      "body": "# Numerical Gradient Check\n\nCompare a supplied gradient with central finite differences. A deliberately wrong derivative must produce a visible error, rather than passing because training loss happens to fall.\n\n```python\nx, epsilon = 2.0, 0.001\nf = lambda value: value**3 - 2*value\nprint((f(x+epsilon)-f(x-epsilon))/(2*epsilon))\n```\n\n## From arithmetic to an experiment\n\nCompare a supplied gradient with central finite differences. A deliberately wrong derivative must produce a visible error, rather than passing because training loss happens to fall. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "gradient_error(x, epsilon, derivative) returns abs(derivative - numerical_gradient) for f(x)=x**3-2*x. Use the central difference; epsilon > 0.",
+      "starter": "def gradient_error(x, epsilon, derivative):\n    pass\n",
+      "solution": "def gradient_error(x, epsilon, derivative):\n    def loss(value):\n        return value ** 3 - 2 * value\n    high = loss(x + epsilon)\n    low = loss(x - epsilon)\n    numerical = (high - low) / (2 * epsilon)\n    error = abs(derivative - numerical)\n    return error\n",
+      "checks": [
+        {
+          "name": "correct derivative",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = gradient_error(2, 0.001, 10)\nassert equivalent(got, 1e-06), got\n"
+        },
+        {
+          "name": "wrong sign",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = gradient_error(1, 0.001, -1)\nassert equivalent(got, 2.000001), got\n"
+        },
+        {
+          "name": "zero point",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = gradient_error(0, 0.001, -2)\nassert equivalent(got, 1e-06), got\n"
+        }
+      ],
+      "hints": [
+        "Compare a supplied gradient with central finite differences.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Compare a supplied gradient with central finite differences. A deliberately wrong derivative must produce a visible error, rather than passing because training loss happens to fall. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-adam",
+      "title": "Adam Optimizer",
+      "body": "# Adam Optimizer\n\nFollow first and second moment estimates, then correct their initial bias. This is a scalar teaching implementation with epsilon outside the square root.\n\n```python\nbeta, gradient = 0.9, 2.0\nm = (1-beta)*gradient\nprint(m, m/(1-beta))\n```\n\n## From arithmetic to an experiment\n\nFollow first and second moment estimates, then correct their initial bias. This is a scalar teaching implementation with epsilon outside the square root. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "adam_step(w, gradient, m, v, t, lr, beta1, beta2, epsilon) returns (new_w, new_m, new_v). t starts at 1 and epsilon > 0. Apply bias correction to both moments.",
+      "starter": "def adam_step(w, gradient, m, v, t, lr, beta1, beta2, epsilon):\n    pass\n",
+      "solution": "def adam_step(w, gradient, m, v, t, lr, beta1, beta2, epsilon):\n    import math\n    m = beta1 * m + (1 - beta1) * gradient\n    v = beta2 * v + (1 - beta2) * gradient * gradient\n    m_hat = m / (1 - beta1 ** t)\n    v_hat = v / (1 - beta2 ** t)\n    w -= lr * m_hat / (math.sqrt(v_hat) + epsilon)\n    return w, m, v\n",
+      "checks": [
+        {
+          "name": "bias-corrected first step",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = adam_step(1, 2, 0, 0, 1, 0.1, 0.9, 0.999, 1e-08)\nassert equivalent(got, [0.9000000005, 0.2, 0.004]), got\n"
+        },
+        {
+          "name": "zero gradient",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = adam_step(3, 0, 0, 0, 1, 0.1, 0.9, 0.99, 1e-08)\nassert equivalent(got, [3, 0, 0]), got\n"
+        },
+        {
+          "name": "no momentum",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = adam_step(0, -2, 0, 0, 1, 0.2, 0, 0, 1)\nassert equivalent(got, [0.13333333333333333, -2, 4]), got\n"
+        }
+      ],
+      "hints": [
+        "Follow first and second moment estimates, then correct their initial bias.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Follow first and second moment estimates, then correct their initial bias. This is a scalar teaching implementation with epsilon outside the square root. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-minibatch",
+      "title": "Mini-batch SGD",
+      "body": "# Mini-batch SGD\n\nEach batch updates the parameter before the next batch is evaluated. Average within a batch, including a shorter final batch.\n\n```python\nxs = [1, 2, 3, 4, 5]\nfor start in range(0, len(xs), 2):\n    print(xs[start:start+2])\n```\n\n## From arithmetic to an experiment\n\nEach batch updates the parameter before the next batch is evaluated. Average within a batch, including a shorter final batch. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "epoch(xs, ys, w, lr, batch_size) returns the new scalar w after one ordered epoch minimizing mean squared error for y=w*x, with no intercept. Use gradient 2*mean((w*x-y)*x). batch_size > 0.",
+      "starter": "def epoch(xs, ys, w, lr, batch_size):\n    pass\n",
+      "solution": "def epoch(xs, ys, w, lr, batch_size):\n    history = [w]\n    for start in range(0, len(xs), batch_size):\n        bx, by = xs[start:start+batch_size], ys[start:start+batch_size]\n        gradient = 2 * sum((w*x-y)*x for x,y in zip(bx,by)) / len(bx)\n        w -= lr * gradient\n        history.append(w)\n    return w\n",
+      "checks": [
+        {
+          "name": "sequential updates",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = epoch([1, 2], [2, 4], 0, 0.1, 1)\nassert equivalent(got, 1.68), got\n"
+        },
+        {
+          "name": "full batch",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = epoch([1, 2], [2, 4], 0, 0.1, 2)\nassert equivalent(got, 1), got\n"
+        },
+        {
+          "name": "short last batch",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = epoch([1, 1, 1], [2, 2, 2], 0, 0.1, 2)\nassert equivalent(got, 0.72), got\n"
+        },
+        {
+          "name": "empty epoch",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = epoch([], [], 3, 0.1, 2)\nassert equivalent(got, 3), got\n"
+        }
+      ],
+      "hints": [
+        "Each batch updates the parameter before the next batch is evaluated.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Each batch updates the parameter before the next batch is evaluated. Average within a batch, including a shorter final batch. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-naivebayes",
+      "title": "Multinomial Naive Bayes",
+      "body": "# Multinomial Naive Bayes\n\nCount tokens per class with Laplace smoothing. Work in log space to avoid multiplying tiny probabilities; repeated tokens contribute repeatedly.\n\n```python\nimport math\nprint(math.log(0.5) + math.log(3/4))\n```\n\n## From arithmetic to an experiment\n\nCount tokens per class with Laplace smoothing. Work in log space to avoid multiplying tiny probabilities; repeated tokens contribute repeatedly. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "log_scores(documents, labels, query, vocabulary) returns log posterior scores (without normalization) for classes 0 and 1. Both classes have documents; vocabulary is nonempty and unique. Ignore query tokens outside vocabulary, use alpha=1 and empirical class priors.",
+      "starter": "def log_scores(documents, labels, query, vocabulary):\n    pass\n",
+      "solution": "def log_scores(documents, labels, query, vocabulary):\n    import math\n    scores = []\n    for label in (0, 1):\n        chosen = [doc for doc,y in zip(documents,labels) if y == label]\n        counts = dict.fromkeys(vocabulary, 1)\n        for doc in chosen:\n            for token in doc:\n                if token in counts:\n                    counts[token] += 1\n        total = sum(counts.values())\n        score = math.log(len(chosen) / len(documents))\n        for token in query:\n            if token in counts:\n                score += math.log(counts[token] / total)\n        scores.append(score)\n    return scores\n",
+      "checks": [
+        {
+          "name": "smoothed likelihood",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = log_scores([['red', 'red'], ['blue']], [0, 1], ['red'], ['red', 'blue'])\nassert equivalent(got, [-0.9808292530117262, -1.791759469228055]), got\n"
+        },
+        {
+          "name": "unknown ignored",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = log_scores([['a'], ['b']], [0, 1], ['?'], ['a', 'b'])\nassert equivalent(got, [-0.6931471805599453, -0.6931471805599453]), got\n"
+        },
+        {
+          "name": "repeated query",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = log_scores([['a'], ['b']], [0, 1], ['a', 'a'], ['a', 'b'])\nassert equivalent(got, [-1.5040773967762742, -2.8903717578961645]), got\n"
+        }
+      ],
+      "hints": [
+        "Count tokens per class with Laplace smoothing.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Count tokens per class with Laplace smoothing. Work in log space to avoid multiplying tiny probabilities; repeated tokens contribute repeatedly. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-pca",
+      "title": "PCA by Power Iteration",
+      "body": "# PCA by Power Iteration\n\nCentre a two-dimensional cloud, build its covariance matrix and repeatedly multiply a direction. The final unit vector points along the greatest variance; choose a consistent sign.\n\n```python\nimport math\nvector = [2, 2]\nnorm = math.hypot(*vector)\nprint([x/norm for x in vector])\n```\n\n## From arithmetic to an experiment\n\nCentre a two-dimensional cloud, build its covariance matrix and repeatedly multiply a direction. The final unit vector points along the greatest variance; choose a consistent sign. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "principal_axis(points, steps) returns the first principal unit direction for 2D points using power iteration starting at (1,1)/sqrt(2). Centre points, use population covariance, take steps iterations; fall back to the covariance column with the greatest norm if the starting direction is orthogonal; return (0,0) for zero variance and orient x >= 0. Inputs are nonempty.",
+      "starter": "def principal_axis(points, steps):\n    pass\n",
+      "solution": "def principal_axis(points, steps):\n    import math\n    mx = sum(p[0] for p in points) / len(points)\n    my = sum(p[1] for p in points) / len(points)\n    xx = sum((x-mx)**2 for x,y in points) / len(points)\n    xy = sum((x-mx)*(y-my) for x,y in points) / len(points)\n    yy = sum((y-my)**2 for x,y in points) / len(points)\n    axis = [2 ** -.5, 2 ** -.5]\n    for _ in range(steps):\n        direction = [xx*axis[0]+xy*axis[1], xy*axis[0]+yy*axis[1]]\n        norm = math.hypot(*direction)\n        if not norm:\n            direction = max(([xx,xy],[xy,yy]), key=lambda v: math.hypot(*v))\n            norm = math.hypot(*direction)\n            if not norm:\n                return 0.0, 0.0\n        axis = [value / norm for value in direction]\n    if axis[0] < 0:\n        axis = [-value for value in axis]\n    return tuple(axis)\n",
+      "checks": [
+        {
+          "name": "diagonal cloud",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = principal_axis([[0, 0], [1, 1], [2, 2]], 3)\nassert equivalent(got, [0.7071067811865476, 0.7071067811865476]), got\n"
+        },
+        {
+          "name": "horizontal cloud",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = principal_axis([[-2, 1], [0, 1], [2, 1]], 3)\nassert equivalent(got, [1, 0]), got\n"
+        },
+        {
+          "name": "orthogonal seed",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = principal_axis([[-1, 1], [1, -1]], 3)\nassert equivalent(got, [0.7071067811865476, -0.7071067811865476]), got\n"
+        },
+        {
+          "name": "zero variance",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = principal_axis([[3, 4], [3, 4]], 3)\nassert equivalent(got, [0, 0]), got\n"
+        }
+      ],
+      "hints": [
+        "Centre a two-dimensional cloud, build its covariance matrix and repeatedly multiply a direction.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "Centre a two-dimensional cloud, build its covariance matrix and repeatedly multiply a direction. The final unit vector points along the greatest variance; choose a consistent sign. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    },
+    {
+      "id": "practice-silhouette",
+      "title": "Silhouette Clustering Score",
+      "body": "# Silhouette Clustering Score\n\nA cluster assignment can be compact yet poorly separated. Compare each point\u2019s mean distance within its cluster with the nearest other cluster; singletons score zero.\n\n```python\nwithin, nearest_other = 1.0, 9.5\nprint((nearest_other-within)/max(within, nearest_other))\n```\n\n## From arithmetic to an experiment\n\nA cluster assignment can be compact yet poorly separated. Compare each point\u2019s mean distance within its cluster with the nearest other cluster; singletons score zero. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run. State the shape and meaning of the returned value before coding. Keep preprocessing, evaluation and model updates in their proper order, and examine the boundary case in each check. The companion lab lets you replay intermediate values while the same algorithm runs.\n",
+      "task": "silhouette(points, labels) returns the mean silhouette for 1D points using absolute distance. There are at least two nonempty clusters. A singleton has score 0; if a=b=0 also use 0.",
+      "starter": "def silhouette(points, labels):\n    pass\n",
+      "solution": "def silhouette(points, labels):\n    scores = []\n    for i, point in enumerate(points):\n        own = [abs(point-q) for j,q in enumerate(points) if j != i and labels[j] == labels[i]]\n        if not own:\n            scores.append(0.0)\n            continue\n        a = sum(own) / len(own)\n        other = []\n        for label in sorted(set(labels) - {labels[i]}):\n            distances = [abs(point-q) for j,q in enumerate(points) if labels[j] == label]\n            other.append(sum(distances) / len(distances))\n        b = min(other)\n        scores.append((b-a)/max(a,b) if max(a,b) else 0.0)\n    return sum(scores) / len(scores)\n",
+      "checks": [
+        {
+          "name": "separated pairs",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = silhouette([0, 1, 9, 10], [0, 0, 1, 1])\nassert equivalent(got, 0.8885448916408669), got\n"
+        },
+        {
+          "name": "singletons",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = silhouette([0, 4], [0, 1])\nassert equivalent(got, 0), got\n"
+        },
+        {
+          "name": "coincident points",
+          "code": "def equivalent(actual, expected):\n    import math\n    if isinstance(expected, (list, tuple)):\n        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(equivalent(a,b) for a,b in zip(actual,expected))\n    if isinstance(expected, (int,float)):\n        return isinstance(actual, (int,float)) and math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-7)\n    return actual == expected\ngot = silhouette([0, 0, 0, 0], [0, 0, 1, 1])\nassert equivalent(got, 0), got\n"
+        }
+      ],
+      "hints": [
+        "A cluster assignment can be compact yet poorly separated.",
+        "Write down intermediate values for the first check before returning the result.",
+        "Handle the stated boundary condition explicitly, then compare the worked answer with your own trace."
+      ],
+      "explanation": "A cluster assignment can be compact yet poorly separated. Compare each point\u2019s mean distance within its cluster with the nearest other cluster; singletons score zero. The trace reads the local variables of your function as it executes. Change one input or parameter, predict the result, then run the checks again. A small deterministic example makes arithmetic mistakes easier to locate than a long training run."
+    }
+  ]
+}

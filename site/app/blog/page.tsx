@@ -5,7 +5,7 @@ import { absolute, allPosts, formatDate } from "./_lib/posts";
 import { BlogImage } from "./_lib/render";
 import "./blog.css";
 
-const description = "News and notes on Python, PyTorch and learning to code, from the team behind Pythilo, the Python IDE and course app for iPhone and iPad.";
+const description = "Practical Python, machine learning and AI: small experiments, clear explanations and code you can run. From the makers of Pythilo for iPhone and iPad.";
 
 export const metadata: Metadata = {
   title: "Blog",
@@ -22,7 +22,7 @@ export default function BlogIndex() {
     <main className="page blog-index">
       <section className="blog-intro">
         <div className="label">Blog</div>
-        <h1>News from Python and PyTorch</h1>
+        <h1>Python, machine learning & AI</h1>
         <p>{description} <a href="/blog/rss.xml">RSS feed</a></p>
       </section>
       {posts.length ? <ul className="blog-cards" role="list">

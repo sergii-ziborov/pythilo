@@ -15,24 +15,54 @@ struct LabTrace: Decodable, Sendable {
 
 struct LabsView: View {
     @State private var path: [String] = []
+    @State private var selected: LabInfo.Section?
+    @State private var query = ""
+
+    private var sections: [LabInfo.Section] {
+        selected.map { [$0] } ?? [.learning, .intelligence, .basics, .structures, .algorithms]
+    }
+
+    private func matching(_ section: LabInfo.Section) -> [LabInfo] {
+        LabCatalog.all.filter {
+            $0.section == section && (query.isEmpty || "\($0.title) \($0.summary)".localizedCaseInsensitiveContains(query))
+        }
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
+                    Text("\(LabCatalog.all.count) interactive labs")
+                        .font(.system(size: 24, weight: .bold))
+                        .accessibilityIdentifier("labs-total")
                     Text("Write the code yourself. Trace runs it line by line and draws every step; How it scales then times it on growing inputs.")
                         .font(.system(size: 15))
                         .foregroundStyle(AppTheme.secondary)
                         .padding(.bottom, 4)
-                    ForEach(LabInfo.Section.allCases, id: \.self) { section in
-                        let labs = LabCatalog.all.filter { $0.section == section }
-                        Text("\(section.rawValue.uppercased()) · \(labs.count)")
-                            .sectionLabel()
-                            .padding(.top, 10)
-                            .padding(.horizontal, 4)
-                            .accessibilityAddTraits(.isHeader)
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 10)], spacing: 10) {
-                            ForEach(labs) { lab($0) }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            filter("All · \(LabCatalog.all.count)", section: nil)
+                            ForEach([LabInfo.Section.learning, .intelligence, .basics, .structures, .algorithms], id: \.self) { section in
+                                let count = LabCatalog.all.filter { $0.section == section }.count
+                                let title = section == .learning ? "ML" : section == .intelligence ? "AI" : section.rawValue
+                                filter("\(title) · \(count)", section: section)
+                            }
+                        }.padding(.vertical, 4)
+                    }
+                    if sections.allSatisfy({ matching($0).isEmpty }) {
+                        ContentUnavailableView.search(text: query)
+                    }
+                    ForEach(sections, id: \.self) { section in
+                        let labs = matching(section)
+                        if !labs.isEmpty {
+                            Text("\(section.rawValue.uppercased()) · \(labs.count)")
+                                .sectionLabel()
+                                .padding(.top, 10)
+                                .padding(.horizontal, 4)
+                                .accessibilityAddTraits(.isHeader)
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 10)], spacing: 10) {
+                                ForEach(labs) { lab($0) }
+                            }
                         }
                     }
                     Text("Timings come from this device. They suggest a growth rate; they do not prove Big O.")
@@ -40,6 +70,8 @@ struct LabsView: View {
                         .foregroundStyle(AppTheme.muted)
                         .padding(.horizontal, 4)
                         .padding(.top, 6)
+                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") · build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "")")
+                        .font(.caption).foregroundStyle(AppTheme.muted)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -48,6 +80,7 @@ struct LabsView: View {
             }
             .background(AppTheme.background)
             .navigationTitle("Labs")
+            .searchable(text: $query, prompt: "Search all labs")
             .navigationDestination(for: String.self) { id in
                 switch id {
                 case "graph": GraphLabView()
@@ -65,6 +98,17 @@ struct LabsView: View {
             }
             #endif
         }
+    }
+
+    private func filter(_ title: String, section: LabInfo.Section?) -> some View {
+        Button { selected = section } label: {
+            Text(title).font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 12).padding(.vertical, 9)
+                .background(selected == section ? AppTheme.violet.opacity(0.25) : AppTheme.secondary.opacity(0.08), in: Capsule())
+                .foregroundStyle(selected == section ? AppTheme.violet : AppTheme.secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected == section ? .isSelected : [])
     }
 
     private func lab(_ info: LabInfo) -> some View {

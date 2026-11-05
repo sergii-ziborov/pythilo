@@ -7,7 +7,7 @@ export type BrowserLab = {
 };
 export const browserLabs = snapshot.labs as BrowserLab[];
 export const labSources: Record<string,string> = snapshot.sources;
-export type LabPanel = { type: string; title?: string; cells?: string[]; pairs?: [string,string][]; series?: { name: string; points: [number,number][] }[]; points?: [number,number,number][]; lines?: [number,number,number,number][] };
+export type LabPanel = { type: string; title?: string; grid?: string[][]; cells?: string[]; pairs?: [string,string][]; series?: { name: string; points: [number,number][] }[]; points?: [number,number,number][]; lines?: [number,number,number,number][] };
 export type LabFrame = { note: string; line: number | null; code: string; context: string; panels: LabPanel[] };
 export type LabResult = { correct: boolean; message: string; truncated: boolean; checks: {name: string; ok: boolean; message: string}[]; frames: LabFrame[] };
 const RESULT = '__PYTHILO_LAB_RESULT__';

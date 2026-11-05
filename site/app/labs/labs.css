@@ -2,3 +2,5 @@
 @media(max-width:1000px){.labs-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.lab-columns{grid-template-columns:1fr}.lab-workspace{max-width:800px}}@media(max-width:600px){.labs-index,.lab-workspace{padding:36px 20px 64px}.labs-how,.labs-cards{grid-template-columns:1fr}.labs-how{gap:12px}.labs-facts{gap:8px}.labs-facts span{font-size:11px;padding:8px 12px}.lab-replay{padding:15px}.lab-player{flex-wrap:wrap}.lab-code .plain-editor{height:360px}.labs-cards h3{margin-top:22px}}
 
 .lab-card-kind em{display:inline-block;color:#8cdec0;font-size:10px;font-style:normal;letter-spacing:0;margin-left:10px}.labs-index .eyebrow,.lab-title .eyebrow{font-size:11px;letter-spacing:.15em;color:#a6b8cc}
+
+.lab-matrix{overflow-x:auto}.lab-matrix table{border-collapse:collapse;margin:12px 0}.lab-matrix td{border:1px solid #334258;padding:12px;text-align:right;min-width:60px;background:#172235}

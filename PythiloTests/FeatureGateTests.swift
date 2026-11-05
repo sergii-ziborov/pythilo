@@ -205,7 +205,7 @@ final class FeatureGateTests: XCTestCase {
                 }
             }
         }
-        XCTAssertGreaterThan(count, 30)
+        XCTAssertEqual(count, 356)
         XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
     }
 

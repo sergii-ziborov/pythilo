@@ -52,12 +52,14 @@ open source (see [License](#license)).
 
 ### Learn
 
-- **236 lessons in 17 courses**: Python foundations and Python deeper (30 each), clean
+- **256 lessons in 19 courses**: Python foundations and Python deeper (30 each), clean
   code, testing, the tools around Python, architecture, concurrency and async, the web,
   data, the mathematics of neural networks, machine learning with PyTorch (30), language
   models from the inside, working with AI tools, and four practical courses on
-  algorithm patterns, data processing, reliability and machine learning.
-  Plus **20 interview tasks** with a timer and hints.
+  algorithm patterns, data processing, reliability and machine learning, followed by
+  ML evaluation and AI building blocks.
+  Plus **100 interview tasks** (35 easy, 45 medium, 20 hard) with a timer, progressive
+  hints, worked solutions and edge-case checks.
 - PyTorch 2.15 runs on the device ([torch-ios](https://github.com/sergii-ziborov/torch-ios)):
   the machine learning lessons train real networks offline.
 - Every exercise is checked by running your code on the device. When a check fails it
@@ -67,12 +69,19 @@ open source (see [License](#license)).
 
 ### Labs
 
-32 labs that trace **your own code** while it runs, with scaling measurements where
-available. Ten also run in the browser at [pythilo.com/labs](https://pythilo.com/labs/),
+52 labs that trace **your own code** while it runs, with scaling measurements where
+available. Thirty also run in the browser at [pythilo.com/labs](https://pythilo.com/labs/),
 using the same tracer and correctness checks.
 Correctness first, then time. The catalogue now covers Basics, Data structures,
-Algorithms and Machine learning, from binary search and linked lists to gradient
-descent, neural networks and Q-learning. For example:
+Algorithms, Machine learning and Artificial intelligence. Search the catalog or use
+the ML (21 labs) and AI (8 labs) filters. For example:
+
+- **ML evaluation and optimization**: train-only standardization, confusion matrices,
+  precision/recall/F1, threshold selection, folds, ridge regression, gradient checks,
+  Adam, mini-batch SGD, Naive Bayes, PCA and silhouette scores.
+- **AI building blocks**: stable softmax and temperature, scaled dot-product attention,
+  causal masks, nucleus candidates, beam search, BPE merging, cosine retrieval and
+  layer normalization.
 
 - **Sorting Bench**: every read and write your sort makes, on four kinds of input.
 - **Graph Explorer**: your BFS, DFS or Dijkstra expanding a grid, tree or random graph,
@@ -94,6 +103,8 @@ descent, neural networks and Q-learning. For example:
   iPhone whose owner allowed it. The relay is live at https://pythilo.com.
 - **A website** with the same lessons running in the browser on Pyodide, a playground
   and rooms. Live at [pythilo.com](https://pythilo.com), with the guide, pricing, support and legal pages.
+- **A practical blog** at [pythilo.com/blog](https://pythilo.com/blog/), with tested
+  Python examples and direct links into the ML and AI lessons and labs.
 
 ### Every shape
 

@@ -9,6 +9,10 @@ export function imageSize(src: string): { width: number; height: number } | unde
   const file = join(process.cwd(), "public", src.replace(/^\/+/, ""));
   if (!src.startsWith("/") || !existsSync(file)) return undefined;
   const b = readFileSync(file);
+  if (src.endsWith(".svg")) {
+    const dimensions = b.toString("utf8").match(/<svg\b[^>]*\bwidth="(\d+)"[^>]*\bheight="(\d+)"/);
+    if (dimensions) return { width: Number(dimensions[1]), height: Number(dimensions[2]) };
+  }
   if (b.toString("ascii", 0, 4) === "RIFF" && b.toString("ascii", 8, 12) === "WEBP") {
     const chunk = b.toString("ascii", 12, 16);
     if (chunk === "VP8X") return { width: 1 + b.readUIntLE(24, 3), height: 1 + b.readUIntLE(27, 3) };

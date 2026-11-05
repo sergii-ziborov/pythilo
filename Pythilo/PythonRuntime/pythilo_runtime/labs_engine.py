@@ -247,6 +247,7 @@ def register(lab_id, variants):
 
 
 MODULES = {
+    **dict.fromkeys(('standardize', 'confusion', 'precisionrecall', 'threshold', 'crossvalidation', 'ridge', 'gradientcheck', 'adam', 'minibatch', 'naivebayes', 'pca', 'silhouette', 'softmax', 'attention', 'causalmask', 'nucleus', 'beamsearch', 'bpe', 'retrieval', 'layernorm'), "labs_intelligence"),
     **dict.fromkeys(("prefix", "monostack", "topological", "knapsack", "bellmanford", "editrows", "linearfit", "logistic", "neighbors", "stump"), "labs_extended"),
     "binsearch": "labs_basics", "window": "labs_basics", "stackqueue": "labs_basics", "recursion": "labs_basics",
     "linkedlist": "labs_structures", "bst": "labs_structures", "heap": "labs_structures", "trie": "labs_structures",

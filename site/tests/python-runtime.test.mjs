@@ -94,7 +94,7 @@ test("the checker's messages are the app's: a failing starter explains what came
 });
 
 test("course content is built from the app's files, and lessons needing missing packages say so", () => {
-  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview", "algorithm-patterns", "data-practice", "reliable-python", "ml-practice"]);
+  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview", "algorithm-patterns", "data-practice", "reliable-python", "ml-practice", "ml-evaluation", "ai-building-blocks"]);
   const all = courses.flatMap(course => course.lessons);
   assert.ok(all.every(lesson => lesson.sections[0].chip === "Idea" && lesson.checks.length && lesson.starter));
   const lessonsOf = id => courses.find(course => course.id === id).lessons;
@@ -131,8 +131,8 @@ test("all browser labs trace actual edited code, accept worked answers and rejec
   }
 });
 
-test("every runnable example in the four new practical courses executes in Pyodide", () => {
-  const practical = courses.filter(course => ["algorithm-patterns", "data-practice", "reliable-python", "ml-practice"].includes(course.id));
+test("every runnable example in all six practical courses executes in Pyodide", () => {
+  const practical = courses.filter(course => ["algorithm-patterns", "data-practice", "reliable-python", "ml-practice", "ml-evaluation", "ai-building-blocks"].includes(course.id));
   let checked = 0;
   const failures = [];
   for (const course of practical) for (const lesson of course.lessons) {
@@ -146,4 +146,35 @@ test("every runnable example in the four new practical courses executes in Pyodi
   }
   assert.deepEqual(failures, []);
   assert.ok(checked >= practical.reduce((total, course) => total + course.lessons.length, 0));
+});
+
+
+test("every Python example in the six practical blog articles runs in Pyodide", async () => {
+  const { allPosts } = await import('../app/blog/_lib/posts.ts');
+  const posts = allPosts().filter(post => !post.slug.includes('news-november'));
+  assert.equal(posts.length, 6);
+  let count = 0;
+  for (const post of posts) for (const block of post.blocks) {
+    if (block.kind !== 'code' || block.language !== 'python') continue;
+    const response = JSON.parse(runner.run(JSON.stringify({ 'example.py': block.code }), 'example.py'));
+    const output = take();
+    assert.equal(response.exitCode, 0, `${post.slug}: ${output.err}`);
+    count++;
+  }
+  assert.ok(count >= 8);
+});
+
+
+test("all 80 added interview reading examples run independently in Pyodide", () => {
+  const interview = courses.find(course => course.id === 'interview');
+  assert.equal(interview.lessons.length, 100);
+  let checked = 0;
+  for (const lesson of interview.lessons.slice(20)) for (const section of lesson.sections) for (const block of parseMarkdown(section.markdown)) {
+    if (block.kind !== 'code' || block.language !== 'python') continue;
+    const response = JSON.parse(runner.run(JSON.stringify({'example.py':block.code}), 'example.py'));
+    const output = take();
+    assert.equal(response.exitCode, 0, `${lesson.id}: ${output.err}`);
+    checked++;
+  }
+  assert.equal(checked, 80);
 });

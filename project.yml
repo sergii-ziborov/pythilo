@@ -119,13 +119,27 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Pythilo.app/Pythilo"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
+  PythiloUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: PythiloUITests
+    dependencies:
+      - target: Pythilo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sergiiziborov.PythiloUITests
+        GENERATE_INFOPLIST_FILE: YES
+
 schemes:
   Pythilo:
     build:
       targets:
         Pythilo: all
         PythiloTests: [test]
+        PythiloUITests: [test]
     test:
       config: Debug
       targets:
         - PythiloTests
+        - PythiloUITests

@@ -2,7 +2,7 @@
 import copy
 import math
 from collections import deque
-from .labs_engine import array, plot, register, scatter, short, variables
+from .labs_engine import array, grid, plot, register, scatter, short, variables
 
 
 def render(view):
@@ -17,6 +17,8 @@ def render(view):
         if isinstance(value, (list, tuple, deque)) and len(value) <= 60:
             if all(isinstance(item, (int, float, str, bool)) for item in value):
                 panels.append(array(list(value), title=name))
+            elif value and all(isinstance(row, (list, tuple)) and len(row) <= 16 and all(isinstance(v, (int,float)) for v in row) for row in value) and len(value) <= 16:
+                panels.append(grid(value, title=name))
             elif name not in ('xs', 'ys'):
                 pairs.append((name, short(value, 100)))
         elif isinstance(value, dict) and len(value) <= 24:

@@ -1,6 +1,7 @@
 import snapshot from "../content/labs.json" with { type: "json" };
 /** App labs, grouped as in Pythilo/UI/Labs/LabCatalog.swift. */
 export const labGroups = [
+  { title: "Artificial intelligence", labs: [] as {id:string; title:string; summary:string}[] },
   { title: "Basics", labs: [
     { id: "binsearch", title: "Binary Search", summary: "Watch lo, hi and mid close in on the target." },
     { id: "window", title: "Two Pointers & Sliding Window", summary: "Grow and shrink a window instead of starting over." },
