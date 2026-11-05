@@ -276,3 +276,13 @@ Public smoke checks pass. A production browser check ran Rotate a list's reading
 example without a learner solution and returned `[4, 1, 2, 3]`, exit 0. Build 19
 uploaded successfully at 22:41:16 UTC; Apple processing is pending. No review
 submission was made.
+
+Build 19 (marketing version 0.1.0) completed processing at 23:07:54 UTC on
+5 November 2026 (6 November locally) and is IN_BETA_TESTING for the existing
+internal group with one tester. Build ID: `895e1e27-f484-456c-a451-ef7d6648d7bf`.
+Apple reports upload COMPLETE with no errors or warnings. Final readback confirms
+the App Store draft is still PREPARE_FOR_SUBMISSION with MANUAL release, the
+256/19/100/52 content counts match, and all eight screenshot assets are COMPLETE.
+No App Review or Beta App Review was requested. Public health is 200. Local
+verification servers are stopped; the workspace retains only its preexisting
+untracked `.cortex-loom/` directory.
