@@ -169,3 +169,15 @@ blog test and production build pass. Production checks fetched every article and
 image, verified matching metadata, PNG signatures/dimensions/MIME and all eight
 RSS enclosure types. The full public smoke check passes again. The app binary
 and lesson/Lab content are unchanged by this follow-up.
+
+The original interview reading examples were repaired and deployed at 22:41:02 UTC
+on 5 November 2026, image
+`sha256:5af988ab8b6b83822e9d6b64cbc2365d0303f6dd6ab4fa700fb8a4020bc2a57c`,
+receipt `pythilo-interview-reading-deploy-20261105-v5`, source revision
+`sha256:254de60b185d7e1fe1541f97fe5b005105c3e5ef953037b2186ef03bcfd8ab62`.
+All 112 reading blocks in the 100 interview tasks now execute in isolation. The
+expanded Pyodide test and all 80 site tests pass; the new native test executes the
+same 112 blocks inside the app and passes. The production build and public smoke
+check pass. A browser check on production ran the first task's example and showed
+`[4, 1, 2, 3]`, exit 0; existing Home/Labs tabs were refreshed to the current counts.
+The screenshot is `build/verification/pythilo-interview-example-fixed-live.jpg`.

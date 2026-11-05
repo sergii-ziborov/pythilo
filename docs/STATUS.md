@@ -268,3 +268,11 @@ the iOS Simulator. The new native gate is
 tests pass with the interview reading test expanded to every task. Existing task
 IDs, checks, hints and solutions are preserved. Build 19 packages this content
 correction; its signed archive contains byte-identical checked course JSON.
+
+The interview reading correction was deployed at 22:41:02 UTC through
+`pythilo-interview-reading-deploy-20261105-v5`, serving image
+`sha256:5af988ab8b6b83822e9d6b64cbc2365d0303f6dd6ab4fa700fb8a4020bc2a57c`.
+Public smoke checks pass. A production browser check ran Rotate a list's reading
+example without a learner solution and returned `[4, 1, 2, 3]`, exit 0. Build 19
+uploaded successfully at 22:41:16 UTC; Apple processing is pending. No review
+submission was made.
