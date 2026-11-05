@@ -60,10 +60,10 @@ def short(value, limit=28):
 # now (the thing this step touched), done, seen, bad, dim, focus.
 
 
-def array(cells, title=None, roles=None, pointers=None, window=None, caption=None):
+def array(cells, title=None, roles=None, pointers=None, window=None, caption=None, offset=0):
     cells = [c if isinstance(c, str) else short(c, 8) for c in cells]
     return {
-        "type": "array", "title": title, "caption": caption, "cells": cells,
+        "type": "array", "title": title, "caption": caption, "cells": cells, "offset": offset,
         "roles": roles or [""] * len(cells),
         "pointers": [{"name": name, "index": index} for name, index in (pointers or [])],
         "window": list(window) if window else None,
@@ -92,9 +92,13 @@ def chain(nodes, pointers, title=None, caption=None):
             "pointers": [{"name": name, "node": node} for name, node in pointers]}
 
 
-def scatter(points, centers=None, lines=None, trails=None, title=None, caption=None):
+def scatter(points, centers=None, lines=None, trails=None, title=None, caption=None, bounds=None, field=None, path=None):
+    """points/centers: [x, y, group]; lines: [x1, y1, x2, y2]; trails: lists of [x, y];
+    field: rows of 0..1 values drawn as a heat map under everything (row 0 at the top);
+    bounds: [xmin, xmax, ymin, ymax]; path: [x, y] points joined in order."""
     return {"type": "scatter", "title": title, "caption": caption, "points": points,
-            "centers": centers or [], "lines": lines or [], "trails": trails or []}
+            "centers": centers or [], "lines": lines or [], "trails": trails or [],
+            "bounds": bounds, "field": field, "path": path or []}
 
 
 def plot(series, title=None, caption=None):
@@ -143,7 +147,7 @@ class Recorder:
             return
         if len(self.frames) >= MAXIMUM_FRAMES:
             self.truncated = True
-            raise Stop(f"Stopped recording after {MAXIMUM_FRAMES} steps.")
+            return
         self._last = panels
         text = self.source_lines[line - 1].strip() if line and 0 < line <= len(self.source_lines) else ""
         self.frames.append({"note": note, "line": line, "code": text, "panels": panels, "context": self.context})
@@ -169,7 +173,7 @@ class Recorder:
                     return
                 if len(self.frames) >= MAXIMUM_FRAMES:
                     self.truncated = True
-                    raise Stop(f"Stopped recording after {MAXIMUM_FRAMES} steps.")
+                    return
                 self._last = panels
                 self.frames.append({"note": note, "line": line, "code": self.source_lines[line - 1].strip() if 0 < line <= len(self.source_lines) else "", "panels": panels, "context": self.context})
 
@@ -299,6 +303,7 @@ def run(job):
                 message = failure(error, filename)
             checks.append({"name": name, "ok": not message, "message": message or ""})
         payload["checks"] = checks
+        payload["truncated"] = payload["truncated"] or recorder.truncated
         payload["correct"] = all(check["ok"] for check in checks)
         payload["message"] = next((check["message"] for check in checks if not check["ok"]), "")
     except LabError as error:
