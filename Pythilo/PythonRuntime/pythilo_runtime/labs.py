@@ -100,29 +100,41 @@ def trace_sort(job):
     )
 
 
-def measure_sort(job):
-    function = _load(job["source"])
-    size = job.get("size", 2000)
-    rows = []
-    for name, sorter in (("your sort", function), ("sorted()", None)):
-        row = {"name": name, "cells": {}}
-        for kind in ("random", "sorted", "reversed", "duplicates"):
-            samples = []
-            correct = True
-            for _ in range(job.get("runs", 5)):
-                values = _inputs(kind, size)
-                expected = sorted(values)
-                started = time.perf_counter()
-                if sorter is None:
-                    values = sorted(values)
-                else:
-                    sorter(values)
-                samples.append((time.perf_counter() - started) * 1000)
-                correct = correct and values == expected
-            row["cells"][kind] = {
-                "median": statistics.median(samples),
-                "spread": max(samples) - min(samples),
-                "correct": correct,
-            }
-        rows.append(row)
-    emit_json("lab_measure", {"id": job["id"], "size": size, "rows": rows})
+def scale_sort(job):
+    """How it scales: the learner's sort on growing lists in three orders, sorted() for comparison."""
+    from .labs_engine import scale
+
+    try:
+        function = _load(job["source"])
+    except Exception as error:
+        emit_json("lab_scale", {"id": job["id"], "lab": "sorting", "variant": "", "what": "", "x": "n", "runs": 0, "series": [],
+                                "takeaway": "", "stopped": describe_failure(error, "sort.py"), "footnote": ""})
+        return
+
+    def series(kind, sorter=None):
+        def prepare(n):
+            values = _inputs(kind, n)
+            if sorter is None:
+                return lambda: function(list(values))
+            return lambda: sorter(values)
+        return prepare
+
+    def check(n):
+        for kind in ("random", "reversed"):
+            values = _inputs(kind, min(n, 300))
+            expected = sorted(values)
+            try:
+                function(values)
+            except Exception as error:
+                return describe_failure(error, "sort.py")
+            if values != expected:
+                return f"the {kind} list did not end up sorted."
+        return None
+
+    scale(
+        job["id"], "sorting", "", "Sorts lists of n numbers in three orders: random, already sorted and reversed. sorted() sorts the random list for comparison.",
+        "list length n", job.get("sizes") or [250, 500, 1000, 2000, 4000, 8000],
+        [("your sort, random", series("random")), ("your sort, sorted", series("sorted")), ("your sort, reversed", series("reversed")),
+         ("sorted(), random", series("random", sorted))],
+        check=check, budget=job.get("budget", 8.0),
+    )

@@ -250,19 +250,23 @@ def _perform(job):
     elif kind == "lab_measure":
         from . import labs
 
-        labs.measure_sort(job)
+        labs.scale_sort(job)
     elif kind in ("lab_graph_trace", "lab_graph_measure"):
         from . import labs_graph
 
-        (labs_graph.trace if kind == "lab_graph_trace" else labs_graph.measure)(job)
-    elif kind == "lab_hash":
+        (labs_graph.trace if kind == "lab_graph_trace" else labs_graph.scale)(job)
+    elif kind in ("lab_hash", "lab_hash_scale"):
         from . import labs_hashing
 
-        labs_hashing.run(job)
+        (labs_hashing.run if kind == "lab_hash" else labs_hashing.scale)(job)
     elif kind in ("lab_dp_trace", "lab_dp_measure"):
         from . import labs_dp
 
-        (labs_dp.trace if kind == "lab_dp_trace" else labs_dp.measure)(job)
+        (labs_dp.trace if kind == "lab_dp_trace" else labs_dp.scale)(job)
+    elif kind in ("lab_run", "lab_scale"):
+        from . import labs_engine
+
+        (labs_engine.run if kind == "lab_run" else labs_engine.run_scale)(job)
     elif kind == "notebook_reset":
         from . import notebook
 

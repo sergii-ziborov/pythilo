@@ -214,40 +214,45 @@ def trace(job):
     )
 
 
-def measure(job):
+def scale(job):
+    """How it scales: the learner's search from node 0 on growing graphs of one shape."""
+    from .labs_engine import scale as run_scale
+
     algorithm = job.get("algorithm", "bfs")
-    function = _load(job["source"], algorithm)
-    weighted = algorithm == "dijkstra"
     topology = job.get("topology", "sparse")
-    rows = []
-    for size in job.get("sizes", [200, 800, 3200]):
-        nodes, adjacency, weights, _ = _build(topology, size, 11, weighted)
-        samples = []
-        correct, message = True, ""
-        graph = None
-        for _ in range(job.get("runs", 3)):
-            graph = Graph(nodes, adjacency, weighted)
-            started = time.perf_counter()
-            try:
-                result = function(graph, 0)
-            except Exception as error:
-                samples.append((time.perf_counter() - started) * 1000)
-                correct, message = False, describe_failure(error, "graph.py")
-                break
-            samples.append((time.perf_counter() - started) * 1000)
-            correct, message = _judge(algorithm, result, adjacency, 0)
-            if not correct:
-                break
-        rows.append(
-            {
-                "size": len(nodes),
-                "edges": len(weights),
-                "median": statistics.median(samples),
-                "spread": max(samples) - min(samples),
-                "expansions": graph.expansions,
-                "examined": graph.examined,
-                "correct": correct,
-                "message": message,
-            }
-        )
-    emit_json("lab_graph_measure", {"id": job["id"], "algorithm": algorithm, "topology": topology, "rows": rows})
+    weighted = algorithm == "dijkstra"
+    try:
+        function = _load(job["source"], algorithm)
+    except Exception as error:
+        emit_json("lab_scale", {"id": job["id"], "lab": "graph", "variant": algorithm, "what": "", "x": "nodes n", "runs": 0,
+                                "series": [], "takeaway": "", "stopped": describe_failure(error, "graph.py"), "footnote": ""})
+        return
+    built = {}
+    counts = {}
+
+    def graph(n):
+        if n not in built:
+            built.clear()
+            built[n] = _build(topology, n, 11, weighted)
+        return built[n]
+
+    def check(n):
+        nodes, adjacency, weights, _ = graph(n)
+        counted = Graph(nodes, adjacency, weighted)
+        try:
+            result = function(counted, 0)
+        except Exception as error:
+            return describe_failure(error, "graph.py")
+        correct, message = _judge(algorithm, result, adjacency, 0)
+        counts["last"] = (len(nodes), len(weights), counted.expansions, counted.examined)
+        return None if correct else message
+
+    def mine(n):
+        nodes, adjacency, _, _ = graph(n)
+        return lambda: function(Graph(nodes, adjacency, weighted), 0)
+
+    sizes = job.get("sizes") or ([25, 50, 100, 200, 400] if topology == "dense" else [200, 400, 800, 1600, 3200, 6400, 12800])
+    shape = {"grid": "square grids", "tree": "random trees", "sparse": "sparse random graphs", "dense": "dense random graphs"}.get(topology, topology)
+    footnote = "Dense graphs have about n² / 4 edges, so the edges, not the nodes, set the pace." if topology == "dense" else ""
+    run_scale(job["id"], "graph", algorithm, f"Runs your {algorithm} from node 0 on {shape} of n nodes.", "nodes n", sizes,
+              [(f"your {algorithm}", mine)], check=check, footnote=footnote)

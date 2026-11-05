@@ -363,7 +363,8 @@ def describe_growth(points, step="double"):
 
 
 def time_call(call, minimum_runs=3, target_ms=40, maximum_runs=25):
-    """The median of several runs. Fast calls run more times so the clock can see them."""
+    """The fastest of several runs: other work on the device can only slow a run down,
+    so the fastest is the least disturbed. Fast calls run more times so the clock can see them."""
     samples = []
     total = 0.0
     while len(samples) < maximum_runs and (len(samples) < minimum_runs or total < target_ms):
@@ -375,7 +376,7 @@ def time_call(call, minimum_runs=3, target_ms=40, maximum_runs=25):
         total += elapsed
         if elapsed > 300:
             break
-    return statistics.median(samples), len(samples)
+    return min(samples), len(samples)
 
 
 def scale(job_id, lab_id, variant, what, x_label, sizes, series, check=None, step="double",
@@ -411,7 +412,7 @@ def scale(job_id, lab_id, variant, what, x_label, sizes, series, check=None, ste
                 row["ok"], row["message"] = False, f"{type(error).__name__} at n = {n:,}: {error}"
                 stopped = row["message"]
                 continue
-            row["points"].append([n, median])
+            row["points"].append([n, median])  # the fastest run
             row["runs"] = max(row["runs"], runs)
             if median > size_limit_ms:
                 if row is rows[0]:

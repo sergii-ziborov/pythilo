@@ -151,3 +151,55 @@ def _run(job):
             "message": message,
         },
     )
+
+
+def scale(job):
+    """How it scales: n puts then n gets on the learner's table and on dict, for one workload."""
+    from .labs_engine import scale as run_scale
+
+    workload = job.get("workload", "words")
+    try:
+        cls = _load(job["source"])
+        buckets = len(_occupancy(cls()) or [None] * 16)
+    except Exception as error:
+        emit_json("lab_scale", {"id": job["id"], "lab": "hash", "variant": workload, "what": "", "x": "keys n", "runs": 0, "series": [],
+                                "takeaway": "", "stopped": describe_failure(error, "table.py"), "footnote": ""})
+        return
+
+    def mine(n):
+        keys = _keys(workload, n, buckets)
+
+        def run():
+            table = cls()
+            for index, key in enumerate(keys):
+                table.put(key, index)
+            for key in keys:
+                table.get(key)
+        return run
+
+    def builtin(n):
+        keys = _keys(workload, n, buckets)
+
+        def run():
+            table = {}
+            for index, key in enumerate(keys):
+                table[key] = index
+            for key in keys:
+                table[key]
+        return run
+
+    def check(n):
+        keys = _keys(workload, min(n, 200), buckets)
+        table = cls()
+        for index, key in enumerate(keys):
+            table.put(key, index)
+        for index, key in enumerate(keys):
+            got = table.get(key)
+            if got != index:
+                return f"get({key!r}) gave {got!r}, expected {index}."
+        return None
+
+    footnote = "Colliding keys all land in one bucket, so each get walks a list as long as the table." if workload == "colliding" else ""
+    run_scale(job["id"], "hash", workload, f"Puts n {workload} keys into a new table, then gets every one back. dict does the same for comparison.",
+              "keys n", job.get("sizes") or [250, 500, 1000, 2000, 4000, 8000, 16000],
+              [("your Table", mine), ("dict", builtin)], check=check, footnote=footnote)

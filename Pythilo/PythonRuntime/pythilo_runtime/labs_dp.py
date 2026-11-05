@@ -186,38 +186,59 @@ def trace(job):
 
 def _sizes(problem):
     if problem == "edit":
-        words = "abcdefghijklmnopqrstuvwx"
-        return [(words[:size], words[size // 3 : size + size // 3]) for size in range(2, 26, 3)]
+        words = "abcdefghijklmnopqrstuvwxyz" * 20
+        return [(words[:size], words[size // 3 : size + size // 3]) for size in (4, 8, 16, 32, 64, 128, 256)]
     if problem == "coins":
-        return [(amount,) for amount in range(5, 160, 15)]
-    return [(n,) for n in range(4, 64, 4)]
+        return [(amount,) for amount in (8, 12, 16, 20, 24, 32, 64, 128, 256, 512)]
+    return [(n,) for n in (8, 12, 16, 20, 24, 28, 32, 64, 128, 256, 512)]
 
 
-def measure(job):
+class _NoWrites(list):
+    """Timing runs keep no trace of table writes."""
+
+    def append(self, item):
+        pass
+
+
+def scale(job):
+    """How it scales: the learner's function on growing inputs, a fresh copy of their file each run."""
+    from .labs_engine import scale as run_scale
+
     problem = job.get("problem", "stairs")
-    rows = []
-    stopped = ""
-    budget = time.perf_counter() + job.get("budgetSeconds", 4)
-    for args in _sizes(problem):
-        writes = []
-        module, name, _ = _load(job["source"], problem, writes)
-        calls, depth = [], [0, 0]
-        counted, _ = _instrument(module, name, calls, depth)
-        started = time.perf_counter()
+    try:
+        _load(job["source"], problem, [])
+    except Exception as error:
+        emit_json("lab_scale", {"id": job["id"], "lab": "dp", "variant": problem, "what": "", "x": "n", "runs": 0, "series": [],
+                                "takeaway": "", "stopped": describe_failure(error, "dp.py"), "footnote": ""})
+        return
+    by_size = {(args[0] if len(args) == 1 else len(args[0])): args for args in _sizes(problem)}
+
+    def fresh(n):
+        # A new module each time, so a cache from the last run cannot answer for free.
+        module, name, _ = _load(job["source"], problem, _NoWrites())
+        function = module.__dict__[name]
+        args = by_size[n]
+        return lambda: function(*args)
+
+    def check(n):
+        module, name, _ = _load(job["source"], problem, _NoWrites())
+        function = module.__dict__[name]
+        args = by_size[n]
+        if n > 24 and problem != "edit":
+            return None
         try:
-            result = counted(*args)
-        except _Stop:
-            stopped = f"Stopped at {_call(name, args)}: over {MAXIMUM_CALLS:,} calls."
-            break
+            result = function(*args)
         except RecursionError:
-            stopped = f"Stopped at {_call(name, args)}: recursion went too deep."
-            break
+            return f"{_call(name, args)} recursed too deep."
         except Exception as error:
-            stopped = describe_failure(error, "dp.py")
-            break
-        elapsed = (time.perf_counter() - started) * 1000
-        rows.append({"size": args[0] if len(args) == 1 else len(args[0]), "milliseconds": elapsed, "calls": len(calls), "correct": result == REFERENCE[problem](*args)})
-        if time.perf_counter() > budget or elapsed > 1000:
-            stopped = "Stopped growing the input: the time budget ran out."
-            break
-    emit_json("lab_dp_measure", {"id": job["id"], "problem": problem, "rows": rows, "stopped": stopped})
+            return describe_failure(error, "dp.py")
+        expected = REFERENCE[problem](*args)
+        return None if result == expected else f"{_call(name, args)} returned {result!r}, expected {expected!r}."
+
+    what = {
+        "stairs": "Calls ways(n) for growing n, with a fresh copy of your file each run so no cache carries over.",
+        "coins": "Calls min_coins(amount) for growing amounts, with a fresh copy of your file each run.",
+        "edit": "Calls edit_distance on two words of length n, with a fresh copy of your file each run.",
+    }[problem]
+    run_scale(job["id"], "dp", problem, what, "length n" if problem == "edit" else "n", sorted(by_size),
+              [("your " + PROBLEMS[problem]["function"], fresh)], check=check)

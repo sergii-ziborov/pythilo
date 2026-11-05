@@ -30,7 +30,8 @@ def _field(function, bounds, columns=26, rows=18, log=True):
     if log:
         flat_log = [math.log1p(v) for v in flat]
         low, high = min(flat_log), max(flat_log)
-        return [[round((math.log1p(v) - low) / (high - low or 1), 2) for v in line] for line in values]
+        # 1 where the loss is lowest, so the valley draws darkest.
+        return [[round(1 - (math.log1p(v) - low) / (high - low or 1), 2) for v in line] for line in values]
     low, high = min(flat), max(flat)
     return [[round((v - low) / (high - low or 1), 2) for v in line] for line in values]
 
