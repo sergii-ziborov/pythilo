@@ -10,9 +10,10 @@ const byName = (a: TreeNode, b: TreeNode) => {
 };
 
 /** The tree is derived from path prefixes; the document stores no folders. */
-export function buildFileTree(paths: Iterable<string>): TreeNode[] {
+export function buildFileTree(paths: Iterable<string>, emptyFolders: Iterable<string> = []): TreeNode[] {
   const root: TreeNode[] = [], folders = new Map<string, TreeNode[]>([["", root]]);
-  for (const path of paths) {
+  // An empty folder is shown, not stored: it lasts until a file is added or the page closes.
+  for (const path of [...paths, ...Array.from(emptyFolders, folder => `${folder}/\u0000`)]) {
     const parts = path.split("/");
     for (let depth = 0; depth < parts.length - 1; depth++) {
       const folder = parts.slice(0, depth + 1).join("/");
@@ -22,7 +23,7 @@ export function buildFileTree(paths: Iterable<string>): TreeNode[] {
         folders.get(parts.slice(0, depth).join("/"))!.push({ kind: "folder", name: parts[depth], path: folder, children });
       }
     }
-    folders.get(parts.slice(0, -1).join("/"))!.push({ kind: "file", name: parts.at(-1)!, path });
+    if (parts.at(-1) !== "\u0000") folders.get(parts.slice(0, -1).join("/"))!.push({ kind: "file", name: parts.at(-1)!, path });
   }
   for (const children of folders.values()) children.sort(byName);
   return root;
@@ -51,7 +52,9 @@ export type FileOperation =
   | { kind: "duplicate"; from: string; to: string }
   | { kind: "delete-file"; path: string; entryFile?: string }
   | { kind: "rename-folder"; from: string; to: string }
-  | { kind: "delete-folder"; path: string; entryFile?: string };
+  | { kind: "delete-folder"; path: string; entryFile?: string }
+  /** Creates or overwrites files, for uploads and for undoing a delete. */
+  | { kind: "add-files"; files: Record<string, string>; entryFile?: string };
 
 export type FilePlan = {
   document: PlaygroundDocument;
@@ -117,13 +120,26 @@ export function planFileOperation(source: PlaygroundDocument, operation: FileOpe
       for (const path of inside) move(path, to + path.slice(from.length));
       break;
     }
+    case "add-files": {
+      for (const [raw, text] of Object.entries(operation.files)) {
+        const path = clean(raw);
+        const existing = Object.keys(files).find(item => item.normalize("NFC").toLowerCase() === path.normalize("NFC").toLowerCase());
+        if (existing && existing !== path) delete files[existing];
+        if (!(path in files)) added.push(path);
+        files[path] = text;
+      }
+      if (operation.entryFile && operation.entryFile in files) entryFile = operation.entryFile;
+      break;
+    }
     case "delete-file":
     case "delete-folder": {
       const gone = operation.kind === "delete-file" ? [operation.path] : Object.keys(files).filter(path => insideFolder(path, operation.path));
       if (!gone.length || gone.some(path => !(path in files))) throw new Error("This no longer exists.");
       if (gone.includes(entryFile)) {
-        if (!operation.entryFile || gone.includes(operation.entryFile) || !(operation.entryFile in files)) throw new Error("Choose a new entry file that stays in the project.");
-        entryFile = operation.entryFile;
+        // Without a choice, the first Python file that stays becomes the entry file.
+        const next = operation.entryFile ?? Object.keys(files).filter(path => path.endsWith(".py") && !gone.includes(path)).sort()[0];
+        if (!next || gone.includes(next) || !(next in files)) throw new Error("A project needs one Python file to run. Add another .py file first.");
+        entryFile = next;
       }
       for (const path of gone) { delete files[path]; removed.push(path); }
       break;
@@ -151,4 +167,22 @@ export function fileIconKind(path: string): FileIconKind {
   if (lower.endsWith(".js")) return "script";
   if (lower === ".gitignore") return "git";
   return "text";
+}
+
+/** The path a file or folder gets when it moves into `folder` ("" is the project root). */
+export function movedPath(path: string, folder: string): string {
+  const name = path.split("/").at(-1)!;
+  return folder ? `${folder}/${name}` : name;
+}
+
+/** Every folder in the project, for "Move to". */
+export function folderPaths(paths: Iterable<string>): string[] {
+  return Array.from(new Set(Array.from(paths).flatMap(ancestors))).sort();
+}
+
+/** The operation that moves a file or folder into another folder, or null when it stays put. */
+export function moveOperation(node: { kind: "file" | "folder"; path: string }, folder: string): FileOperation | null {
+  const to = movedPath(node.path, folder);
+  if (to === node.path || (node.kind === "folder" && (folder === node.path || insideFolder(folder, node.path)))) return null;
+  return node.kind === "folder" ? { kind: "rename-folder", from: node.path, to } : { kind: "rename", from: node.path, to };
 }

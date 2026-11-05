@@ -57,7 +57,9 @@ test("file operations share the Python document rules", () => {
   assert.throws(() => planFileOperation(project(), { kind: "create", path: "__pycache__/x.py" }), /Unsupported/);
   assert.throws(() => planFileOperation(project(), { kind: "create", path: "MAIN.py" }), /already exists/);
   assert.throws(() => planFileOperation(project(), { kind: "create", path: "main.py/x.py" }));
-  assert.throws(() => planFileOperation(project(), { kind: "delete-file", path: "main.py" }), /new entry/);
+  // Deleting the main file without a choice makes the first remaining Python file the main file.
+  assert.equal(planFileOperation(project(), { kind: "delete-file", path: "main.py" }).document.entryFile, "cleaner.py");
+  assert.throws(() => planFileOperation({ ...project(), files: { "main.py": "", "notes.md": "" } }, { kind: "delete-file", path: "main.py" }), /one Python file/);
   assert.equal(planFileOperation(project(), { kind: "delete-file", path: "main.py", entryFile: "cleaner.py" }).document.entryFile, "cleaner.py");
   assert.equal(planFileOperation(project(), { kind: "duplicate", from: "cleaner.py", to: "cleaner_copy.py" }).document.files["cleaner_copy.py"], project().files["cleaner.py"]);
   assert.equal(isDestructiveInSharedRoom({ kind: "create", path: "a.py" }), false);
