@@ -165,16 +165,17 @@ test("every Python example in the six practical blog articles runs in Pyodide", 
 });
 
 
-test("all 80 added interview reading examples run independently in Pyodide", () => {
+test("reading examples in all 100 interview tasks run independently in Pyodide", async () => {
   const interview = courses.find(course => course.id === 'interview');
   assert.equal(interview.lessons.length, 100);
   let checked = 0;
-  for (const lesson of interview.lessons.slice(20)) for (const section of lesson.sections) for (const block of parseMarkdown(section.markdown)) {
+  for (const lesson of interview.lessons) for (const section of lesson.sections) for (const block of parseMarkdown(section.markdown)) {
     if (block.kind !== 'code' || block.language !== 'python') continue;
-    const response = JSON.parse(runner.run(JSON.stringify({'example.py':block.code}), 'example.py'));
+    const files = JSON.stringify({'example.py':block.code});
+    const response = JSON.parse(stackSwitching ? await runner.run.callPromising(files, 'example.py') : runner.run(files, 'example.py'));
     const output = take();
     assert.equal(response.exitCode, 0, `${lesson.id}: ${output.err}`);
     checked++;
   }
-  assert.equal(checked, 80);
+  assert.equal(checked, 112);
 });

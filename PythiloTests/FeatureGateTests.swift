@@ -209,6 +209,33 @@ final class FeatureGateTests: XCTestCase {
         XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
     }
 
+    func testEveryInterviewReadingExampleRunsIndependentlyOnTheDevice() async throws {
+        let library = CourseLibrary()
+        let interview = try XCTUnwrap(library.interview)
+        XCTAssertEqual(interview.lessons.count, 100)
+        let pattern = try NSRegularExpression(pattern: "```python\\n([\\s\\S]*?)```")
+        var failures: [String] = []
+        var count = 0
+        for lesson in interview.lessons {
+            let body = lesson.body as NSString
+            let matches = pattern.matches(in: lesson.body, range: NSRange(location: 0, length: body.length))
+            XCTAssertFalse(matches.isEmpty, lesson.id)
+            for (index, match) in matches.enumerated() {
+                let path = root.appending(path: "\(lesson.id)-\(index).py")
+                try body.substring(with: match.range(at: 1)).write(to: path, atomically: true, encoding: .utf8)
+                session.clearOutput()
+                let id = session.submit(["kind": "script", "path": path.path, "root": root.path, "cwd": root.path], label: "Reading example")
+                try await waitUntil(timeout: 30) { self.session.lastOutcome?.id == id && self.session.phase == .idle }
+                if session.lastOutcome?.code != 0 {
+                    failures.append("\(lesson.id) example \(index): \(session.output.map(\.text).joined())")
+                }
+                count += 1
+            }
+        }
+        XCTAssertEqual(count, 112)
+        XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
+    }
+
     private let insertion = """
     def my_sort(items):
         for i in range(1, len(items)):

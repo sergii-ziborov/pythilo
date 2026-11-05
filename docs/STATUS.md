@@ -256,3 +256,15 @@ production build, individual public article/image/feed checks and the full publi
 smoke test pass. Current serving image:
 `sha256:d6d956f87350ad3e21c2d43fa8317ba600685d0a997f4a2cc3960f2e4f7c8252`;
 receipt `pythilo-blog-share-covers-deploy-20261105-v4`.
+
+Build 18 completed Apple processing at 22:35:05 UTC and is IN_BETA_TESTING for
+the existing internal group (one tester). A follow-up audit of the original
+interview reading blocks found standalone snippets that referenced undefined
+functions or input names. Twenty-two blocks were repaired, including complete
+asyncio examples. All 112 Python blocks across all 100 interview tasks now run
+independently in CPython, Pyodide (including promising asyncio calls) and inside
+the iOS Simulator. The new native gate is
+`testEveryInterviewReadingExampleRunsIndependentlyOnTheDevice`; all 80 website
+tests pass with the interview reading test expanded to every task. Existing task
+IDs, checks, hints and solutions are preserved. Build 19 packages this content
+correction; its signed archive contains byte-identical checked course JSON.
