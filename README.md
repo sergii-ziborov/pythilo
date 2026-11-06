@@ -52,7 +52,7 @@ open source (see [License](#license)).
 
 ### Learn
 
-- **406 lessons in 32 courses**, including 98 advanced lessons (18 integration projects): Python foundations and Python deeper (30 each), clean
+- **424 lessons in 34 courses**, including 116 advanced lessons (24 integration projects): Python foundations and Python deeper (30 each), clean
   code, testing, the tools around Python, architecture, concurrency and async, the web,
   data, the mathematics of neural networks, machine learning with PyTorch (30), language
   models from the inside, working with AI tools, and four practical courses on
@@ -70,16 +70,22 @@ open source (see [License](#license)).
 
 ### Labs
 
-96 labs that trace **your own code** while it runs, with scaling measurements where
+114 labs in 13 topics that trace **your own code** while it runs, with scaling measurements where
 available. Seventy-four also run in the browser at [pythilo.com/labs](https://pythilo.com/labs/),
-using the same tracer and correctness checks.
+using the same tracer and correctness checks. Eighteen new PyTorch Labs run in the app,
+including six composed projects. Expand a topic or search by concept to find them.
 Correctness first, then time. The catalogue now covers Basics, Data structures,
 Algorithms, Machine learning and Artificial intelligence. Search the catalog or use
-the ML (45 labs) and AI (28 labs) filters. For example:
+the ML (54 labs) and AI (37 labs) filters. For example:
 
 - **ML evaluation and optimization**: train-only standardization, confusion matrices,
   precision/recall/F1, threshold selection, folds, ridge regression, gradient checks,
   Adam, mini-batch SGD, Naive Bayes, PCA and silhouette scores.
+- **PyTorch and transformers**: global gradient clipping, AdamW parameter ownership,
+  distillation, contrastive learning, EMA, token accumulation, RoPE, KV caches,
+  packed-document masks, grouped-query attention and RMS normalization. Projects train
+  MLPs, resume AdamW/dropout exactly, learn low-rank adapters, audit decoder blocks,
+  train a tiny causal language model and classify padded sequences.
 - **AI building blocks**: stable softmax and temperature, scaled dot-product attention,
   causal masks, nucleus candidates, beam search, BPE merging, cosine retrieval and
   layer normalization.

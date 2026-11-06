@@ -1,0 +1,308 @@
+{
+  "id": "transformer-engineering",
+  "title": "Transformers: implementation and training",
+  "summary": "Real PyTorch CPU tensor operations, independent checks and three composed projects. Run in Pythilo; no external weights, GPU or service required.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "pt-torchsdpa",
+      "title": "Mask attention with finite empty-row gradients",
+      "body": "# Mask attention with finite empty-row gradients\n\nCausal, padding and authorization constraints eventually become a participation mask over attention scores. Mask meaning varies between APIs, so this exercise explicitly uses true for an admitted key. A row with no admitted key is an important edge case: ordinary softmax of all negative infinity produces an undefined intermediate. The implementation must avoid that intermediate before multiplying the final mask. Checks examine finite backward values and forbidden-key gradients as well as forward outputs, so replacing a visible NaN after an invalid computation is insufficient.\n\n```python\nimport torch\nallow = torch.tensor([[True, False]])\nprint(allow.any(-1, keepdim=True))\n```\n\n## Review the design\n\nMask semantics and the loss denominator are separate contracts. Fused backends and mixed precision need their own numerical and performance validation.\n",
+      "task": "For aligned q[B,H,Q,D], k[B,H,K,D], v[B,H,K,V], compute softmax(q@k.T/sqrt(D)) over allowed keys, then multiply by v. allow is boolean [B,1-or-H,Q,K], True means participate. Return output and weights. A fully forbidden query must produce zero weights/output and finite zero gradients, not NaN. Validate nonempty dimensions and exact mask shape/type. Use actual differentiable tensor operations; dropout is zero.",
+      "starter": "import torch\n\n\ndef masked_attention(q, k, v, allow):\n    return None\n",
+      "solution": "import math\nimport torch\n\n\ndef masked_attention(q, k, v, allow):\n    if q.ndim != 4 or k.ndim != 4 or v.ndim != 4 or k.shape[:3] != v.shape[:3] or q.shape[:2] != k.shape[:2] or q.shape[-1] != k.shape[-1]:\n        raise ValueError('aligned batch, head and attention dimensions required')\n    b, h, length, width = q.shape\n    if not width or not length or k.shape[2] == 0:\n        raise ValueError('nonempty queries and keys required')\n    if allow.dtype != torch.bool or allow.ndim != 4 or allow.shape[0] != b or allow.shape[1] not in (1, h) or allow.shape[2:] != (length, k.shape[2]):\n        raise ValueError('boolean [B,1-or-H,Q,K] participation mask required')\n    scores = q @ k.transpose(-2, -1) / math.sqrt(width)\n    active = allow.any(dim=-1, keepdim=True)\n    scores = scores.masked_fill(~allow, float('-inf'))\n    scores = torch.where(active, scores, torch.zeros_like(scores))\n    weights = torch.softmax(scores, dim=-1) * allow.to(scores.dtype)\n    return weights @ v, weights\n",
+      "checks": [
+        {
+          "name": "allowed values and exact forbidden probabilities",
+          "code": "q=torch.tensor([[[[1.,0.],[0.,1.]]]],requires_grad=True)\nk=torch.tensor([[[[1.,0.],[0.,1.]]]],requires_grad=True)\nv=torch.tensor([[[[2.,0.],[0.,4.]]]],requires_grad=True)\nout,w=masked_attention(q,k,v,torch.tensor([[[[True,False],[True,True]]]]))\nassert torch.equal(out[0,0,0],v[0,0,0]) and w[0,0,0,1].item()==0\nassert torch.allclose(w.sum(-1),torch.ones(1,1,2))\n"
+        },
+        {
+          "name": "fully masked rows have finite zero backward",
+          "code": "q=torch.tensor([[[[1.,0.],[0.,1.]]]],requires_grad=True)\nk=torch.tensor([[[[1.,0.],[0.,1.]]]],requires_grad=True)\nv=torch.tensor([[[[2.,0.],[0.,4.]]]],requires_grad=True)\nout,w=masked_attention(q,k,v,torch.zeros(1,1,2,2,dtype=torch.bool))\nout.sum().backward()\nassert torch.equal(out,torch.zeros_like(out)) and torch.equal(w,torch.zeros_like(w))\nassert all(torch.isfinite(t.grad).all() and torch.equal(t.grad,torch.zeros_like(t)) for t in (q,k,v))\n"
+        },
+        {
+          "name": "masked keys cannot affect output or receive gradients",
+          "code": "q=torch.tensor([[[[1.,0.],[0.,1.]]]],requires_grad=True)\nk=torch.tensor([[[[1.,0.],[0.,1.]]]],requires_grad=True)\nv=torch.tensor([[[[2.,0.],[0.,4.]]]],requires_grad=True)\nallow=torch.tensor([[[[True,False],[True,False]]]])\nout,w=masked_attention(q,k,v,allow);out.sum().backward()\nassert torch.equal(k.grad[:,:,1],torch.zeros_like(k.grad[:,:,1])) and torch.equal(v.grad[:,:,1],torch.zeros_like(v.grad[:,:,1]))\n"
+        },
+        {
+          "name": "float masks rejected",
+          "code": "q=torch.tensor([[[[1.,0.],[0.,1.]]]],requires_grad=True)\nk=torch.tensor([[[[1.,0.],[0.,1.]]]],requires_grad=True)\nv=torch.tensor([[[[2.,0.],[0.,4.]]]],requires_grad=True)\ntry:\n    masked_attention(q,k,v,torch.ones(1,1,2,2))\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Mask semantics and the loss denominator are separate contracts. Fused backends and mixed precision need their own numerical and performance validation."
+      ],
+      "explanation": "Mask semantics and the loss denominator are separate contracts. Fused backends and mixed precision need their own numerical and performance validation."
+    },
+    {
+      "id": "pt-torchrope",
+      "title": "Apply rotary positions without losing relative geometry",
+      "body": "# Apply rotary positions without losing relative geometry\n\nRotary positions encode relative offsets through rotations of paired query and key coordinates. Coordinate pairing is part of the model convention: two plausible layouts can disagree while preserving shapes. This Lab specifies adjacent pairs and checks their geometry directly. Each rotation preserves a token vector norm, and adding a common position offset to queries and keys preserves their dot products. Position identities must match the cache offset during incremental decoding; applying a correct rotation with the wrong absolute positions still changes attention.\n\n```python\nimport torch\nx = torch.tensor([1., 0.])\nangle = torch.tensor(1.)\npair = torch.stack([angle.cos(), angle.sin()])\nprint(pair)\n```\n\n## Review the design\n\nRecord frequency base, pair convention, position offsets and any long-context scaling in the model artifact. Shape compatibility alone cannot establish RoPE compatibility.\n",
+      "task": "x is [B,H,T,D] with positive even D. positions is long [T], nonnegative. For adjacent coordinate pairs (2i,2i+1), rotate by position*base**(-2i/D). Return a new differentiable tensor in the same shape; do not mutate x. Require finite base>1. Tests check zero positions, norms, a shared offset of query/key positions and input gradients. This is adjacent-pair RoPE, not the split-half convention.",
+      "starter": "import torch\n\n\ndef rotary_positions(x, positions, base=10000.0):\n    return None\n",
+      "solution": "import math\nimport torch\n\n\ndef rotary_positions(x, positions, base=10000.0):\n    if x.ndim != 4 or x.shape[-1] < 2 or x.shape[-1] % 2:\n        raise ValueError('a positive even head width required')\n    if positions.ndim != 1 or positions.shape[0] != x.shape[-2] or positions.dtype != torch.long or bool((positions < 0).any()):\n        raise ValueError('one nonnegative integer position per token required')\n    if not math.isfinite(base) or base <= 1:\n        raise ValueError('finite frequency base greater than one required')\n    width = x.shape[-1]\n    frequency = base ** (-torch.arange(0, width, 2, dtype=x.dtype, device=x.device) / width)\n    angle = positions.to(dtype=x.dtype, device=x.device)[:, None] * frequency\n    cosine, sine = angle.cos(), angle.sin()\n    even, odd = x[..., 0::2], x[..., 1::2]\n    pairs = torch.stack((even * cosine - odd * sine, even * sine + odd * cosine), dim=-1)\n    return pairs.flatten(-2)\n",
+      "checks": [
+        {
+          "name": "zero positions and owned output",
+          "code": "x=torch.randn(1,2,3,4);old=x.clone();r=rotary_positions(x,torch.zeros(3,dtype=torch.long))\nassert torch.equal(r,x) and torch.equal(x,old) and r.data_ptr()!=x.data_ptr()\n"
+        },
+        {
+          "name": "rotations preserve norms and have real gradients",
+          "code": "x=torch.randn(1,2,3,4,requires_grad=True);r=rotary_positions(x,torch.tensor([0,1,4]))\nassert torch.allclose(r.norm(dim=-1),x.norm(dim=-1),atol=1e-6)\nr.square().sum().backward();assert torch.allclose(x.grad,2*x,atol=1e-5)\n"
+        },
+        {
+          "name": "shared offsets preserve query/key dot products",
+          "code": "q=torch.arange(12,dtype=torch.float32).reshape(1,1,3,4)/10;k=q.flip(-1);p=torch.tensor([1,2,5])\na=rotary_positions(q,p)@rotary_positions(k,p).transpose(-2,-1)\nb=rotary_positions(q,p+7)@rotary_positions(k,p+7).transpose(-2,-1)\nassert torch.allclose(a,b,atol=1e-5)\n"
+        },
+        {
+          "name": "odd head width rejected",
+          "code": "try:\n    rotary_positions(torch.ones(1,1,2,3),torch.tensor([0,1]))\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Record frequency base, pair convention, position offsets and any long-context scaling in the model artifact. Shape compatibility alone cannot establish RoPE compatibility."
+      ],
+      "explanation": "Record frequency base, pair convention, position offsets and any long-context scaling in the model artifact. Shape compatibility alone cannot establish RoPE compatibility."
+    },
+    {
+      "id": "pt-torchkv",
+      "title": "Decode chunks with an owned, offset-aware KV cache",
+      "body": "# Decode chunks with an owned, offset-aware KV cache\n\nA cached query begins after the keys already stored. Applying an ordinary upper-left triangular mask to a short new chunk can hide most of its past or expose later tokens incorrectly. This Lab derives absolute query positions from cache length and compares incremental results with one full causal pass. The returned cache owns its tensors, so later caller mutations cannot corrupt earlier results. It is an exclusive-owner CPU inference cache with fixed head geometry; paging, eviction, concurrency and server memory allocation remain outside the exercise.\n\n```python\nimport torch\npast, count = 3, 2\nquery = torch.arange(past, past+count)\nkeys = torch.arange(past+count)\nprint(keys[None, :] <= query[:, None])\n```\n\n## Review the design\n\nKeep positional encoding offsets, cache identity and model version consistent. Detached inference caches do not implement recurrent training or durable serving state.\n",
+      "task": "Inference-only q,k,v have the same nonempty [B,H,T,D] shape. Optional cache has exactly k/v with matching batch/head/width/dtype/device. Append current keys and values and admit key position <= past_length+query_index. Return output and a detached cloned k/v cache; do not mutate or alias old cache or new input chunks. Full, tokenwise and multi-token chunked execution must agree. No dropout or positional transform is applied here.",
+      "starter": "import torch\n\n\ndef cached_attention(q, k, v, cache=None):\n    return None\n",
+      "solution": "import math\nimport torch\n\n\n@torch.no_grad()\ndef cached_attention(q, k, v, cache=None):\n    if q.ndim != 4 or q.shape != k.shape or k.shape != v.shape or min(q.shape) < 1:\n        raise ValueError('aligned nonempty [B,H,T,D] chunks required')\n    past = 0\n    if cache is not None:\n        if set(cache) != {'k', 'v'} or cache['k'].shape != cache['v'].shape or cache['k'].ndim != 4:\n            raise ValueError('owned key/value cache required')\n        old = cache['k']\n        if old.shape[:2] != k.shape[:2] or old.shape[-1] != k.shape[-1] or old.dtype != k.dtype or old.device != k.device:\n            raise ValueError('cache and chunk dimensions must agree')\n        past = old.shape[2]\n        keys = torch.cat((cache['k'], k), dim=2)\n        values = torch.cat((cache['v'], v), dim=2)\n    else:\n        keys, values = k, v\n    query_positions = torch.arange(past, past + q.shape[2], device=q.device)\n    key_positions = torch.arange(keys.shape[2], device=q.device)\n    allow = key_positions[None, :] <= query_positions[:, None]\n    scores = q @ keys.transpose(-2, -1) / math.sqrt(q.shape[-1])\n    weights = torch.softmax(scores.masked_fill(~allow, float('-inf')), dim=-1)\n    return weights @ values, {'k': keys.detach().clone(), 'v': values.detach().clone()}\n",
+      "checks": [
+        {
+          "name": "tokenwise inference matches full causal attention",
+          "code": "q=torch.arange(12,dtype=torch.float32).reshape(1,1,3,4)/10\nk=q.flip(-1);v=q+1\nfull,_=cached_attention(q,k,v);cache=None;parts=[]\nfor i in range(3):\n    out,cache=cached_attention(q[:,:,i:i+1],k[:,:,i:i+1],v[:,:,i:i+1],cache);parts.append(out)\nassert torch.allclose(full,torch.cat(parts,dim=2),atol=1e-6)\n"
+        },
+        {
+          "name": "multi-token chunks use the correct causal offset",
+          "code": "q=torch.arange(12,dtype=torch.float32).reshape(1,1,3,4)/10\nk=q.flip(-1);v=q+1\nfull,_=cached_attention(q,k,v);a,c=cached_attention(q[:,:,:1],k[:,:,:1],v[:,:,:1]);b,_=cached_attention(q[:,:,1:],k[:,:,1:],v[:,:,1:],c)\nassert torch.allclose(torch.cat([a,b],dim=2),full,atol=1e-6)\n"
+        },
+        {
+          "name": "old cache and input chunks cannot alias new storage",
+          "code": "q=torch.arange(12,dtype=torch.float32).reshape(1,1,3,4)/10\nk=q.flip(-1);v=q+1\n_,c=cached_attention(q[:,:,:1],k[:,:,:1],v[:,:,:1]);old=c['k'].clone();_,n=cached_attention(q[:,:,1:],k[:,:,1:],v[:,:,1:],c)\nn['k'].zero_();assert torch.equal(c['k'],old) and not torch.equal(k,torch.zeros_like(k)) and not n['k'].requires_grad\n"
+        },
+        {
+          "name": "cache geometry mismatch rejected",
+          "code": "q=torch.arange(12,dtype=torch.float32).reshape(1,1,3,4)/10\nk=q.flip(-1);v=q+1\ntry:\n    cached_attention(q,k,v,{'k':torch.zeros(1,2,1,4),'v':torch.zeros(1,2,1,4)})\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Keep positional encoding offsets, cache identity and model version consistent. Detached inference caches do not implement recurrent training or durable serving state."
+      ],
+      "explanation": "Keep positional encoding offsets, cache identity and model version consistent. Detached inference caches do not implement recurrent training or durable serving state."
+    },
+    {
+      "id": "pt-torchpacked",
+      "title": "Isolate packed documents in causal attention",
+      "body": "# Isolate packed documents in causal attention\n\nPacking several documents into one tensor improves utilization, but a causal triangle alone permits one document to read an earlier unrelated document. Attention must combine ordering, document identity and padding. The loss needs a separate boundary rule for next-token targets; an attention mask does not prevent scoring a document transition as a target. This Lab perturbs one packed document and checks another document’s output and gradients. Padding creates fully forbidden query rows, which must remain finite during backward rather than being hidden after an undefined softmax.\n\n```python\nimport torch\nids = torch.tensor([0, 0, 1, -1])\nsame = ids[:, None] == ids[None, :]\nprint(same & (ids[:, None] >= 0))\n```\n\n## Review the design\n\nReview both attention isolation and shifted-target boundary masking. These local segment identities are data boundaries, not tenant authorization by themselves.\n",
+      "task": "q,k,v have aligned nonempty [B,H,T,D] shapes. Long segments[B,T] assigns document identities or -1 padding. A query may see only earlier-or-equal positions with the same nonnegative document identity. Return differentiable attention output. Padded queries produce finite zero outputs and zero gradients. Block cross-document influence even when both documents share one row; reject invalid shapes or segment values below -1.",
+      "starter": "import torch\n\n\ndef packed_attention(q, k, v, segments):\n    return None\n",
+      "solution": "import math\nimport torch\n\n\ndef packed_attention(q, k, v, segments):\n    if q.ndim != 4 or q.shape != k.shape or k.shape != v.shape or min(q.shape) < 1:\n        raise ValueError('aligned nonempty [B,H,T,D] tensors required')\n    if segments.shape != (q.shape[0], q.shape[2]) or segments.dtype != torch.long or bool((segments < -1).any()):\n        raise ValueError('integer document identities or -1 padding required')\n    length = q.shape[2]\n    same = segments[:, :, None] == segments[:, None, :]\n    valid = (segments[:, :, None] >= 0) & (segments[:, None, :] >= 0)\n    causal = torch.ones(length, length, dtype=torch.bool, device=q.device).tril()\n    allow = (same & valid & causal)[:, None, :, :]\n    active = allow.any(dim=-1, keepdim=True)\n    scores = q @ k.transpose(-2, -1) / math.sqrt(q.shape[-1])\n    scores = scores.masked_fill(~allow, float('-inf'))\n    scores = torch.where(active, scores, torch.zeros_like(scores))\n    weights = torch.softmax(scores, dim=-1) * allow.to(scores.dtype)\n    return weights @ v\n",
+      "checks": [
+        {
+          "name": "other documents cannot influence a packed query",
+          "code": "q=torch.ones(1,1,4,2);k=q.clone();v=torch.arange(8,dtype=torch.float32).reshape(1,1,4,2);s=torch.tensor([[0,0,1,1]])\na=packed_attention(q,k,v,s);poison=v.clone();poison[:,:,:2]+=10000\nb=packed_attention(q,k,poison,s)\nassert torch.equal(a[:,:,2:],b[:,:,2:])\n"
+        },
+        {
+          "name": "future tokens are hidden within a document",
+          "code": "q=torch.ones(1,1,3,2);k=q.clone();v=torch.arange(6,dtype=torch.float32).reshape(1,1,3,2);s=torch.zeros(1,3,dtype=torch.long)\na=packed_attention(q,k,v,s);v[:,:,2]+=100\nb=packed_attention(q,k,v,s);assert torch.equal(a[:,:,:2],b[:,:,:2])\n"
+        },
+        {
+          "name": "padding and forbidden gradients are finite zeros",
+          "code": "q=torch.ones(1,1,3,2,requires_grad=True);k=q.detach().clone().requires_grad_();v=q.detach().clone().requires_grad_()\nr=packed_attention(q,k,v,torch.tensor([[0,1,-1]]));r[:,:,1].sum().backward()\nassert torch.equal(r[:,:,2],torch.zeros_like(r[:,:,2]))\nassert torch.equal(v.grad[:,:,0],torch.zeros_like(v.grad[:,:,0])) and all(torch.isfinite(t.grad).all() for t in (q,k,v))\n"
+        },
+        {
+          "name": "invalid segment identity rejected",
+          "code": "try:\n    packed_attention(torch.ones(1,1,1,2),torch.ones(1,1,1,2),torch.ones(1,1,1,2),torch.tensor([[-2]]))\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Review both attention isolation and shifted-target boundary masking. These local segment identities are data boundaries, not tenant authorization by themselves."
+      ],
+      "explanation": "Review both attention isolation and shifted-target boundary masking. These local segment identities are data boundaries, not tenant authorization by themselves."
+    },
+    {
+      "id": "pt-torchgqa",
+      "title": "Share KV heads without breaking query-head mapping",
+      "body": "# Share KV heads without breaking query-head mapping\n\nGrouped-query attention shares key and value projections across several query heads. The grouping order matters: repeating the complete head list produces a different mapping from repeating each head consecutively. This Lab tests a hand-checkable single-token mapping, then checks causal isolation and gradient accumulation into shared values. The implementation materializes repeated KV heads for clarity. That validates the mathematical layout but does not claim the memory savings of a fused kernel, paged cache, accelerator implementation or production inference server.\n\n```python\nimport torch\nheads = torch.tensor([10, 20])\nprint(heads.repeat_interleave(2))\n```\n\n## Review the design\n\nKeep head grouping, cache layout and projection ordering in the model contract. Measure actual backend memory and latency before claiming a serving improvement.\n",
+      "task": "q is [B,Hq,T,D], k/v are [B,Hkv,T,D]. Require nonempty aligned dimensions and Hq a positive multiple of Hkv. Repeat each KV head consecutively Hq/Hkv times, then compute scaled causal attention with zero dropout. Return differentiable output [B,Hq,T,D]. Gradients into a shared KV head must sum contributions from all query heads using it.",
+      "starter": "import torch\n\n\ndef grouped_attention(q, k, v):\n    return None\n",
+      "solution": "import math\nimport torch\n\n\ndef grouped_attention(q, k, v):\n    if q.ndim != 4 or k.ndim != 4 or k.shape != v.shape or q.shape[0] != k.shape[0] or q.shape[2:] != k.shape[2:] or min(k.shape) < 1:\n        raise ValueError('aligned [B,H,T,D] tensors required')\n    if q.shape[1] < 1 or q.shape[1] % k.shape[1]:\n        raise ValueError('query heads must be a positive multiple of KV heads')\n    repetitions = q.shape[1] // k.shape[1]\n    keys = k.repeat_interleave(repetitions, dim=1)\n    values = v.repeat_interleave(repetitions, dim=1)\n    scores = q @ keys.transpose(-2, -1) / math.sqrt(q.shape[-1])\n    allow = torch.ones(q.shape[2], q.shape[2], dtype=torch.bool, device=q.device).tril()\n    weights = torch.softmax(scores.masked_fill(~allow, float('-inf')), dim=-1)\n    return weights @ values\n",
+      "checks": [
+        {
+          "name": "consecutive query groups map to the right KV head",
+          "code": "q=torch.ones(1,4,1,2);k=torch.ones(1,2,1,2);v=torch.tensor([[[[1.,2.]],[[7.,8.]]]])\nr=grouped_attention(q,k,v)\nassert torch.equal(r[0,:,0],torch.tensor([[1.,2.],[1.,2.],[7.,8.],[7.,8.]]))\n"
+        },
+        {
+          "name": "shared value gradients sum query contributions",
+          "code": "q=torch.ones(1,4,1,2,requires_grad=True);k=torch.ones(1,2,1,2,requires_grad=True);v=torch.ones(1,2,1,2,requires_grad=True)\ngrouped_attention(q,k,v).sum().backward()\nassert torch.equal(v.grad,torch.full_like(v,2)) and torch.isfinite(q.grad).all()\n"
+        },
+        {
+          "name": "causal isolation with several heads",
+          "code": "q=torch.ones(1,4,3,2);k=torch.ones(1,2,3,2);v=torch.arange(12,dtype=torch.float32).reshape(1,2,3,2)\na=grouped_attention(q,k,v);v[:,:,2]+=100\nb=grouped_attention(q,k,v);assert torch.equal(a[:,:,:2],b[:,:,:2])\n"
+        },
+        {
+          "name": "nondivisible head counts rejected",
+          "code": "try:\n    grouped_attention(torch.ones(1,3,2,2),torch.ones(1,2,2,2),torch.ones(1,2,2,2))\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Keep head grouping, cache layout and projection ordering in the model contract. Measure actual backend memory and latency before claiming a serving improvement."
+      ],
+      "explanation": "Keep head grouping, cache layout and projection ordering in the model contract. Measure actual backend memory and latency before claiming a serving improvement."
+    },
+    {
+      "id": "pt-torchrms",
+      "title": "Normalize RMS with stable accumulation and autograd",
+      "body": "# Normalize RMS with stable accumulation and autograd\n\nRMS normalization rescales by the root mean square and differs from centering-based layer normalization. The distinction is visible on a constant nonzero row, where RMS normalization retains a signal rather than removing it. Squaring low-precision values before promoting them can overflow even when the final normalized output is ordinary. This Lab promotes the accumulation first and checks both input and learned-weight gradients. It is an inspectable CPU formula, not a fused normalization kernel or a benchmark of accelerator throughput.\n\n```python\nimport torch\nx = torch.tensor([3., 4.])\nprint(torch.sqrt(x.square().mean()))\n```\n\n## Review the design\n\nSpecify accumulation dtype, epsilon and learned-weight dtype when matching another implementation. Epsilon makes exact scale invariance inappropriate near zero.\n",
+      "task": "Compute x / sqrt(mean(x**2,last_axis,keepdim=True)+eps) times a learned last-axis weight. Do not subtract the mean. Accumulate in float32 for float16/bfloat16/float32 input and float64 for float64 input, cast the normalized values back to x.dtype, then multiply weight. Require a nonempty last axis, weight shape [D] and finite eps>0. Return a new differentiable tensor without changing inputs.",
+      "starter": "import torch\n\n\ndef rms_normalize(x, weight, eps=1e-6):\n    return None\n",
+      "solution": "import math\nimport torch\n\n\ndef rms_normalize(x, weight, eps=1e-6):\n    if x.ndim < 1 or x.shape[-1] == 0 or weight.shape != x.shape[-1:]:\n        raise ValueError('one learned weight per last-axis feature required')\n    if not math.isfinite(eps) or eps <= 0:\n        raise ValueError('positive finite epsilon required')\n    working = x if x.dtype == torch.float64 else x.float()\n    mean_square = working.square().mean(dim=-1, keepdim=True)\n    normalized = working * torch.rsqrt(mean_square + eps)\n    return normalized.to(x.dtype) * weight\n",
+      "checks": [
+        {
+          "name": "RMS is not mean-centered layer norm",
+          "code": "x=torch.full((2,3),2.)\nr=rms_normalize(x,torch.ones(3))\nassert torch.allclose(r,torch.ones_like(x),atol=1e-5)\n"
+        },
+        {
+          "name": "zero inputs and both parameter gradients stay finite",
+          "code": "x=torch.tensor([[3.,4.],[0.,0.]],requires_grad=True);w=torch.ones(2,requires_grad=True)\nr=rms_normalize(x,w);r.sum().backward()\nassert torch.equal(r[1],torch.zeros(2)) and torch.isfinite(x.grad).all() and w.grad.abs().sum()>0\n"
+        },
+        {
+          "name": "low precision squares accumulate after promotion",
+          "code": "x=torch.tensor([[1000.,1000.]],dtype=torch.float16);w=torch.ones(2,dtype=torch.float16)\nr=rms_normalize(x,w)\nassert r.dtype==torch.float16 and torch.allclose(r,torch.ones_like(r),atol=.002)\n"
+        },
+        {
+          "name": "shape and epsilon mismatches rejected",
+          "code": "try:\n    rms_normalize(torch.ones(2,3),torch.ones(2))\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\ntry:\n    rms_normalize(torch.ones(2,3),torch.ones(3),0)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Specify accumulation dtype, epsilon and learned-weight dtype when matching another implementation. Epsilon makes exact scale invariance inappropriate near zero."
+      ],
+      "explanation": "Specify accumulation dtype, epsilon and learned-weight dtype when matching another implementation. Epsilon makes exact scale invariance inappropriate near zero."
+    },
+    {
+      "id": "project-torchblock",
+      "title": "Project: build a pre-norm decoder block and audit its gradients",
+      "body": "# Project: build a pre-norm decoder block and audit its gradients\n\nA decoder block composes normalization, projection layout, multiple attention heads, causal masking, residual connections and a feed-forward network. Plausible shapes do not establish the correct computation. This project tests future-token isolation, the identity residual when both branches are zero and finite gradients through every parameter family. It also checks the causal backward boundary. The block is small and executes real tensor operations on CPU; it is a mathematical building block rather than a pretrained model or a fused-kernel performance claim.\n\n```python\nimport torch\nx = torch.arange(8.).reshape(1, 2, 4)\nheads = x.reshape(1, 2, 2, 2)\nprint(heads.transpose(1, 2).shape)\n```\n\n## Review the design\n\nAudit QKV packing, head transposes, residual ordering and normalization convention. Loading a checkpoint requires the same conventions, not merely matching tensor sizes.\n",
+      "task": "Implement one causal pre-norm block on nonempty x[B,T,D]. parameters has exactly n1/n2 [D], qkv [3D,D], out [D,D], ff1 [2D,D], ff2 [D,2D]. Use layer_norm eps=1e-5 with these weights and no biases; split contiguous Q/K/V projections into heads, scaled causal softmax attention, concatenate heads and add the output projection residual. Then add ff2(GELU(ff1(layer_norm(residual,n2)))). Dropout is zero; heads must divide D. Return the differentiable output and reject a wrong schema.",
+      "starter": "import torch\n\n\ndef decoder_block(x, parameters, heads):\n    return None\n",
+      "solution": "import math\nimport torch\nfrom torch.nn import functional as F\n\n\ndef decoder_block(x, parameters, heads):\n    if x.ndim != 3 or min(x.shape) < 1 or type(heads) is not int or heads < 1 or x.shape[-1] % heads:\n        raise ValueError('nonempty [B,T,D] input and a head count dividing D required')\n    batch, length, width = x.shape\n    shapes = {'n1': (width,), 'n2': (width,), 'qkv': (3 * width, width),\n              'out': (width, width), 'ff1': (2 * width, width), 'ff2': (width, 2 * width)}\n    if parameters.keys() != shapes.keys() or any(tuple(parameters[k].shape) != shape for k, shape in shapes.items()):\n        raise ValueError('exact decoder parameter schema required')\n    normalized = F.layer_norm(x, (width,), parameters['n1'])\n    qkv = F.linear(normalized, parameters['qkv'])\n    q, k, v = [part.reshape(batch, length, heads, width // heads).transpose(1, 2)\n               for part in qkv.chunk(3, dim=-1)]\n    scores = q @ k.transpose(-2, -1) / math.sqrt(width // heads)\n    causal = torch.ones(length, length, dtype=torch.bool, device=x.device).tril()\n    attention = torch.softmax(scores.masked_fill(~causal, float('-inf')), dim=-1) @ v\n    joined = attention.transpose(1, 2).reshape(batch, length, width)\n    residual = x + F.linear(joined, parameters['out'])\n    hidden = F.layer_norm(residual, (width,), parameters['n2'])\n    hidden = F.gelu(F.linear(hidden, parameters['ff1']))\n    return residual + F.linear(hidden, parameters['ff2'])\n",
+      "checks": [
+        {
+          "name": "future tokens cannot change earlier outputs",
+          "code": "x=torch.arange(12,dtype=torch.float32).reshape(1,3,4)/10\np={'n1':torch.ones(4,requires_grad=True),'n2':torch.ones(4,requires_grad=True)}\nfor key,shape in [('qkv',(12,4)),('out',(4,4)),('ff1',(8,4)),('ff2',(4,8))]:\n    p[key]=(torch.arange(shape[0]*shape[1],dtype=torch.float32).reshape(shape).sin()*.2).requires_grad_()\na=decoder_block(x,p,2);poison=x.clone();poison[:,2]+=100\nb=decoder_block(poison,p,2)\nassert torch.allclose(a[:,:2],b[:,:2],atol=1e-6)\n"
+        },
+        {
+          "name": "all parameter families participate in autograd",
+          "code": "x=torch.arange(12,dtype=torch.float32).reshape(1,3,4)/10\np={'n1':torch.ones(4,requires_grad=True),'n2':torch.ones(4,requires_grad=True)}\nfor key,shape in [('qkv',(12,4)),('out',(4,4)),('ff1',(8,4)),('ff2',(4,8))]:\n    p[key]=(torch.arange(shape[0]*shape[1],dtype=torch.float32).reshape(shape).sin()*.2).requires_grad_()\nr=decoder_block(x,p,2);r.square().sum().backward()\nassert all(v.grad is not None and torch.isfinite(v.grad).all() and v.grad.abs().sum()>0 for v in p.values())\n"
+        },
+        {
+          "name": "zero branches preserve the input residual",
+          "code": "x=torch.arange(12,dtype=torch.float32).reshape(1,3,4)/10\np={'n1':torch.ones(4,requires_grad=True),'n2':torch.ones(4,requires_grad=True)}\nfor key,shape in [('qkv',(12,4)),('out',(4,4)),('ff1',(8,4)),('ff2',(4,8))]:\n    p[key]=(torch.arange(shape[0]*shape[1],dtype=torch.float32).reshape(shape).sin()*.2).requires_grad_()\np['out']=torch.zeros(4,4);p['ff2']=torch.zeros(4,8)\nassert torch.equal(decoder_block(x,p,2),x)\n"
+        },
+        {
+          "name": "backward cannot cross the causal boundary",
+          "code": "x=torch.arange(12,dtype=torch.float32).reshape(1,3,4)/10\np={'n1':torch.ones(4,requires_grad=True),'n2':torch.ones(4,requires_grad=True)}\nfor key,shape in [('qkv',(12,4)),('out',(4,4)),('ff1',(8,4)),('ff2',(4,8))]:\n    p[key]=(torch.arange(shape[0]*shape[1],dtype=torch.float32).reshape(shape).sin()*.2).requires_grad_()\nx=x.clone().requires_grad_();decoder_block(x,p,2)[:,0].sum().backward()\nassert torch.equal(x.grad[:,1:],torch.zeros_like(x.grad[:,1:])) and torch.isfinite(x.grad).all()\n"
+        },
+        {
+          "name": "invalid parameter schema rejected",
+          "code": "x=torch.arange(12,dtype=torch.float32).reshape(1,3,4)/10\np={'n1':torch.ones(4,requires_grad=True),'n2':torch.ones(4,requires_grad=True)}\nfor key,shape in [('qkv',(12,4)),('out',(4,4)),('ff1',(8,4)),('ff2',(4,8))]:\n    p[key]=(torch.arange(shape[0]*shape[1],dtype=torch.float32).reshape(shape).sin()*.2).requires_grad_()\np.pop('n2')\ntry:\n    decoder_block(x,p,2)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Audit QKV packing, head transposes, residual ordering and normalization convention. Loading a checkpoint requires the same conventions, not merely matching tensor sizes."
+      ],
+      "explanation": "Audit QKV packing, head transposes, residual ordering and normalization convention. Loading a checkpoint requires the same conventions, not merely matching tensor sizes."
+    },
+    {
+      "id": "project-torchtinylm",
+      "title": "Project: train and reload a tiny causal language model",
+      "body": "# Project: train and reload a tiny causal language model\n\nThis project trains a complete tiny decoder instead of inspecting fixed logits. Token and position embeddings feed a causal multihead block, and the output projection shares the token embedding weights. Training pairs each position with the next token and clips actual gradients before AdamW updates. An owned JSON-compatible artifact reloads for independent inference and a causal perturbation test. The synthetic cyclic vocabulary is deliberately small enough for CPU execution in Pythilo. Its training loss demonstrates optimization, not useful language understanding or the quality of a large language model.\n\n```python\nimport torch\nids = torch.tensor([[0, 1, 2, 0]])\nprint(ids[:, :-1])\nprint(ids[:, 1:])\n```\n\n## Review the design\n\nReview shifted targets, future-token isolation, tied ownership and artifact reload. Real language modeling additionally needs representative tokenization, held-out documents and a compute budget.\n",
+      "task": "Implement TinyDecoder(vocab) with token/32-position embeddings of width 8; pre-norm two-head attention (head width 4), bias-free qkv/output projections, residual; pre-norm 8→16→8 GELU feed-forward residual; final LayerNorm and output tied to token.weight. Train rectangular in-vocabulary sequences length 2..32 using shifted mean CE, AdamW lr=.03 weight_decay=.01, global gradient cap 1, positive steps and fork_rng seed. Return artifact (vocab/state lists), initial_loss, loss, perplexity and pre-update history. Also implement tiny_lm_logits(artifact,tokens) for detached eval. Trace uses four updates; tests train longer.",
+      "starter": "import torch\n\n\ndef train_tiny_lm(tokens, vocab, steps, seed):\n    return None\n",
+      "solution": "import math\nimport torch\nfrom torch import nn\nfrom torch.nn import functional as F\n\n\nclass TinyDecoder(nn.Module):\n    def __init__(self, vocab):\n        super().__init__()\n        self.token = nn.Embedding(vocab, 8)\n        self.position = nn.Embedding(32, 8)\n        self.norm1 = nn.LayerNorm(8)\n        self.qkv = nn.Linear(8, 24, bias=False)\n        self.projection = nn.Linear(8, 8, bias=False)\n        self.norm2 = nn.LayerNorm(8)\n        self.feedforward = nn.Sequential(nn.Linear(8, 16), nn.GELU(), nn.Linear(16, 8))\n        self.final = nn.LayerNorm(8)\n\n    def forward(self, tokens):\n        batch, length = tokens.shape\n        x = self.token(tokens) + self.position(torch.arange(length, device=tokens.device))\n        normalized = self.norm1(x)\n        q, k, v = [part.reshape(batch, length, 2, 4).transpose(1, 2)\n                   for part in self.qkv(normalized).chunk(3, dim=-1)]\n        scores = q @ k.transpose(-2, -1) / math.sqrt(4)\n        allow = torch.ones(length, length, dtype=torch.bool, device=tokens.device).tril()\n        mixed = torch.softmax(scores.masked_fill(~allow, float('-inf')), dim=-1) @ v\n        x = x + self.projection(mixed.transpose(1, 2).reshape(batch, length, 8))\n        x = x + self.feedforward(self.norm2(x))\n        return F.linear(self.final(x), self.token.weight)\n\n\ndef _tokens(rows, vocab):\n    if type(vocab) is not int or vocab < 2 or not rows or not rows[0] or len(rows[0]) > 32:\n        raise ValueError('nonempty token rows with length at most 32 required')\n    if any(len(row) != len(rows[0]) or any(type(t) is not int or not 0 <= t < vocab for t in row) for row in rows):\n        raise ValueError('rectangular in-vocabulary integer tokens required')\n    return torch.tensor(rows, dtype=torch.long)\n\n\ndef tiny_lm_logits(artifact, tokens):\n    encoded = _tokens(tokens, artifact['vocab'])\n    with torch.random.fork_rng(devices=[]):\n        model = TinyDecoder(artifact['vocab'])\n        model.load_state_dict({k: torch.tensor(v, dtype=torch.float32) for k, v in artifact['state'].items()})\n        model.eval()\n        with torch.no_grad():\n            return model(encoded)\n\n\ndef train_tiny_lm(tokens, vocab, steps, seed):\n    encoded = _tokens(tokens, vocab)\n    if encoded.shape[1] < 2 or type(steps) is not int or steps < 1:\n        raise ValueError('next-token sequences and positive training steps required')\n    with torch.random.fork_rng(devices=[]):\n        torch.manual_seed(seed)\n        model = TinyDecoder(vocab)\n        optimizer = torch.optim.AdamW(model.parameters(), lr=.03, weight_decay=.01)\n        def objective():\n            logits = model(encoded)[:, :-1, :]\n            return F.cross_entropy(logits.reshape(-1, vocab), encoded[:, 1:].reshape(-1))\n        initial = float(objective().detach())\n        history = []\n        for step in range(steps):\n            model.train()\n            optimizer.zero_grad(set_to_none=True)\n            loss = objective()\n            loss.backward()\n            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0, error_if_nonfinite=True)\n            optimizer.step()\n            history.append(float(loss.detach()))\n        model.eval()\n        with torch.no_grad():\n            final = float(objective())\n        artifact = {'vocab': vocab, 'state': {k: v.tolist() for k, v in model.state_dict().items()}}\n        return {'artifact': artifact, 'initial_loss': initial, 'loss': final,\n                'perplexity': math.exp(final), 'history': history}\n",
+      "checks": [
+        {
+          "name": "real transformer optimization learns the token pattern",
+          "code": "tokens=[[0,1,2,0,1,2],[1,2,0,1,2,0]]\nr=train_tiny_lm(tokens,3,60,7)\nassert r['loss']<.1 and r['loss']<r['initial_loss']/10 and len(r['history'])==60\n"
+        },
+        {
+          "name": "exported logits reproduce shifted loss and perplexity",
+          "code": "tokens=[[0,1,2,0,1,2],[1,2,0,1,2,0]]\nimport math,json\nr=train_tiny_lm(tokens,3,6,4);a=json.loads(json.dumps(r['artifact']));z=tiny_lm_logits(a,tokens)\nl=torch.nn.functional.cross_entropy(z[:,:-1].reshape(-1,3),torch.tensor(tokens)[:,1:].reshape(-1))\nassert abs(l.item()-r['loss'])<1e-6 and abs(math.exp(l.item())-r['perplexity'])<1e-6 and not z.requires_grad\n"
+        },
+        {
+          "name": "saved model cannot read a future token",
+          "code": "tokens=[[0,1,2,0,1,2],[1,2,0,1,2,0]]\na=train_tiny_lm(tokens,3,3,7)['artifact']\nx=tiny_lm_logits(a,[[0,1,2,0]]);y=tiny_lm_logits(a,[[0,1,2,1]])\nassert torch.allclose(x[:,:3],y[:,:3],atol=1e-6)\n"
+        },
+        {
+          "name": "training is seeded and leaves caller RNG intact",
+          "code": "tokens=[[0,1,2,0,1,2],[1,2,0,1,2,0]]\ntorch.manual_seed(17);old=torch.get_rng_state().clone();a=train_tiny_lm(tokens,3,2,5)\nassert torch.equal(old,torch.get_rng_state())\nassert a==train_tiny_lm(tokens,3,2,5)\n"
+        },
+        {
+          "name": "too-short and invalid token sequences fail",
+          "code": "try:\n    train_tiny_lm([[0]],3,2,7)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\ntry:\n    train_tiny_lm([[0,3]],3,2,7)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Review shifted targets, future-token isolation, tied ownership and artifact reload. Real language modeling additionally needs representative tokenization, held-out documents and a compute budget."
+      ],
+      "explanation": "Review shifted targets, future-token isolation, tied ownership and artifact reload. Real language modeling additionally needs representative tokenization, held-out documents and a compute budget."
+    },
+    {
+      "id": "project-torchseqcls",
+      "title": "Project: train a padding-safe transformer classifier",
+      "body": "# Project: train a padding-safe transformer classifier\n\nA sequence classifier must distinguish real tokens from batching artifacts. This project trains an actual attention encoder over variable-length sequences, masks padding keys and pools only valid query positions. Validation selects an owned checkpoint; test labels cannot alter it. The saved artifact is reloaded on differently padded inputs to verify prediction stability. This is a small CPU model with learned absolute positions and a synthetic binary vocabulary task. It is not a pretrained encoder, and its local checks do not establish generalization on real text.\n\n```python\nimport torch\nids = torch.tensor([[1, 2, 0]])\nvalid = ids != 0\nprint(valid.sum(-1))\n```\n\n## Review the design\n\nReview attention masks, pooling denominator, maximum context and checkpoint selection separately. Padding invariance here covers appended padding, not arbitrary changes to valid token positions.\n",
+      "task": "Use rows with disjoint id, tokens (0=PAD, at least one non-PAD, max length 32) and integer binary y. SequenceClassifier has width-8 token/position embeddings, one-head qkv Linear(8,24), scaled bidirectional attention excluding PAD keys, Linear(8,8) projection and residual LayerNorm, valid-token mean pooling, Linear(8,2) head. Train AdamW lr=.03 weight_decay=.01 with gradient cap 1. Choose and restore a deep-copied minimum validation-loss state (first tie), then evaluate test. Return artifact(vocab/state), initial_loss, training_loss, validation_loss, best_step, test_loss, predictions, history. Provide detached sequence_logits(artifact,sequences). Preserve caller RNG.",
+      "starter": "import torch\n\n\ndef train_sequence_classifier(train, validation, test, vocab, steps, seed):\n    return None\n",
+      "solution": "import copy\nimport math\nimport torch\nfrom torch import nn\nfrom torch.nn import functional as F\n\n\nclass SequenceClassifier(nn.Module):\n    def __init__(self, vocab):\n        super().__init__()\n        self.token = nn.Embedding(vocab, 8, padding_idx=0)\n        self.position = nn.Embedding(32, 8)\n        self.qkv = nn.Linear(8, 24)\n        self.projection = nn.Linear(8, 8)\n        self.norm = nn.LayerNorm(8)\n        self.head = nn.Linear(8, 2)\n\n    def forward(self, tokens):\n        valid = tokens != 0\n        x = self.token(tokens) + self.position(torch.arange(tokens.shape[1], device=tokens.device))\n        q, k, v = self.qkv(x).chunk(3, dim=-1)\n        scores = q @ k.transpose(-2, -1) / math.sqrt(8)\n        weights = torch.softmax(scores.masked_fill(~valid[:, None, :], float('-inf')), dim=-1)\n        hidden = self.norm(x + self.projection(weights @ v))\n        pooled = (hidden * valid[:, :, None]).sum(dim=1) / valid.sum(dim=1, keepdim=True)\n        return self.head(pooled)\n\n\ndef _encode(sequences, vocab):\n    if type(vocab) is not int or vocab < 3 or not sequences:\n        raise ValueError('a vocabulary and nonempty sequences required')\n    if any(not row or len(row) > 32 or any(type(t) is not int or not 0 <= t < vocab for t in row) or not any(row) for row in sequences):\n        raise ValueError('in-vocabulary rows need a non-padding token and length at most 32')\n    length = max(len(row) for row in sequences)\n    return torch.tensor([row + [0] * (length - len(row)) for row in sequences], dtype=torch.long)\n\n\ndef sequence_logits(artifact, sequences):\n    encoded = _encode(sequences, artifact['vocab'])\n    with torch.random.fork_rng(devices=[]):\n        model = SequenceClassifier(artifact['vocab'])\n        model.load_state_dict({k: torch.tensor(v, dtype=torch.float32) for k, v in artifact['state'].items()})\n        model.eval()\n        with torch.no_grad():\n            return model(encoded)\n\n\ndef train_sequence_classifier(train, validation, test, vocab, steps, seed):\n    if any(not part for part in (train, validation, test)) or type(steps) is not int or steps < 1:\n        raise ValueError('nonempty partitions and positive training steps required')\n    rows = train + validation + test\n    if len({r['id'] for r in rows}) != len(rows) or any(type(r['y']) is not int or r['y'] not in (0, 1) for r in rows):\n        raise ValueError('disjoint sample identities and binary labels required')\n    encoded = [_encode([r['tokens'] for r in part], vocab) for part in (train, validation, test)]\n    labels = [torch.tensor([r['y'] for r in part], dtype=torch.long) for part in (train, validation, test)]\n    with torch.random.fork_rng(devices=[]):\n        torch.manual_seed(seed)\n        model = SequenceClassifier(vocab)\n        optimizer = torch.optim.AdamW(model.parameters(), lr=.03, weight_decay=.01)\n        initial = float(F.cross_entropy(model(encoded[0]), labels[0]).detach())\n        best, history = None, []\n        for step in range(1, steps + 1):\n            model.train()\n            optimizer.zero_grad(set_to_none=True)\n            loss = F.cross_entropy(model(encoded[0]), labels[0])\n            loss.backward()\n            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0, error_if_nonfinite=True)\n            optimizer.step()\n            model.eval()\n            with torch.no_grad():\n                value = float(F.cross_entropy(model(encoded[1]), labels[1]))\n            history.append(value)\n            if best is None or value < best[0]:\n                best = (value, step, copy.deepcopy(model.state_dict()))\n        model.load_state_dict(best[2])\n        model.eval()\n        with torch.no_grad():\n            logits = model(encoded[2])\n            train_loss = float(F.cross_entropy(model(encoded[0]), labels[0]))\n            test_loss = float(F.cross_entropy(logits, labels[2]))\n        artifact = {'vocab': vocab, 'state': {k: v.tolist() for k, v in model.state_dict().items()}}\n        return {'artifact': artifact, 'initial_loss': initial, 'training_loss': train_loss,\n                'test_loss': test_loss, 'validation_loss': best[0], 'best_step': best[1],\n                'predictions': logits.argmax(dim=-1).tolist(), 'history': history}\n",
+      "checks": [
+        {
+          "name": "actual training and validation-selected checkpoint",
+          "code": "train=[{'id': 't0', 'tokens': [1, 1], 'y': 0}, {'id': 't1', 'tokens': [1, 2], 'y': 0}, {'id': 't2', 'tokens': [3, 4], 'y': 1}, {'id': 't3', 'tokens': [4, 3, 4], 'y': 1}, {'id': 'e0', 'tokens': [1], 'y': 0}, {'id': 'e1', 'tokens': [2], 'y': 0}, {'id': 'e2', 'tokens': [3], 'y': 1}, {'id': 'e3', 'tokens': [4], 'y': 1}]\nvalidation=[{'id': 'v0', 'tokens': [1], 'y': 0}, {'id': 'v1', 'tokens': [4], 'y': 1}]\ntest=[{'id': 'z0', 'tokens': [2, 1], 'y': 0}, {'id': 'z1', 'tokens': [3], 'y': 1}]\nr=train_sequence_classifier(train,validation,test,5,40,7)\nassert r['training_loss']<.1 and r['training_loss']<r['initial_loss'] and r['predictions']==[0,1]\nassert r['validation_loss']==min(r['history']) and r['best_step']==r['history'].index(min(r['history']))+1\n"
+        },
+        {
+          "name": "right padding cannot change exported predictions",
+          "code": "train=[{'id': 't0', 'tokens': [1, 1], 'y': 0}, {'id': 't1', 'tokens': [1, 2], 'y': 0}, {'id': 't2', 'tokens': [3, 4], 'y': 1}, {'id': 't3', 'tokens': [4, 3, 4], 'y': 1}, {'id': 'e0', 'tokens': [1], 'y': 0}, {'id': 'e1', 'tokens': [2], 'y': 0}, {'id': 'e2', 'tokens': [3], 'y': 1}, {'id': 'e3', 'tokens': [4], 'y': 1}]\nvalidation=[{'id': 'v0', 'tokens': [1], 'y': 0}, {'id': 'v1', 'tokens': [4], 'y': 1}]\ntest=[{'id': 'z0', 'tokens': [2, 1], 'y': 0}, {'id': 'z1', 'tokens': [3], 'y': 1}]\na=train_sequence_classifier(train,validation,test,5,3,4)['artifact']\nx=sequence_logits(a,[[1,2],[3]])\ny=sequence_logits(a,[[1,2,0,0],[3,0,0,0]])\nassert torch.allclose(x,y,atol=1e-5) and not y.requires_grad\n"
+        },
+        {
+          "name": "held-out labels cannot change the artifact",
+          "code": "train=[{'id': 't0', 'tokens': [1, 1], 'y': 0}, {'id': 't1', 'tokens': [1, 2], 'y': 0}, {'id': 't2', 'tokens': [3, 4], 'y': 1}, {'id': 't3', 'tokens': [4, 3, 4], 'y': 1}, {'id': 'e0', 'tokens': [1], 'y': 0}, {'id': 'e1', 'tokens': [2], 'y': 0}, {'id': 'e2', 'tokens': [3], 'y': 1}, {'id': 'e3', 'tokens': [4], 'y': 1}]\nvalidation=[{'id': 'v0', 'tokens': [1], 'y': 0}, {'id': 'v1', 'tokens': [4], 'y': 1}]\ntest=[{'id': 'z0', 'tokens': [2, 1], 'y': 0}, {'id': 'z1', 'tokens': [3], 'y': 1}]\nimport copy\na=train_sequence_classifier(train,validation,test,5,4,7);poison=copy.deepcopy(test)\nfor r in poison:r['y']=1-r['y']\nb=train_sequence_classifier(train,validation,poison,5,4,7)\nassert a['artifact']==b['artifact'] and a['predictions']==b['predictions'] and a['test_loss']!=b['test_loss']\n"
+        },
+        {
+          "name": "reloaded checkpoint reproduces validation evidence",
+          "code": "train=[{'id': 't0', 'tokens': [1, 1], 'y': 0}, {'id': 't1', 'tokens': [1, 2], 'y': 0}, {'id': 't2', 'tokens': [3, 4], 'y': 1}, {'id': 't3', 'tokens': [4, 3, 4], 'y': 1}, {'id': 'e0', 'tokens': [1], 'y': 0}, {'id': 'e1', 'tokens': [2], 'y': 0}, {'id': 'e2', 'tokens': [3], 'y': 1}, {'id': 'e3', 'tokens': [4], 'y': 1}]\nvalidation=[{'id': 'v0', 'tokens': [1], 'y': 0}, {'id': 'v1', 'tokens': [4], 'y': 1}]\ntest=[{'id': 'z0', 'tokens': [2, 1], 'y': 0}, {'id': 'z1', 'tokens': [3], 'y': 1}]\nr=train_sequence_classifier(train,validation,test,5,5,7);z=sequence_logits(r['artifact'],[row['tokens'] for row in validation])\nl=torch.nn.functional.cross_entropy(z,torch.tensor([row['y'] for row in validation]))\nassert abs(l.item()-r['validation_loss'])<1e-6\n"
+        },
+        {
+          "name": "all-padding input and identity leakage rejected",
+          "code": "train=[{'id': 't0', 'tokens': [1, 1], 'y': 0}, {'id': 't1', 'tokens': [1, 2], 'y': 0}, {'id': 't2', 'tokens': [3, 4], 'y': 1}, {'id': 't3', 'tokens': [4, 3, 4], 'y': 1}, {'id': 'e0', 'tokens': [1], 'y': 0}, {'id': 'e1', 'tokens': [2], 'y': 0}, {'id': 'e2', 'tokens': [3], 'y': 1}, {'id': 'e3', 'tokens': [4], 'y': 1}]\nvalidation=[{'id': 'v0', 'tokens': [1], 'y': 0}, {'id': 'v1', 'tokens': [4], 'y': 1}]\ntest=[{'id': 'z0', 'tokens': [2, 1], 'y': 0}, {'id': 'z1', 'tokens': [3], 'y': 1}]\ntry:\n    train_sequence_classifier(train,train,test,5,2,7)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\ntry:\n    sequence_logits({'vocab':5,'state':{}},[[0,0]])\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Review attention masks, pooling denominator, maximum context and checkpoint selection separately. Padding invariance here covers appended padding, not arbitrary changes to valid token positions."
+      ],
+      "explanation": "Review attention masks, pooling denominator, maximum context and checkpoint selection separately. Padding invariance here covers appended padding, not arbitrary changes to valid token positions."
+    }
+  ]
+}

@@ -18,6 +18,8 @@ struct LabsView: View {
     @State private var path = NavigationPath()
     @State private var selected: LabInfo.Section?
     @State private var query = ""
+    @State private var expandedTopics: Set<String> = []
+    @State private var collapsedSearchTopics: Set<String> = []
 
     private var sections: [LabInfo.Section] {
         selected.map { [$0] } ?? [.learning, .intelligence, .basics, .structures, .algorithms]
@@ -25,7 +27,7 @@ struct LabsView: View {
 
     private func matching(_ section: LabInfo.Section) -> [LabInfo] {
         LabCatalog.all.filter {
-            $0.section == section && (query.isEmpty || "\($0.title) \($0.summary)".localizedCaseInsensitiveContains(query))
+            $0.section == section && (query.isEmpty || "\($0.title) \($0.summary) \(LabCatalog.topic(for: $0)?.title ?? "")".localizedCaseInsensitiveContains(query))
         }
     }
 
@@ -36,7 +38,7 @@ struct LabsView: View {
                     Text("\(LabCatalog.all.count) interactive labs")
                         .font(.system(size: 24, weight: .bold))
                         .accessibilityIdentifier("labs-total")
-                    Text("Write the code yourself. Trace runs it line by line and draws every step; How it scales then times it on growing inputs.")
+                    Text("Choose a topic or search for a concept. Write the code yourself, trace what changes and check the edges. PyTorch projects train small models on this device.")
                         .font(.system(size: 15))
                         .foregroundStyle(AppTheme.secondary)
                         .padding(.bottom, 4)
@@ -61,8 +63,11 @@ struct LabsView: View {
                                 .padding(.top, 10)
                                 .padding(.horizontal, 4)
                                 .accessibilityAddTraits(.isHeader)
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 10)], spacing: 10) {
-                                ForEach(labs) { lab($0) }
+                            ForEach(LabCatalog.topics.filter { $0.section == section }) { topic in
+                                let matches = labs.filter { LabCatalog.topic(for: $0)?.id == topic.id }
+                                if !matches.isEmpty {
+                                    topicGroup(topic, labs: matches)
+                                }
                             }
                         }
                     }
@@ -82,6 +87,7 @@ struct LabsView: View {
             .background(AppTheme.background)
             .navigationTitle("Labs")
             .searchable(text: $query, prompt: "Search all labs")
+            .onChange(of: query) { collapsedSearchTopics = [] }
             .navigationDestination(for: String.self) { id in
                 switch id {
                 case "graph": GraphLabView()
@@ -101,6 +107,39 @@ struct LabsView: View {
                 if path.isEmpty, let lab = UserDefaults.standard.string(forKey: "openLab") { path.append(lab) }
             }
             #endif
+        }
+    }
+
+    private func topicGroup(_ topic: LabTopic, labs: [LabInfo]) -> some View {
+        let expanded = query.isEmpty ? expandedTopics.contains(topic.id) : !collapsedSearchTopics.contains(topic.id)
+        return VStack(alignment: .leading, spacing: 8) {
+            Button {
+                if !query.isEmpty {
+                    if collapsedSearchTopics.contains(topic.id) { collapsedSearchTopics.remove(topic.id) }
+                    else { collapsedSearchTopics.insert(topic.id) }
+                } else if expandedTopics.contains(topic.id) { expandedTopics.remove(topic.id) }
+                else { expandedTopics.insert(topic.id) }
+            } label: {
+                HStack(spacing: 10) {
+                    Text(topic.title).font(.system(size: 16, weight: .semibold))
+                    Spacer(minLength: 4)
+                    Text("\(labs.count)").font(.system(size: 14, weight: .medium)).monospacedDigit()
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(AppTheme.primary)
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                .contentShape(Rectangle())
+                .panelCard(cornerRadius: 12)
+            }
+            .buttonStyle(.app)
+            .accessibilityIdentifier("labs-topic-\(topic.id)")
+            .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+            if expanded {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 10)], spacing: 10) {
+                    ForEach(labs) { lab($0) }
+                }
+            }
         }
     }
 

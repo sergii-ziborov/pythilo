@@ -5,8 +5,12 @@ export type BrowserLab = {
   variants: { id: string; title: string; prompt: string; file: string; scales: boolean }[];
   starter: string; answer: string;
   lessons?: string[];
+  runtime?: 'pytorch';
 };
-export const browserLabs = snapshot.labs as BrowserLab[];
+export const allLabs = snapshot.labs as BrowserLab[];
+export const browserLabs = allLabs.filter(lab => lab.runtime !== 'pytorch');
+export const labTopics = snapshot.topics;
+export const labTopicAssignments: Record<string, string> = snapshot.assignments;
 export const labSources: Record<string,string> = snapshot.sources;
 export type LabPanel = { type: string; title?: string; grid?: string[][]; cells?: string[]; pairs?: [string,string][]; series?: { name: string; points: [number,number][] }[]; points?: [number,number,number][]; lines?: [number,number,number,number][] };
 export type LabFrame = { note: string; line: number | null; code: string; context: string; panels: LabPanel[] };

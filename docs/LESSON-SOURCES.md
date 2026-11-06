@@ -119,3 +119,37 @@ Primary references:
 - [OWASP RAG security guidance](https://cheatsheetseries.owasp.org/cheatsheets/RAG_Security_Cheat_Sheet.html)
   informs access filtering, versioned provenance and the distinction between
   digest consistency, instruction trust and semantic answer support.
+
+## PyTorch and transformer Labs
+
+The `pytorch-training` and `transformer-engineering` courses add 18 lessons with
+18 native Labs, including six composed projects. Solutions are original,
+self-contained CPU programs using the bundled PyTorch 2.15 runtime. All 79 check
+groups execute forward computations, autograd, optimizer updates, state ownership
+or inference from exported artifacts. Training traces use four small updates;
+checks run longer trajectories and compare independent evidence.
+
+Projects train a nonlinear classifier with a validation-selected owned checkpoint,
+continue AdamW sampling/dropout exactly within the same CPU runtime, learn and
+merge a low-rank linear adapter, audit a causal decoder block, train a tiny tied
+embedding language model and classify padded variable-length sequences. No
+downloaded pretrained weights, GPU, remote inference or distributed training is
+claimed. The synthetic fixtures establish the listed behavior rather than useful
+language understanding or representative deployment quality. Browser pages mark
+these Labs App required; existing compatible Labs continue running in Pyodide.
+
+Primary references checked for this expansion:
+
+- PyTorch [scaled dot-product attention](https://docs.pytorch.org/docs/main/generated/torch.nn.functional.scaled_dot_product_attention.html):
+  participation-mask semantics, causal alignment and explicit dropout policy.
+- PyTorch [saving and loading models](https://docs.pytorch.org/tutorials/beginner/saving_loading_models.html):
+  model and optimizer state ownership; this course separately captures CPU RNG
+  and a fixed data-stream identity for its bounded continuation contract.
+- [RoFormer](https://arxiv.org/abs/2104.09864): rotary position geometry. The Lab
+  explicitly chooses adjacent coordinate pairs and checks common-offset behavior.
+- [LoRA](https://arxiv.org/abs/2106.09685): frozen-base low-rank updates. The local
+  project states its scaling and does not claim a pretrained-model fine-tune.
+
+The shared `lab-topics.json` assigns every native Lab to exactly one topic in its
+section. Native and web catalogs use those same assignments, with expandable topic
+groups, concept search and visible runtime requirements on the site.

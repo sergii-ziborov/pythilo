@@ -1,0 +1,312 @@
+{
+  "id": "pytorch-training",
+  "title": "PyTorch: training systems",
+  "summary": "Real PyTorch CPU tensor operations, independent checks and three composed projects. Run in Pythilo; no external weights, GPU or service required.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "pt-torchclip",
+      "title": "Clip one global gradient norm before updating",
+      "body": "# Clip one global gradient norm before updating\n\nClipping each layer independently defines a different update from clipping the norm of the entire gradient vector. This Lab uses real parameter gradients and a single global clipping call. The returned diagnostic is the norm before clipping; the applied update must use the clipped values. Validate all incoming groups before applying an update so one nonfinite gradient cannot leave a partially changed model. A missing gradient is different from a zero gradient, especially when an optimizer also applies momentum or decay.\n\n```python\nimport torch\ng = torch.tensor([3., 4.])\nprint(g.norm().item())\n```\n\n## Review the design\n\nExplain the order of unscaling, nonfinite detection, global clipping and optimizer stepping. This CPU exercise does not execute automatic mixed precision or distributed collectives.\n",
+      "task": "Implement one SGD update on lists of parameter vectors. A corresponding gradient is a same-length vector or None. Use real torch Parameters and clip_grad_norm_ over all groups together, then subtract lr times the clipped gradient under no_grad. Return values and the pre-clipping norm. Reject empty/misaligned/nonfinite groups, lr<0 and cap<=0. Do not mutate input lists. Parameters with None gradients stay unchanged.",
+      "starter": "import torch\n\n\ndef clipped_update(values, gradients, lr, cap):\n    return None\n",
+      "solution": "import math\nimport torch\n\n\ndef clipped_update(values, gradients, lr, cap):\n    if len(values) != len(gradients) or not values:\n        raise ValueError('aligned parameter and gradient groups required')\n    if not math.isfinite(lr) or lr < 0 or not math.isfinite(cap) or cap <= 0:\n        raise ValueError('nonnegative learning rate and positive norm cap required')\n    if any(not row or any(not math.isfinite(v) for v in row) for row in values):\n        raise ValueError('nonempty finite parameter groups required')\n    for value, gradient in zip(values, gradients):\n        if gradient is not None and (len(value) != len(gradient) or any(not math.isfinite(g) for g in gradient)):\n            raise ValueError('finite shape-aligned gradients required')\n    parameters = [torch.nn.Parameter(torch.tensor(row, dtype=torch.float64)) for row in values]\n    for parameter, gradient in zip(parameters, gradients):\n        if gradient is not None:\n            parameter.grad = torch.tensor(gradient, dtype=torch.float64)\n    norm = torch.nn.utils.clip_grad_norm_(parameters, cap, error_if_nonfinite=True)\n    with torch.no_grad():\n        for parameter in parameters:\n            if parameter.grad is not None:\n                parameter.add_(parameter.grad, alpha=-lr)\n    return {'values': [p.detach().tolist() for p in parameters], 'norm': float(norm)}\n",
+      "checks": [
+        {
+          "name": "global norm and clipped update",
+          "code": "r=clipped_update([[1.],[2.]],[[3.],[4.]],.5,2)\nassert abs(r['norm']-5)<1e-12\nassert abs(r['values'][0][0]-.4)<1e-6 and abs(r['values'][1][0]-1.2)<1e-6\n"
+        },
+        {
+          "name": "missing gradients and input ownership",
+          "code": "import copy\nv=[[1.],[2.]]; old=copy.deepcopy(v)\nr=clipped_update(v,[None,[0.]],.1,1)\nassert v==old and r['values']==v and r['norm']==0\n"
+        },
+        {
+          "name": "small gradients are not amplified",
+          "code": "r=clipped_update([[1.]],[[.1]],1,3)\nassert abs(r['values'][0][0]-.9)<1e-12\n"
+        },
+        {
+          "name": "nonfinite gradients and zero cap fail",
+          "code": "try:\n    clipped_update([[1.]],[[float('nan')]],.1,1)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\ntry:\n    clipped_update([[1.]],[[1.]],.1,0)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Explain the order of unscaling, nonfinite detection, global clipping and optimizer stepping. This CPU exercise does not execute automatic mixed precision or distributed collectives."
+      ],
+      "explanation": "Explain the order of unscaling, nonfinite detection, global clipping and optimizer stepping. This CPU exercise does not execute automatic mixed precision or distributed collectives."
+    },
+    {
+      "id": "pt-torchgroups",
+      "title": "Partition AdamW parameters without duplicate ownership",
+      "body": "# Partition AdamW parameters without duplicate ownership\n\nA training policy must say which parameters receive decoupled weight decay. This exercise uses an explicit dimensional rule: matrices decay, while vectors and scalars do not. It is a policy to review, not a universal theorem about every architecture. Shared embeddings and tied output heads can expose the same parameter through several module paths. Duplicating ownership changes the update or causes an optimizer error. The Lab checks identities and executes an actual AdamW step rather than accepting only a plausible list of names.\n\n```python\nimport torch\nlayer = torch.nn.Linear(3, 2)\nfor name, p in layer.named_parameters():\n    print(name, p.ndim)\n```\n\n## Review the design\n\nDefend the decay policy for normalization, embeddings, biases and adapters. Parameter identity, gradient participation and optimizer state ownership are separate concerns.\n",
+      "task": "Return two optimizer group dicts with params lists. Include each distinct trainable parameter once. In this declared policy, tensors with ndim>=2 receive decay; scalars and vectors receive zero decay. Exclude frozen parameters. Reject negative/nonfinite decay and a model with no trainable parameters. Return original Parameter objects, not detached copies. Tied weights must not enter an optimizer twice.",
+      "starter": "import torch\n\n\ndef adamw_groups(model, decay):\n    return None\n",
+      "solution": "import math\nimport torch\n\n\ndef adamw_groups(model, decay):\n    if not math.isfinite(decay) or decay < 0:\n        raise ValueError('nonnegative finite decay required')\n    decayed, exempt, seen = [], [], set()\n    for name, parameter in model.named_parameters():\n        if not parameter.requires_grad or id(parameter) in seen:\n            continue\n        seen.add(id(parameter))\n        if parameter.ndim >= 2:\n            decayed.append(parameter)\n        else:\n            exempt.append(parameter)\n    if not seen:\n        raise ValueError('at least one trainable parameter required')\n    return [{'params': decayed, 'weight_decay': decay},\n            {'params': exempt, 'weight_decay': 0.0}]\n",
+      "checks": [
+        {
+          "name": "all trainable parameters have one owner",
+          "code": "m=torch.nn.Sequential(torch.nn.Linear(2,2),torch.nn.LayerNorm(2))\ng=adamw_groups(m,.1)\na=[p for row in g for p in row['params']]\nassert len(a)==4 and {id(p) for p in a}=={id(p) for p in m.parameters()}\nassert all(p.ndim>=2 for p in g[0]['params']) and all(p.ndim<2 for p in g[1]['params'])\n"
+        },
+        {
+          "name": "tied weights are deduplicated and frozen weights excluded",
+          "code": "m=torch.nn.Module();m.a=torch.nn.Linear(2,2);m.b=torch.nn.Linear(2,2);m.b.weight=m.a.weight;m.b.bias.requires_grad_(False)\ng=adamw_groups(m,.2)\nassert sum(len(r['params']) for r in g)==2\n"
+        },
+        {
+          "name": "actual AdamW applies only declared decay",
+          "code": "m=torch.nn.Linear(2,1)\nwith torch.no_grad():m.weight.fill_(1);m.bias.fill_(1)\nfor p in m.parameters():p.grad=torch.zeros_like(p)\no=torch.optim.AdamW(adamw_groups(m,.2),lr=.1);o.step()\nassert torch.allclose(m.weight,torch.full_like(m.weight,.98)) and m.bias.item()==1\n"
+        },
+        {
+          "name": "invalid policy rejected",
+          "code": "try:\n    adamw_groups(torch.nn.Linear(1,1),-1)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\ntry:\n    adamw_groups(torch.nn.Identity(),.1)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Defend the decay policy for normalization, embeddings, biases and adapters. Parameter identity, gradient participation and optimizer state ownership are separate concerns."
+      ],
+      "explanation": "Defend the decay policy for normalization, embeddings, biases and adapters. Parameter identity, gradient participation and optimizer state ownership are separate concerns."
+    },
+    {
+      "id": "pt-torchdistill",
+      "title": "Distill a detached teacher with temperature scaling",
+      "body": "# Distill a detached teacher with temperature scaling\n\nSoft teacher distributions contain relative class information that hard labels discard. Temperature changes the distribution and gradient scale, so the declared objective includes the squared temperature factor. The teacher is a fixed target: accidentally training it along with the student changes the optimization problem. KL divergence also has an argument-order convention that differs from the mathematical notation. This Lab checks actual student gradients, detached teacher ownership, mixture endpoints and agreement with an independently computed categorical divergence.\n\n```python\nimport torch\nlogits = torch.tensor([[4., 0.]])\nprint((logits/2).softmax(-1))\n```\n\n## Review the design\n\nState what the teacher knows, which data generated targets and how temperature was selected. Distillation does not make unavailable or private training evidence disappear.\n",
+      "task": "Compute (1-alpha)*cross_entropy(student,labels) + alpha*T*T*KL(softmax(teacher.detach()/T) || softmax(student/T)). Use KL batchmean, not an elementwise mean. Inputs are finite aligned [N,C] tensors, integer labels [N], C>=2, T>0 and alpha in [0,1]. Return a differentiable scalar. Teacher logits must receive no gradient.",
+      "starter": "import torch\n\n\ndef distillation_loss(student, teacher, labels, temperature, alpha):\n    return None\n",
+      "solution": "import math\nimport torch\nfrom torch.nn import functional as F\n\n\ndef distillation_loss(student, teacher, labels, temperature, alpha):\n    if not math.isfinite(temperature) or temperature <= 0 or not math.isfinite(alpha) or not 0 <= alpha <= 1:\n        raise ValueError('positive temperature and mixture in 0..1 required')\n    if student.ndim != 2 or student.shape != teacher.shape or student.shape[0] == 0 or student.shape[1] < 2:\n        raise ValueError('aligned nonempty multiclass logits required')\n    if labels.shape != student.shape[:1] or labels.dtype != torch.long:\n        raise ValueError('one integer target per observation required')\n    if not bool(torch.isfinite(student).all()) or not bool(torch.isfinite(teacher).all()):\n        raise ValueError('finite logits required')\n    hard = F.cross_entropy(student, labels)\n    target = F.softmax(teacher.detach() / temperature, dim=-1)\n    soft = F.kl_div(F.log_softmax(student / temperature, dim=-1), target, reduction='batchmean')\n    return (1 - alpha) * hard + alpha * temperature ** 2 * soft\n",
+      "checks": [
+        {
+          "name": "independent categorical KL and mixture",
+          "code": "import math\ns=torch.zeros(1,2,requires_grad=True);t=torch.tensor([[2.,0.]])\np=(t/2).softmax(-1)\nkl=(p*(p.log()+math.log(2))).sum()\nr=distillation_loss(s,t,torch.tensor([1]),2,.7)\nassert torch.allclose(r,.3*torch.tensor(math.log(2))+.7*4*kl)\n"
+        },
+        {
+          "name": "only the student receives gradients",
+          "code": "s=torch.zeros(2,2,requires_grad=True);t=torch.ones(2,2,requires_grad=True)\ndistillation_loss(s,t,torch.tensor([0,1]),2,.5).backward()\nassert s.grad is not None and torch.isfinite(s.grad).all() and t.grad is None\n"
+        },
+        {
+          "name": "hard-label endpoint and identical distributions",
+          "code": "from torch.nn import functional as F\ns=torch.tensor([[1.,2.],[3.,0.]],requires_grad=True);y=torch.tensor([0,1])\nassert torch.allclose(distillation_loss(s,s.detach(),y,3,0),F.cross_entropy(s,y))\nassert abs(distillation_loss(s,s.detach(),y,3,1).item())<1e-6\n"
+        },
+        {
+          "name": "zero temperature rejected",
+          "code": "try:\n    distillation_loss(torch.zeros(1,2),torch.zeros(1,2),torch.tensor([0]),0,.5)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "State what the teacher knows, which data generated targets and how temperature was selected. Distillation does not make unavailable or private training evidence disappear."
+      ],
+      "explanation": "State what the teacher knows, which data generated targets and how temperature was selected. Distillation does not make unavailable or private training evidence disappear."
+    },
+    {
+      "id": "pt-torchcontrast",
+      "title": "Train paired embeddings with symmetric InfoNCE",
+      "body": "# Train paired embeddings with symmetric InfoNCE\n\nA contrastive batch declares which two observations belong together and treats the other in-batch candidates as negatives. Normalizing embeddings makes scale distinct from similarity, while temperature controls how strongly difficult candidates contribute. A symmetric objective trains both retrieval directions. Reordering one side alone changes pair identities; reordering both sides together must preserve the loss. This small CPU problem uses actual autograd and local negatives. It does not execute a distributed gather, establish that every negative is valid, or remove false-negative bias.\n\n```python\nimport torch\nx = torch.eye(2)\nprint(x @ x.T)\n```\n\n## Review the design\n\nAudit pair identity, false negatives, temperature and batch composition. Distributed negatives additionally need correct cross-worker gradient and identity handling.\n",
+      "task": "For finite nonzero aligned [N,D] embeddings, N>=2, L2-normalize each row, form a@b.T / temperature and average row-wise and column-wise cross entropy against diagonal pair identities. Return a differentiable scalar; gradients must reach both encoders. Reject zero vectors, bad shapes and nonpositive/nonfinite temperature.",
+      "starter": "import torch\n\n\ndef symmetric_contrastive(a, b, temperature):\n    return None\n",
+      "solution": "import math\nimport torch\nfrom torch.nn import functional as F\n\n\ndef symmetric_contrastive(a, b, temperature):\n    if a.ndim != 2 or a.shape != b.shape or a.shape[0] < 2 or a.shape[1] < 1:\n        raise ValueError('two aligned embedding matrices with at least two pairs required')\n    if not math.isfinite(temperature) or temperature <= 0:\n        raise ValueError('positive finite temperature required')\n    if any(not bool(torch.isfinite(x).all()) or bool((x.norm(dim=-1) == 0).any()) for x in (a, b)):\n        raise ValueError('finite nonzero embeddings required')\n    scores = F.normalize(a, dim=-1) @ F.normalize(b, dim=-1).T / temperature\n    labels = torch.arange(a.shape[0], device=a.device)\n    return (F.cross_entropy(scores, labels) + F.cross_entropy(scores.T, labels)) / 2\n",
+      "checks": [
+        {
+          "name": "correct pairs beat mismatched pairs",
+          "code": "a=torch.eye(3)\nassert symmetric_contrastive(a,a,.2)<symmetric_contrastive(a,a[[1,2,0]],.2)\n"
+        },
+        {
+          "name": "both encoders receive nonzero gradients",
+          "code": "a=torch.tensor([[1.,.2],[.3,1.]],requires_grad=True);b=torch.tensor([[.8,.1],[.2,.7]],requires_grad=True)\nsymmetric_contrastive(a,b,.5).backward()\nassert a.grad.abs().sum()>0 and b.grad.abs().sum()>0\n"
+        },
+        {
+          "name": "joint permutation and positive scale invariance",
+          "code": "a=torch.tensor([[1.,.2],[.3,1.],[1.,1.]]);b=a+.1\nr=symmetric_contrastive(a,b,.3)\nassert torch.allclose(r,symmetric_contrastive(a[[2,0,1]]*3,b[[2,0,1]]*7,.3),atol=1e-6)\n"
+        },
+        {
+          "name": "zero embeddings rejected",
+          "code": "try:\n    symmetric_contrastive(torch.zeros(2,2),torch.eye(2),.1)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Audit pair identity, false negatives, temperature and batch composition. Distributed negatives additionally need correct cross-worker gradient and identity handling."
+      ],
+      "explanation": "Audit pair identity, false negatives, temperature and batch composition. Distributed negatives additionally need correct cross-worker gradient and identity handling."
+    },
+    {
+      "id": "pt-torchema",
+      "title": "Own EMA weights and copy non-parameter buffers",
+      "body": "# Own EMA weights and copy non-parameter buffers\n\nAn exponential moving average is another owned model state, not a shallow alias of the current model. Averaging parameter tensors can stabilize evaluation, but buffers need a declared policy too. Here running statistics and counters are copied rather than averaged. This is an explicit exercise contract; other EMA implementations can make different choices. The update disables gradient recording, verifies compatible state before mutation and refuses shared storage so a supposed shadow model cannot silently modify its source.\n\n```python\nimport copy, torch\nm = torch.nn.Linear(1, 1)\nshadow = copy.deepcopy(m)\nprint(shadow is m)\n```\n\n## Review the design\n\nExplain buffer policy, update cadence and evaluation ownership. Keep EMA state in a resumable checkpoint when continuation requires the same averaging history.\n",
+      "task": "Update an independent average module in place and return it. Floating named parameters use decay*old+(1-decay)*live under no_grad. All other state entries, including running-statistic and integer buffers, copy the live value. Require matching state keys/shapes/dtypes and decay in [0,1]; reject shared tensor storage before changing anything. Live model state must remain unchanged. Update exact tied aliases once; reject inconsistent shadow aliases before mutation.",
+      "starter": "import torch\n\n\ndef update_ema(average, model, decay):\n    return None\n",
+      "solution": "import math\nimport torch\n\n\ndef update_ema(average, model, decay):\n    if not math.isfinite(decay) or not 0 <= decay <= 1:\n        raise ValueError('EMA decay in 0..1 required')\n    old, new = average.state_dict(), model.state_dict()\n    if old.keys() != new.keys() or any(old[k].shape != new[k].shape or old[k].dtype != new[k].dtype for k in old):\n        raise ValueError('matching model state required')\n    live_storage = {value.data_ptr() for value in new.values() if value.numel()}\n    if any(value.numel() and value.data_ptr() in live_storage for value in old.values()):\n        raise ValueError('the average must own separate tensor storage')\n    parameter_names = {name for name, _ in model.named_parameters(remove_duplicate=False)}\n    aliases = {}\n    for name, value in old.items():\n        if not value.numel():\n            continue\n        identity = value.data_ptr()\n        signature = (new[name].data_ptr(), tuple(value.shape), tuple(value.stride()), name in parameter_names)\n        if identity in aliases and aliases[identity] != signature:\n            raise ValueError('shared shadow storage needs matching live aliases')\n        aliases[identity] = signature\n    updated = set()\n    with torch.no_grad():\n        for name in old:\n            identity = old[name].data_ptr() if old[name].numel() else name\n            if identity in updated:\n                continue\n            updated.add(identity)\n            if name in parameter_names and old[name].is_floating_point():\n                old[name].mul_(decay).add_(new[name], alpha=1 - decay)\n            else:\n                old[name].copy_(new[name])\n    return average\n",
+      "checks": [
+        {
+          "name": "parameters average without changing the source",
+          "code": "import copy\nm=torch.nn.Linear(1,1);a=copy.deepcopy(m)\nwith torch.no_grad():a.weight.fill_(2);m.weight.fill_(6)\nr=update_ema(a,m,.75)\nassert r is a and a.weight.item()==3 and m.weight.item()==6 and a.weight.grad is None, 'Return and update the independently owned EMA module.'\n"
+        },
+        {
+          "name": "floating and integer buffers are copied",
+          "code": "a=torch.nn.BatchNorm1d(2);m=torch.nn.BatchNorm1d(2)\nwith torch.no_grad():m.running_mean.fill_(8);m.num_batches_tracked.fill_(7)\nupdate_ema(a,m,.9)\nassert torch.equal(a.running_mean,m.running_mean) and a.num_batches_tracked.item()==7\n"
+        },
+        {
+          "name": "tied parameters are averaged exactly once",
+          "code": "import copy\nm=torch.nn.Module();m.a=torch.nn.Linear(2,2,bias=False);m.b=torch.nn.Linear(2,2,bias=False);m.b.weight=m.a.weight;a=copy.deepcopy(m)\nwith torch.no_grad():a.a.weight.fill_(2);m.a.weight.fill_(6)\nupdate_ema(a,m,.75)\nassert torch.equal(a.a.weight,torch.full_like(a.a.weight,3)) and a.a.weight is a.b.weight\n"
+        },
+        {
+          "name": "storage cannot alias the live model",
+          "code": "m=torch.nn.Linear(1,1)\ntry:\n    update_ema(m,m,.9)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        },
+        {
+          "name": "shape mismatch rejected before mutation",
+          "code": "a=torch.nn.Linear(1,1);m=torch.nn.Linear(2,1);old=a.weight.detach().clone()\ntry:\n    update_ema(a,m,.9)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\nassert torch.equal(a.weight,old)\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Explain buffer policy, update cadence and evaluation ownership. Keep EMA state in a resumable checkpoint when continuation requires the same averaging history."
+      ],
+      "explanation": "Explain buffer policy, update cadence and evaluation ownership. Keep EMA state in a resumable checkpoint when continuation requires the same averaging history."
+    },
+    {
+      "id": "pt-torchtokens",
+      "title": "Accumulate unequal token microbatches by valid targets",
+      "body": "# Accumulate unequal token microbatches by valid targets\n\nEqual weighting of microbatch means overweights a short or heavily padded microbatch. Token-level training needs one denominator for the complete effective batch. The numerator is a sum over admitted targets, while padding contributes neither loss nor count. An all-padding batch still needs a graph-connected zero so backward remains defined. This exercise combines real independent computation graphs and checks that repartitioning the same tokens preserves both loss and gradients. It does not assume that stochastic layers or batch-dependent model behavior are equivalent across partitions.\n\n```python\ncounts = [3, 1]\nmeans = [2., 4.]\nprint(sum(n*m for n,m in zip(counts, means))\n      / sum(counts))\n```\n\n## Review the design\n\nDefine the effective batch objective before adding accumulation, clipping or distributed reduction. Zero valid targets can require skipping an optimizer step even when backward is defined.\n",
+      "task": "Each microbatch is (logits[N,C], targets[N]) with long targets and a pad sentinel. Sum cross-entropy over valid targets across all microbatches and divide once by the total valid target count. Return one scalar attached to every logits graph. All-padding microbatches contribute differentiable zero; an entirely padded collection returns differentiable zero. Reject an empty collection or invalid aligned shapes/dtypes.",
+      "starter": "import torch\n\n\ndef accumulated_token_loss(batches, pad=-1):\n    return None\n",
+      "solution": "import torch\nfrom torch.nn import functional as F\n\n\ndef accumulated_token_loss(batches, pad=-1):\n    if not batches:\n        raise ValueError('at least one logits/target microbatch required')\n    total, count = None, 0\n    for logits, targets in batches:\n        if logits.ndim != 2 or logits.shape[0] == 0 or logits.shape[1] < 2 or targets.shape != logits.shape[:1] or targets.dtype != torch.long:\n            raise ValueError('nonempty logits and aligned integer targets required')\n        valid = targets != pad\n        n = int(valid.sum())\n        if n:\n            part = F.cross_entropy(logits[valid], targets[valid], reduction='sum')\n        else:\n            part = logits.sum() * 0\n        total = part if total is None else total + part\n        count += n\n    return total / count if count else total\n",
+      "checks": [
+        {
+          "name": "one denominator matches concatenated valid targets",
+          "code": "from torch.nn import functional as F\na=torch.tensor([[3.,0.],[0.,2.]],requires_grad=True);b=torch.tensor([[1.,0.]],requires_grad=True)\nr=accumulated_token_loss([(a,torch.tensor([0,-1])),(b,torch.tensor([1]))])\nexpected=F.cross_entropy(torch.stack([a[0],b[0]]),torch.tensor([0,1]))\nassert torch.allclose(r,expected)\n"
+        },
+        {
+          "name": "padding receives zero gradient",
+          "code": "a=torch.zeros(2,2,requires_grad=True);b=torch.zeros(1,2,requires_grad=True)\naccumulated_token_loss([(a,torch.tensor([0,-1])),(b,torch.tensor([1]))]).backward()\nassert torch.equal(a.grad[1],torch.zeros(2)) and torch.allclose(a.grad[0],torch.tensor([-.25,.25])) and torch.allclose(b.grad[0],torch.tensor([.25,-.25]))\n"
+        },
+        {
+          "name": "all-padding graphs remain differentiable",
+          "code": "a=torch.ones(2,2,requires_grad=True);b=torch.ones(1,2,requires_grad=True)\nr=accumulated_token_loss([(a,torch.tensor([-1,-1])),(b,torch.tensor([-1]))]);r.backward()\nassert r.item()==0 and torch.equal(a.grad,torch.zeros_like(a)) and torch.equal(b.grad,torch.zeros_like(b))\n"
+        },
+        {
+          "name": "empty collection rejected",
+          "code": "try:\n    accumulated_token_loss([])\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Define the effective batch objective before adding accumulation, clipping or distributed reduction. Zero valid targets can require skipping an optimizer step even when backward is defined."
+      ],
+      "explanation": "Define the effective batch objective before adding accumulation, clipping or distributed reduction. Zero valid targets can require skipping an optimizer step even when backward is defined."
+    },
+    {
+      "id": "project-torchmlp",
+      "title": "Project: train, validate and export a nonlinear classifier",
+      "body": "# Project: train, validate and export a nonlinear classifier\n\nThis project trains a nonlinear classifier with real PyTorch autograd and Adam. Preprocessing belongs to the training partition; validation selects a historical checkpoint; test labels only measure the frozen result. Copying a state dictionary is essential because live weights continue changing. The exported artifact contains both preprocessing and model parameters, allowing independent inference after JSON serialization. The tiny XOR fixture demonstrates nonlinear learning and data boundaries. It is a CPU training exercise rather than evidence of generalization on a representative production dataset.\n\n```python\nimport torch\nx = torch.tensor([[0., 1.], [1., 0.]])\nprint(x.std(0, correction=0))\n```\n\n## Review the design\n\nAudit fitted statistics, checkpoint ownership, deterministic initialization and held-out identities. A passing synthetic test is not an estimate of real deployment performance.\n",
+      "task": "Rows contain unique disjoint id, finite two-feature x and integer binary y. Fit population means/stds on train only (constant scale=1), then train Linear(2,8), Tanh, Linear(8,2) with Adam lr=.04 for steps full-batch updates. Select a deep-copied model state by lowest validation cross entropy, first exact tie. Restore it and evaluate test. Return artifact with state/means/scales, predictions, initial_loss, training_loss, validation_loss, best_step, test_loss and validation history. Preserve caller CPU RNG using fork_rng. Reject invalid partitions and steps. Trace uses four updates; checks train longer.",
+      "starter": "import torch\n\n\ndef fit_mlp(train, validation, test, steps, seed):\n    return None\n",
+      "solution": "import copy\nimport math\nimport torch\nfrom torch import nn\nfrom torch.nn import functional as F\n\n\ndef fit_mlp(train, validation, test, steps, seed):\n    if any(not part for part in (train, validation, test)) or type(steps) is not int or steps < 1:\n        raise ValueError('three nonempty partitions and a positive step budget required')\n    rows = train + validation + test\n    if len({row['id'] for row in rows}) != len(rows):\n        raise ValueError('unique disjoint sample identities required')\n    if any(len(row['x']) != 2 or any(not math.isfinite(x) for x in row['x']) or type(row['y']) is not int or row['y'] not in (0, 1) for row in rows):\n        raise ValueError('finite two-feature binary observations required')\n    with torch.random.fork_rng(devices=[]):\n        torch.manual_seed(seed)\n        x = torch.tensor([r['x'] for r in train], dtype=torch.float32)\n        y = torch.tensor([r['y'] for r in train], dtype=torch.long)\n        means = x.mean(dim=0)\n        scales = x.std(dim=0, correction=0)\n        scales = torch.where(scales == 0, torch.ones_like(scales), scales)\n        x = (x - means) / scales\n        vx = (torch.tensor([r['x'] for r in validation]) - means) / scales\n        vy = torch.tensor([r['y'] for r in validation], dtype=torch.long)\n        model = nn.Sequential(nn.Linear(2, 8), nn.Tanh(), nn.Linear(8, 2))\n        optimizer = torch.optim.Adam(model.parameters(), lr=.04)\n        initial = float(F.cross_entropy(model(x), y).detach())\n        best, history = None, []\n        for step in range(1, steps + 1):\n            model.train()\n            optimizer.zero_grad(set_to_none=True)\n            loss = F.cross_entropy(model(x), y)\n            loss.backward()\n            optimizer.step()\n            model.eval()\n            with torch.no_grad():\n                value = float(F.cross_entropy(model(vx), vy))\n            history.append(value)\n            if best is None or value < best[0]:\n                best = (value, step, copy.deepcopy(model.state_dict()))\n        model.load_state_dict(best[2])\n        model.eval()\n        with torch.no_grad():\n            tx = (torch.tensor([r['x'] for r in test]) - means) / scales\n            ty = torch.tensor([r['y'] for r in test], dtype=torch.long)\n            logits = model(tx)\n            test_loss = float(F.cross_entropy(logits, ty))\n            training_loss = float(F.cross_entropy(model(x), y))\n        artifact = {'state': {k: v.tolist() for k, v in model.state_dict().items()},\n                    'means': means.tolist(), 'scales': scales.tolist()}\n        return {'artifact': artifact, 'predictions': logits.argmax(dim=-1).tolist(),\n                'initial_loss': initial, 'training_loss': training_loss,\n                'validation_loss': best[0], 'best_step': best[1],\n                'test_loss': test_loss, 'history': history}\n",
+      "checks": [
+        {
+          "name": "actual nonlinear learning and checkpoint selection",
+          "code": "train=[{'id': 't0', 'x': [0.0, 0.0], 'y': 0}, {'id': 't1', 'x': [0.0, 1.0], 'y': 1}, {'id': 't2', 'x': [1.0, 0.0], 'y': 1}, {'id': 't3', 'x': [1.0, 1.0], 'y': 0}]\nvalidation=[{'id': 'v0', 'x': [0.05, 0.05], 'y': 0}, {'id': 'v1', 'x': [0.05, 0.95], 'y': 1}, {'id': 'v2', 'x': [0.95, 0.05], 'y': 1}, {'id': 'v3', 'x': [0.95, 0.95], 'y': 0}]\ntest=[{'id': 'z0', 'x': [0.1, 0.1], 'y': 0}, {'id': 'z1', 'x': [0.1, 0.9], 'y': 1}]\nr=fit_mlp(train,validation,test,80,7)\nassert r['training_loss']<.08 and r['training_loss']<r['initial_loss'] and r['predictions']==[0,1]\nassert r['validation_loss']==min(r['history']) and r['best_step']==r['history'].index(min(r['history']))+1\n"
+        },
+        {
+          "name": "held-out labels cannot change model selection",
+          "code": "train=[{'id': 't0', 'x': [0.0, 0.0], 'y': 0}, {'id': 't1', 'x': [0.0, 1.0], 'y': 1}, {'id': 't2', 'x': [1.0, 0.0], 'y': 1}, {'id': 't3', 'x': [1.0, 1.0], 'y': 0}]\nvalidation=[{'id': 'v0', 'x': [0.05, 0.05], 'y': 0}, {'id': 'v1', 'x': [0.05, 0.95], 'y': 1}, {'id': 'v2', 'x': [0.95, 0.05], 'y': 1}, {'id': 'v3', 'x': [0.95, 0.95], 'y': 0}]\ntest=[{'id': 'z0', 'x': [0.1, 0.1], 'y': 0}, {'id': 'z1', 'x': [0.1, 0.9], 'y': 1}]\nimport copy\na=fit_mlp(train,validation,test,12,3);poison=copy.deepcopy(test)\nfor row in poison:row['y']=1-row['y']\nb=fit_mlp(train,validation,poison,12,3)\nassert a['artifact']==b['artifact'] and a['predictions']==b['predictions'] and a['best_step']==b['best_step'] and a['test_loss']!=b['test_loss']\n"
+        },
+        {
+          "name": "serialized artifact independently predicts",
+          "code": "train=[{'id': 't0', 'x': [0.0, 0.0], 'y': 0}, {'id': 't1', 'x': [0.0, 1.0], 'y': 1}, {'id': 't2', 'x': [1.0, 0.0], 'y': 1}, {'id': 't3', 'x': [1.0, 1.0], 'y': 0}]\nvalidation=[{'id': 'v0', 'x': [0.05, 0.05], 'y': 0}, {'id': 'v1', 'x': [0.05, 0.95], 'y': 1}, {'id': 'v2', 'x': [0.95, 0.05], 'y': 1}, {'id': 'v3', 'x': [0.95, 0.95], 'y': 0}]\ntest=[{'id': 'z0', 'x': [0.1, 0.1], 'y': 0}, {'id': 'z1', 'x': [0.1, 0.9], 'y': 1}]\nimport json\nr=fit_mlp(train,validation,test,20,7);a=json.loads(json.dumps(r['artifact']))\nx=(torch.tensor([row['x'] for row in test])-torch.tensor(a['means']))/torch.tensor(a['scales'])\ns={k:torch.tensor(v) for k,v in a['state'].items()}\nh=torch.tanh(torch.nn.functional.linear(x,s['0.weight'],s['0.bias']))\nz=torch.nn.functional.linear(h,s['2.weight'],s['2.bias'])\nassert z.argmax(-1).tolist()==r['predictions'] and a['means']==[.5,.5]\n"
+        },
+        {
+          "name": "caller randomness is preserved",
+          "code": "train=[{'id': 't0', 'x': [0.0, 0.0], 'y': 0}, {'id': 't1', 'x': [0.0, 1.0], 'y': 1}, {'id': 't2', 'x': [1.0, 0.0], 'y': 1}, {'id': 't3', 'x': [1.0, 1.0], 'y': 0}]\nvalidation=[{'id': 'v0', 'x': [0.05, 0.05], 'y': 0}, {'id': 'v1', 'x': [0.05, 0.95], 'y': 1}, {'id': 'v2', 'x': [0.95, 0.05], 'y': 1}, {'id': 'v3', 'x': [0.95, 0.95], 'y': 0}]\ntest=[{'id': 'z0', 'x': [0.1, 0.1], 'y': 0}, {'id': 'z1', 'x': [0.1, 0.9], 'y': 1}]\ntorch.manual_seed(113);before=torch.get_rng_state().clone()\na=fit_mlp(train,validation,test,3,5)\nassert torch.equal(before,torch.get_rng_state())\nb=fit_mlp(train,validation,test,3,5)\nassert a==b\n"
+        },
+        {
+          "name": "partition identity leakage rejected",
+          "code": "train=[{'id': 't0', 'x': [0.0, 0.0], 'y': 0}, {'id': 't1', 'x': [0.0, 1.0], 'y': 1}, {'id': 't2', 'x': [1.0, 0.0], 'y': 1}, {'id': 't3', 'x': [1.0, 1.0], 'y': 0}]\nvalidation=[{'id': 'v0', 'x': [0.05, 0.05], 'y': 0}, {'id': 'v1', 'x': [0.05, 0.95], 'y': 1}, {'id': 'v2', 'x': [0.95, 0.05], 'y': 1}, {'id': 'v3', 'x': [0.95, 0.95], 'y': 0}]\ntest=[{'id': 'z0', 'x': [0.1, 0.1], 'y': 0}, {'id': 'z1', 'x': [0.1, 0.9], 'y': 1}]\ntry:\n    fit_mlp(train,train,test,2,7)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Audit fitted statistics, checkpoint ownership, deterministic initialization and held-out identities. A passing synthetic test is not an estimate of real deployment performance."
+      ],
+      "explanation": "Audit fitted statistics, checkpoint ownership, deterministic initialization and held-out identities. A passing synthetic test is not an estimate of real deployment performance."
+    },
+    {
+      "id": "project-torchresume",
+      "title": "Project: resume AdamW, sampling and dropout exactly",
+      "body": "# Project: resume AdamW, sampling and dropout exactly\n\nResuming weights alone is not resuming an experiment. AdamW moments, dropout randomness and the next sampled examples affect every subsequent update. This project captures an owned checkpoint at an update boundary and restores randomness after model construction has consumed random numbers. Checks compare uninterrupted training with two resumed segments, including exact losses, sampled indices and parameter tensors. The guarantee is bounded to this CPU model, fixed data and runtime. It does not claim bitwise portability across devices, library releases, multiprocessing loaders or distributed workers.\n\n```python\nimport torch\nstate = torch.get_rng_state().clone()\nfirst = torch.rand(2)\ntorch.set_rng_state(state)\nprint(torch.equal(first, torch.rand(2)))\n```\n\n## Review the design\n\nState the recovery boundary and record preprocessing, dataset identity, sampling and optimizer progress. Filesystem atomicity and durable checkpoint publication are separate production concerns.\n",
+      "task": "Train CPU Sequential(Linear(2,4),Tanh,Dropout(.25),Linear(4,1)) with AdamW lr=.02 and weight_decay=.01. Each step draws randperm(N)[:min(3,N)] and minimizes mean squared error. Return checkpoint (model/optimizer deep copies, CPU rng clone, cumulative step, SHA256 of json.dumps([xs,ys],sort_keys=True,allow_nan=False).encode()), losses and sampled batches. On resume initialize objects, load model and copied optimizer state, then restore captured RNG before the next draw. Preserve caller RNG with fork_rng. Reject changed data, invalid steps or nonfinite/misaligned two-feature data. Zero steps capture state without updating.",
+      "starter": "import torch\n\n\ndef train_segment(xs, ys, steps, seed, checkpoint=None):\n    return None\n",
+      "solution": "import copy\nimport hashlib\nimport json\nimport math\nimport torch\nfrom torch import nn\nfrom torch.nn import functional as F\n\n\ndef train_segment(xs, ys, steps, seed, checkpoint=None):\n    if not xs or len(xs) != len(ys) or type(steps) is not int or steps < 0:\n        raise ValueError('aligned data and nonnegative integer steps required')\n    if any(len(row) != 2 or any(not math.isfinite(v) for v in row) for row in xs) or any(not math.isfinite(v) for v in ys):\n        raise ValueError('finite two-feature regression data required')\n    identity = hashlib.sha256(json.dumps([xs, ys], sort_keys=True, allow_nan=False).encode()).hexdigest()\n    if checkpoint is not None and (checkpoint['data'] != identity or type(checkpoint['step']) is not int or checkpoint['step'] < 0):\n        raise ValueError('checkpoint belongs to a different data stream')\n    with torch.random.fork_rng(devices=[]):\n        torch.manual_seed(seed)\n        model = nn.Sequential(nn.Linear(2, 4), nn.Tanh(), nn.Dropout(.25), nn.Linear(4, 1))\n        optimizer = torch.optim.AdamW(model.parameters(), lr=.02, weight_decay=.01)\n        position = 0\n        if checkpoint is not None:\n            model.load_state_dict(checkpoint['model'])\n            optimizer.load_state_dict(copy.deepcopy(checkpoint['optimizer']))\n            torch.set_rng_state(checkpoint['rng'].clone())\n            position = checkpoint['step']\n        x = torch.tensor(xs, dtype=torch.float32)\n        y = torch.tensor(ys, dtype=torch.float32)\n        model.train()\n        losses, batches = [], []\n        for step in range(steps):\n            indices = torch.randperm(len(xs))[:min(3, len(xs))]\n            optimizer.zero_grad(set_to_none=True)\n            loss = F.mse_loss(model(x[indices]).squeeze(-1), y[indices])\n            loss.backward()\n            optimizer.step()\n            losses.append(float(loss.detach()))\n            batches.append(indices.tolist())\n        captured = copy.deepcopy({'model': model.state_dict(), 'optimizer': optimizer.state_dict(),\n                                 'rng': torch.get_rng_state(), 'step': position + steps,\n                                 'data': identity})\n        return {'checkpoint': captured, 'losses': losses, 'batches': batches}\n",
+      "checks": [
+        {
+          "name": "resumed trajectory equals uninterrupted training",
+          "code": "xs=[[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]\nys=[0.0, 1.0, 1.0, 2.0]\nfull=train_segment(xs,ys,8,7);a=train_segment(xs,ys,3,7);b=train_segment(xs,ys,5,99,a['checkpoint'])\nassert full['losses']==a['losses']+b['losses'] and full['batches']==a['batches']+b['batches']\nassert b['checkpoint']['step']==8\nassert all(torch.equal(v,b['checkpoint']['model'][k]) for k,v in full['checkpoint']['model'].items())\n"
+        },
+        {
+          "name": "optimizer moments and RNG continue exactly",
+          "code": "xs=[[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]\nys=[0.0, 1.0, 1.0, 2.0]\nfull=train_segment(xs,ys,5,4);a=train_segment(xs,ys,2,4);b=train_segment(xs,ys,3,4,a['checkpoint'])\nf=full['checkpoint'];r=b['checkpoint']\nassert torch.equal(f['rng'],r['rng'])\nfor key,state in f['optimizer']['state'].items():\n    for name,value in state.items():\n        assert torch.equal(value,r['optimizer']['state'][key][name])\n"
+        },
+        {
+          "name": "resume cannot mutate its supplied checkpoint",
+          "code": "xs=[[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]\nys=[0.0, 1.0, 1.0, 2.0]\nimport copy\na=train_segment(xs,ys,2,3)['checkpoint'];old=copy.deepcopy(a)\ntrain_segment(xs,ys,3,3,a)\nassert all(torch.equal(v,a['model'][k]) for k,v in old['model'].items()) and torch.equal(a['rng'],old['rng']) and a['step']==2\n"
+        },
+        {
+          "name": "zero-step capture and caller RNG ownership",
+          "code": "xs=[[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]\nys=[0.0, 1.0, 1.0, 2.0]\ntorch.manual_seed(91);old=torch.get_rng_state().clone()\nr=train_segment(xs,ys,0,3)\nassert r['checkpoint']['step']==0 and r['losses']==[] and r['batches']==[] and torch.equal(old,torch.get_rng_state())\n"
+        },
+        {
+          "name": "data identity mismatch rejected",
+          "code": "xs=[[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]\nys=[0.0, 1.0, 1.0, 2.0]\nc=train_segment(xs,ys,1,3)['checkpoint']\ntry:\n    train_segment(xs,[0.,1.,1.,9.],1,3,c)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "State the recovery boundary and record preprocessing, dataset identity, sampling and optimizer progress. Filesystem atomicity and durable checkpoint publication are separate production concerns."
+      ],
+      "explanation": "State the recovery boundary and record preprocessing, dataset identity, sampling and optimizer progress. Filesystem atomicity and durable checkpoint publication are separate production concerns."
+    },
+    {
+      "id": "project-torchlora",
+      "title": "Project: learn and merge a frozen-base low-rank adapter",
+      "body": "# Project: learn and merge a frozen-base low-rank adapter\n\nLow-rank adaptation trains a small update while retaining a frozen base matrix. Zero-initializing one adapter factor makes the first forward pass match the base exactly; the other factor needs nonzero initialization so learning can begin. This project performs actual gradient updates, then merges the learned matrix and checks inference equivalence. It is a local linear adapter with explicit scaling, not a downloaded pretrained language model or a claim about large-model fine-tuning quality. The merged artifact is useful only with the same base, scale and tensor layout.\n\n```python\nimport torch\na = torch.tensor([[1., 2.]])\nb = torch.tensor([[3.], [4.]])\nprint(b @ a)\n```\n\n## Review the design\n\nRecord adapter rank, scaling, base-model identity and merge policy. Real transformer fine-tuning also needs target-module selection, tokenization and a held-out evaluation.\n",
+      "task": "For finite base [out,in], xs [N,in] and ys [N,out], train only A [rank,in] and B [out,rank]. Initialize A=randn*.1, B=zeros under a local seed. Predict linear(xs,base)+linear(linear(xs,A),B)/rank; use Adam lr=.05 and mean squared error for positive steps. Base remains frozen and caller lists unchanged. Return base, a, b, merged=base+B@A/rank, history of pre-update losses, final loss and merged predictions as lists/scalars. Rank is a positive integer <=min(out,in). Preserve caller CPU RNG.",
+      "starter": "import torch\n\n\ndef fit_low_rank(base, xs, ys, rank, steps, seed):\n    return None\n",
+      "solution": "import math\nimport torch\nfrom torch import nn\nfrom torch.nn import functional as F\n\n\ndef fit_low_rank(base, xs, ys, rank, steps, seed):\n    if type(rank) is not int or rank < 1 or type(steps) is not int or steps < 1:\n        raise ValueError('positive rank and training steps required')\n    frozen = torch.tensor(base, dtype=torch.float32)\n    x, y = torch.tensor(xs, dtype=torch.float32), torch.tensor(ys, dtype=torch.float32)\n    if frozen.ndim != 2 or x.ndim != 2 or y.ndim != 2 or x.shape[0] != y.shape[0] or x.shape[1] != frozen.shape[1] or y.shape[1] != frozen.shape[0] or min(x.shape) < 1 or rank > min(frozen.shape):\n        raise ValueError('aligned nonempty data and feasible adapter rank required')\n    if any(not bool(torch.isfinite(t).all()) for t in (frozen, x, y)):\n        raise ValueError('finite model and data required')\n    with torch.random.fork_rng(devices=[]):\n        torch.manual_seed(seed)\n        a = nn.Parameter(torch.randn(rank, frozen.shape[1]) * .1)\n        b = nn.Parameter(torch.zeros(frozen.shape[0], rank))\n        optimizer = torch.optim.Adam([a, b], lr=.05)\n        history = []\n        for step in range(steps):\n            optimizer.zero_grad(set_to_none=True)\n            prediction = F.linear(x, frozen) + F.linear(F.linear(x, a), b) / rank\n            loss = F.mse_loss(prediction, y)\n            loss.backward()\n            optimizer.step()\n            history.append(float(loss.detach()))\n        merged = frozen + b.detach() @ a.detach() / rank\n        with torch.no_grad():\n            final_loss = float(F.mse_loss(F.linear(x, merged), y))\n        return {'base': frozen.tolist(), 'a': a.detach().tolist(), 'b': b.detach().tolist(),\n                'merged': merged.tolist(), 'history': history, 'loss': final_loss,\n                'predictions': F.linear(x, merged).tolist()}\n",
+      "checks": [
+        {
+          "name": "a real rank-one target is learned",
+          "code": "base=[[0.,0.],[0.,0.]]\nxs=[[1.,0.],[0.,1.],[1.,1.],[-1.,1.]]\nys=[[1.,2.],[2.,4.],[3.,6.],[1.,2.]]\nr=fit_low_rank(base,xs,ys,1,100,7)\nassert r['loss']<.03 and r['loss']<r['history'][0]/100\nassert any(abs(v)>0 for row in r['b'] for v in row)\n"
+        },
+        {
+          "name": "merge reproduces adapter inference",
+          "code": "base=[[0.,0.],[0.,0.]]\nxs=[[1.,0.],[0.,1.],[1.,1.],[-1.,1.]]\nys=[[1.,2.],[2.,4.],[3.,6.],[1.,2.]]\nr=fit_low_rank(base,xs,ys,1,12,5)\nx=torch.tensor(xs);a=torch.tensor(r['a']);b=torch.tensor(r['b']);w=torch.tensor(r['base'])\np=x@w.T+(x@a.T)@b.T\nassert torch.allclose(p,torch.tensor(r['predictions']),atol=1e-5)\nassert torch.allclose(torch.tensor(r['merged']),w+b@a)\n"
+        },
+        {
+          "name": "base and caller randomness remain owned",
+          "code": "base=[[0.,0.],[0.,0.]]\nxs=[[1.,0.],[0.,1.],[1.,1.],[-1.,1.]]\nys=[[1.,2.],[2.,4.],[3.,6.],[1.,2.]]\nimport copy\nold=copy.deepcopy(base);torch.manual_seed(90);rng=torch.get_rng_state().clone()\nr=fit_low_rank(base,xs,ys,1,3,5)\nassert base==old==r['base'] and torch.equal(rng,torch.get_rng_state())\n"
+        },
+        {
+          "name": "seeded training is reproducible",
+          "code": "base=[[0.,0.],[0.,0.]]\nxs=[[1.,0.],[0.,1.],[1.,1.],[-1.,1.]]\nys=[[1.,2.],[2.,4.],[3.,6.],[1.,2.]]\nassert fit_low_rank(base,xs,ys,1,4,7)==fit_low_rank(base,xs,ys,1,4,7)\n"
+        },
+        {
+          "name": "impossible rank rejected",
+          "code": "base=[[0.,0.],[0.,0.]]\nxs=[[1.,0.],[0.,1.],[1.,1.],[-1.,1.]]\nys=[[1.,2.],[2.,4.],[3.,6.],[1.,2.]]\ntry:\n    fit_low_rank(base,xs,ys,3,3,7)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject the invalid input before changing state.'\n"
+        }
+      ],
+      "hints": [
+        "Write down the tensor shapes and the state this function owns.",
+        "Check the independent cases, then compare forward values and gradients or resumed state.",
+        "Record adapter rank, scaling, base-model identity and merge policy. Real transformer fine-tuning also needs target-module selection, tokenization and a held-out evaluation."
+      ],
+      "explanation": "Record adapter rank, scaling, base-model identity and merge policy. Real transformer fine-tuning also needs target-module selection, tokenization and a held-out evaluation."
+    }
+  ]
+}

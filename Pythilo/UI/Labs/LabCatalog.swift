@@ -10,6 +10,12 @@ struct LabVariant: Codable, Identifiable, Hashable, Sendable {
     var scales = true
 }
 
+struct LabTopic: Codable, Identifiable, Hashable, Sendable {
+    let id: String
+    let title: String
+    let section: LabInfo.Section
+}
+
 struct LabInfo: Codable, Identifiable, Hashable, Sendable {
     enum Section: String, Codable, CaseIterable, Sendable {
         case basics = "Basics"
@@ -47,6 +53,22 @@ struct LabInfo: Codable, Identifiable, Hashable, Sendable {
 
 enum LabCatalog {
     enum Code: String { case starter, answer }
+
+    private struct Topics: Decodable {
+        let topics: [LabTopic]
+        let assignments: [String: String]
+    }
+    private static let topicIndex: Topics = {
+        let url = Bundle.main.bundleURL.appending(path: "app/pythilo_runtime/labcode/lab-topics.json")
+        guard let data = try? Data(contentsOf: url), let index = try? JSONDecoder().decode(Topics.self, from: data) else {
+            return Topics(topics: [], assignments: [:])
+        }
+        return index
+    }()
+    static var topics: [LabTopic] { topicIndex.topics }
+    static func topic(for lab: LabInfo) -> LabTopic? {
+        topics.first { $0.id == topicIndex.assignments[lab.id] }
+    }
 
     static func code(_ lab: String, _ variant: String, _ kind: Code) -> String {
         let url = Bundle.main.bundleURL.appending(path: "app/pythilo_runtime/labcode/\(lab).\(variant).\(kind.rawValue).py")

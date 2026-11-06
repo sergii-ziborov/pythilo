@@ -151,7 +151,9 @@ writeFileSync(join(content, 'lessons-checker.json'), JSON.stringify({ source: ch
 // The new browser labs use the exact tracing engine and files bundled by iOS.
 const labRoot = join(repository, 'Pythilo', 'PythonRuntime', 'pythilo_runtime');
 const labCatalog = JSON.parse(readFileSync(join(labRoot, 'labcode', 'catalog-expansion.json'), 'utf8'));
+const labTopics = JSON.parse(readFileSync(join(labRoot, 'labcode', 'lab-topics.json'), 'utf8'));
 writeFileSync(join(content, 'labs.json'), JSON.stringify({
+  ...labTopics,
   labs: labCatalog.map(lab => ({ ...lab,
     starter: readFileSync(join(labRoot, 'labcode', `${lab.id}.practice.starter.py`), 'utf8'),
     answer: readFileSync(join(labRoot, 'labcode', `${lab.id}.practice.answer.py`), 'utf8'),

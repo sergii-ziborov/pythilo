@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { browserLabs } from "@/lib/browser-labs";
+import { allLabs } from "@/lib/browser-labs";
 import { notFound } from "next/navigation";
 import { Inline, Markdown } from "@/components/markdown";
 import { PythonCode } from "@/components/python-code";
@@ -29,7 +29,7 @@ export default async function LessonPage({ params }: Params) {
     : <pre className="code-block"><code>{source}</code></pre>;
   const position = course.kind === "interview" ? `${lesson.level ?? ""}${lesson.minutes ? ` · ${lesson.minutes} min` : ""} · Task ${index + 1} of ${course.lessons.length}` : `Lesson ${index + 1} of ${course.lessons.length}`;
   return <LessonWorkspace
-    practice={browserLabs.filter(lab => lab.lessons?.includes(lesson.id)).map(lab => <p key={lab.id}><Link className="pill-button" href={`/labs/${lab.id}/`}>Practice in Lab: {lab.title} →</Link></p>)}
+    practice={allLabs.filter(lab => lab.lessons?.includes(lesson.id)).map(lab => <p key={lab.id}><Link className="pill-button" href={`/labs/${lab.id}/`}>Practice in Lab: {lab.title} →</Link></p>)}
     course={course.id} lesson={lesson.id} breadcrumb={{ courseTitle: course.title, lessonTitle: lesson.title }} position={position.replace(/^ · /, "")}
     sections={lesson.sections.map(section => ({ chip: section.chip, title: section.title, content: <Markdown source={section.markdown} code={code} /> }))}
     task={<Inline text={lesson.task} />} starter={lesson.starter} checks={lesson.checks}

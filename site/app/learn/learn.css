@@ -1,4 +1,13 @@
 .lesson-shell { height: 100dvh; display: flex; flex-direction: column; }
+.lesson-reading > p > .pill-button {
+  max-width: 100%;
+  height: auto;
+  min-height: 44px;
+  padding: 10px 16px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
 .lesson-header { min-height: 64px; border-bottom: 1px solid var(--divider); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 24px; }
 .lesson-header .brand { font-size: 17px; }
 .lesson-breadcrumb { font-size: 14.5px; color: var(--muted); min-width: 0; }

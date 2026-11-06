@@ -30,6 +30,8 @@ TORCH_IMPORT_SECONDS = 20
 
 # File stem -> (course id, kind, number of lessons)
 EXPECTED_COURSES = {
+    "34-pytorch-training": ("pytorch-training", "path", 9),
+    "35-transformer-engineering": ("transformer-engineering", "path", 9),
     '32-ml-systems': ('ml-systems', "path", 12),
     '33-ai-systems': ('ai-systems', "path", 12),
     '25-python-runtime': ('python-runtime', "path", 12),

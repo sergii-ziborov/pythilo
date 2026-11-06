@@ -125,7 +125,7 @@ test("lesson checks register their module and restore module/path state on succe
 });
 
 test("course content is built from the app's files, and lessons needing missing packages say so", () => {
-  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview", "algorithm-patterns", "data-practice", "reliable-python", "ml-practice", "ml-evaluation", "ai-building-blocks", "pydantic", "fastapi-httpx", "testing-practice", "data-formats", "python-runtime", "python-systems", "ml-statistics", "ml-production", "ai-production", "deep-learning-practice", "senior-projects", "ml-systems", "ai-systems"]);
+  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview", "algorithm-patterns", "data-practice", "reliable-python", "ml-practice", "ml-evaluation", "ai-building-blocks", "pydantic", "fastapi-httpx", "testing-practice", "data-formats", "python-runtime", "python-systems", "ml-statistics", "ml-production", "ai-production", "deep-learning-practice", "senior-projects", "ml-systems", "ai-systems", "pytorch-training", "transformer-engineering"]);
   const all = courses.flatMap(course => course.lessons);
   assert.ok(all.every(lesson => lesson.sections[0].chip === "Idea" && lesson.checks.length && lesson.starter));
   const lessonsOf = id => courses.find(course => course.id === id).lessons;
@@ -217,7 +217,7 @@ test("every browser-compatible reading example in all courses runs independently
     checked++;
   }
   assert.deepEqual(failures, []);
-  assert.equal(checked + unavailable, 563);
+  assert.equal(checked + unavailable, 581);
   assert.ok(checked > 400);
   console.log(`Reading examples verified in browser: ${checked}; app-only: ${unavailable}`);
 });

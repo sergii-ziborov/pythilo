@@ -45,9 +45,9 @@ final class LabsTests: XCTestCase {
     }
 
     func testTheCatalogHasSectionsAndManyLabs() {
-        XCTAssertEqual(LabCatalog.all.count, 96)
-        XCTAssertEqual(LabCatalog.all.filter { $0.section == .learning }.count, 45)
-        XCTAssertEqual(LabCatalog.all.filter { $0.section == .intelligence }.count, 28)
+        XCTAssertEqual(LabCatalog.all.count, 114)
+        XCTAssertEqual(LabCatalog.all.filter { $0.section == .learning }.count, 54)
+        XCTAssertEqual(LabCatalog.all.filter { $0.section == .intelligence }.count, 37)
         XCTAssertNotNil(LabCatalog.lab("attention"))
         XCTAssertNotNil(LabCatalog.lab("bellmanford"))
         XCTAssertNotNil(LabCatalog.lab("logistic"))
@@ -55,6 +55,12 @@ final class LabsTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(LabCatalog.all.filter { $0.section == section }.count, 4, section.rawValue)
         }
         XCTAssertEqual(Set(LabCatalog.all.map(\.id)).count, LabCatalog.all.count, "ids are unique")
+        XCTAssertEqual(LabCatalog.topics.count, 13)
+        for lab in LabCatalog.all {
+            XCTAssertEqual(LabCatalog.topic(for: lab)?.section, lab.section, "\(lab.id) must have one topic in its section")
+        }
+        XCTAssertEqual(LabCatalog.all.filter { LabCatalog.topic(for: $0)?.id == "pytorch-training" }.count, 9)
+        XCTAssertEqual(LabCatalog.all.filter { LabCatalog.topic(for: $0)?.id == "transformer-projects" }.count, 3)
         let lessonIDs = Set(CourseLibrary.shared.courses.flatMap { $0.lessons.map(\.id) })
         for lab in LabCatalog.all {
             for id in lab.lessons ?? [] { XCTAssertTrue(lessonIDs.contains(id), "\(lab.id): missing lesson \(id)") }
@@ -75,6 +81,25 @@ final class LabsTests: XCTestCase {
             if result.checks.isEmpty { failures.append("\(lab.id).\(variant.id): no checks") }
         }
         XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
+    }
+
+    func testPyTorchLabsShareRunnableLessonContracts() async throws {
+        let tensorLabs = LabCatalog.all.filter { $0.id.hasPrefix("torch") }
+        XCTAssertEqual(tensorLabs.count, 18)
+        var checkCount = 0
+        for lab in tensorLabs {
+            let lessons = CourseLibrary.shared.courses.flatMap(\.lessons).filter { lab.lessons?.contains($0.id) == true }
+            XCTAssertEqual(lessons.count, 1, lab.id)
+            guard let lesson = lessons.first else { continue }
+            let answer = LabCatalog.code(lab.id, "practice", .answer)
+            XCTAssertEqual(answer, lesson.solution, lab.id)
+            let result = try await trace(lab.id, "practice", answer)
+            XCTAssertEqual(result?.correct, true, "\(lab.id): \(result?.message ?? "no result")")
+            XCTAssertEqual(result?.checks.map(\.name), lesson.checks.map(\.name), lab.id)
+            XCTAssertEqual(result?.truncated, false, lab.id)
+            checkCount += result?.checks.count ?? 0
+        }
+        XCTAssertEqual(checkCount, 79)
     }
 
     func testEveryStarterFailsWithAReadableMessage() async throws {

@@ -1522,5 +1522,401 @@
         "scales": false
       }
     ]
+  },
+  {
+    "id": "torchclip",
+    "title": "Clip one global gradient norm before updating",
+    "summary": "Clipping each layer independently defines a different update from clipping the norm of the entire gradient vector.",
+    "symbol": "cpu",
+    "tint": "mint",
+    "section": "Machine learning",
+    "runtime": "pytorch",
+    "idea": "# Clip one global gradient norm before updating\n\nClipping each layer independently defines a different update from clipping the norm of the entire gradient vector. This Lab uses real parameter gradients and a single global clipping call. The returned diagnostic is the norm before clipping; the applied update must use the clipped values. Validate all incoming groups before applying an update so one nonfinite gradient cannot leave a partially changed model. A missing gradient is different from a zero gradient, especially when an optimizer also applies momentum or decay.\n\n```python\nimport torch\ng = torch.tensor([3., 4.])\nprint(g.norm().item())\n```\n\n## Review the design\n\nExplain the order of unscaling, nonfinite detection, global clipping and optimizer stepping. This CPU exercise does not execute automatic mixed precision or distributed collectives.\n",
+    "lessons": [
+      "pt-torchclip"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "Implement one SGD update on lists of parameter vectors. A corresponding gradient is a same-length vector or None. Use real torch Parameters and clip_grad_norm_ over all groups together, then subtract lr times the clipped gradient under no_grad. Return values and the pre-clipping norm. Reject empty/misaligned/nonfinite groups, lr<0 and cap<=0. Do not mutate input lists. Parameters with None gradients stay unchanged.",
+        "file": "torchclip.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchgroups",
+    "title": "Partition AdamW parameters without duplicate ownership",
+    "summary": "A training policy must say which parameters receive decoupled weight decay.",
+    "symbol": "cpu",
+    "tint": "mint",
+    "section": "Machine learning",
+    "runtime": "pytorch",
+    "idea": "# Partition AdamW parameters without duplicate ownership\n\nA training policy must say which parameters receive decoupled weight decay. This exercise uses an explicit dimensional rule: matrices decay, while vectors and scalars do not. It is a policy to review, not a universal theorem about every architecture. Shared embeddings and tied output heads can expose the same parameter through several module paths. Duplicating ownership changes the update or causes an optimizer error. The Lab checks identities and executes an actual AdamW step rather than accepting only a plausible list of names.\n\n```python\nimport torch\nlayer = torch.nn.Linear(3, 2)\nfor name, p in layer.named_parameters():\n    print(name, p.ndim)\n```\n\n## Review the design\n\nDefend the decay policy for normalization, embeddings, biases and adapters. Parameter identity, gradient participation and optimizer state ownership are separate concerns.\n",
+    "lessons": [
+      "pt-torchgroups"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "Return two optimizer group dicts with params lists. Include each distinct trainable parameter once. In this declared policy, tensors with ndim>=2 receive decay; scalars and vectors receive zero decay. Exclude frozen parameters. Reject negative/nonfinite decay and a model with no trainable parameters. Return original Parameter objects, not detached copies. Tied weights must not enter an optimizer twice.",
+        "file": "torchgroups.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchdistill",
+    "title": "Distill a detached teacher with temperature scaling",
+    "summary": "Soft teacher distributions contain relative class information that hard labels discard.",
+    "symbol": "cpu",
+    "tint": "mint",
+    "section": "Machine learning",
+    "runtime": "pytorch",
+    "idea": "# Distill a detached teacher with temperature scaling\n\nSoft teacher distributions contain relative class information that hard labels discard. Temperature changes the distribution and gradient scale, so the declared objective includes the squared temperature factor. The teacher is a fixed target: accidentally training it along with the student changes the optimization problem. KL divergence also has an argument-order convention that differs from the mathematical notation. This Lab checks actual student gradients, detached teacher ownership, mixture endpoints and agreement with an independently computed categorical divergence.\n\n```python\nimport torch\nlogits = torch.tensor([[4., 0.]])\nprint((logits/2).softmax(-1))\n```\n\n## Review the design\n\nState what the teacher knows, which data generated targets and how temperature was selected. Distillation does not make unavailable or private training evidence disappear.\n",
+    "lessons": [
+      "pt-torchdistill"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "Compute (1-alpha)*cross_entropy(student,labels) + alpha*T*T*KL(softmax(teacher.detach()/T) || softmax(student/T)). Use KL batchmean, not an elementwise mean. Inputs are finite aligned [N,C] tensors, integer labels [N], C>=2, T>0 and alpha in [0,1]. Return a differentiable scalar. Teacher logits must receive no gradient.",
+        "file": "torchdistill.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchcontrast",
+    "title": "Train paired embeddings with symmetric InfoNCE",
+    "summary": "A contrastive batch declares which two observations belong together and treats the other in-batch candidates as negatives.",
+    "symbol": "cpu",
+    "tint": "mint",
+    "section": "Machine learning",
+    "runtime": "pytorch",
+    "idea": "# Train paired embeddings with symmetric InfoNCE\n\nA contrastive batch declares which two observations belong together and treats the other in-batch candidates as negatives. Normalizing embeddings makes scale distinct from similarity, while temperature controls how strongly difficult candidates contribute. A symmetric objective trains both retrieval directions. Reordering one side alone changes pair identities; reordering both sides together must preserve the loss. This small CPU problem uses actual autograd and local negatives. It does not execute a distributed gather, establish that every negative is valid, or remove false-negative bias.\n\n```python\nimport torch\nx = torch.eye(2)\nprint(x @ x.T)\n```\n\n## Review the design\n\nAudit pair identity, false negatives, temperature and batch composition. Distributed negatives additionally need correct cross-worker gradient and identity handling.\n",
+    "lessons": [
+      "pt-torchcontrast"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "For finite nonzero aligned [N,D] embeddings, N>=2, L2-normalize each row, form a@b.T / temperature and average row-wise and column-wise cross entropy against diagonal pair identities. Return a differentiable scalar; gradients must reach both encoders. Reject zero vectors, bad shapes and nonpositive/nonfinite temperature.",
+        "file": "torchcontrast.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchema",
+    "title": "Own EMA weights and copy non-parameter buffers",
+    "summary": "An exponential moving average is another owned model state, not a shallow alias of the current model.",
+    "symbol": "cpu",
+    "tint": "mint",
+    "section": "Machine learning",
+    "runtime": "pytorch",
+    "idea": "# Own EMA weights and copy non-parameter buffers\n\nAn exponential moving average is another owned model state, not a shallow alias of the current model. Averaging parameter tensors can stabilize evaluation, but buffers need a declared policy too. Here running statistics and counters are copied rather than averaged. This is an explicit exercise contract; other EMA implementations can make different choices. The update disables gradient recording, verifies compatible state before mutation and refuses shared storage so a supposed shadow model cannot silently modify its source.\n\n```python\nimport copy, torch\nm = torch.nn.Linear(1, 1)\nshadow = copy.deepcopy(m)\nprint(shadow is m)\n```\n\n## Review the design\n\nExplain buffer policy, update cadence and evaluation ownership. Keep EMA state in a resumable checkpoint when continuation requires the same averaging history.\n",
+    "lessons": [
+      "pt-torchema"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "Update an independent average module in place and return it. Floating named parameters use decay*old+(1-decay)*live under no_grad. All other state entries, including running-statistic and integer buffers, copy the live value. Require matching state keys/shapes/dtypes and decay in [0,1]; reject shared tensor storage before changing anything. Live model state must remain unchanged. Update exact tied aliases once; reject inconsistent shadow aliases before mutation.",
+        "file": "torchema.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchtokens",
+    "title": "Accumulate unequal token microbatches by valid targets",
+    "summary": "Equal weighting of microbatch means overweights a short or heavily padded microbatch.",
+    "symbol": "cpu",
+    "tint": "mint",
+    "section": "Machine learning",
+    "runtime": "pytorch",
+    "idea": "# Accumulate unequal token microbatches by valid targets\n\nEqual weighting of microbatch means overweights a short or heavily padded microbatch. Token-level training needs one denominator for the complete effective batch. The numerator is a sum over admitted targets, while padding contributes neither loss nor count. An all-padding batch still needs a graph-connected zero so backward remains defined. This exercise combines real independent computation graphs and checks that repartitioning the same tokens preserves both loss and gradients. It does not assume that stochastic layers or batch-dependent model behavior are equivalent across partitions.\n\n```python\ncounts = [3, 1]\nmeans = [2., 4.]\nprint(sum(n*m for n,m in zip(counts, means))\n      / sum(counts))\n```\n\n## Review the design\n\nDefine the effective batch objective before adding accumulation, clipping or distributed reduction. Zero valid targets can require skipping an optimizer step even when backward is defined.\n",
+    "lessons": [
+      "pt-torchtokens"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "Each microbatch is (logits[N,C], targets[N]) with long targets and a pad sentinel. Sum cross-entropy over valid targets across all microbatches and divide once by the total valid target count. Return one scalar attached to every logits graph. All-padding microbatches contribute differentiable zero; an entirely padded collection returns differentiable zero. Reject an empty collection or invalid aligned shapes/dtypes.",
+        "file": "torchtokens.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchmlp",
+    "title": "Project: train, validate and export a nonlinear classifier",
+    "summary": "This project trains a nonlinear classifier with real PyTorch autograd and Adam.",
+    "symbol": "cpu",
+    "tint": "mint",
+    "section": "Machine learning",
+    "runtime": "pytorch",
+    "idea": "# Project: train, validate and export a nonlinear classifier\n\nThis project trains a nonlinear classifier with real PyTorch autograd and Adam. Preprocessing belongs to the training partition; validation selects a historical checkpoint; test labels only measure the frozen result. Copying a state dictionary is essential because live weights continue changing. The exported artifact contains both preprocessing and model parameters, allowing independent inference after JSON serialization. The tiny XOR fixture demonstrates nonlinear learning and data boundaries. It is a CPU training exercise rather than evidence of generalization on a representative production dataset.\n\n```python\nimport torch\nx = torch.tensor([[0., 1.], [1., 0.]])\nprint(x.std(0, correction=0))\n```\n\n## Review the design\n\nAudit fitted statistics, checkpoint ownership, deterministic initialization and held-out identities. A passing synthetic test is not an estimate of real deployment performance.\n",
+    "lessons": [
+      "project-torchmlp"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "Rows contain unique disjoint id, finite two-feature x and integer binary y. Fit population means/stds on train only (constant scale=1), then train Linear(2,8), Tanh, Linear(8,2) with Adam lr=.04 for steps full-batch updates. Select a deep-copied model state by lowest validation cross entropy, first exact tie. Restore it and evaluate test. Return artifact with state/means/scales, predictions, initial_loss, training_loss, validation_loss, best_step, test_loss and validation history. Preserve caller CPU RNG using fork_rng. Reject invalid partitions and steps. Trace uses four updates; checks train longer.",
+        "file": "torchmlp.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchresume",
+    "title": "Project: resume AdamW, sampling and dropout exactly",
+    "summary": "Resuming weights alone is not resuming an experiment.",
+    "symbol": "cpu",
+    "tint": "mint",
+    "section": "Machine learning",
+    "runtime": "pytorch",
+    "idea": "# Project: resume AdamW, sampling and dropout exactly\n\nResuming weights alone is not resuming an experiment. AdamW moments, dropout randomness and the next sampled examples affect every subsequent update. This project captures an owned checkpoint at an update boundary and restores randomness after model construction has consumed random numbers. Checks compare uninterrupted training with two resumed segments, including exact losses, sampled indices and parameter tensors. The guarantee is bounded to this CPU model, fixed data and runtime. It does not claim bitwise portability across devices, library releases, multiprocessing loaders or distributed workers.\n\n```python\nimport torch\nstate = torch.get_rng_state().clone()\nfirst = torch.rand(2)\ntorch.set_rng_state(state)\nprint(torch.equal(first, torch.rand(2)))\n```\n\n## Review the design\n\nState the recovery boundary and record preprocessing, dataset identity, sampling and optimizer progress. Filesystem atomicity and durable checkpoint publication are separate production concerns.\n",
+    "lessons": [
+      "project-torchresume"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "Train CPU Sequential(Linear(2,4),Tanh,Dropout(.25),Linear(4,1)) with AdamW lr=.02 and weight_decay=.01. Each step draws randperm(N)[:min(3,N)] and minimizes mean squared error. Return checkpoint (model/optimizer deep copies, CPU rng clone, cumulative step, SHA256 of json.dumps([xs,ys],sort_keys=True,allow_nan=False).encode()), losses and sampled batches. On resume initialize objects, load model and copied optimizer state, then restore captured RNG before the next draw. Preserve caller RNG with fork_rng. Reject changed data, invalid steps or nonfinite/misaligned two-feature data. Zero steps capture state without updating.",
+        "file": "torchresume.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchlora",
+    "title": "Project: learn and merge a frozen-base low-rank adapter",
+    "summary": "Low-rank adaptation trains a small update while retaining a frozen base matrix.",
+    "symbol": "cpu",
+    "tint": "mint",
+    "section": "Machine learning",
+    "runtime": "pytorch",
+    "idea": "# Project: learn and merge a frozen-base low-rank adapter\n\nLow-rank adaptation trains a small update while retaining a frozen base matrix. Zero-initializing one adapter factor makes the first forward pass match the base exactly; the other factor needs nonzero initialization so learning can begin. This project performs actual gradient updates, then merges the learned matrix and checks inference equivalence. It is a local linear adapter with explicit scaling, not a downloaded pretrained language model or a claim about large-model fine-tuning quality. The merged artifact is useful only with the same base, scale and tensor layout.\n\n```python\nimport torch\na = torch.tensor([[1., 2.]])\nb = torch.tensor([[3.], [4.]])\nprint(b @ a)\n```\n\n## Review the design\n\nRecord adapter rank, scaling, base-model identity and merge policy. Real transformer fine-tuning also needs target-module selection, tokenization and a held-out evaluation.\n",
+    "lessons": [
+      "project-torchlora"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "For finite base [out,in], xs [N,in] and ys [N,out], train only A [rank,in] and B [out,rank]. Initialize A=randn*.1, B=zeros under a local seed. Predict linear(xs,base)+linear(linear(xs,A),B)/rank; use Adam lr=.05 and mean squared error for positive steps. Base remains frozen and caller lists unchanged. Return base, a, b, merged=base+B@A/rank, history of pre-update losses, final loss and merged predictions as lists/scalars. Rank is a positive integer <=min(out,in). Preserve caller CPU RNG.",
+        "file": "torchlora.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchsdpa",
+    "title": "Mask attention with finite empty-row gradients",
+    "summary": "Causal, padding and authorization constraints eventually become a participation mask over attention scores.",
+    "symbol": "square.stack.3d.up",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "runtime": "pytorch",
+    "idea": "# Mask attention with finite empty-row gradients\n\nCausal, padding and authorization constraints eventually become a participation mask over attention scores. Mask meaning varies between APIs, so this exercise explicitly uses true for an admitted key. A row with no admitted key is an important edge case: ordinary softmax of all negative infinity produces an undefined intermediate. The implementation must avoid that intermediate before multiplying the final mask. Checks examine finite backward values and forbidden-key gradients as well as forward outputs, so replacing a visible NaN after an invalid computation is insufficient.\n\n```python\nimport torch\nallow = torch.tensor([[True, False]])\nprint(allow.any(-1, keepdim=True))\n```\n\n## Review the design\n\nMask semantics and the loss denominator are separate contracts. Fused backends and mixed precision need their own numerical and performance validation.\n",
+    "lessons": [
+      "pt-torchsdpa"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "For aligned q[B,H,Q,D], k[B,H,K,D], v[B,H,K,V], compute softmax(q@k.T/sqrt(D)) over allowed keys, then multiply by v. allow is boolean [B,1-or-H,Q,K], True means participate. Return output and weights. A fully forbidden query must produce zero weights/output and finite zero gradients, not NaN. Validate nonempty dimensions and exact mask shape/type. Use actual differentiable tensor operations; dropout is zero.",
+        "file": "torchsdpa.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchrope",
+    "title": "Apply rotary positions without losing relative geometry",
+    "summary": "Rotary positions encode relative offsets through rotations of paired query and key coordinates.",
+    "symbol": "square.stack.3d.up",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "runtime": "pytorch",
+    "idea": "# Apply rotary positions without losing relative geometry\n\nRotary positions encode relative offsets through rotations of paired query and key coordinates. Coordinate pairing is part of the model convention: two plausible layouts can disagree while preserving shapes. This Lab specifies adjacent pairs and checks their geometry directly. Each rotation preserves a token vector norm, and adding a common position offset to queries and keys preserves their dot products. Position identities must match the cache offset during incremental decoding; applying a correct rotation with the wrong absolute positions still changes attention.\n\n```python\nimport torch\nx = torch.tensor([1., 0.])\nangle = torch.tensor(1.)\npair = torch.stack([angle.cos(), angle.sin()])\nprint(pair)\n```\n\n## Review the design\n\nRecord frequency base, pair convention, position offsets and any long-context scaling in the model artifact. Shape compatibility alone cannot establish RoPE compatibility.\n",
+    "lessons": [
+      "pt-torchrope"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "x is [B,H,T,D] with positive even D. positions is long [T], nonnegative. For adjacent coordinate pairs (2i,2i+1), rotate by position*base**(-2i/D). Return a new differentiable tensor in the same shape; do not mutate x. Require finite base>1. Tests check zero positions, norms, a shared offset of query/key positions and input gradients. This is adjacent-pair RoPE, not the split-half convention.",
+        "file": "torchrope.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchkv",
+    "title": "Decode chunks with an owned, offset-aware KV cache",
+    "summary": "A cached query begins after the keys already stored.",
+    "symbol": "square.stack.3d.up",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "runtime": "pytorch",
+    "idea": "# Decode chunks with an owned, offset-aware KV cache\n\nA cached query begins after the keys already stored. Applying an ordinary upper-left triangular mask to a short new chunk can hide most of its past or expose later tokens incorrectly. This Lab derives absolute query positions from cache length and compares incremental results with one full causal pass. The returned cache owns its tensors, so later caller mutations cannot corrupt earlier results. It is an exclusive-owner CPU inference cache with fixed head geometry; paging, eviction, concurrency and server memory allocation remain outside the exercise.\n\n```python\nimport torch\npast, count = 3, 2\nquery = torch.arange(past, past+count)\nkeys = torch.arange(past+count)\nprint(keys[None, :] <= query[:, None])\n```\n\n## Review the design\n\nKeep positional encoding offsets, cache identity and model version consistent. Detached inference caches do not implement recurrent training or durable serving state.\n",
+    "lessons": [
+      "pt-torchkv"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "Inference-only q,k,v have the same nonempty [B,H,T,D] shape. Optional cache has exactly k/v with matching batch/head/width/dtype/device. Append current keys and values and admit key position <= past_length+query_index. Return output and a detached cloned k/v cache; do not mutate or alias old cache or new input chunks. Full, tokenwise and multi-token chunked execution must agree. No dropout or positional transform is applied here.",
+        "file": "torchkv.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchpacked",
+    "title": "Isolate packed documents in causal attention",
+    "summary": "Packing several documents into one tensor improves utilization, but a causal triangle alone permits one document to read an earlier unrelated document.",
+    "symbol": "square.stack.3d.up",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "runtime": "pytorch",
+    "idea": "# Isolate packed documents in causal attention\n\nPacking several documents into one tensor improves utilization, but a causal triangle alone permits one document to read an earlier unrelated document. Attention must combine ordering, document identity and padding. The loss needs a separate boundary rule for next-token targets; an attention mask does not prevent scoring a document transition as a target. This Lab perturbs one packed document and checks another document’s output and gradients. Padding creates fully forbidden query rows, which must remain finite during backward rather than being hidden after an undefined softmax.\n\n```python\nimport torch\nids = torch.tensor([0, 0, 1, -1])\nsame = ids[:, None] == ids[None, :]\nprint(same & (ids[:, None] >= 0))\n```\n\n## Review the design\n\nReview both attention isolation and shifted-target boundary masking. These local segment identities are data boundaries, not tenant authorization by themselves.\n",
+    "lessons": [
+      "pt-torchpacked"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "q,k,v have aligned nonempty [B,H,T,D] shapes. Long segments[B,T] assigns document identities or -1 padding. A query may see only earlier-or-equal positions with the same nonnegative document identity. Return differentiable attention output. Padded queries produce finite zero outputs and zero gradients. Block cross-document influence even when both documents share one row; reject invalid shapes or segment values below -1.",
+        "file": "torchpacked.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchgqa",
+    "title": "Share KV heads without breaking query-head mapping",
+    "summary": "Grouped-query attention shares key and value projections across several query heads.",
+    "symbol": "square.stack.3d.up",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "runtime": "pytorch",
+    "idea": "# Share KV heads without breaking query-head mapping\n\nGrouped-query attention shares key and value projections across several query heads. The grouping order matters: repeating the complete head list produces a different mapping from repeating each head consecutively. This Lab tests a hand-checkable single-token mapping, then checks causal isolation and gradient accumulation into shared values. The implementation materializes repeated KV heads for clarity. That validates the mathematical layout but does not claim the memory savings of a fused kernel, paged cache, accelerator implementation or production inference server.\n\n```python\nimport torch\nheads = torch.tensor([10, 20])\nprint(heads.repeat_interleave(2))\n```\n\n## Review the design\n\nKeep head grouping, cache layout and projection ordering in the model contract. Measure actual backend memory and latency before claiming a serving improvement.\n",
+    "lessons": [
+      "pt-torchgqa"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "q is [B,Hq,T,D], k/v are [B,Hkv,T,D]. Require nonempty aligned dimensions and Hq a positive multiple of Hkv. Repeat each KV head consecutively Hq/Hkv times, then compute scaled causal attention with zero dropout. Return differentiable output [B,Hq,T,D]. Gradients into a shared KV head must sum contributions from all query heads using it.",
+        "file": "torchgqa.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchrms",
+    "title": "Normalize RMS with stable accumulation and autograd",
+    "summary": "RMS normalization rescales by the root mean square and differs from centering-based layer normalization.",
+    "symbol": "square.stack.3d.up",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "runtime": "pytorch",
+    "idea": "# Normalize RMS with stable accumulation and autograd\n\nRMS normalization rescales by the root mean square and differs from centering-based layer normalization. The distinction is visible on a constant nonzero row, where RMS normalization retains a signal rather than removing it. Squaring low-precision values before promoting them can overflow even when the final normalized output is ordinary. This Lab promotes the accumulation first and checks both input and learned-weight gradients. It is an inspectable CPU formula, not a fused normalization kernel or a benchmark of accelerator throughput.\n\n```python\nimport torch\nx = torch.tensor([3., 4.])\nprint(torch.sqrt(x.square().mean()))\n```\n\n## Review the design\n\nSpecify accumulation dtype, epsilon and learned-weight dtype when matching another implementation. Epsilon makes exact scale invariance inappropriate near zero.\n",
+    "lessons": [
+      "pt-torchrms"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "Compute x / sqrt(mean(x**2,last_axis,keepdim=True)+eps) times a learned last-axis weight. Do not subtract the mean. Accumulate in float32 for float16/bfloat16/float32 input and float64 for float64 input, cast the normalized values back to x.dtype, then multiply weight. Require a nonempty last axis, weight shape [D] and finite eps>0. Return a new differentiable tensor without changing inputs.",
+        "file": "torchrms.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchblock",
+    "title": "Project: build a pre-norm decoder block and audit its gradients",
+    "summary": "A decoder block composes normalization, projection layout, multiple attention heads, causal masking, residual connections and a feed-forward network.",
+    "symbol": "square.stack.3d.up",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "runtime": "pytorch",
+    "idea": "# Project: build a pre-norm decoder block and audit its gradients\n\nA decoder block composes normalization, projection layout, multiple attention heads, causal masking, residual connections and a feed-forward network. Plausible shapes do not establish the correct computation. This project tests future-token isolation, the identity residual when both branches are zero and finite gradients through every parameter family. It also checks the causal backward boundary. The block is small and executes real tensor operations on CPU; it is a mathematical building block rather than a pretrained model or a fused-kernel performance claim.\n\n```python\nimport torch\nx = torch.arange(8.).reshape(1, 2, 4)\nheads = x.reshape(1, 2, 2, 2)\nprint(heads.transpose(1, 2).shape)\n```\n\n## Review the design\n\nAudit QKV packing, head transposes, residual ordering and normalization convention. Loading a checkpoint requires the same conventions, not merely matching tensor sizes.\n",
+    "lessons": [
+      "project-torchblock"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "Implement one causal pre-norm block on nonempty x[B,T,D]. parameters has exactly n1/n2 [D], qkv [3D,D], out [D,D], ff1 [2D,D], ff2 [D,2D]. Use layer_norm eps=1e-5 with these weights and no biases; split contiguous Q/K/V projections into heads, scaled causal softmax attention, concatenate heads and add the output projection residual. Then add ff2(GELU(ff1(layer_norm(residual,n2)))). Dropout is zero; heads must divide D. Return the differentiable output and reject a wrong schema.",
+        "file": "torchblock.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchtinylm",
+    "title": "Project: train and reload a tiny causal language model",
+    "summary": "This project trains a complete tiny decoder instead of inspecting fixed logits.",
+    "symbol": "square.stack.3d.up",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "runtime": "pytorch",
+    "idea": "# Project: train and reload a tiny causal language model\n\nThis project trains a complete tiny decoder instead of inspecting fixed logits. Token and position embeddings feed a causal multihead block, and the output projection shares the token embedding weights. Training pairs each position with the next token and clips actual gradients before AdamW updates. An owned JSON-compatible artifact reloads for independent inference and a causal perturbation test. The synthetic cyclic vocabulary is deliberately small enough for CPU execution in Pythilo. Its training loss demonstrates optimization, not useful language understanding or the quality of a large language model.\n\n```python\nimport torch\nids = torch.tensor([[0, 1, 2, 0]])\nprint(ids[:, :-1])\nprint(ids[:, 1:])\n```\n\n## Review the design\n\nReview shifted targets, future-token isolation, tied ownership and artifact reload. Real language modeling additionally needs representative tokenization, held-out documents and a compute budget.\n",
+    "lessons": [
+      "project-torchtinylm"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "Implement TinyDecoder(vocab) with token/32-position embeddings of width 8; pre-norm two-head attention (head width 4), bias-free qkv/output projections, residual; pre-norm 8→16→8 GELU feed-forward residual; final LayerNorm and output tied to token.weight. Train rectangular in-vocabulary sequences length 2..32 using shifted mean CE, AdamW lr=.03 weight_decay=.01, global gradient cap 1, positive steps and fork_rng seed. Return artifact (vocab/state lists), initial_loss, loss, perplexity and pre-update history. Also implement tiny_lm_logits(artifact,tokens) for detached eval. Trace uses four updates; tests train longer.",
+        "file": "torchtinylm.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "torchseqcls",
+    "title": "Project: train a padding-safe transformer classifier",
+    "summary": "A sequence classifier must distinguish real tokens from batching artifacts.",
+    "symbol": "square.stack.3d.up",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "runtime": "pytorch",
+    "idea": "# Project: train a padding-safe transformer classifier\n\nA sequence classifier must distinguish real tokens from batching artifacts. This project trains an actual attention encoder over variable-length sequences, masks padding keys and pools only valid query positions. Validation selects an owned checkpoint; test labels cannot alter it. The saved artifact is reloaded on differently padded inputs to verify prediction stability. This is a small CPU model with learned absolute positions and a synthetic binary vocabulary task. It is not a pretrained encoder, and its local checks do not establish generalization on real text.\n\n```python\nimport torch\nids = torch.tensor([[1, 2, 0]])\nvalid = ids != 0\nprint(valid.sum(-1))\n```\n\n## Review the design\n\nReview attention masks, pooling denominator, maximum context and checkpoint selection separately. Padding invariance here covers appended padding, not arbitrary changes to valid token positions.\n",
+    "lessons": [
+      "project-torchseqcls"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Build and check",
+        "prompt": "Use rows with disjoint id, tokens (0=PAD, at least one non-PAD, max length 32) and integer binary y. SequenceClassifier has width-8 token/position embeddings, one-head qkv Linear(8,24), scaled bidirectional attention excluding PAD keys, Linear(8,8) projection and residual LayerNorm, valid-token mean pooling, Linear(8,2) head. Train AdamW lr=.03 weight_decay=.01 with gradient cap 1. Choose and restore a deep-copied minimum validation-loss state (first tie), then evaluate test. Return artifact(vocab/state), initial_loss, training_loss, validation_loss, best_step, test_loss, predictions, history. Provide detached sequence_logits(artifact,sequences). Preserve caller RNG.",
+        "file": "torchseqcls.py",
+        "scales": false
+      }
+    ]
   }
 ]

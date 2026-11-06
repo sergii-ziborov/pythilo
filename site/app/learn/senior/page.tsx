@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { SiteFooter, SiteHeader } from '@/components/site-header';
 import { courses } from '@/lib/courses';
 import { seniorPaths } from '@/lib/senior-paths';
-import { browserLabs } from '@/lib/browser-labs';
+import { allLabs } from '@/lib/browser-labs';
 import '../learn.css';
 
 export const metadata: Metadata = { title: 'Senior Python, ML and AI practice paths', description: 'Three advanced practice paths with runnable lessons, linked labs, integration projects and explicit production experience requirements.' };
@@ -11,7 +11,7 @@ const byId = (id: string) => courses.find(course => course.id === id)!;
 export default function SeniorPathsPage() {
   const advanced = courses.filter(course => course.order >= 25);
   const projects = advanced.flatMap(course => course.lessons).filter(lesson => lesson.title.startsWith('Project:'));
-  const labs = browserLabs.filter(lab => lab.lessons?.some(id => advanced.some(course => course.lessons.some(lesson => lesson.id === id))));
+  const labs = allLabs.filter(lab => lab.lessons?.some(id => advanced.some(course => course.lessons.some(lesson => lesson.id === id))));
   return <><SiteHeader current="learn" /><main className="page">
     <section className="learn-intro"><div className="label">ADVANCED PRACTICE</div><h1>Build evidence for senior work</h1><p>{advanced.reduce((n, course) => n + course.lessons.length, 0)} advanced lessons (including {projects.length} integration projects), plus {labs.length} companion Labs extend the Python, mathematics, ML and LLM foundations. Examples execute with real Python. PyTorch exercises run in the app; compatible lessons and Labs run here.</p><p>Completing a course does not certify seniority. Use the checks to establish concrete behavior, then explain the design and its limits. The production work below requires real services, datasets, model providers or hardware and is not claimed to have run on an iPhone.</p></section>
     {seniorPaths.map(path => <section key={path.id} className="course-section" id={path.id}>
