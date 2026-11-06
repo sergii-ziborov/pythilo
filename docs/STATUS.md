@@ -394,3 +394,12 @@ at all four corners, catalog filter/card padding, classic Trace, editor Run,
 lesson Check, project/Playground actions and Lab choices. Result bundle:
 `build/verification/senior-button-targets.xcresult`. The AI filter expectation
 was updated to the actual 16-Lab catalog; no app code changed in this follow-up.
+
+TestFlight 0.1.0 (23) is available to the existing internal group, confirmed at
+12:30:53 UTC on 6 November 2026: Apple processing `VALID`, internal state
+`IN_BETA_TESTING`, one tester, automatic access to all builds. English and Russian
+notes exactly match `build/testflight/build-23-notes.json`. No Beta App Review
+submission exists; App Store 1.0 remains `PREPARE_FOR_SUBMISSION` with manual
+release. Proof: `build/release-receipts/testflight-23-ready.json`. Upload completed
+at 11:58:56 UTC; Apple finished processing at 12:30:24 UTC. No App Review or Beta
+App Review was requested.
