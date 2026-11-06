@@ -388,3 +388,9 @@ pass. Browser proof: `build/verification/pythilo-senior-lab-live.png`; native pr
 The Release archive for build 23 matches 31 course JSON files and the current
 Lab catalog/code/runtime byte for byte (191 checked files). Source proof:
 `build/release-receipts/testflight-23-archive-source.json`.
+
+The seven `ButtonHitTargetTests` also pass after the expansion, including Trace
+at all four corners, catalog filter/card padding, classic Trace, editor Run,
+lesson Check, project/Playground actions and Lab choices. Result bundle:
+`build/verification/senior-button-targets.xcresult`. The AI filter expectation
+was updated to the actual 16-Lab catalog; no app code changed in this follow-up.

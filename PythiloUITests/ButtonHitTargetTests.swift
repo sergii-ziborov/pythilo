@@ -32,7 +32,7 @@ final class ButtonHitTargetTests: XCTestCase {
         XCTAssertTrue(filter.waitForExistence(timeout: 20))
         XCTAssertGreaterThanOrEqual(filter.frame.height, 44)
         filter.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.8)).tap()
-        XCTAssertTrue(app.staticTexts["ARTIFICIAL INTELLIGENCE · 8"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["ARTIFICIAL INTELLIGENCE · 16"].waitForExistence(timeout: 5))
         let attention = app.buttons["lab-attention"]
         XCTAssertTrue(attention.exists)
         attention.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.92)).tap()
