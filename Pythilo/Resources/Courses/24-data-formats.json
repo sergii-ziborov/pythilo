@@ -1,0 +1,232 @@
+{
+  "id": "data-formats",
+  "title": "Files, formats and binary data",
+  "summary": "Eight practical standard-library lessons: TOML, XML, ZIP, gzip, binary records, JSON Lines, Base64 and HMAC. Every example uses local or in-memory data.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "format-toml",
+      "title": "Read real TOML configuration",
+      "body": "# Read real TOML configuration\n\nTOML is a configuration format with typed values, tables and arrays. Python's tomllib reads TOML text into ordinary Python objects. It is a reader, so writing TOML is a separate concern; keep that distinction clear when designing a configuration editor.\n\nUse loads for text and load for a binary file object. A table becomes a nested dictionary, while a port written as a TOML integer becomes an int. Supply defaults at the layer that owns them, and allow malformed syntax to produce an explicit parsing error instead of silently treating a broken file as empty configuration.\n\n```python\nimport tomllib\ntext = \"\"\"\n[server]\nhost = \"localhost\"\nport = 8000\n\"\"\"\nsettings = tomllib.loads(text)\nprint(settings[\"server\"][\"port\"])\n```\n",
+      "task": "Implement server_config(text): parse TOML and return (host,port) from the server table. Default missing host to \"localhost\", missing port to 8000, and a missing server table to both defaults. Malformed TOML must raise.",
+      "starter": "import tomllib\n\ndef server_config(text):\n    return None\n",
+      "solution": "import tomllib\ndef server_config(text):\n    server=tomllib.loads(text).get('server',{})\n    return server.get('host','localhost'),server.get('port',8000)\n",
+      "checks": [
+        {
+          "name": "reads typed values",
+          "code": "assert server_config('[server]\\nhost=\"demo\"\\nport=9000')==('demo',9000)\n"
+        },
+        {
+          "name": "supplies explicit defaults",
+          "code": "assert server_config('')==('localhost',8000)\nassert server_config('[server]\\nport=1')==('localhost',1)\n"
+        },
+        {
+          "name": "rejects malformed syntax",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: server_config('[server'))\n"
+        }
+      ],
+      "hints": [
+        "Call tomllib.loads before applying any defaults.",
+        "Read the server dictionary with get, then default host and port independently.",
+        "tomllib parses the configuration before defaults are applied. Defaulting absent keys does not conceal syntax errors, and TOML integers retain their integer type."
+      ],
+      "explanation": "tomllib parses the configuration before defaults are applied. Defaulting absent keys does not conceal syntax errors, and TOML integers retain their integer type."
+    },
+    {
+      "id": "format-xml",
+      "title": "Read structured XML with ElementTree",
+      "body": "# Read structured XML with ElementTree\n\nXML represents nested elements with attributes and text. ElementTree parses that structure so code can address children and attributes without splitting strings around angle brackets. Escaping is handled by the serializer when creating output.\n\nA missing element and an empty text value are different cases. Decide which the application accepts rather than letting an AttributeError define the behaviour accidentally. This exercise uses a small local XML document with a fixed schema. It reads only direct item children, making that scope explicit instead of collecting unrelated nested elements with a broad search.\n\n```python\nfrom xml.etree import ElementTree as ET\nroot = ET.fromstring(\n    '<items><item id=\"2\">Tea</item></items>')\nprint([(item.attrib[\"id\"], item.text)\n       for item in root.findall(\"item\")])\n```\n",
+      "task": "Implement xml_items(text): parse an <items> root, return direct <item> children as (int id, stripped text) tuples in order. Empty text becomes \"\". Reject a different root or a missing id.",
+      "starter": "from xml.etree import ElementTree as ET\n\ndef xml_items(text):\n    return None\n",
+      "solution": "from xml.etree import ElementTree as ET\ndef xml_items(text):\n    root=ET.fromstring(text)\n    if root.tag!='items': raise ValueError('expected items root')\n    result=[]\n    for item in root.findall('item'):\n        if 'id' not in item.attrib: raise ValueError('missing id')\n        result.append((int(item.attrib['id']),(item.text or '').strip()))\n    return result\n",
+      "checks": [
+        {
+          "name": "reads attributes and text",
+          "code": "assert xml_items('<items><item id=\"2\"> Tea </item></items>')==[(2,'Tea')]\n"
+        },
+        {
+          "name": "empty elements",
+          "code": "assert xml_items('<items><item id=\"0\"/></items>')==[(0,'')]\nassert xml_items('<items/>')==[]\n"
+        },
+        {
+          "name": "rejects a bad shape",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: xml_items('<other/>'))\nassert _bad(lambda: xml_items('<items><item/></items>'))\n"
+        }
+      ],
+      "hints": [
+        "Use ElementTree.fromstring and check the root tag explicitly.",
+        "Iterate root.findall(\"item\"), require its id, and use (item.text or \"\").strip().",
+        "ElementTree handles XML syntax while the function owns the application schema. Checking the root and required attribute produces intentional errors instead of accidental attribute lookups."
+      ],
+      "explanation": "ElementTree handles XML syntax while the function owns the application schema. Checking the root and required attribute produces intentional errors instead of accidental attribute lookups."
+    },
+    {
+      "id": "format-zip",
+      "title": "Round-trip a ZIP archive in memory",
+      "body": "# Round-trip a ZIP archive in memory\n\nA ZIP file contains named entries, each with its own data. BytesIO gives zipfile a file-like object backed by memory, so a small archive can be created and read without leaving files behind.\n\nText still needs an explicit encoding before it becomes archive bytes. Reading an entry returns bytes again; decode it at the text boundary. This exercise reads named entries directly rather than extracting an archive to the filesystem. That keeps archive member names separate from local paths and makes the round trip independent of the current working directory.\n\n```python\nimport io, zipfile\nbuffer = io.BytesIO()\nwith zipfile.ZipFile(buffer, \"w\") as archive:\n    archive.writestr(\"note.txt\", \"Tea\")\nwith zipfile.ZipFile(\n        io.BytesIO(buffer.getvalue())) as archive:\n    print(archive.read(\"note.txt\").decode())\n```\n",
+      "task": "Implement zip_texts(entries) returning ZIP bytes for a dictionary of names to text, encoded as UTF-8. unzip_texts(blob) reads all non-directory entries and returns the same mapping. Support an empty archive and Unicode text.",
+      "starter": "import io\n\nimport zipfile\n\ndef zip_texts(entries):\n    return None\n\ndef unzip_texts(blob):\n    return None\n",
+      "solution": "import io\nimport zipfile\ndef zip_texts(entries):\n    buffer=io.BytesIO()\n    with zipfile.ZipFile(buffer,'w') as archive:\n        for name,text in entries.items():\n            archive.writestr(name,text.encode('utf-8'))\n    return buffer.getvalue()\ndef unzip_texts(blob):\n    with zipfile.ZipFile(io.BytesIO(blob)) as archive:\n        return {item.filename:archive.read(item).decode('utf-8') for item in archive.infolist() if not item.is_dir()}\n",
+      "checks": [
+        {
+          "name": "round trip",
+          "code": "data={'a.txt':'one','folder/b.txt':'two'}\nassert unzip_texts(zip_texts(data))==data\n"
+        },
+        {
+          "name": "Unicode and empty archive",
+          "code": "assert unzip_texts(zip_texts({'note.txt':'чай'}))=={'note.txt':'чай'}\nassert unzip_texts(zip_texts({}))=={}\n"
+        },
+        {
+          "name": "returns actual ZIP bytes",
+          "code": "import io,zipfile\nblob=zip_texts({'x':'y'}); assert isinstance(blob,bytes) and zipfile.is_zipfile(io.BytesIO(blob))\n"
+        }
+      ],
+      "hints": [
+        "Write each UTF-8 encoded string through ZipFile backed by BytesIO.",
+        "Read member bytes directly and decode them; skip directory entries rather than extracting files.",
+        "BytesIO supplies the file interface ZIP needs. Encoding and decoding UTF-8 explicitly preserves text while the archive remains ordinary portable ZIP bytes."
+      ],
+      "explanation": "BytesIO supplies the file interface ZIP needs. Encoding and decoding UTF-8 explicitly preserves text while the archive remains ordinary portable ZIP bytes."
+    },
+    {
+      "id": "format-gzip",
+      "title": "Compress a JSON payload reproducibly",
+      "body": "# Compress a JSON payload reproducibly\n\nCompression operates on bytes, while JSON serialization starts with Python values. Keeping those stages separate makes a data pipeline easier to inspect: serialize the object, encode the text, compress the bytes, then reverse the steps when reading.\n\nGzip can include a timestamp in its header. Supplying a fixed mtime makes repeated compression of the same serialized data reproducible in this runtime. Stable JSON key ordering removes another avoidable difference. A compressed payload is still a format contract: malformed gzip or malformed decoded JSON should produce an error rather than an unrelated empty result.\n\n```python\nimport gzip, json\nraw = json.dumps({\"count\": 3}).encode()\npacked = gzip.compress(raw, mtime=0)\nrestored = json.loads(gzip.decompress(packed))\nprint(restored)\n```\n",
+      "task": "Implement pack_json(value) with sorted JSON keys, UTF-8 and gzip mtime=0. unpack_json(blob) reverses it. Equal dictionaries with different insertion orders must produce equal bytes in this runtime.",
+      "starter": "import gzip\n\nimport json\n\ndef pack_json(value):\n    return None\n\ndef unpack_json(blob):\n    return None\n",
+      "solution": "import gzip\nimport json\ndef pack_json(value):\n    raw=json.dumps(value,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode('utf-8')\n    return gzip.compress(raw,mtime=0)\ndef unpack_json(blob):\n    return json.loads(gzip.decompress(blob).decode('utf-8'))\n",
+      "checks": [
+        {
+          "name": "round trip nested data",
+          "code": "value={'items':[1,2],'name':'чай'}\nassert unpack_json(pack_json(value))==value\n"
+        },
+        {
+          "name": "stable serialization",
+          "code": "assert pack_json({'a':1,'b':2})==pack_json({'b':2,'a':1})\n"
+        },
+        {
+          "name": "empty and scalar values",
+          "code": "assert unpack_json(pack_json([]))==[]\nassert unpack_json(pack_json(None)) is None\n"
+        }
+      ],
+      "hints": [
+        "Serialize JSON with sorted keys and encode it as UTF-8.",
+        "Use gzip.compress(raw,mtime=0), then decompress, decode and json.loads to reverse the stages.",
+        "Canonical JSON ordering and a fixed gzip timestamp make the pipeline deterministic in the same runtime. Each decoding stage validates its own representation and preserves the original JSON-compatible value."
+      ],
+      "explanation": "Canonical JSON ordering and a fixed gzip timestamp make the pipeline deterministic in the same runtime. Each decoding stage validates its own representation and preserves the original JSON-compatible value."
+    },
+    {
+      "id": "format-struct",
+      "title": "Define a portable binary record",
+      "body": "# Define a portable binary record\n\nA binary format needs explicit sizes, signedness and byte order. The struct module packs Python values into a byte layout described by a format string. Without an explicit prefix, native alignment and byte order can make a format depend on the machine.\n\nThe greater-than prefix selects big-endian standard sizes. A signed short uses two bytes and has a bounded range, so invalid values should raise instead of wrapping silently. Decoding also checks the exact record length. A tiny example is enough to see those bytes and verify the same result on a phone and in WebAssembly.\n\n```python\nimport struct\nrecord = struct.pack(\">hh\", -2, 300)\nprint(record.hex())\nprint(struct.unpack(\">hh\", record))\n```\n",
+      "task": "Implement encode_point(x,y) returning a big-endian record of two signed 16-bit integers, and decode_point(blob) returning the pair. Reject out-of-range values or a record whose size is not exactly four bytes.",
+      "starter": "import struct\n\ndef encode_point(x, y):\n    return None\n\ndef decode_point(blob):\n    return None\n",
+      "solution": "import struct\ndef encode_point(x,y):\n    return struct.pack('>hh',x,y)\ndef decode_point(blob):\n    return struct.unpack('>hh',blob)\n",
+      "checks": [
+        {
+          "name": "explicit byte order",
+          "code": "assert encode_point(1,256)==b'\\x00\\x01\\x01\\x00'\n"
+        },
+        {
+          "name": "signed range round trip",
+          "code": "assert decode_point(encode_point(-32768,32767))==(-32768,32767)\nassert decode_point(encode_point(0,0))==(0,0)\n"
+        },
+        {
+          "name": "invalid records raise",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nimport struct\nassert _bad(lambda: encode_point(32768,0),struct.error)\nassert _bad(lambda: decode_point(b'x'),struct.error)\n"
+        }
+      ],
+      "hints": [
+        "The format >hh means big-endian and two signed 16-bit integers.",
+        "Use the same format for pack and unpack; struct itself rejects bad ranges and lengths.",
+        "The >hh layout fixes byte order and two signed 16-bit fields. struct enforces both integer range and exact record length, making malformed data visible at the format boundary."
+      ],
+      "explanation": "The >hh layout fixes byte order and two signed 16-bit fields. struct enforces both integer range and exact record length, making malformed data visible at the format boundary."
+    },
+    {
+      "id": "format-json-lines",
+      "title": "Parse JSON Lines with useful line numbers",
+      "body": "# Parse JSON Lines with useful line numbers\n\nJSON Lines stores one JSON value on each line, making it convenient for incremental processing. Each line is decoded separately; concatenating all the lines and passing them to one json.loads call describes a different format.\n\nPreserve physical line numbers while skipping blank lines so an error points to the source a person can inspect. A valid JSON scalar may still violate an application's record schema, so decoding and shape validation are separate steps. This exercise accepts only object records and returns them in file order, with no network or pre-existing file dependency.\n\n```python\nimport json\ntext = '{\"id\":1}\\n\\n{\"id\":2}\\n'\nrecords = [json.loads(line)\n           for line in text.splitlines()\n           if line.strip()]\nprint(records)\n```\n",
+      "task": "Implement json_records(text): decode each nonblank line as a JSON object, preserving order. Raise ValueError mentioning the physical line number on malformed JSON or a nonobject value.",
+      "starter": "import json\n\ndef json_records(text):\n    return None\n",
+      "solution": "import json\ndef json_records(text):\n    result=[]\n    for number,line in enumerate(text.splitlines(),1):\n        if not line.strip(): continue\n        try:\n            value=json.loads(line)\n        except json.JSONDecodeError as error:\n            raise ValueError(f'line {number}: invalid JSON') from error\n        if not isinstance(value,dict):\n            raise ValueError(f'line {number}: expected object')\n        result.append(value)\n    return result\n",
+      "checks": [
+        {
+          "name": "ordered records and blank lines",
+          "code": "assert json_records('{\"a\":1}\\n\\n{\"a\":2}\\n')==[{'a':1},{'a':2}]\nassert json_records('  \\n')==[]\n"
+        },
+        {
+          "name": "malformed line number",
+          "code": "message=''\ntry: json_records('{}\\n\\nbad')\nexcept ValueError as error: message=str(error)\nassert '3' in message\n"
+        },
+        {
+          "name": "rejects a nonobject record",
+          "code": "message=''\ntry: json_records('[]')\nexcept ValueError as error: message=str(error)\nassert '1' in message and 'object' in message\n"
+        }
+      ],
+      "hints": [
+        "Enumerate the physical lines starting at 1 before skipping blanks.",
+        "Decode each nonblank line, require a dict, and include its original line number in errors.",
+        "enumerate counts physical lines before blank lines are skipped. The function reports the parsing boundary and the object-shape boundary separately, while keeping successfully parsed records in order."
+      ],
+      "explanation": "enumerate counts physical lines before blank lines are skipped. The function reports the parsing boundary and the object-shape boundary separately, while keeping successfully parsed records in order."
+    },
+    {
+      "id": "format-base64",
+      "title": "Encode binary bytes for a text boundary",
+      "body": "# Encode binary bytes for a text boundary\n\nBase64 represents arbitrary bytes using an ASCII alphabet. It is useful when a text-only format must carry a small binary value. Encoding does not require the original bytes to be valid UTF-8, and decoding should recover those exact bytes.\n\nChoose validation deliberately when accepting encoded input. A permissive decoder may discard characters that your protocol should reject. Base64 changes representation; the original data remains recoverable by anyone with the encoded text. Keep the bytes-to-text conversion separate from interpreting the decoded payload as a file, image or other application-specific format.\n\n```python\nimport base64\nraw = bytes([0, 255, 42])\ntext = base64.b64encode(raw).decode(\"ascii\")\nprint(text)\nprint(base64.b64decode(text, validate=True))\n```\n",
+      "task": "Implement encode_blob(raw) returning standard Base64 ASCII text, and decode_blob(text) returning the original bytes with strict alphabet validation. Support empty bytes and binary values that are not UTF-8.",
+      "starter": "import base64\n\ndef encode_blob(raw):\n    return None\n\ndef decode_blob(text):\n    return None\n",
+      "solution": "import base64\ndef encode_blob(raw):\n    return base64.b64encode(raw).decode('ascii')\ndef decode_blob(text):\n    return base64.b64decode(text,validate=True)\n",
+      "checks": [
+        {
+          "name": "binary round trip",
+          "code": "raw=bytes([0,255,42]); assert decode_blob(encode_blob(raw))==raw\n"
+        },
+        {
+          "name": "standard encoding and empty data",
+          "code": "assert encode_blob(b'abc')=='YWJj'\nassert encode_blob(b'')=='' and decode_blob('')==b''\n"
+        },
+        {
+          "name": "rejects an invalid alphabet",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nimport binascii\nassert _bad(lambda: decode_blob('@@@'),binascii.Error)\n"
+        }
+      ],
+      "hints": [
+        "b64encode returns bytes; decode that representation as ASCII.",
+        "Pass validate=True to b64decode so invalid characters are rejected.",
+        "The ASCII conversion applies only to the encoded representation. validate=True rejects characters outside the Base64 alphabet instead of silently dropping them."
+      ],
+      "explanation": "The ASCII conversion applies only to the encoded representation. validate=True rejects characters outside the Base64 alphabet instead of silently dropping them."
+    },
+    {
+      "id": "format-hmac",
+      "title": "Authenticate exact bytes with HMAC",
+      "body": "# Authenticate exact bytes with HMAC\n\nAn HMAC binds a byte sequence to a shared secret key. A verifier recomputes the tag with the same key and compares it with the received tag. Changing the message or key changes the result. The message itself remains readable.\n\nBoth sides must agree on the exact bytes, including encoding, whitespace and field order when serializing structured data. Use compare_digest for tag comparison instead of building a custom character loop. This exercise authenticates a small local byte string; a full protocol must additionally define its own key handling and message freshness contract.\n\n```python\nimport hashlib, hmac\nkey, message = b\"demo-key\", b\"hello\"\ntag = hmac.new(key, message,\n               hashlib.sha256).hexdigest()\nexpected = hmac.new(key, message,\n                    hashlib.sha256).hexdigest()\nprint(hmac.compare_digest(tag, expected))\n```\n",
+      "task": "Implement sign_message(key,message) returning a SHA-256 HMAC hex string, and verify_message(key,message,signature) using compare_digest. All inputs except signature are bytes. A changed key, message or signature must fail verification.",
+      "starter": "import hashlib\n\nimport hmac\n\ndef sign_message(key, message):\n    return None\n\ndef verify_message(key, message, signature):\n    return None\n",
+      "solution": "import hashlib\nimport hmac\ndef sign_message(key,message):\n    return hmac.new(key,message,hashlib.sha256).hexdigest()\ndef verify_message(key,message,signature):\n    return hmac.compare_digest(sign_message(key,message),signature)\n",
+      "checks": [
+        {
+          "name": "valid signature",
+          "code": "tag=sign_message(b'key',b'message'); assert len(tag)==64\nassert verify_message(b'key',b'message',tag) is True\n"
+        },
+        {
+          "name": "changed message or key",
+          "code": "tag=sign_message(b'key',b'message'); assert verify_message(b'other',b'message',tag) is False\nassert verify_message(b'key',b'changed',tag) is False\n"
+        },
+        {
+          "name": "empty data and modified tag",
+          "code": "tag=sign_message(b'key',b''); assert verify_message(b'key',b'',tag) is True\nassert verify_message(b'key',b'',('0' if tag[0]!='0' else '1')+tag[1:]) is False\n"
+        }
+      ],
+      "hints": [
+        "Use hmac.new(key,message,hashlib.sha256).hexdigest().",
+        "Recompute the expected tag and compare it to the supplied one with hmac.compare_digest.",
+        "HMAC uses the shared key and exact message bytes. compare_digest checks the computed and supplied tags with the standard library primitive rather than an application-specific comparison loop."
+      ],
+      "explanation": "HMAC uses the shared key and exact message bytes. compare_digest checks the computed and supplied tags with the standard library primitive rather than an application-specific comparison loop."
+    }
+  ]
+}

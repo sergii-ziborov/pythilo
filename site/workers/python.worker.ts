@@ -3,7 +3,7 @@ import type { PyodideAPI } from "pyodide";
 import type { PyCallable } from "pyodide/ffi";
 import checker from "../content/lessons-checker.json" with { type: "json" };
 import { LESSON_SHIM, RUNNER_SOURCE, SHIM_ROOT } from "../lib/python-runner";
-import { BROWSER_CHECKER, BROWSER_RUNTIME, PYODIDE_VERSION, explainRuntimeError, stdinLayout, type Diagnostic, type LessonCheckResult, type RunResult, type WorkerReply, type WorkerRequest } from "../lib/python-runtime";
+import { BROWSER_CHECKER, BROWSER_LOCKFILE, BROWSER_RUNTIME, PYODIDE_VERSION, explainRuntimeError, stdinLayout, type Diagnostic, type LessonCheckResult, type RunResult, type WorkerReply, type WorkerRequest } from "../lib/python-runtime";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 const post = (message: WorkerReply) => worker.postMessage(message);
@@ -59,7 +59,7 @@ async function initialize() {
   post({ type: "stage", label: "Loading Python in this browser" });
   const base = new URL("/pyodide/", worker.location.origin).href;
   const { loadPyodide } = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ base + "pyodide.mjs") as typeof import("pyodide");
-  const instance = await loadPyodide({ indexURL: base, lockFileURL: base + "pyodide-lock.json", env: { HOME: "/home/pyodide", PYTHONHASHSEED: "0" } });
+  const instance = await loadPyodide({ indexURL: base, lockFileURL: new URL(BROWSER_LOCKFILE, worker.location.origin).href, env: { HOME: "/home/pyodide", PYTHONHASHSEED: "0" } });
   if (instance.version !== PYODIDE_VERSION) throw new Error(`Pyodide ${instance.version} does not match this site's ${PYODIDE_VERSION}.`);
   instance.setStdout(writer("stdout")); instance.setStderr(writer("stderr"));
   instance.setStdin({ stdin: readLine, isatty: false });

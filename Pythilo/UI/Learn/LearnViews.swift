@@ -485,8 +485,7 @@ struct LessonView: View {
     @State private var hintsShown = 0
     @State private var showSolution = false
     @State private var showTask = true
-    @State private var showReport = false
-    @State private var reportKind: ReportKind = .check
+    @State private var reportKind: ReportKind?
     @State private var visibleSections: Set<Int> = []
     @State private var library = CourseLibrary.shared
     @State private var failure: String?
@@ -502,7 +501,10 @@ struct LessonView: View {
     private var isWide: Bool { sizeClass == .regular }
     private var index: Int { (course.lessons.firstIndex(of: lesson) ?? 0) + 1 }
 
-    enum ReportKind { case run, check }
+    enum ReportKind: String, Identifiable {
+        case run, check
+        var id: String { rawValue }
+    }
 
     var body: some View {
         Group {
@@ -545,8 +547,8 @@ struct LessonView: View {
                 }
             }
         }
-        .sheet(isPresented: $showReport) {
-            reportSheet
+        .sheet(item: $reportKind) { kind in
+            reportSheet(kind: kind)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
@@ -874,31 +876,31 @@ struct LessonView: View {
 
     // MARK: Report
 
-    private var reportSheet: some View {
+    private func reportSheet(kind: ReportKind) -> some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    if reportKind == .check {
+                    if kind == .check {
                         checkSummary
                     }
-                    outputBlock
+                    outputBlock(kind: kind)
                     if let failure { Text(failure).font(.system(size: 13)).foregroundStyle(AppTheme.coralInk) }
                 }
                 .padding(16)
             }
             .background(AppTheme.background)
-            .navigationTitle(reportTitle)
+            .navigationTitle(reportTitle(kind: kind))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { showReport = false } }
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { reportKind = nil } }
             }
         }
         .accessibilityIdentifier("lesson-report")
     }
 
-    private var reportTitle: String {
-        if session.isBusy { return reportKind == .check ? "Checking…" : "Running…" }
-        if reportKind == .run { return "Output" }
+    private func reportTitle(kind: ReportKind) -> String {
+        if session.isBusy { return kind == .check ? "Checking…" : "Running…" }
+        if kind == .run { return "Output" }
         if reportError != nil { return "Could not check" }
         return allPassed ? "All checks passed" : "\(passed) of \(results.count) checks passed"
     }
@@ -940,7 +942,7 @@ struct LessonView: View {
             .background(AppTheme.mint.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             if let next = library.next(after: lesson, in: course), let onNext {
                 Button {
-                    showReport = false
+                    reportKind = nil
                     onNext(next)
                 } label: {
                     HStack(spacing: 6) {
@@ -969,9 +971,9 @@ struct LessonView: View {
     }
 
     @ViewBuilder
-    private var outputBlock: some View {
+    private func outputBlock(kind: ReportKind) -> some View {
         let text = Self.outputText(session.output)
-        if !text.isEmpty || reportKind == .run {
+        if !text.isEmpty || kind == .run {
             VStack(alignment: .leading, spacing: 6) {
                 Text("OUTPUT").sectionLabel()
                 Text(text.isEmpty ? (session.isBusy ? "…" : "Nothing was printed.") : text)
@@ -1031,7 +1033,6 @@ struct LessonView: View {
         session.onCustom = nil
         session.clearOutput()
         reportKind = .run
-        showReport = true
         session.submit(
             ["kind": "script", "path": url.path, "root": url.deletingLastPathComponent().path, "cwd": url.deletingLastPathComponent().path],
             label: label
@@ -1046,7 +1047,6 @@ struct LessonView: View {
         reportError = nil
         session.clearOutput()
         reportKind = .check
-        showReport = true
         let url = CourseLibrary.draftURL(lesson)
         session.onCustom = { [lesson] kind, data in
             guard kind == "lesson_result", let report = try? JSONDecoder().decode(LessonReport.self, from: data) else { return }
@@ -1086,7 +1086,7 @@ struct LessonView: View {
             ]
         )
         do {
-            showReport = false
+            reportKind = nil
             onOpenProject(try ProjectStore.shared.create(name: lesson.id, template: template))
         } catch {
             failure = error.localizedDescription

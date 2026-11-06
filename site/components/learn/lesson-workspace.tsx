@@ -7,9 +7,10 @@ import { PlainEditor } from "@/components/python/plain-editor";
 import { InputLine, RunFooter, Transcript } from "@/components/python/run-output";
 import { BROWSER_RUNTIME, PYODIDE_VERSION, explainRuntimeError, type LessonCheckResult } from "@/lib/python-runtime";
 import { markPassed, readDraft, writeDraft } from "./progress";
+import { browserSourceMissing } from "@/lib/python-source-support";
 
 type Owner = "solution" | `example:${number}`;
-type LessonContextValue = { python: PythonRuntime; owner: Owner | null; run: (owner: Owner, code: string) => void; blocked: boolean };
+type LessonContextValue = { python: PythonRuntime; owner: Owner | null; run: (owner: Owner, code: string) => void };
 const LessonContext = createContext<LessonContextValue | null>(null);
 
 export type LessonSection = { chip: string; title: string; content: ReactNode };
@@ -22,10 +23,12 @@ type Props = {
 /** "Run example" under a code block in the reading. Its output appears under the block. */
 export function ExampleBlock({ code, index, children }: { code: string; index: number; children: ReactNode }) {
   const context = useContext(LessonContext)!, mine = context.owner === `example:${index}`, python = context.python;
+  const missing = useMemo(() => browserSourceMissing(code), [code]);
   return <figure className="example">
     {children}
-    <button type="button" className="example-run" disabled={context.python.busy || context.blocked} onClick={() => context.run(`example:${index}`, code)}><svg width="12" height="14" viewBox="0 0 14 16" fill="currentColor" aria-hidden="true"><path d="M1 1.8c0-.8.9-1.3 1.6-.9l10 6.2c.6.4.6 1.4 0 1.8l-10 6.2c-.7.4-1.6-.1-1.6-.9z" /></svg>{mine && python.busy ? python.stage || "Running…" : "Run example"}</button>
-    {mine && (python.transcript.length || python.result) ? <figcaption className="example-output">
+    <button type="button" className="example-run" disabled={context.python.busy || missing.length > 0} onClick={() => context.run(`example:${index}`, code)}><svg width="12" height="14" viewBox="0 0 14 16" fill="currentColor" aria-hidden="true"><path d="M1 1.8c0-.8.9-1.3 1.6-.9l10 6.2c.6.4.6 1.4 0 1.8l-10 6.2c-.7.4-1.6-.1-1.6-.9z" /></svg>{missing.length ? "App required" : mine && python.busy ? python.stage || "Running…" : "Run example"}</button>
+    {missing.length ? <figcaption className="example-output">This example uses {missing.join(" and ")}. Run it in the Pythilo app, where these features are available.</figcaption> : null}
+    {mine && !missing.length && (python.transcript.length || python.result) ? <figcaption className="example-output">
       <Transcript parts={python.transcript} empty="(no output)" />
       {python.waitingForInput ? <InputLine onSubmit={python.provideInput} /> : null}
       {python.result && !python.busy ? <RunFooter result={python.result} /> : null}
@@ -61,7 +64,7 @@ export function LessonWorkspace({ course, lesson, breadcrumb, position, sections
       if (!result.stopped && !result.error && result.results.length && result.results.every(item => item.ok)) { markPassed(course, lesson); setSection(taskIndex); }
     } catch (error) { if (!/^Stopped/.test(error instanceof Error ? error.message : "")) setFailure(error instanceof Error ? error.message : String(error)); }
   };
-  const context = useMemo(() => ({ python, owner, run, blocked }), [python, owner, run, blocked]);
+  const context = useMemo(() => ({ python, owner, run }), [python, owner, run]);
   const passed = checked && !checked.stopped && !checked.error && checked.results.length > 0 && checked.results.every(item => item.ok);
   const failed = checked?.results.filter(item => !item.ok) ?? [];
   const solutionOutput = owner === "solution";

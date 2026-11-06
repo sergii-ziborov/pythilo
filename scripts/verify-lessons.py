@@ -30,6 +30,10 @@ TORCH_IMPORT_SECONDS = 20
 
 # File stem -> (course id, kind, number of lessons)
 EXPECTED_COURSES = {
+    "21-pydantic": ("pydantic", "path", 20),
+    "22-fastapi-httpx": ("fastapi-httpx", "path", 14),
+    "23-testing-practice": ("testing-practice", "path", 10),
+    "24-data-formats": ("data-formats", "path", 8),
     "19-ml-evaluation": ("ml-evaluation", "path", 12),
     "20-ai-building-blocks": ("ai-building-blocks", "path", 8),
     "15-algorithm-patterns": ("algorithm-patterns", "path", 8),
@@ -255,7 +259,13 @@ def static_problems(lesson, kind):
         tree = ast.parse(check["code"])
         if not any(isinstance(node, ast.Assert) for node in ast.walk(tree)):
             problems.append(f"check '{check['name']}' has no assert")
-        if imported_modules(check["code"]) & {"time", "datetime"}:
+        clock_modules = imported_modules(check["code"])
+        uses_date_clock = "datetime" in clock_modules and any(
+            isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr in {"now", "today", "utcnow"}
+            for node in ast.walk(tree)
+        )
+        if "time" in clock_modules or uses_date_clock:
             problems.append(f"check '{check['name']}' depends on the clock")
 
     hints = lesson.get("hints")

@@ -1,0 +1,568 @@
+{
+  "id": "pydantic",
+  "title": "Pydantic: validate real data",
+  "summary": "Twenty practical lessons using Pydantic 2: models, constraints, validators, nested data, unions, serialization and JSON Schema. Every example runs independently.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "pd-models",
+      "title": "Parse a boundary with BaseModel",
+      "body": "# Parse a boundary with BaseModel\n\nType hints describe a Python function, but they do not validate a dictionary received from JSON. A Pydantic model turns that boundary into executable rules. Constructing the model converts supported input values and rejects values that cannot satisfy the field types.\n\nThe result is a model instance with typed attributes. Use `model_dump()` to produce a dictionary for the next layer. Keep the original input available when diagnosing bad data; validation should not mutate the caller's dictionary.\n\n```python\nfrom pydantic import BaseModel\n\nclass Count(BaseModel):\n    value: int\n\nitem = Count(value=\"12\")\nprint(item.value, type(item.value).__name__)\nprint(item.model_dump())\n```\n",
+      "task": "Define User with integer id and string name. Implement load_user(raw) returning its validated dictionary. Accept integer strings for id, ignore unknown fields, and reject missing or invalid fields.",
+      "starter": "from pydantic import BaseModel\n\nclass User(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef load_user(raw):\n    return None\n",
+      "solution": "from pydantic import BaseModel\nclass User(BaseModel):\n    id: int\n    name: str\ndef load_user(raw):\n    return User.model_validate(raw).model_dump()\n",
+      "checks": [
+        {
+          "name": "converts an integer string",
+          "code": "assert load_user({'id':'7','name':'Ada'}) == {'id':7,'name':'Ada'}\n"
+        },
+        {
+          "name": "rejects invalid input",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: load_user({'id':'x','name':'Ada'}))\nassert _bad(lambda: load_user({'id':1}))\n"
+        },
+        {
+          "name": "ignores extras without mutation",
+          "code": "raw={'id':2,'name':'Lin','debug':True}\nassert load_user(raw)=={'id':2,'name':'Lin'}\nassert raw['debug'] is True\n"
+        }
+      ],
+      "hints": [
+        "Declare id as int and name as str on a BaseModel.",
+        "Validate raw with model_validate, then return model_dump so extras are not copied into the output.",
+        "BaseModel performs parsing at construction. model_validate accepts the incoming object, while model_dump returns only the declared fields. A successful type hint alone would not provide these guarantees."
+      ],
+      "explanation": "BaseModel performs parsing at construction. model_validate accepts the incoming object, while model_dump returns only the declared fields. A successful type hint alone would not provide these guarantees."
+    },
+    {
+      "id": "pd-strict",
+      "title": "Choose strict validation deliberately",
+      "body": "# Choose strict validation deliberately\n\nAutomatic conversion is useful at a text boundary, but it can hide a mistake inside an already typed system. Strict fields require the expected Python type instead of accepting every convertible value. In particular, a boolean should not silently become a measurement just because Python treats bool as a subclass of int.\n\nPydantic offers strictness per model, per field and per validation call. Choose the boundary that owns the policy. A strict model makes the rule visible to every caller.\n\n```python\nfrom pydantic import BaseModel, ConfigDict\nfrom pydantic import ValidationError\nclass Sample(BaseModel):\n    model_config = ConfigDict(strict=True)\n    count: int\ntry:\n    Sample(count=\"3\")\nexcept ValidationError as error:\n    print(error.errors()[0][\"type\"])\n```\n",
+      "task": "Define strict Measurement with count: int. Implement strict_count(raw) returning its count. Reject numeric strings, bools and floats; accept zero and negative integers.",
+      "starter": "from pydantic import BaseModel, ConfigDict\n\nclass Measurement(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef strict_count(raw):\n    return None\n",
+      "solution": "from pydantic import BaseModel, ConfigDict\nclass Measurement(BaseModel):\n    model_config = ConfigDict(strict=True)\n    count: int\ndef strict_count(raw):\n    return Measurement.model_validate(raw).count\n",
+      "checks": [
+        {
+          "name": "accepts integers",
+          "code": "assert strict_count({'count':4})==4\n"
+        },
+        {
+          "name": "rejects coercion",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: strict_count({'count':'4'}))\nassert _bad(lambda: strict_count({'count':True}))\nassert _bad(lambda: strict_count({'count':4.0}))\n"
+        },
+        {
+          "name": "keeps signed integers",
+          "code": "assert strict_count({'count':0})==0\nassert strict_count({'count':-2})==-2\n"
+        }
+      ],
+      "hints": [
+        "Set model_config to ConfigDict(strict=True) on Measurement.",
+        "Return the validated count; numeric strings, floats and bools must fail before you return it.",
+        "ConfigDict(strict=True) is attached to the model, so all of its fields share the same conversion policy. Range validation is a separate decision from type strictness."
+      ],
+      "explanation": "ConfigDict(strict=True) is attached to the model, so all of its fields share the same conversion policy. Range validation is a separate decision from type strictness."
+    },
+    {
+      "id": "pd-fields",
+      "title": "Constrain fields with Field",
+      "body": "# Constrain fields with Field\n\nA valid Python type can still carry an invalid domain value. A negative quantity is an integer, and an empty label is a string. Field constraints combine those domain rules with the type so every construction path checks the same conditions.\n\nUse inclusive and exclusive bounds carefully: `ge` includes its boundary, while `gt` excludes it. String length is checked on the value you actually validate. If whitespace should be removed first, add an explicit normalization rule rather than assuming length validation strips it.\n\n```python\nfrom pydantic import BaseModel, Field\nclass Page(BaseModel):\n    size: int = Field(ge=1, le=50)\nprint(Page(size=10).model_dump())\n```\n",
+      "task": "Define Product with name length 1..40, price greater than zero, and stock integer at least zero. product_data(raw) returns its validated dictionary.",
+      "starter": "from pydantic import BaseModel, Field\n\nclass Product(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef product_data(raw):\n    return None\n",
+      "solution": "from pydantic import BaseModel, Field\nclass Product(BaseModel):\n    name: str = Field(min_length=1,max_length=40)\n    price: float = Field(gt=0)\n    stock: int = Field(ge=0)\ndef product_data(raw):\n    return Product.model_validate(raw).model_dump()\n",
+      "checks": [
+        {
+          "name": "parses valid fields",
+          "code": "assert product_data({'name':'Tea','price':'2.5','stock':0})=={'name':'Tea','price':2.5,'stock':0}\n"
+        },
+        {
+          "name": "checks numeric bounds",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: product_data({'name':'Tea','price':0,'stock':1}))\nassert _bad(lambda: product_data({'name':'Tea','price':2,'stock':-1}))\n"
+        },
+        {
+          "name": "checks name bounds",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: product_data({'name':'','price':2,'stock':1}))\nassert _bad(lambda: product_data({'name':'x'*41,'price':2,'stock':1}))\n"
+        }
+      ],
+      "hints": [
+        "Put min_length/max_length on name, gt on price and ge on stock.",
+        "Zero stock is allowed, but zero price and an empty name are not.",
+        "Field keeps range and length rules next to their fields. Pydantic reports the field that failed, so callers do not have to infer which condition a hand-written boolean represented."
+      ],
+      "explanation": "Field keeps range and length rules next to their fields. Pydantic reports the field that failed, so callers do not have to infer which condition a hand-written boolean represented."
+    },
+    {
+      "id": "pd-annotated",
+      "title": "Reuse constraints with Annotated",
+      "body": "# Reuse constraints with Annotated\n\nRepeating the same bounds on several models makes it easy for their rules to drift. Annotated attaches reusable validation metadata to a type. The resulting alias still communicates its underlying Python type to a type checker, while Pydantic reads the additional constraints at runtime.\n\nPut the alias on collection elements when every element has the rule. A constraint on the collection itself has a different meaning, such as minimum list length. Naming these types also gives an API schema a useful vocabulary.\n\n```python\nfrom typing import Annotated\nfrom pydantic import Field, TypeAdapter\nPositive = Annotated[int, Field(gt=0)]\nvalues = TypeAdapter(list[Positive])\nprint(values.validate_python([\"2\", 3]))\n```\n",
+      "task": "Implement positive_ids(raw) with TypeAdapter and an Annotated integer constrained above zero. Validate a list, return list[int], allow an empty list, and reject any nonpositive or invalid element.",
+      "starter": "from typing import Annotated\n\nfrom pydantic import Field, TypeAdapter\n\ndef positive_ids(raw):\n    return None\n",
+      "solution": "from typing import Annotated\nfrom pydantic import Field, TypeAdapter\nPositive = Annotated[int, Field(gt=0)]\ndef positive_ids(raw):\n    return TypeAdapter(list[Positive]).validate_python(raw)\n",
+      "checks": [
+        {
+          "name": "parses each element",
+          "code": "assert positive_ids(['2',3])==[2,3]\n"
+        },
+        {
+          "name": "rejects one bad element",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: positive_ids([1,0]))\nassert _bad(lambda: positive_ids([-1]))\nassert _bad(lambda: positive_ids(['no']))\n"
+        },
+        {
+          "name": "empty list is valid",
+          "code": "assert positive_ids([])==[]\n"
+        }
+      ],
+      "hints": [
+        "Define an Annotated integer alias with Field(gt=0).",
+        "Pass list of that alias to TypeAdapter, so the rule applies to every member.",
+        "Annotated describes each integer, so the list adapter checks every element. An empty collection satisfies an element constraint because it contains no invalid elements."
+      ],
+      "explanation": "Annotated describes each integer, so the list adapter checks every element. An empty collection satisfies an element constraint because it contains no invalid elements."
+    },
+    {
+      "id": "pd-errors",
+      "title": "Read structured validation errors",
+      "body": "# Read structured validation errors\n\nA validation error can describe several failures at once. Parse its structured `errors()` result instead of scraping the formatted message. Each entry includes a location, a machine-readable error type and a human message.\n\nLocations are tuples and can include collection indexes, so a nested error can identify exactly which item failed. Error messages and documentation URLs may change between versions. Base program logic on locations and error types, and choose deliberately whether raw rejected input belongs in a log or user response.\n\n```python\nfrom pydantic import BaseModel\nfrom pydantic import ValidationError\nclass Row(BaseModel):\n    age: int\ntry:\n    Row(age=\"wrong\")\nexcept ValidationError as error:\n    print([e[\"loc\"] for e in error.errors()])\n```\n",
+      "task": "Implement invalid_fields(raw) validating Profile(name: str, age: int). Return a sorted list of the first location components of all errors, or [] on success. Report both fields when both are absent.",
+      "starter": "from pydantic import BaseModel, ValidationError\n\nclass Profile(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef invalid_fields(raw):\n    return None\n",
+      "solution": "from pydantic import BaseModel, ValidationError\nclass Profile(BaseModel):\n    name: str\n    age: int\ndef invalid_fields(raw):\n    try:\n        Profile.model_validate(raw)\n    except ValidationError as error:\n        return sorted(str(e['loc'][0]) for e in error.errors())\n    return []\n",
+      "checks": [
+        {
+          "name": "valid profile",
+          "code": "assert invalid_fields({'name':'Ada','age':'9'})==[]\n"
+        },
+        {
+          "name": "one invalid field",
+          "code": "assert invalid_fields({'name':'Ada','age':'x'})==['age']\n"
+        },
+        {
+          "name": "all missing fields",
+          "code": "assert invalid_fields({})==['age','name']\n"
+        }
+      ],
+      "hints": [
+        "Catch ValidationError from Profile.model_validate(raw).",
+        "Read each entry's loc tuple from errors(); collect and sort the first component.",
+        "ValidationError.errors returns data, not a display contract. Collecting the first location component is a deliberate summary for this flat model; nested forms should preserve the whole location."
+      ],
+      "explanation": "ValidationError.errors returns data, not a display contract. Collecting the first location component is a deliberate summary for this flat model; nested forms should preserve the whole location."
+    },
+    {
+      "id": "pd-required-null",
+      "title": "Distinguish missing from nullable",
+      "body": "# Distinguish missing from nullable\n\nA nullable field is allowed to contain None. That does not automatically give the field a default. In Pydantic 2, an annotation such as `str | None` is still required unless a default is supplied.\n\nThis distinction matters for partial forms and API updates. Missing means the caller did not send a value; an explicit null may mean clear an existing value. Use `model_fields_set` when that distinction must survive validation, and avoid replacing all missing fields with None before you validate them.\n\n```python\nfrom pydantic import BaseModel\nclass Note(BaseModel):\n    text: str | None = None\nprint(Note().model_fields_set)\nprint(Note(text=None).model_fields_set)\n```\n",
+      "task": "Define Patch with nullable title defaulting to None. patch_data(raw) must return only fields explicitly supplied, using exclude_unset=True. Preserve an explicit title=None and ignore unknown fields.",
+      "starter": "from pydantic import BaseModel\n\nclass Patch(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef patch_data(raw):\n    return None\n",
+      "solution": "from pydantic import BaseModel\nclass Patch(BaseModel):\n    title: str | None = None\ndef patch_data(raw):\n    return Patch.model_validate(raw).model_dump(exclude_unset=True)\n",
+      "checks": [
+        {
+          "name": "absent field stays absent",
+          "code": "assert patch_data({})=={}\n"
+        },
+        {
+          "name": "explicit null is kept",
+          "code": "assert patch_data({'title':None})=={'title':None}\n"
+        },
+        {
+          "name": "title is retained",
+          "code": "assert patch_data({'title':'Next','extra':1})=={'title':'Next'}\n"
+        }
+      ],
+      "hints": [
+        "A nullable field with default None can still distinguish omission from explicit null.",
+        "Dump with exclude_unset=True, which uses model_fields_set rather than comparing values to defaults.",
+        "exclude_unset consults which fields were supplied, not whether their values equal the defaults. exclude_none would incorrectly erase an explicit request to clear the title."
+      ],
+      "explanation": "exclude_unset consults which fields were supplied, not whether their values equal the defaults. exclude_none would incorrectly erase an explicit request to clear the title."
+    },
+    {
+      "id": "pd-factories",
+      "title": "Create independent default containers",
+      "body": "# Create independent default containers\n\nA default value and a default factory express different intentions. A factory is called when an input omits the field, so it can produce a new container or a value computed at construction time. It also makes ownership of mutable state visible to a reader.\n\nPydantic protects many mutable defaults by copying them, but an explicit factory is clearer when fresh state is part of the contract. Supplied values still go through validation; the factory is not a general hook for transforming every input.\n\n```python\nfrom pydantic import BaseModel, Field\nclass Bag(BaseModel):\n    tags: list[str] = Field(\n        default_factory=list)\na, b = Bag(), Bag()\na.tags.append(\"new\")\nprint(a.tags, b.tags)\n```\n",
+      "task": "Implement independent_tags() constructing two Bag models with tags default_factory=list. Append \"new\" to the first and return their dumped dictionaries. Neither call may share accumulated state with another call.",
+      "starter": "from pydantic import BaseModel, Field\n\nclass Bag(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef independent_tags():\n    return None\n",
+      "solution": "from pydantic import BaseModel, Field\nclass Bag(BaseModel):\n    tags: list[str] = Field(default_factory=list)\ndef independent_tags():\n    first, second = Bag(), Bag()\n    first.tags.append('new')\n    return first.model_dump(), second.model_dump()\n",
+      "checks": [
+        {
+          "name": "first changes alone",
+          "code": "assert independent_tags()[0]=={'tags':['new']}\n"
+        },
+        {
+          "name": "second starts empty",
+          "code": "assert independent_tags()[1]=={'tags':[]}\n"
+        },
+        {
+          "name": "calls are independent",
+          "code": "assert independent_tags()==independent_tags()\n"
+        }
+      ],
+      "hints": [
+        "Use Field(default_factory=list) on Bag.tags.",
+        "Construct two models inside each call, append only to the first, then dump both.",
+        "default_factory=list states that each omitted collection starts fresh. Returning ordinary dictionaries also lets a caller inspect the results without retaining model instances."
+      ],
+      "explanation": "default_factory=list states that each omitted collection starts fresh. Returning ordinary dictionaries also lets a caller inspect the results without retaining model instances."
+    },
+    {
+      "id": "pd-extra",
+      "title": "Reject unknown keys at a boundary",
+      "body": "# Reject unknown keys at a boundary\n\nPydantic models ignore extra keys by default. That is useful for tolerant readers, but a typo in configuration can then disappear silently. A boundary that owns a fixed vocabulary can reject unknown keys with `extra=\"forbid\"`.\n\nChoose the policy per model. A public response consumer may deliberately tolerate new fields, while a configuration editor should usually report misspellings. Rejecting extras also prevents callers from assuming that arbitrary input fields have been validated merely because the model accepted the rest of the object.\n\n```python\nfrom pydantic import BaseModel, ConfigDict\nfrom pydantic import ValidationError\nclass Options(BaseModel):\n    model_config = ConfigDict(extra=\"forbid\")\n    limit: int\ntry:\n    Options(limit=2, limti=3)\nexcept ValidationError as error:\n    print(error.errors()[0][\"loc\"])\n```\n",
+      "task": "Define Options with extra=\"forbid\", host: str and port: int default 8000. options_data(raw) returns its validated dictionary and rejects misspelled or unknown keys.",
+      "starter": "from pydantic import BaseModel, ConfigDict\n\nclass Options(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef options_data(raw):\n    return None\n",
+      "solution": "from pydantic import BaseModel, ConfigDict\nclass Options(BaseModel):\n    model_config = ConfigDict(extra='forbid')\n    host: str\n    port: int = 8000\ndef options_data(raw):\n    return Options.model_validate(raw).model_dump()\n",
+      "checks": [
+        {
+          "name": "uses the port default",
+          "code": "assert options_data({'host':'localhost'})=={'host':'localhost','port':8000}\n"
+        },
+        {
+          "name": "parses a supplied port",
+          "code": "assert options_data({'host':'x','port':'9000'})['port']==9000\n"
+        },
+        {
+          "name": "rejects unknown keys",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: options_data({'host':'x','prot':9000}))\n"
+        }
+      ],
+      "hints": [
+        "Use ConfigDict(extra=\"forbid\") to turn unknown keys into errors.",
+        "Declare port with default 8000 and return the validated model's dictionary.",
+        "ConfigDict(extra=\"forbid\") makes an unknown key a validation error. The default port applies only when the input omits that declared field."
+      ],
+      "explanation": "ConfigDict(extra=\"forbid\") makes an unknown key a validation error. The default port applies only when the input omits that declared field."
+    },
+    {
+      "id": "pd-nested",
+      "title": "Validate nested collections",
+      "body": "# Validate nested collections\n\nA boundary often contains a collection of structured records. Nesting models lets Pydantic validate both the outer object and every inner item, while error locations retain the path through the collection.\n\nAfter validation, the inner values are model instances rather than unchecked dictionaries. Business logic can therefore use attributes and trust the declared constraints. Dumping the outer model recursively serializes those inner models. The input data remains the caller's object; avoid using it as a second, unvalidated source for later calculations.\n\n```python\nfrom pydantic import BaseModel\nclass Item(BaseModel):\n    units: int\nclass Order(BaseModel):\n    items: list[Item]\norder = Order(items=[{\"units\": \"3\"}])\nprint(order.items[0].units)\n```\n",
+      "task": "Implement order_total(raw) validating Order(items: list[Line]), where Line has price: float >=0 and quantity: int >0. Return the sum of price times quantity; an empty order costs zero.",
+      "starter": "from pydantic import BaseModel, Field\n\nclass Line(BaseModel):\n    # Add the fields and rules here.\n    pass\n\nclass Order(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef order_total(raw):\n    return None\n",
+      "solution": "from pydantic import BaseModel, Field\nclass Line(BaseModel):\n    price: float = Field(ge=0)\n    quantity: int = Field(gt=0)\nclass Order(BaseModel):\n    items: list[Line]\ndef order_total(raw):\n    order=Order.model_validate(raw)\n    return sum(item.price*item.quantity for item in order.items)\n",
+      "checks": [
+        {
+          "name": "calculates typed values",
+          "code": "assert order_total({'items':[{'price':'2.5','quantity':'2'},{'price':1,'quantity':3}]})==8\n"
+        },
+        {
+          "name": "empty order",
+          "code": "assert order_total({'items':[]})==0\n"
+        },
+        {
+          "name": "nested rules apply",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: order_total({'items':[{'price':1,'quantity':0}]}))\n"
+        }
+      ],
+      "hints": [
+        "Create a Line model and use list[Line] inside Order.",
+        "Validate the outer order before summing item.price times item.quantity from typed child instances.",
+        "The calculation uses validated Line instances. Constraints on a child model are applied for each item, so one bad quantity invalidates the whole order instead of quietly changing the total."
+      ],
+      "explanation": "The calculation uses validated Line instances. Constraints on a child model are applied for each item, so one bad quantity invalidates the whole order instead of quietly changing the total."
+    },
+    {
+      "id": "pd-aliases",
+      "title": "Separate input names from output names",
+      "body": "# Separate input names from output names\n\nExternal data does not always use Python's naming style. An alias maps an external key to a model field without forcing that spelling throughout the program. Validation aliases control reading, while serialization aliases control writing.\n\nAliasChoices is useful during a small, explicit migration: accept either the old or the new input key, then emit one canonical name. Choose precedence deliberately if both appear. Dumping by alias is an explicit operation; ordinary dumps use the Python field names unless configured otherwise.\n\n```python\nfrom pydantic import BaseModel, Field\nfrom pydantic import AliasChoices\nclass User(BaseModel):\n    name: str = Field(validation_alias=\n        AliasChoices(\"name\", \"displayName\"))\nprint(User(displayName=\"Ada\").name)\n```\n",
+      "task": "Implement canonical_user(raw): accept either user_id or userId as the integer identifier (user_id wins when both occur). Return {\"user_id\": id}, and reject a missing or invalid identifier.",
+      "starter": "from pydantic import BaseModel, Field, AliasChoices\n\nclass UserKey(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef canonical_user(raw):\n    return None\n",
+      "solution": "from pydantic import BaseModel, Field, AliasChoices\nclass UserKey(BaseModel):\n    user_id: int = Field(validation_alias=AliasChoices('user_id','userId'))\ndef canonical_user(raw):\n    return UserKey.model_validate(raw).model_dump()\n",
+      "checks": [
+        {
+          "name": "accepts legacy input",
+          "code": "assert canonical_user({'userId':'8'})=={'user_id':8}\n"
+        },
+        {
+          "name": "canonical name wins",
+          "code": "assert canonical_user({'user_id':3,'userId':4})=={'user_id':3}\n"
+        },
+        {
+          "name": "requires a valid identifier",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: canonical_user({}))\nassert _bad(lambda: canonical_user({'userId':'bad'}))\n"
+        }
+      ],
+      "hints": [
+        "Use Field(validation_alias=AliasChoices(\"user_id\",\"userId\")).",
+        "The first alias wins; an ordinary model_dump returns the Python field name user_id.",
+        "AliasChoices lists accepted input keys in priority order. model_dump returns the canonical Python field name, so downstream code does not have to handle several spellings."
+      ],
+      "explanation": "AliasChoices lists accepted input keys in priority order. model_dump returns the canonical Python field name, so downstream code does not have to handle several spellings."
+    },
+    {
+      "id": "pd-before",
+      "title": "Normalize input before type validation",
+      "body": "# Normalize input before type validation\n\nA before validator receives the raw input, so it can normalize one explicitly supported representation before Pydantic checks the annotated type. It must handle unexpected types rather than assuming every input is already a string.\n\nKeep normalization narrow. Removing whitespace from a name is reasonable; silently converting every object to text can hide a caller error. Return unsupported inputs unchanged when you want normal type validation to explain them. This keeps conversion policy separate from the model's ordinary type and field constraints.\n\n```python\nfrom pydantic import BaseModel\nfrom pydantic import field_validator\nclass Tag(BaseModel):\n    name: str\n    @field_validator(\"name\", mode=\"before\")\n    @classmethod\n    def strip(cls, value):\n        if isinstance(value, str):\n            return value.strip()\n        return value\nprint(Tag(name=\"  tea  \").name)\n```\n",
+      "task": "Implement clean_name(raw) validating a Person model. Strip whitespace from the string name before checking its minimum length of 1. Reject nonstrings and whitespace-only names.",
+      "starter": "from pydantic import BaseModel, Field, field_validator\n\nclass Person(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef clean_name(raw):\n    return None\n",
+      "solution": "from pydantic import BaseModel, Field, field_validator\nclass Person(BaseModel):\n    name: str = Field(min_length=1)\n    @field_validator('name', mode='before')\n    @classmethod\n    def strip_name(cls, value):\n        return value.strip() if isinstance(value,str) else value\ndef clean_name(raw):\n    return Person.model_validate(raw).name\n",
+      "checks": [
+        {
+          "name": "normalizes whitespace",
+          "code": "assert clean_name({'name':'  Ada  '})=='Ada'\n"
+        },
+        {
+          "name": "rejects empty after normalization",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: clean_name({'name':'   '}))\n"
+        },
+        {
+          "name": "does not stringify objects",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: clean_name({'name':12}))\nassert clean_name({'name':'Lin'})=='Lin'\n"
+        }
+      ],
+      "hints": [
+        "Use field_validator(\"name\", mode=\"before\") and a classmethod.",
+        "Strip only string inputs, then let the annotated str and min_length=1 enforce the remaining rules.",
+        "The before validator strips only strings. Pydantic then enforces str and min_length, so whitespace cannot slip through a length check performed before normalization."
+      ],
+      "explanation": "The before validator strips only strings. Pydantic then enforces str and min_length, so whitespace cannot slip through a length check performed before normalization."
+    },
+    {
+      "id": "pd-after",
+      "title": "Validate a parsed field value",
+      "body": "# Validate a parsed field value\n\nAn after validator runs once a field has passed its ordinary type validation. Its input can therefore be treated as the annotated type, which makes domain checks simpler. Return the value after checking it; forgetting the return changes the model's field value.\n\nRaise ValueError for a failed domain condition. An accidental TypeError indicates a programming mistake and should not be used as a normal validation result. Keep a validator focused on one field unless the rule genuinely needs several fields together.\n\n```python\nfrom pydantic import BaseModel\nfrom pydantic import field_validator\nclass Even(BaseModel):\n    value: int\n    @field_validator(\"value\")\n    @classmethod\n    def even(cls, value):\n        if value % 2:\n            raise ValueError(\"must be even\")\n        return value\nprint(Even(value=\"4\").value)\n```\n",
+      "task": "Implement even_count(raw) through a Count model whose integer value must be even. Permit integer-string conversion and negative even numbers; reject odd values.",
+      "starter": "from pydantic import BaseModel, field_validator\n\nclass Count(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef even_count(raw):\n    return None\n",
+      "solution": "from pydantic import BaseModel, field_validator\nclass Count(BaseModel):\n    value: int\n    @field_validator('value')\n    @classmethod\n    def ensure_even(cls,value):\n        if value % 2:\n            raise ValueError('must be even')\n        return value\ndef even_count(raw):\n    return Count.model_validate(raw).value\n",
+      "checks": [
+        {
+          "name": "checks after conversion",
+          "code": "assert even_count({'value':'6'})==6\n"
+        },
+        {
+          "name": "allows signed even values",
+          "code": "assert even_count({'value':-4})==-4\nassert even_count({'value':0})==0\n"
+        },
+        {
+          "name": "rejects odd values",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: even_count({'value':3}))\n"
+        }
+      ],
+      "hints": [
+        "Use an after field validator on an int field.",
+        "Raise ValueError for an odd integer and return the value after a successful check.",
+        "Type parsing happens first, so the validator receives an int. Returning the checked integer preserves the field; raising ValueError produces a normal, located Pydantic validation error."
+      ],
+      "explanation": "Type parsing happens first, so the validator receives an int. Returning the checked integer preserves the field; raising ValueError produces a normal, located Pydantic validation error."
+    },
+    {
+      "id": "pd-model-validator",
+      "title": "Check relationships between fields",
+      "body": "# Check relationships between fields\n\nSome rules involve more than one field. A valid start and a valid end do not necessarily form a valid interval. An after model validator sees the parsed model and can enforce that relationship in one place.\n\nReturn the instance after checking it. The validator should express a domain invariant rather than repair arbitrary contradictory data. Field errors are still reported by the fields themselves; the model-level rule is reached only after those fields have been parsed successfully. Equality at a boundary remains a separate policy decision.\n\n```python\nfrom pydantic import BaseModel\nfrom pydantic import model_validator\nclass Span(BaseModel):\n    start: int\n    end: int\n    @model_validator(mode=\"after\")\n    def ordered(self):\n        if self.end < self.start:\n            raise ValueError(\"reversed span\")\n        return self\nprint(Span(start=2, end=5).end)\n```\n",
+      "task": "Implement span_length(raw) with Span(start: int, end: int). Validate end >= start using a model validator, and return end-start. A zero-length interval is valid.",
+      "starter": "from pydantic import BaseModel, model_validator\n\nclass Span(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef span_length(raw):\n    return None\n",
+      "solution": "from pydantic import BaseModel, model_validator\nclass Span(BaseModel):\n    start: int\n    end: int\n    @model_validator(mode='after')\n    def ordered(self):\n        if self.end < self.start:\n            raise ValueError('end precedes start')\n        return self\ndef span_length(raw):\n    span=Span.model_validate(raw)\n    return span.end-span.start\n",
+      "checks": [
+        {
+          "name": "parses before comparing",
+          "code": "assert span_length({'start':'2','end':'8'})==6\n"
+        },
+        {
+          "name": "accepts equal bounds",
+          "code": "assert span_length({'start':4,'end':4})==0\n"
+        },
+        {
+          "name": "rejects reversed intervals",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: span_length({'start':8,'end':2}))\n"
+        }
+      ],
+      "hints": [
+        "Use model_validator(mode=\"after\") to compare two parsed fields.",
+        "Reject end less than start, return self, then compute end minus start in the function.",
+        "The model validator checks a relationship on typed fields and returns self. Inclusive ordering allows equality, which is why length zero is a valid result."
+      ],
+      "explanation": "The model validator checks a relationship on typed fields and returns self. Inclusive ordering allows equality, which is why length zero is a valid result."
+    },
+    {
+      "id": "pd-tagged-unions",
+      "title": "Select a model with a discriminator",
+      "body": "# Select a model with a discriminator\n\nAn untagged union may try several candidate models before deciding what the input means. A discriminator makes the decision explicit: a literal tag selects one branch, and only that branch's fields are validated.\n\nThis works well for events, commands and configuration variants. Give each branch a unique tag and preserve it when serializing. An unknown tag is an error, not a reason to guess a branch. Fields valid for a different variant must not accidentally make an invalid event appear acceptable.\n\n```python\nfrom typing import Annotated, Literal\nfrom pydantic import BaseModel, Field\nfrom pydantic import TypeAdapter\nclass Add(BaseModel):\n    kind: Literal[\"add\"]\n    amount: int\nEvent = Annotated[Add, Field()]\nprint(TypeAdapter(Event).validate_python(\n    {\"kind\": \"add\", \"amount\": \"3\"}))\n```\n",
+      "task": "Implement event_value(raw) validating a discriminated union: Add(kind=\"add\", amount:int) or Remove(kind=\"remove\", key:str). Return the amount or key. Reject unknown tags and missing branch fields.",
+      "starter": "from typing import Annotated, Literal\n\nfrom pydantic import BaseModel, Field, TypeAdapter\n\nclass Add(BaseModel):\n    # Add the fields and rules here.\n    pass\n\nclass Remove(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef event_value(raw):\n    return None\n",
+      "solution": "from typing import Annotated, Literal\nfrom pydantic import BaseModel, Field, TypeAdapter\nclass Add(BaseModel):\n    kind: Literal['add']\n    amount: int\nclass Remove(BaseModel):\n    kind: Literal['remove']\n    key: str\nEvent = Annotated[Add | Remove, Field(discriminator='kind')]\ndef event_value(raw):\n    item=TypeAdapter(Event).validate_python(raw)\n    return item.amount if isinstance(item,Add) else item.key\n",
+      "checks": [
+        {
+          "name": "selects add",
+          "code": "assert event_value({'kind':'add','amount':'3'})==3\n"
+        },
+        {
+          "name": "selects remove",
+          "code": "assert event_value({'kind':'remove','key':'abc'})=='abc'\n"
+        },
+        {
+          "name": "rejects invalid variants",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: event_value({'kind':'other','amount':1}))\nassert _bad(lambda: event_value({'kind':'add','key':'x'}))\n"
+        }
+      ],
+      "hints": [
+        "Give each branch a Literal kind and set Field(discriminator=\"kind\") on their Annotated union.",
+        "Validate with TypeAdapter, then inspect the concrete Add or Remove instance to choose its value.",
+        "The kind field selects exactly one model. After validation the result is a concrete Add or Remove instance, so ordinary isinstance dispatch is unambiguous."
+      ],
+      "explanation": "The kind field selects exactly one model. After validation the result is a concrete Add or Remove instance, so ordinary isinstance dispatch is unambiguous."
+    },
+    {
+      "id": "pd-adapter",
+      "title": "Validate a type without a wrapper model",
+      "body": "# Validate a type without a wrapper model\n\nNot every boundary is a named record. A JSON endpoint might return a list of integers or a mapping of names to counts. TypeAdapter validates those existing Python type expressions without inventing an artificial BaseModel field around them.\n\nCreate an adapter once when repeatedly validating the same type. It can validate Python objects or JSON text, and can also serialize values. Validation of raw JSON and serialization of an already trusted value are different operations; do not assume dumping a bad value performs validation first.\n\n```python\nfrom pydantic import TypeAdapter\nadapter = TypeAdapter(dict[str, int])\nprint(adapter.validate_json(\n    '{\"tea\": \"2\", \"water\": 1}'))\n```\n",
+      "task": "Implement parse_counts(text) using TypeAdapter(dict[str,int]).validate_json. Return a dictionary of integer counts. Reject malformed JSON, nonobject JSON and values that cannot become integers.",
+      "starter": "from pydantic import TypeAdapter\n\ndef parse_counts(text):\n    return None\n",
+      "solution": "from pydantic import TypeAdapter\ndef parse_counts(text):\n    return TypeAdapter(dict[str,int]).validate_json(text)\n",
+      "checks": [
+        {
+          "name": "parses JSON values",
+          "code": "assert parse_counts('{\"a\":\"2\",\"b\":0}')=={'a':2,'b':0}\n"
+        },
+        {
+          "name": "accepts an empty mapping",
+          "code": "assert parse_counts('{}')=={}\n"
+        },
+        {
+          "name": "rejects invalid JSON or shape",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: parse_counts('no'))\nassert _bad(lambda: parse_counts('[]'))\nassert _bad(lambda: parse_counts('{\"a\":\"x\"}'))\n"
+        }
+      ],
+      "hints": [
+        "TypeAdapter can validate dict[str,int] directly without a BaseModel wrapper.",
+        "Use validate_json on the text so malformed JSON and invalid dictionary values are both rejected.",
+        "TypeAdapter expresses the actual top-level type. validate_json combines JSON decoding and validation, preserving one consistent error interface for both malformed text and invalid values."
+      ],
+      "explanation": "TypeAdapter expresses the actual top-level type. validate_json combines JSON decoding and validation, preserving one consistent error interface for both malformed text and invalid values."
+    },
+    {
+      "id": "pd-root-model",
+      "title": "Give a root collection model behaviour",
+      "body": "# Give a root collection model behaviour\n\nA RootModel wraps one value at the root instead of declaring an object with several named fields. Its root may be a list, a dictionary or another supported type. Unlike an ordinary model with a field called root, its JSON representation is the root value itself.\n\nUse it when a collection deserves a model's validation methods or additional behaviour but the external format must remain a bare collection. Access the parsed collection through `.root`. Choose TypeAdapter instead if you only need validation and no named model behaviour.\n\n```python\nfrom pydantic import RootModel\nclass Tags(RootModel[list[str]]):\n    pass\ntags = Tags.model_validate([\"tea\", \"new\"])\nprint(tags.root)\nprint(tags.model_dump_json())\n```\n",
+      "task": "Implement root_numbers(raw) with a RootModel[list[int]]. Return (the sum of .root, the dumped collection). Empty input returns (0, []). Reject an invalid member.",
+      "starter": "from pydantic import RootModel\n\nclass Numbers(RootModel[list[int]]):\n    # Add the fields and rules here.\n    pass\n\ndef root_numbers(raw):\n    return None\n",
+      "solution": "from pydantic import RootModel\nclass Numbers(RootModel[list[int]]):\n    pass\ndef root_numbers(raw):\n    item=Numbers.model_validate(raw)\n    return sum(item.root), item.model_dump()\n",
+      "checks": [
+        {
+          "name": "uses a bare collection",
+          "code": "assert root_numbers(['2',3])==(5,[2,3])\n"
+        },
+        {
+          "name": "empty root",
+          "code": "assert root_numbers([])==(0,[])\n"
+        },
+        {
+          "name": "validates members",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: root_numbers([1,'bad']))\n"
+        }
+      ],
+      "hints": [
+        "Subclass RootModel[list[int]], then call model_validate on the incoming collection.",
+        "Read numbers from .root; model_dump returns the bare collection rather than a dictionary containing root.",
+        "RootModel serializes the collection directly rather than adding a root key. The .root attribute supplies the validated values for model behaviour such as aggregation."
+      ],
+      "explanation": "RootModel serializes the collection directly rather than adding a root key. The .root attribute supplies the validated values for model behaviour such as aggregation."
+    },
+    {
+      "id": "pd-json-mode",
+      "title": "Serialize Python values for JSON",
+      "body": "# Serialize Python values for JSON\n\nA model can contain values that JSON has no native representation for, such as dates, UUIDs or sets. A normal Python dump preserves many of those useful Python objects. A JSON-mode dump converts them to a representation JSON can encode.\n\nChoose the format at the boundary where it is needed. Keep date objects for calculations and produce text when writing a response or file. `model_dump_json()` returns JSON text, while `model_dump(mode=\"json\")` returns JSON-compatible Python data. These are different return contracts even when they represent the same information.\n\n```python\nfrom datetime import date\nfrom pydantic import BaseModel\nclass Event(BaseModel):\n    day: date\nitem = Event(day=\"2026-01-02\")\nprint(type(item.model_dump()[\"day\"]).__name__)\nprint(item.model_dump(mode=\"json\"))\n```\n",
+      "task": "Implement event_json(raw) with Event(day: date, name: str). Return a JSON-compatible dictionary whose day is ISO date text. Reject an impossible date.",
+      "starter": "from datetime import date\n\nfrom pydantic import BaseModel\n\nclass Event(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef event_json(raw):\n    return None\n",
+      "solution": "from datetime import date\nfrom pydantic import BaseModel\nclass Event(BaseModel):\n    day: date\n    name: str\ndef event_json(raw):\n    return Event.model_validate(raw).model_dump(mode='json')\n",
+      "checks": [
+        {
+          "name": "serializes date text",
+          "code": "assert event_json({'day':'2026-02-03','name':'Meet'})=={'day':'2026-02-03','name':'Meet'}\n"
+        },
+        {
+          "name": "accepts Python date objects",
+          "code": "from datetime import date\nassert event_json({'day':date(2024,2,29),'name':'Leap'})['day']=='2024-02-29'\n"
+        },
+        {
+          "name": "rejects invalid dates",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: event_json({'day':'2026-02-30','name':'No'}))\n"
+        }
+      ],
+      "hints": [
+        "Declare day as datetime.date in the Event model.",
+        "Use model_dump(mode=\"json\") to produce date text while retaining the dictionary shape.",
+        "JSON mode converts the validated date to ISO text while retaining the dictionary shape. The model validates calendar dates before serialization, so formatting cannot conceal an impossible date."
+      ],
+      "explanation": "JSON mode converts the validated date to ISO text while retaining the dictionary shape. The model validates calendar dates before serialization, so formatting cannot conceal an impossible date."
+    },
+    {
+      "id": "pd-computed",
+      "title": "Expose derived data with computed_field",
+      "body": "# Expose derived data with computed_field\n\nDerived data should have one source of truth. Storing a subtotal alongside its inputs allows the values to disagree. A computed field exposes a property in model serialization while calculating its value from validated inputs.\n\nThe property is not an independently validated input field. Use it for deterministic derived information, and remember that repeatedly accessing an ordinary property recomputes it. Keep expensive or effectful work out of serialization. If a value depends on external state, computing it explicitly in a service is usually a clearer boundary.\n\n```python\nfrom pydantic import BaseModel\nfrom pydantic import computed_field\nclass Square(BaseModel):\n    side: int\n    @computed_field\n    @property\n    def area(self) -> int:\n        return self.side * self.side\nprint(Square(side=3).model_dump())\n```\n",
+      "task": "Implement invoice_data(raw) with Invoice(price:float>=0, quantity:int>=0) and computed total:float. Return a dump containing price, quantity and total. Ignore any supplied total and calculate it from inputs.",
+      "starter": "from pydantic import BaseModel, Field, computed_field\n\nclass Invoice(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef invoice_data(raw):\n    return None\n",
+      "solution": "from pydantic import BaseModel, Field, computed_field\nclass Invoice(BaseModel):\n    price: float = Field(ge=0)\n    quantity: int = Field(ge=0)\n    @computed_field\n    @property\n    def total(self) -> float:\n        return self.price*self.quantity\ndef invoice_data(raw):\n    return Invoice.model_validate(raw).model_dump()\n",
+      "checks": [
+        {
+          "name": "includes the derived total",
+          "code": "assert invoice_data({'price':2.5,'quantity':4})=={'price':2.5,'quantity':4,'total':10.0}\n"
+        },
+        {
+          "name": "does not trust a supplied total",
+          "code": "assert invoice_data({'price':3,'quantity':2,'total':999})['total']==6\n"
+        },
+        {
+          "name": "zero and invalid quantities",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert invoice_data({'price':2,'quantity':0})['total']==0\nassert _bad(lambda: invoice_data({'price':2,'quantity':-1}))\n"
+        }
+      ],
+      "hints": [
+        "Decorate a typed total property with computed_field.",
+        "Calculate total from price and quantity; do not declare it as an independently supplied field.",
+        "computed_field includes the typed property in serialization. Because total is derived from validated price and quantity, a conflicting extra input cannot replace the calculation."
+      ],
+      "explanation": "computed_field includes the typed property in serialization. Because total is derived from validated price and quantity, a conflicting extra input cannot replace the calculation."
+    },
+    {
+      "id": "pd-assignment",
+      "title": "Keep invariants when fields change",
+      "body": "# Keep invariants when fields change\n\nValidation at construction does not automatically validate every later assignment. A model that begins valid can otherwise be changed into an invalid state. Enable assignment validation when a mutable model must preserve its field rules after construction.\n\nAnother choice is a frozen model and explicit reconstruction. Neither choice makes nested mutable containers deeply immutable. Also, `model_copy(update=...)` is a trusted-data operation, not a general replacement for validating untrusted updates. Select the update boundary deliberately and test that rejected updates leave the previous value intact.\n\n```python\nfrom pydantic import BaseModel, ConfigDict\nfrom pydantic import Field, ValidationError\nclass Counter(BaseModel):\n    model_config = ConfigDict(\n        validate_assignment=True)\n    count: int = Field(ge=0)\nitem = Counter(count=2)\ntry:\n    item.count = -1\nexcept ValidationError:\n    print(item.count)\n```\n",
+      "task": "Implement update_count(initial,new) using a Counter model with count>=0 and validate_assignment=True. Return (accepted, final_count), catching a rejected assignment but allowing invalid initial construction to raise.",
+      "starter": "from pydantic import BaseModel, ConfigDict, Field, ValidationError\n\nclass Counter(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef update_count(initial, new):\n    return None\n",
+      "solution": "from pydantic import BaseModel, ConfigDict, Field, ValidationError\nclass Counter(BaseModel):\n    model_config = ConfigDict(validate_assignment=True)\n    count: int = Field(ge=0)\ndef update_count(initial,new):\n    item=Counter(count=initial)\n    try:\n        item.count=new\n    except ValidationError:\n        return False,item.count\n    return True,item.count\n",
+      "checks": [
+        {
+          "name": "valid assignment is parsed",
+          "code": "assert update_count(1,'3')==(True,3)\n"
+        },
+        {
+          "name": "invalid assignment preserves value",
+          "code": "assert update_count(2,-1)==(False,2)\n"
+        },
+        {
+          "name": "initial construction is validated",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nassert _bad(lambda: update_count(-1,3))\nassert update_count(0,0)==(True,0)\n"
+        }
+      ],
+      "hints": [
+        "Set validate_assignment=True and Field(ge=0) on count.",
+        "Construct first, then catch ValidationError only around the assignment so invalid initial values still raise.",
+        "Assignment validation applies the field schema on every write. A failed field assignment leaves the previous value in place, which is different from mutating an unchecked dictionary."
+      ],
+      "explanation": "Assignment validation applies the field schema on every write. A failed field assignment leaves the previous value in place, which is different from mutating an unchecked dictionary."
+    },
+    {
+      "id": "pd-schema",
+      "title": "Derive a schema from the validated model",
+      "body": "# Derive a schema from the validated model\n\nA schema describes a data contract in a machine-readable form. Deriving it from the same model used for validation reduces the chance that documentation and actual input rules disagree. JSON Schema includes types, required fields and constraints; it is not itself a successful validation of any particular input.\n\nInspect the part of the schema your integration needs instead of comparing an entire generated document byte for byte. Titles and definition ordering are presentation details. Optional fields with defaults and required fields also need different treatment in forms and client generators.\n\n```python\nfrom pydantic import BaseModel, Field\nclass Query(BaseModel):\n    limit: int = Field(ge=1, le=50)\nschema = Query.model_json_schema()\nprint(schema[\"required\"])\nprint(schema[\"properties\"][\"limit\"][\"minimum\"])\n```\n",
+      "task": "Implement query_schema() from a Query model: required term:str of length>=1, limit:int default10 in 1..100. Return its JSON Schema. Use model_json_schema instead of hand-writing a separate contract.",
+      "starter": "from pydantic import BaseModel, Field\n\nclass Query(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef query_schema():\n    return None\n",
+      "solution": "from pydantic import BaseModel, Field\nclass Query(BaseModel):\n    term: str = Field(min_length=1)\n    limit: int = Field(default=10,ge=1,le=100)\ndef query_schema():\n    return Query.model_json_schema()\n",
+      "checks": [
+        {
+          "name": "distinguishes required and defaulted",
+          "code": "assert query_schema()['required']==['term']\nassert query_schema()['properties']['limit']['default']==10\n"
+        },
+        {
+          "name": "publishes numeric limits",
+          "code": "p=query_schema()['properties']['limit']\nassert p['minimum']==1 and p['maximum']==100\n"
+        },
+        {
+          "name": "publishes string constraints",
+          "code": "p=query_schema()['properties']['term']\nassert p['type']=='string' and p['minLength']==1\n"
+        }
+      ],
+      "hints": [
+        "Declare constraints on the real Query model.",
+        "Return Query.model_json_schema(); a defaulted limit is not a required field.",
+        "The generated schema and the model share one declaration. Tests inspect meaningful constraints rather than generated titles or key ordering, making the contract both explicit and stable."
+      ],
+      "explanation": "The generated schema and the model share one declaration. Tests inspect meaningful constraints rather than generated titles or key ordering, making the contract both explicit and stable."
+    }
+  ]
+}

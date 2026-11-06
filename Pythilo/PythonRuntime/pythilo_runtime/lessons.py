@@ -139,9 +139,27 @@ def _describe(error):
 
 
 def check(job):
+    # Match normal module execution. Pydantic generics and annotation resolvers
+    # look up the defining module while constructing their schemas.
+    module = types.ModuleType("solution_under_test")
+    missing = object()
+    previous = sys.modules.get(module.__name__, missing)
+    search_path = sys.path[:]
+    sys.modules[module.__name__] = module
+    try:
+        _check_in_module(job, module)
+    finally:
+        if previous is missing:
+            sys.modules.pop(module.__name__, None)
+        else:
+            sys.modules[module.__name__] = previous
+        sys.path[:] = search_path
+        linecache.cache.pop("<check>", None)
+
+
+def _check_in_module(job, module):
     path = job["path"]
     checks = job.get("checks") or []
-    module = types.ModuleType("solution_under_test")
     module.__file__ = path
     namespace = module.__dict__
     captured = io.StringIO()
@@ -174,5 +192,4 @@ def check(job):
             raise
         except BaseException as error:
             results.append({"name": name, "ok": False, "message": _describe(error)})
-    linecache.cache.pop("<check>", None)
     emit_json("lesson_result", {"id": job["id"], "results": results, "error": load_error})

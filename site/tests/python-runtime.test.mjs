@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadPyodide } from "pyodide";
+import { createHash } from "node:crypto";
 import { LESSON_SHIM, RUNNER_SOURCE, SHIM_ROOT } from "../lib/python-runner.ts";
 import { browserLabs, labFiles, readLabResult } from "../lib/browser-labs.ts";
 import { parseInline, parseMarkdown } from "../lib/markdown.ts";
 import { highlightPython } from "../lib/python-highlight.ts";
+import { browserSourceMissing } from "../lib/python-source-support.ts";
 
 // The worker's Python code, run in the same Pyodide build under Node.
 const site = fileURLToPath(new URL("..", import.meta.url));
@@ -26,6 +28,17 @@ before(async () => {
   pyodide.FS.writeFile(SHIM_ROOT + "/pythilo_runtime/lessons.py", JSON.parse(readFileSync(new URL("../content/lessons-checker.json", import.meta.url), "utf8")).source);
   pyodide.runPython(`import sys, types\nsys.path.append(${JSON.stringify(SHIM_ROOT)})\nm = types.ModuleType("_pythilo_web")\nexec(compile(${JSON.stringify(RUNNER_SOURCE)}, "<pythilo>", "exec"), m.__dict__)\nsys.modules["_pythilo_web"] = m`);
   runner = pyodide.pyimport("_pythilo_web");
+});
+
+test("a fresh runtime discovers new libraries from imports and versions its cached catalog", async () => {
+  const runtime = JSON.parse(readFileSync(new URL("../content/runtime.json", import.meta.url), "utf8"));
+  const hash = createHash("sha256").update(readFileSync(lock)).digest("hex").slice(0, 16);
+  assert.equal(runtime.lockFile, `/pyodide/pyodide-lock.json?v=${hash}`);
+  const fresh = await loadPyodide({ indexURL: site + "node_modules/pyodide/", lockFileURL: fileURLToPath(lock), packageCacheDir: site + "public/pyodide/" });
+  assert.equal(fresh.runPython("import importlib.util; importlib.util.find_spec('pydantic') is None"), true);
+  const source = "from pydantic import BaseModel\nfrom fastapi import FastAPI\nimport httpx\nclass Count(BaseModel):\n    value: int\nassert Count(value='12').value == 12\nassert FastAPI().title == 'FastAPI'\nassert httpx.Response(200, json={'ok': True}).json() == {'ok': True}\n";
+  await fresh.loadPackagesFromImports(source, { messageCallback: () => {} });
+  fresh.runPython(source);
 });
 
 test("run imports project modules, separates stdout and stderr and reports exit codes", () => {
@@ -82,7 +95,8 @@ test("every lesson's solution passes the app's own checker in Pyodide", { skip: 
     if (result.error || result.results.length !== lesson.checks.length || result.results.some(item => !item.ok)) failures.push(`${course.id}/${lesson.id}: ${result.error ?? result.results.filter(item => !item.ok).map(item => `${item.name}: ${item.message}`).join("; ")}`);
   }
   assert.deepEqual(failures, []);
-  assert.ok(checked > 50);
+  assert.ok(checked > 350);
+  console.log(`Browser lesson solutions verified: ${checked}`);
 });
 
 test("the checker's messages are the app's: a failing starter explains what came back", () => {
@@ -93,8 +107,25 @@ test("the checker's messages are the app's: a failing starter explains what came
   assert.equal(result.results[0].message, "second call\nadd(3) returned 3, expected 8.");
 });
 
+test("lesson checks register their module and restore module/path state on success or failure", async () => {
+  await pyodide.loadPackage("pydantic", { messageCallback: () => {} });
+  pyodide.runPython("import sys, types\n_saved_module = types.ModuleType('previous_lesson')\nsys.modules['solution_under_test'] = _saved_module\n_saved_path = sys.path[:]");
+  try {
+    const source = "import sys\nfrom pydantic import RootModel\nclass Numbers(RootModel[list[int]]):\n    pass\nregistered = sys.modules[__name__].__dict__ is globals()\nvalue = Numbers.model_validate(['2', 3]).root\n";
+    const checked = JSON.parse(runner.lesson_check(source, JSON.stringify([{ name: "real module", code: "assert registered and value == [2, 3]" }])));
+    assert.equal(checked.error, null);
+    assert.deepEqual(checked.results.map(item => item.ok), [true]);
+    assert.equal(pyodide.runPython("sys.modules['solution_under_test'] is _saved_module and sys.path == _saved_path"), true);
+    runner.lesson_check("raise ValueError('bad input')", "[]");
+    assert.equal(pyodide.runPython("sys.modules['solution_under_test'] is _saved_module and sys.path == _saved_path"), true);
+  } finally {
+    pyodide.runPython("sys.modules.pop('solution_under_test', None)");
+    take();
+  }
+});
+
 test("course content is built from the app's files, and lessons needing missing packages say so", () => {
-  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview", "algorithm-patterns", "data-practice", "reliable-python", "ml-practice", "ml-evaluation", "ai-building-blocks"]);
+  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview", "algorithm-patterns", "data-practice", "reliable-python", "ml-practice", "ml-evaluation", "ai-building-blocks", "pydantic", "fastapi-httpx", "testing-practice", "data-formats"]);
   const all = courses.flatMap(course => course.lessons);
   assert.ok(all.every(lesson => lesson.sections[0].chip === "Idea" && lesson.checks.length && lesson.starter));
   const lessonsOf = id => courses.find(course => course.id === id).lessons;
@@ -131,24 +162,6 @@ test("all browser labs trace actual edited code, accept worked answers and rejec
   }
 });
 
-test("every runnable example in all six practical courses executes in Pyodide", () => {
-  const practical = courses.filter(course => ["algorithm-patterns", "data-practice", "reliable-python", "ml-practice", "ml-evaluation", "ai-building-blocks"].includes(course.id));
-  let checked = 0;
-  const failures = [];
-  for (const course of practical) for (const lesson of course.lessons) {
-    for (const section of lesson.sections) for (const block of parseMarkdown(section.markdown)) {
-      if (block.kind !== "code" || block.language !== "python") continue;
-      const response = JSON.parse(runner.run(JSON.stringify({ "example.py": block.code }), "example.py"));
-      const output = take();
-      if (response.exitCode !== 0) failures.push(`${course.id}/${lesson.id}: ${output.err}`);
-      checked++;
-    }
-  }
-  assert.deepEqual(failures, []);
-  assert.ok(checked >= practical.reduce((total, course) => total + course.lessons.length, 0));
-});
-
-
 test("every Python example in the six practical blog articles runs in Pyodide", async () => {
   const { allPosts } = await import('../app/blog/_lib/posts.ts');
   const posts = allPosts().filter(post => !post.slug.includes('news-november'));
@@ -165,17 +178,35 @@ test("every Python example in the six practical blog articles runs in Pyodide", 
 });
 
 
-test("reading examples in all 100 interview tasks run independently in Pyodide", async () => {
-  const interview = courses.find(course => course.id === 'interview');
-  assert.equal(interview.lessons.length, 100);
-  let checked = 0;
-  for (const lesson of interview.lessons) for (const section of lesson.sections) for (const block of parseMarkdown(section.markdown)) {
-    if (block.kind !== 'code' || block.language !== 'python') continue;
-    const files = JSON.stringify({'example.py':block.code});
-    const response = JSON.parse(stackSwitching ? await runner.run.callPromising(files, 'example.py') : runner.run(files, 'example.py'));
+test("every browser-compatible reading example in all courses runs independently", async () => {
+  let checked = 0, unavailable = 0;
+  const failures = [];
+  for (const course of courses) for (const lesson of course.lessons) for (const section of lesson.sections) for (const block of parseMarkdown(section.markdown)) {
+    if (block.kind !== "code" || block.language !== "python") continue;
+    const missing = browserSourceMissing(block.code);
+    if (missing.length) { unavailable++; continue; }
+    await pyodide.loadPackagesFromImports(block.code, { messageCallback: () => {} });
+    const files = JSON.stringify({ "example.py": block.code });
+    const response = JSON.parse(stackSwitching ? await runner.run.callPromising(files, "example.py") : runner.run(files, "example.py"));
     const output = take();
-    assert.equal(response.exitCode, 0, `${lesson.id}: ${output.err}`);
+    if (response.exitCode !== 0) failures.push(`${course.id}/${lesson.id}: ${output.err}`);
     checked++;
   }
-  assert.equal(checked, 112);
+  assert.deepEqual(failures, []);
+  assert.equal(checked + unavailable, 465);
+  assert.ok(checked > 350);
+  console.log(`Reading examples verified in browser: ${checked}; app-only: ${unavailable}`);
+});
+
+test("all 52 new lessons and their examples are browser compatible", () => {
+  const added = courses.filter(course => course.order >= 21);
+  assert.equal(added.flatMap(course => course.lessons).length, 52);
+  for (const course of added) for (const lesson of course.lessons) {
+    assert.deepEqual(lesson.missing, [], lesson.id);
+    for (const section of lesson.sections) for (const block of parseMarkdown(section.markdown)) {
+      if (block.kind === "code" && block.language === "python") assert.deepEqual(browserSourceMissing(block.code), [], lesson.id);
+    }
+  }
+  assert.deepEqual(browserSourceMissing("from django.urls import path"), ["django"]);
+  assert.deepEqual(browserSourceMissing("import threading\nthreading.Thread(target=print).start()"), ["threads"]);
 });

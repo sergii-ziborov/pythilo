@@ -8,6 +8,8 @@ import { BROWSER_RUNTIME } from "@/lib/python-runtime";
 export const metadata: Metadata = { title: "Learn Python", description: "Python lessons that run in your browser: read, write code, run it and check it, with no account." };
 
 export default function LearnPage() {
+  const newCourses = courses.filter(course => course.order >= 21);
+  const newLessonCount = newCourses.reduce((total, course) => total + course.lessons.length, 0);
   return <>
     <SiteHeader current="learn" />
     <main className="page">
@@ -16,7 +18,7 @@ export default function LearnPage() {
         <p>Read every lesson here and run browser-compatible exercises with {BROWSER_RUNTIME}. Read a part, try the examples, then write the solution and check it with the same checks the app uses. Exercises that need PyTorch, threads or unavailable packages are marked App required.</p>
         <ProgressNote />
       </section>
-      <section className="course-section" aria-labelledby="new-courses"><div className="label">NEW · 52 LESSONS</div><h2 id="new-courses">Go further with practical Python</h2><p>Six practical courses run entirely in this browser. Work through them after the foundations, or choose a topic.</p><div className="new-course-links">{courses.filter(course=>course.order>=15).map(course=><Link key={course.id} href={`/learn/${course.id}/`}><strong>{course.title}</strong><span>{course.summary}</span></Link>)}</div><p><Link href="/labs/">Put the patterns to work in 30 interactive browser labs →</Link></p></section>
+      <section className="course-section" aria-labelledby="new-courses"><div className="label">NEW · {newLessonCount} LESSONS</div><h2 id="new-courses">Validate data and build real APIs</h2><p>Four new courses cover Pydantic 2, FastAPI, HTTPX, testing and data formats. Run their examples and exercises here or in the app. API examples use in-memory transports and need no server, account or API key.</p><div className="new-course-links">{newCourses.map(course=><Link key={course.id} href={`/learn/${course.id}/`}><strong>{course.title}</strong><span>{course.summary}</span></Link>)}</div><p><Link href="/labs/">Put the patterns to work in 30 interactive browser labs →</Link></p></section>
       {courses.map(course => <section key={course.id} className="course-section" aria-labelledby={`course-${course.id}`}>
         <div className={`label${course.kind === "interview" ? " practice" : ""}`}>{courseLabel(course)}</div>
         <h2 id={`course-${course.id}`}><Link href={`/learn/${course.id}/`} style={{ color: "inherit" }}>{course.title}</Link></h2>

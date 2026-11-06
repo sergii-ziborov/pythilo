@@ -19,12 +19,18 @@ const content = join(site, 'content');
 const coursesDirectory = join(repository, 'Pythilo', 'Resources', 'Courses');
 const checkerFile = join(repository, 'Pythilo', 'PythonRuntime', 'pythilo_runtime', 'lessons.py');
 // Lessons import numpy; `test` runs pytest. pyflakes is used by `check` when Pyodide ships it.
-const WANTED = ['numpy', 'pytest', 'pyflakes'];
+const WANTED = ['numpy', 'pytest', 'pyflakes', 'pydantic', 'fastapi', 'httpx'];
 const CORE = ['pyodide.mjs', 'pyodide.asm.mjs', 'pyodide.asm.wasm', 'python_stdlib.zip'];
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const version = JSON.parse(readFileSync(join(pyodideModule, 'package.json'), 'utf8')).version;
 const lock = JSON.parse(readFileSync(join(pyodideModule, 'pyodide-lock.json'), 'utf8'));
+// This Pyodide release names the wheel pydantic-core but spells its dependency
+// pydantic_core. Normalize that spelling without changing wheel hashes.
+for (const item of Object.values(lock.packages)) {
+  item.depends = item.depends.map(name => lock.packages[name] ? name :
+    lock.packages[name.replaceAll('_', '-')] ? name.replaceAll('_', '-') : name);
+}
 mkdirSync(content, { recursive: true });
 
 function closure(names) {
@@ -87,7 +93,13 @@ if (!stdlib) {
 }
 const packages = Object.fromEntries(hosted.map(name => [name, lock.packages[name].version]));
 const importable = new Set([...stdlib, ...hosted.flatMap(name => lock.packages[name].imports)]);
-writeFileSync(runtimeFile, JSON.stringify({ pyodide: version, python: lock.info.python, packages, imports: hosted.flatMap(name => lock.packages[name].imports).sort(), checker: hosted.includes('pyflakes') ? 'pyflakes' : 'compile', stdlib }, null, 1) + '\n');
+// The package catalog is cached for a day. Its URL must change when wheels are
+// added, even when the Pyodide version itself stays the same.
+const lockBytes = existsSync(join(publicPyodide, 'pyodide-lock.json'))
+  ? readFileSync(join(publicPyodide, 'pyodide-lock.json'))
+  : JSON.stringify({ ...lock, packages: Object.fromEntries(hosted.map(name => [name, lock.packages[name]])) });
+const lockFile = `/pyodide/pyodide-lock.json?v=${sha256(lockBytes).slice(0, 16)}`;
+writeFileSync(runtimeFile, JSON.stringify({ pyodide: version, python: lock.info.python, lockFile, packages, imports: hosted.flatMap(name => lock.packages[name].imports).sort(), checker: hosted.includes('pyflakes') ? 'pyflakes' : 'compile', stdlib }, null, 1) + '\n');
 
 // Top-level names a lesson imports, from its starter, solution and checks.
 function imports(text) {

@@ -4,6 +4,7 @@ import type { RuntimeAction } from "./playground-runtime-authority.ts";
 /** Pyodide and Python versions of the self-hosted runtime, fixed at build time. */
 export const PYODIDE_VERSION: string = runtime.pyodide;
 export const PYTHON_VERSION: string = runtime.python;
+export const BROWSER_LOCKFILE: string = runtime.lockFile;
 export const BROWSER_RUNTIME = `Pyodide ${runtime.pyodide} · Python ${runtime.python}`;
 /** `pyflakes` when Pyodide ships it, otherwise a compile check only. */
 export const BROWSER_CHECKER: "pyflakes" | "compile" = runtime.checker === "pyflakes" ? "pyflakes" : "compile";

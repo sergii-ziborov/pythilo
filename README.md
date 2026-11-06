@@ -52,12 +52,13 @@ open source (see [License](#license)).
 
 ### Learn
 
-- **256 lessons in 19 courses**: Python foundations and Python deeper (30 each), clean
+- **308 lessons in 23 courses**: Python foundations and Python deeper (30 each), clean
   code, testing, the tools around Python, architecture, concurrency and async, the web,
   data, the mathematics of neural networks, machine learning with PyTorch (30), language
   models from the inside, working with AI tools, and four practical courses on
   algorithm patterns, data processing, reliability and machine learning, followed by
-  ML evaluation and AI building blocks.
+  ML evaluation and AI building blocks. New courses cover Pydantic 2 (20 lessons),
+  FastAPI/HTTPX (14), practical testing (10) and file/data formats (8).
   Plus **100 interview tasks** (35 easy, 45 medium, 20 hard) with a timer, progressive
   hints, worked solutions and edge-case checks.
 - PyTorch 2.15 runs on the device ([torch-ios](https://github.com/sergii-ziborov/torch-ios)):

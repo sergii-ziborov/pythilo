@@ -1,0 +1,288 @@
+{
+  "id": "testing-practice",
+  "title": "Testing real Python components",
+  "summary": "Ten practical lessons on numerical assertions, exception contracts, signature-aware mocks, async dependencies and real pytest suites with fixtures and captured logs.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "test-approx",
+      "title": "Assert numerical results with a tolerance",
+      "body": "# Assert numerical results with a tolerance\n\nFloating-point calculations can produce a tiny rounding difference even when the algorithm is correct. pytest.approx describes the allowed numerical error instead of requiring identical binary representations. Its relative and absolute tolerances serve different roles, especially for values near zero.\n\nA tolerance is part of the test's contract. Choose it from the calculation's accuracy requirements rather than enlarging it until a broken result passes. Approximate comparison does not make an invalid value valid, and NaN is not equal to an ordinary expected number. Keep exact comparisons for counts and other exact quantities.\n\n```python\nimport pytest\nprint(0.1 + 0.2 == pytest.approx(0.3))\nprint(1.01 == pytest.approx(1.0,\n    rel=0, abs=0.001))\n```\n",
+      "task": "Implement close_to(actual,expected,tolerance) with pytest.approx, relative tolerance zero and the supplied absolute tolerance. Return a bool. Compare near-zero values correctly and reject NaN when expected is finite.",
+      "starter": "import pytest\n\ndef close_to(actual, expected, tolerance):\n    return None\n",
+      "solution": "import pytest\ndef close_to(actual,expected,tolerance):\n    return bool(actual==pytest.approx(expected,rel=0,abs=tolerance))\n",
+      "checks": [
+        {
+          "name": "rounding difference",
+          "code": "assert close_to(0.1+0.2,0.3,1e-12) is True\n"
+        },
+        {
+          "name": "outside tolerance",
+          "code": "assert close_to(1.01,1.0,0.001) is False\n"
+        },
+        {
+          "name": "zero and NaN",
+          "code": "assert close_to(1e-8,0,1e-7) is True\nassert close_to(float('nan'),1,0.1) is False\n"
+        }
+      ],
+      "hints": [
+        "Set rel=0 when the contract specifies only an absolute tolerance.",
+        "Compare actual to pytest.approx(expected,abs=tolerance,rel=0) and return the bool.",
+        "Absolute tolerance handles values near zero without a scale-dependent allowance. A deliberately false comparison confirms that the tolerance does not accept a materially wrong result."
+      ],
+      "explanation": "Absolute tolerance handles values near zero without a scale-dependent allowance. A deliberately false comparison confirms that the tolerance does not accept a materially wrong result."
+    },
+    {
+      "id": "test-exception-contract",
+      "title": "Inspect a captured exception contract",
+      "body": "# Inspect a captured exception contract\n\nAn exception test should check the failure the caller relies on. Capturing an exception with pytest.raises lets the test inspect its type and message instead of merely accepting any failure from the code block.\n\nKeep the context manager around the operation expected to fail. Setup inside the same block might raise first and create a false positive. The match parameter is a regular expression, so escaping and anchoring matter when you intend exact text. An unexpected exception type should remain visible; it may reveal a programming error rather than a valid rejection.\n\n```python\nimport pytest\nwith pytest.raises(ValueError,\n                   match=\"^negative$\") as info:\n    raise ValueError(\"negative\")\nprint(str(info.value))\n```\n",
+      "task": "Implement captured_error(operation,pattern): call operation inside pytest.raises(ValueError,match=pattern), return its message. A missing error, wrong message or different exception type must not be accepted.",
+      "starter": "import pytest\n\ndef captured_error(operation, pattern):\n    return None\n",
+      "solution": "import pytest\ndef captured_error(operation,pattern):\n    with pytest.raises(ValueError,match=pattern) as info:\n        operation()\n    return str(info.value)\n",
+      "checks": [
+        {
+          "name": "returns the captured message",
+          "code": "def fail(): raise ValueError('bad value')\nassert captured_error(fail,'^bad value$')=='bad value'\n"
+        },
+        {
+          "name": "does not swallow wrong types",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\ndef fail(): raise TypeError('wrong')\nassert _bad(lambda: captured_error(fail,'wrong'),TypeError)\n"
+        },
+        {
+          "name": "requires the expected message",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\ndef fail(): raise ValueError('other')\nassert _bad(lambda: captured_error(fail,'^wanted$'),AssertionError)\n"
+        }
+      ],
+      "hints": [
+        "Use pytest.raises(ValueError,match=pattern) as a context manager.",
+        "Call only the expected failing operation inside the block, then return str(info.value).",
+        "The raises context proves the expected exception occurred. Returning info.value preserves its actual message, while a wrong type escapes instead of being converted to an acceptable failure."
+      ],
+      "explanation": "The raises context proves the expected exception occurred. Returning info.value preserves its actual message, while a wrong type escapes instead of being converted to an acceptable failure."
+    },
+    {
+      "id": "test-autospec",
+      "title": "Check calls against a real signature",
+      "body": "# Check calls against a real signature\n\nA bare Mock accepts almost any attribute access or call. That flexibility can let a test pass after the real dependency's interface has changed. create_autospec creates a mock whose call interface follows the real object.\n\nSignature checking verifies argument names and counts, not the semantic meaning of every argument or all type hints. Keep behaviour tests as well as interaction tests. A useful autospec test demonstrates that a valid call succeeds and that an impossible call is rejected; checking only that a mock was called can miss a mismatch in the call contract.\n\n```python\nfrom unittest.mock import create_autospec\ndef send(address, *, urgent=False):\n    return True\nmock = create_autospec(send,\n                       return_value=\"sent\")\nprint(mock(\"ada\", urgent=True))\nmock.assert_called_once_with(\n    \"ada\", urgent=True)\n```\n",
+      "task": "Implement checked_call(function,args,kwargs) using create_autospec(function,return_value=\"ok\"). Invoke it and return the result. Invalid argument counts or keyword names must raise TypeError.",
+      "starter": "from unittest.mock import create_autospec\n\ndef checked_call(function, args, kwargs):\n    return None\n",
+      "solution": "from unittest.mock import create_autospec\ndef checked_call(function,args,kwargs):\n    mock=create_autospec(function,return_value='ok')\n    return mock(*args,**kwargs)\n",
+      "checks": [
+        {
+          "name": "valid signature",
+          "code": "def send(name,*,urgent=False): pass\nassert checked_call(send,['Ada'],{'urgent':True})=='ok'\n"
+        },
+        {
+          "name": "missing argument",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\ndef send(name): pass\nassert _bad(lambda: checked_call(send,[],{}),TypeError)\n"
+        },
+        {
+          "name": "invalid keyword",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\ndef send(name): pass\nassert _bad(lambda: checked_call(send,['Ada'],{'unknown':True}),TypeError)\n"
+        }
+      ],
+      "hints": [
+        "create_autospec uses the real function's call signature.",
+        "Configure return_value=\"ok\" and invoke the mock with *args and **kwargs.",
+        "Autospec uses the actual callable signature. It rejects calls that the real dependency could not accept, while the fixed return value keeps the test independent of the dependency implementation."
+      ],
+      "explanation": "Autospec uses the actual callable signature. It rejects calls that the real dependency could not accept, while the fixed return value keeps the test independent of the dependency implementation."
+    },
+    {
+      "id": "test-patch-scope",
+      "title": "Restore a patched attribute reliably",
+      "body": "# Restore a patched attribute reliably\n\nA patch changes what code looks up for the duration of a test. A context manager makes that duration explicit and restores the previous value when the block exits, including when an exception escapes the block.\n\nPatch the object or module where the consumer actually reads the attribute. Changing another alias may leave the original reference untouched. A scoped patch is preferable to manual assignment followed by cleanup because an early failure cannot skip restoration. Verify the restored state too, especially when several tests share a dependency object.\n\n```python\nfrom unittest.mock import patch\nclass Settings:\n    mode = \"live\"\nwith patch.object(Settings, \"mode\", \"test\"):\n    print(Settings.mode)\nprint(Settings.mode)\n```\n",
+      "task": "Implement temporary_value(obj,value): temporarily patch obj.mode to value, record it, exit the context, and return (temporary_value,restored_value). Preserve the original attribute after each call.",
+      "starter": "from unittest.mock import patch\n\ndef temporary_value(obj, value):\n    return None\n",
+      "solution": "from unittest.mock import patch\ndef temporary_value(obj,value):\n    with patch.object(obj,'mode',value):\n        during=obj.mode\n    return during,obj.mode\n",
+      "checks": [
+        {
+          "name": "temporary value is observed",
+          "code": "class Options: mode='live'\nassert temporary_value(Options,'test')==('test','live')\n"
+        },
+        {
+          "name": "object state is restored",
+          "code": "class Options: mode='original'\ntemporary_value(Options,'other')\nassert Options.mode=='original'\n"
+        },
+        {
+          "name": "patches remain independent",
+          "code": "class Options: mode=1\nassert temporary_value(Options,2)==(2,1)\nassert temporary_value(Options,3)==(3,1)\n"
+        }
+      ],
+      "hints": [
+        "Use patch.object(obj,\"mode\",value) as a bounded context manager.",
+        "Record the value inside the block, then read the restored attribute after leaving it.",
+        "patch.object restores the exact previous attribute on context exit. Recording the temporary and final values makes both parts of that lifetime observable."
+      ],
+      "explanation": "patch.object restores the exact previous attribute on context exit. Recording the temporary and final values makes both parts of that lifetime observable."
+    },
+    {
+      "id": "test-async-mock",
+      "title": "Verify awaited dependencies",
+      "body": "# Verify awaited dependencies\n\nCalling an async function produces an awaitable; the work does not necessarily happen until it is awaited. AsyncMock therefore distinguishes a call from an await. Its await assertions check the interaction that an async consumer actually needs.\n\nUse an injected dependency so the test can supply AsyncMock without contacting a remote service. Configure a return value and inspect await arguments. A consumer that forgets await can otherwise appear to have called its dependency while returning a coroutine object or skipping the intended result. Standalone examples enter the event loop with asyncio.run.\n\n```python\nimport asyncio\nfrom unittest.mock import AsyncMock\nasync def demo():\n    fetch = AsyncMock(return_value=7)\n    print(await fetch(\"key\"))\n    fetch.assert_awaited_once_with(\"key\")\nasyncio.run(demo())\n```\n",
+      "task": "Implement async fetch_twice(fetch,key): await fetch(key) twice and return the two results as a list. Preserve the order of results and propagate an exception from the dependency.",
+      "starter": "async def fetch_twice(fetch, key):\n    return None\n",
+      "solution": "async def fetch_twice(fetch,key):\n    first=await fetch(key)\n    second=await fetch(key)\n    return [first,second]\n",
+      "checks": [
+        {
+          "name": "awaits both calls",
+          "code": "import asyncio\nfrom unittest.mock import AsyncMock,call\nfetch=AsyncMock(side_effect=[2,3]); assert asyncio.run(fetch_twice(fetch,'x'))==[2,3]\nassert fetch.await_args_list==[call('x'),call('x')]\n"
+        },
+        {
+          "name": "supports None values",
+          "code": "import asyncio\nfrom unittest.mock import AsyncMock\nfetch=AsyncMock(return_value=None); assert asyncio.run(fetch_twice(fetch,'k'))==[None,None]\nassert fetch.await_count==2\n"
+        },
+        {
+          "name": "propagates failure",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nimport asyncio\nfrom unittest.mock import AsyncMock\nfetch=AsyncMock(side_effect=ValueError('bad')); assert _bad(lambda: asyncio.run(fetch_twice(fetch,'x')))\nassert fetch.await_count==1\n"
+        }
+      ],
+      "hints": [
+        "Call and await the dependency separately for the first and second result.",
+        "A dependency exception must escape immediately, without a second await after the first failure.",
+        "Awaiting each dependency call obtains its result and makes failure ordering explicit. AsyncMock.await_args_list verifies that two real awaits occurred, rather than two unused coroutine creations."
+      ],
+      "explanation": "Awaiting each dependency call obtains its result and makes failure ordering explicit. AsyncMock.await_args_list verifies that two real awaits occurred, rather than two unused coroutine creations."
+    },
+    {
+      "id": "test-side-effects",
+      "title": "Test retry behaviour without waiting",
+      "body": "# Test retry behaviour without waiting\n\nA mock's side_effect can provide a sequence of results and exceptions. That makes retry behaviour testable without a real flaky server or wall-clock delays. Each call consumes one entry, so the test can also check the exact number of attempts.\n\nRetry only the failures named in the contract. A blanket catch can repeat a programming error or a nonrepeatable action. A test should cover eventual success, exhausted attempts and a failure that must not be retried. The example uses an injected callable, keeping policy separate from request delivery and timing.\n\n```python\nfrom unittest.mock import Mock\nfetch = Mock(side_effect=[\n    OSError(\"offline\"), \"ready\"])\ntry:\n    fetch()\nexcept OSError:\n    print(fetch())\nprint(fetch.call_count)\n```\n",
+      "task": "Implement retry_oserror(fetch,attempts): require attempts>=1, call fetch until success, retry only OSError, and raise the final OSError after exhaustion. Return a successful value unchanged, including None.",
+      "starter": "def retry_oserror(fetch, attempts):\n    return None\n",
+      "solution": "def retry_oserror(fetch,attempts):\n    if attempts<1: raise ValueError('attempts must be positive')\n    for index in range(attempts):\n        try:\n            return fetch()\n        except OSError:\n            if index==attempts-1: raise\n",
+      "checks": [
+        {
+          "name": "eventual success",
+          "code": "from unittest.mock import Mock\nf=Mock(side_effect=[OSError('x'),7]); assert retry_oserror(f,3)==7 and f.call_count==2\n"
+        },
+        {
+          "name": "exhaustion and invalid attempts",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nfrom unittest.mock import Mock\nf=Mock(side_effect=OSError('x')); assert _bad(lambda: retry_oserror(f,2),OSError)\nassert f.call_count==2\nassert _bad(lambda: retry_oserror(f,0))\n"
+        },
+        {
+          "name": "other exceptions and None",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nfrom unittest.mock import Mock\nf=Mock(side_effect=TypeError('bad')); assert _bad(lambda: retry_oserror(f,4),TypeError)\nassert f.call_count==1\nassert retry_oserror(Mock(return_value=None),1) is None\n"
+        }
+      ],
+      "hints": [
+        "Validate the attempt count before entering the retry loop.",
+        "Catch only OSError; return immediately on success and re-raise on the final attempt.",
+        "A finite side_effect sequence exposes retry count and ordering directly. Catching only OSError leaves programming errors visible and avoids retrying a successful None result."
+      ],
+      "explanation": "A finite side_effect sequence exposes retry count and ordering directly. Catching only OSError leaves programming errors visible and avoids retrying a successful None result."
+    },
+    {
+      "id": "test-yield-fixtures",
+      "title": "Run a fixture and its teardown",
+      "body": "# Run a fixture and its teardown\n\nA yield fixture separates setup from teardown around the test that requests it. Code before yield prepares a resource; code after yield releases it. Pytest owns that lifetime, so test code does not need to remember a manual cleanup call.\n\nThis exercise writes a real test module into a temporary directory and invokes pytest on it. An audit file records the order of events. That checks actual fixture execution instead of merely reading a decorator. Plugin auto-loading is disabled for the isolated run so unrelated host configuration cannot change the demonstration.\n\n```python\nimport pytest\n@pytest.fixture\ndef items():\n    values = []\n    yield values\n    values.clear()\nprint(items.__name__)\n```\n",
+      "task": "Implement fixture_lifecycle() using a real pytest run in a temporary folder. A yield fixture records \"open\", its test records \"body\", and teardown records \"close\". Return (exit_code,event_list). No state may leak between calls.",
+      "starter": "import os\n\nimport tempfile\n\nfrom pathlib import Path\n\nfrom unittest.mock import patch\n\nimport pytest\n\ndef _run_suite(source):\n    return None\n\ndef fixture_lifecycle():\n    return None\n",
+      "solution": "import os\nimport tempfile\nfrom pathlib import Path\nfrom unittest.mock import patch\nimport pytest\n\ndef _run_suite(source):\n    with tempfile.TemporaryDirectory() as folder:\n        path=Path(folder)/('test_'+Path(folder).name+'.py')\n        path.write_text(source,encoding='utf-8')\n        with patch.dict(os.environ,{'PYTEST_DISABLE_PLUGIN_AUTOLOAD':'1','PYTEST_ADDOPTS':''}):\n            status=pytest.main(['-q','--import-mode=importlib','-p','no:cacheprovider','-p','no:faulthandler','--confcutdir',folder,str(path)])\n        audit=Path(folder)/'events.txt'\n        return int(status), audit.read_text().splitlines() if audit.exists() else []\n\ndef fixture_lifecycle():\n    return _run_suite(\"import pytest\\nfrom pathlib import Path\\naudit=Path(__file__).with_name('events.txt')\\ndef record(value):\\n    with audit.open('a') as file: file.write(value+'\\\\n')\\n@pytest.fixture\\ndef resource():\\n    record('open')\\n    yield 7\\n    record('close')\\ndef test_resource(resource):\\n    record('body')\\n    assert resource==7\\n\")\n",
+      "checks": [
+        {
+          "name": "real pytest passes",
+          "code": "assert fixture_lifecycle()[0]==0\n"
+        },
+        {
+          "name": "teardown follows the test",
+          "code": "assert fixture_lifecycle()[1]==['open','body','close']\n"
+        },
+        {
+          "name": "fresh run has fresh state",
+          "code": "assert fixture_lifecycle()==(0,['open','body','close'])\n"
+        }
+      ],
+      "hints": [
+        "Write a real pytest module with a yield fixture and a test that requests it.",
+        "Use a fresh temporary module name for every run and inspect the audit file after pytest returns.",
+        "The events file is inspected after pytest has returned, so close proves that teardown really ran. The temporary directory gives every call its own module and audit file."
+      ],
+      "explanation": "The events file is inspected after pytest has returned, so close proves that teardown really ran. The temporary directory gives every call its own module and audit file."
+    },
+    {
+      "id": "test-parametrized-suite",
+      "title": "Make one test reject several bad implementations",
+      "body": "# Make one test reject several bad implementations\n\nParametrization runs one test body with several named inputs. The useful measure is not the number of rows, but which incorrect implementations those rows can distinguish. Include different behavioural categories such as zero, positive and negative values.\n\nHere the candidate implementation and the tests are written into a real temporary module. Running that module with pytest proves that a good implementation passes and a plausible wrong one fails. Keep test inputs deterministic, and do not rewrite the expected value using the same algorithm as the candidate: that can reproduce the same mistake on both sides.\n\n```python\nimport pytest\ncases = [(0, 0), (-3, 9), (4, 16)]\n@pytest.mark.parametrize(\n    \"value,expected\", cases)\ndef test_square(value, expected):\n    assert value * value == expected\nprint(len(cases))\n```\n",
+      "task": "Implement test_square_source(implementation): run a real pytest module combining the supplied source defining square(value) with parametrized checks for (0,0),(-3,9),(4,16). Return pytest exit code as int.",
+      "starter": "import os\n\nimport tempfile\n\nfrom pathlib import Path\n\nfrom unittest.mock import patch\n\nimport pytest\n\ndef _run_suite(source):\n    return None\n\ndef test_square_source(implementation):\n    return None\n",
+      "solution": "import os\nimport tempfile\nfrom pathlib import Path\nfrom unittest.mock import patch\nimport pytest\n\ndef _run_suite(source):\n    with tempfile.TemporaryDirectory() as folder:\n        path=Path(folder)/('test_'+Path(folder).name+'.py')\n        path.write_text(source,encoding='utf-8')\n        with patch.dict(os.environ,{'PYTEST_DISABLE_PLUGIN_AUTOLOAD':'1','PYTEST_ADDOPTS':''}):\n            status=pytest.main(['-q','--import-mode=importlib','-p','no:cacheprovider','-p','no:faulthandler','--confcutdir',folder,str(path)])\n        audit=Path(folder)/'events.txt'\n        return int(status), audit.read_text().splitlines() if audit.exists() else []\n\ndef test_square_source(implementation):\n    return _run_suite(implementation+'\\n'+\"import pytest\\n@pytest.mark.parametrize('value,expected',[(0,0),(-3,9),(4,16)])\\ndef test_square(value,expected):\\n    assert square(value)==expected\\n\")[0]\n",
+      "checks": [
+        {
+          "name": "accepts the right implementation",
+          "code": "assert test_square_source('def square(value): return value*value')==0\n"
+        },
+        {
+          "name": "rejects absolute value",
+          "code": "assert test_square_source('def square(value): return abs(value)')==1\n"
+        },
+        {
+          "name": "rejects a constant",
+          "code": "assert test_square_source('def square(value): return 0')==1\n"
+        }
+      ],
+      "hints": [
+        "Combine the candidate source with a parametrized test using literal expected squares.",
+        "Run pytest against a fresh temporary file; return its exit code so broken candidates produce 1.",
+        "Literal expected values form an independent oracle. The negative and positive cases reject an absolute-value implementation, while the nonzero cases reject a constant result."
+      ],
+      "explanation": "Literal expected values form an independent oracle. The negative and positive cases reject an absolute-value implementation, while the nonzero cases reject a constant result."
+    },
+    {
+      "id": "test-caplog",
+      "title": "Assert a log record without scraping a console",
+      "body": "# Assert a log record without scraping a console\n\nLogs are structured records before they become formatted console text. Pytest's caplog fixture exposes those records, including logger name, level and rendered message. Testing them is less brittle than matching a timestamped output format.\n\nSet the level inside a bounded context and target the logger used by the component. The fixture restores logging state after the test. A real pytest invocation is important here: calling a test function by hand does not provide fixtures. This example keeps the message deterministic and avoids relying on an application's global logging configuration.\n\n```python\nimport logging\nrecords = []\nclass Capture(logging.Handler):\n    def emit(self, record):\n        records.append(record.getMessage())\nlog = logging.getLogger(\"demo.capture\")\nhandler = Capture()\nlog.addHandler(handler)\nlog.warning(\"ready %s\", 3)\nlog.removeHandler(handler)\nprint(records)\n```\n",
+      "task": "Implement log_suite() using real pytest with caplog. Capture exactly one INFO record from logger lesson.capture with message \"ready 3\". Return pytest exit code. The test must inspect records, not console text.",
+      "starter": "import os\n\nimport tempfile\n\nfrom pathlib import Path\n\nfrom unittest.mock import patch\n\nimport pytest\n\ndef _run_suite(source):\n    return None\n\ndef log_suite():\n    return None\n",
+      "solution": "import os\nimport tempfile\nfrom pathlib import Path\nfrom unittest.mock import patch\nimport pytest\n\ndef _run_suite(source):\n    with tempfile.TemporaryDirectory() as folder:\n        path=Path(folder)/('test_'+Path(folder).name+'.py')\n        path.write_text(source,encoding='utf-8')\n        with patch.dict(os.environ,{'PYTEST_DISABLE_PLUGIN_AUTOLOAD':'1','PYTEST_ADDOPTS':''}):\n            status=pytest.main(['-q','--import-mode=importlib','-p','no:cacheprovider','-p','no:faulthandler','--confcutdir',folder,str(path)])\n        audit=Path(folder)/'events.txt'\n        return int(status), audit.read_text().splitlines() if audit.exists() else []\n\ndef log_suite():\n    return _run_suite(\"import logging\\ndef test_message(caplog):\\n    with caplog.at_level(logging.INFO,logger='lesson.capture'):\\n        logging.getLogger('lesson.capture').info('ready %s',3)\\n    assert [(r.name,r.levelname,r.getMessage()) for r in caplog.records]==[('lesson.capture','INFO','ready 3')]\\n\")[0]\n",
+      "checks": [
+        {
+          "name": "fixture is supplied by pytest",
+          "code": "assert log_suite()==0\n"
+        },
+        {
+          "name": "repeat invocation restores logging",
+          "code": "assert log_suite()==0\n"
+        },
+        {
+          "name": "no handler is left on the target logger",
+          "code": "import logging\nassert log_suite()==0\nassert logging.getLogger('lesson.capture').handlers==[]\n"
+        }
+      ],
+      "hints": [
+        "Use caplog.at_level for the specific logger inside a pytest test.",
+        "Inspect record.name, record.levelname and record.getMessage() after logging.",
+        "caplog.records preserves name, severity and message separately. The fixture scoped handler and level changes are restored by pytest, leaving no handler attached to the component logger."
+      ],
+      "explanation": "caplog.records preserves name, severity and message separately. The fixture scoped handler and level changes are restored by pytest, leaving no handler attached to the component logger."
+    },
+    {
+      "id": "test-capsys",
+      "title": "Check stdout and stderr separately",
+      "body": "# Check stdout and stderr separately\n\nA command-line component has several observable outputs. Stdout carries its result, while stderr can carry diagnostics. Keeping those channels separate lets another program consume the result without parsing a warning out of it.\n\nPytest's capsys fixture captures the streams and readouterr returns both values. Reading also clears the captured buffers for the next observation. As with other fixtures, pytest must execute the test; merely defining the function does not exercise it. Use exact short outputs here so a swapped channel or missing newline produces a useful failure.\n\n```python\nimport contextlib, io, sys\nout, err = io.StringIO(), io.StringIO()\nwith contextlib.redirect_stdout(out):\n    with contextlib.redirect_stderr(err):\n        print(\"result\")\n        print(\"warning\", file=sys.stderr)\nprint(repr(out.getvalue()))\nprint(repr(err.getvalue()))\n```\n",
+      "task": "Implement output_suite(implementation): append a pytest test using capsys to source defining emit(). Calling emit() must print exactly \"result\n\" to stdout and \"warning\n\" to stderr. Return pytest exit code.",
+      "starter": "import os\n\nimport tempfile\n\nfrom pathlib import Path\n\nfrom unittest.mock import patch\n\nimport pytest\n\ndef _run_suite(source):\n    return None\n\ndef output_suite(implementation):\n    return None\n",
+      "solution": "import os\nimport tempfile\nfrom pathlib import Path\nfrom unittest.mock import patch\nimport pytest\n\ndef _run_suite(source):\n    with tempfile.TemporaryDirectory() as folder:\n        path=Path(folder)/('test_'+Path(folder).name+'.py')\n        path.write_text(source,encoding='utf-8')\n        with patch.dict(os.environ,{'PYTEST_DISABLE_PLUGIN_AUTOLOAD':'1','PYTEST_ADDOPTS':''}):\n            status=pytest.main(['-q','--import-mode=importlib','-p','no:cacheprovider','-p','no:faulthandler','--confcutdir',folder,str(path)])\n        audit=Path(folder)/'events.txt'\n        return int(status), audit.read_text().splitlines() if audit.exists() else []\n\ndef output_suite(implementation):\n    tests=\"def test_output(capsys):\\n    emit()\\n    captured=capsys.readouterr()\\n    assert captured.out=='result\\\\n'\\n    assert captured.err=='warning\\\\n'\\n\"\n    return _run_suite(implementation+'\\n'+tests)[0]\n",
+      "checks": [
+        {
+          "name": "accepts separate streams",
+          "code": "assert output_suite(\"import sys\\ndef emit():\\n    print('result')\\n    print('warning',file=sys.stderr)\")==0\n"
+        },
+        {
+          "name": "rejects a swapped channel",
+          "code": "assert output_suite(\"def emit():\\n    print('result')\\n    print('warning')\")==1\n"
+        },
+        {
+          "name": "rejects missing output",
+          "code": "assert output_suite('def emit(): pass')==1\n"
+        }
+      ],
+      "hints": [
+        "Call emit() inside a real pytest test that requests capsys.",
+        "readouterr gives separate out and err strings; assert both exact contents, including newlines.",
+        "The test uses capsys.readouterr to distinguish output channels and exact newlines. Executing both good and broken candidates proves the test detects observable behaviour rather than merely collecting a function."
+      ],
+      "explanation": "The test uses capsys.readouterr to distinguish output channels and exact newlines. Executing both good and broken candidates proves the test detects observable behaviour rather than merely collecting a function."
+    }
+  ]
+}

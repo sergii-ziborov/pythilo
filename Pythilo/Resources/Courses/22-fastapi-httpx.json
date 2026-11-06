@@ -1,0 +1,400 @@
+{
+  "id": "fastapi-httpx",
+  "title": "FastAPI and HTTPX in practice",
+  "summary": "Fourteen offline API lessons: requests, response models, dependencies, routers, middleware, background tasks, HTTP clients and a small CRUD service.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "api-paths",
+      "title": "Run an API without opening a socket",
+      "body": "# Run an API without opening a socket\n\nAn ASGI application can receive real HTTP-shaped requests without binding a network port. HTTPX's ASGITransport calls the application in memory. This makes examples deterministic and removes a running server, an internet connection and a port choice from the test setup.\n\nFastAPI parses path parameters before calling the endpoint. An invalid integer therefore produces a validation response instead of reaching your business logic. Use an async endpoint for these examples so they also run in a browser runtime that cannot start background threads.\n\n```python\nimport asyncio, httpx\nfrom fastapi import FastAPI\napp = FastAPI()\n@app.get(\"/double/{value}\")\nasync def double(value: int):\n    return {\"value\": value * 2}\nasync def demo():\n    transport = httpx.ASGITransport(app=app)\n    async with httpx.AsyncClient(\n        transport=transport,\n        base_url=\"http://test\") as client:\n        print((await client.get(\n            \"/double/3\")).json())\nasyncio.run(demo())\n```\n",
+      "task": "Implement build_app() returning a FastAPI app with GET /square/{value}, integer value, returning {\"square\": value*value}. Invalid integers must produce HTTP 422.",
+      "starter": "from fastapi import FastAPI\n\ndef build_app():\n    return None\n",
+      "solution": "from fastapi import FastAPI\ndef build_app():\n    app=FastAPI()\n    @app.get('/square/{value}')\n    async def square(value:int):\n        return {'square':value*value}\n    return app\n",
+      "checks": [
+        {
+          "name": "typed path",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nr=asyncio.run(request(build_app(),'GET','/square/4')); assert r.status_code==200 and r.json()=={'square':16}\n"
+        },
+        {
+          "name": "signed input",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'GET','/square/-3')).json()=={'square':9}\n"
+        },
+        {
+          "name": "invalid path",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'GET','/square/no')).status_code==422\n"
+        }
+      ],
+      "hints": [
+        "Create an app inside build_app and add an async GET endpoint.",
+        "Annotate value as int so FastAPI, rather than your endpoint, rejects noninteger paths.",
+        "ASGITransport exercises routing, validation and response serialization without a socket. An async endpoint avoids the thread-pool dispatch used for synchronous endpoint functions."
+      ],
+      "explanation": "ASGITransport exercises routing, validation and response serialization without a socket. An async endpoint avoids the thread-pool dispatch used for synchronous endpoint functions."
+    },
+    {
+      "id": "api-query",
+      "title": "Validate query bounds at the route",
+      "body": "# Validate query bounds at the route\n\nQuery strings carry text, even when a caller means an integer or a boolean. Declare the intended type and constraints in the route signature. FastAPI then parses values, supplies declared defaults and reports invalid requests before executing the endpoint.\n\nAnnotated keeps validation metadata next to a normal Python type. Distinguish a missing query parameter from an explicitly invalid value: a default applies to absence, not to every conversion failure. Test the boundary values themselves, since inclusive bounds are easy to describe incorrectly in documentation.\n\n```python\nfrom typing import Annotated\nfrom fastapi import FastAPI, Query\napp = FastAPI()\n@app.get(\"/page\")\nasync def page(limit: Annotated[\n    int, Query(ge=1, le=20)] = 10):\n    return {\"limit\": limit}\nprint(app.openapi()[\"paths\"].keys())\n```\n",
+      "task": "Implement build_app() with GET /page, integer limit default 10 constrained to 1..100, returning {\"limit\": limit}. Invalid values must return 422.",
+      "starter": "from typing import Annotated\n\nfrom fastapi import FastAPI, Query\n\ndef build_app():\n    return None\n",
+      "solution": "from typing import Annotated\nfrom fastapi import FastAPI, Query\ndef build_app():\n    app=FastAPI()\n    @app.get('/page')\n    async def page(limit:Annotated[int,Query(ge=1,le=100)]=10):\n        return {'limit':limit}\n    return app\n",
+      "checks": [
+        {
+          "name": "default",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'GET','/page')).json()=={'limit':10}\n"
+        },
+        {
+          "name": "inclusive bounds",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'GET','/page?limit=100')).json()=={'limit':100}\nassert asyncio.run(request(build_app(),'GET','/page?limit=1')).status_code==200\n"
+        },
+        {
+          "name": "rejects bad queries",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'GET','/page?limit=0')).status_code==422\nassert asyncio.run(request(build_app(),'GET','/page?limit=x')).status_code==422\n"
+        }
+      ],
+      "hints": [
+        "Use an Annotated int with Query(ge=1,le=100) and a Python default of 10.",
+        "Return the parsed limit; a malformed supplied value is not the same as an absent value.",
+        "Query supplies bounds while the int annotation supplies parsing. Neither malformed text nor zero is equivalent to an omitted parameter, so both must produce a validation response."
+      ],
+      "explanation": "Query supplies bounds while the int annotation supplies parsing. Neither malformed text nor zero is equivalent to an omitted parameter, so both must produce a validation response."
+    },
+    {
+      "id": "api-body",
+      "title": "Validate a JSON request body",
+      "body": "# Validate a JSON request body\n\nA JSON body needs an explicit contract just as a path or query does. Annotating an endpoint parameter with a Pydantic model tells FastAPI to parse the request body and validate its fields before invoking the endpoint.\n\nReturn only values derived from the validated model. Reading a second copy of the raw dictionary would bypass those rules. Use the response status to distinguish successful creation from a normal read, and test malformed data as well as a successful request. These tests run entirely through an in-memory ASGI transport.\n\n```python\nfrom fastapi import FastAPI\nfrom pydantic import BaseModel, Field\nclass Item(BaseModel):\n    units: int = Field(gt=0)\napp = FastAPI()\n@app.post(\"/items\", status_code=201)\nasync def create(item: Item):\n    return item.model_dump()\nprint(app.openapi()[\"paths\"].keys())\n```\n",
+      "task": "Define Item(name:str minimum length1, quantity:int>0). build_app() provides POST /items, returning the validated dictionary with HTTP 201; invalid or missing fields return 422.",
+      "starter": "from fastapi import FastAPI\n\nfrom pydantic import BaseModel, Field\n\nclass Item(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef build_app():\n    return None\n",
+      "solution": "from fastapi import FastAPI\nfrom pydantic import BaseModel, Field\nclass Item(BaseModel):\n    name:str=Field(min_length=1)\n    quantity:int=Field(gt=0)\ndef build_app():\n    app=FastAPI()\n    @app.post('/items',status_code=201)\n    async def create(item:Item):\n        return item.model_dump()\n    return app\n",
+      "checks": [
+        {
+          "name": "creates an item",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nr=asyncio.run(request(build_app(),'POST','/items',json={'name':'Tea','quantity':'2'})); assert r.status_code==201 and r.json()=={'name':'Tea','quantity':2}\n"
+        },
+        {
+          "name": "rejects invalid fields",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'POST','/items',json={'name':'','quantity':0})).status_code==422\n"
+        },
+        {
+          "name": "requires a body",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'POST','/items',json={})).status_code==422\n"
+        }
+      ],
+      "hints": [
+        "Declare a Pydantic Item model and annotate the async endpoint's body parameter.",
+        "Use status_code=201 on the POST decorator and return item.model_dump().",
+        "The model is the boundary between JSON and business logic. FastAPI creates Item before the endpoint runs, and the explicit 201 status describes successful creation."
+      ],
+      "explanation": "The model is the boundary between JSON and business logic. FastAPI creates Item before the endpoint runs, and the explicit 201 status describes successful creation."
+    },
+    {
+      "id": "api-response",
+      "title": "Filter output through a response model",
+      "body": "# Filter output through a response model\n\nInput validation and output shaping solve different problems. A service may hold internal fields that do not belong in an API response. A response model validates and serializes the public shape, filtering fields outside that declared contract.\n\nTreat the public response type as a deliberate interface. Returning an internal dictionary directly can expose a field added much later, even if the endpoint itself was not edited. Test that a private field is absent as well as testing the public fields. Response validation is also useful for catching a server implementation that returns the wrong shape.\n\n```python\nfrom fastapi import FastAPI\nfrom pydantic import BaseModel\nclass Public(BaseModel):\n    name: str\napp = FastAPI()\n@app.get(\"/me\", response_model=Public)\nasync def me():\n    return {\"name\": \"Ada\", \"secret\": \"x\"}\nprint(app.openapi()[\"paths\"].keys())\n```\n",
+      "task": "Implement build_app() with GET /me and response model PublicUser(id:int,name:str). The endpoint may internally include token=\"private\", but the HTTP JSON must contain only id=1 and name=\"Ada\".",
+      "starter": "from fastapi import FastAPI\n\nfrom pydantic import BaseModel\n\nclass PublicUser(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef build_app():\n    return None\n",
+      "solution": "from fastapi import FastAPI\nfrom pydantic import BaseModel\nclass PublicUser(BaseModel):\n    id:int\n    name:str\ndef build_app():\n    app=FastAPI()\n    @app.get('/me',response_model=PublicUser)\n    async def me():\n        return {'id':1,'name':'Ada','token':'private'}\n    return app\n",
+      "checks": [
+        {
+          "name": "public fields",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nr=asyncio.run(request(build_app(),'GET','/me')); assert r.status_code==200 and r.json()=={'id':1,'name':'Ada'}\n"
+        },
+        {
+          "name": "private data is absent",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert 'token' not in asyncio.run(request(build_app(),'GET','/me')).json()\n"
+        },
+        {
+          "name": "schema declares a response",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nschema=build_app().openapi(); assert '200' in schema['paths']['/me']['get']['responses']\n"
+        }
+      ],
+      "hints": [
+        "Pass PublicUser as response_model on the GET decorator.",
+        "The internal return dictionary may contain token, but the response model must declare only id and name.",
+        "The response_model parameter filters and validates the returned value. The endpoint keeps its internal representation while the HTTP response follows the explicitly declared public model."
+      ],
+      "explanation": "The response_model parameter filters and validates the returned value. The endpoint keeps its internal representation while the HTTP response follows the explicitly declared public model."
+    },
+    {
+      "id": "api-errors",
+      "title": "Turn a missing resource into HTTP 404",
+      "body": "# Turn a missing resource into HTTP 404\n\nAn expected domain failure should become an intentional HTTP response. Raising HTTPException stops the endpoint and gives FastAPI a status and a JSON detail. An uncaught KeyError instead describes a server implementation error and usually becomes a server failure.\n\nKeep successful and missing-resource paths explicit. Do not catch every exception and report 404, since that would hide programming errors and broken dependencies. Testing both paths through the application also verifies that the framework's exception handler, rather than an ordinary Python return value, creates the response.\n\n```python\nfrom fastapi import FastAPI, HTTPException\napp = FastAPI()\n@app.get(\"/items/{key}\")\nasync def read(key: int):\n    if key != 1:\n        raise HTTPException(404, \"not found\")\n    return {\"key\": key}\nprint(app.openapi()[\"paths\"].keys())\n```\n",
+      "task": "Implement build_app() serving GET /items/{key}. Only key 1 exists and returns {\"name\":\"Tea\"}. Any other integer returns 404 with detail \"not found\"; a noninteger key returns 422.",
+      "starter": "from fastapi import FastAPI, HTTPException\n\ndef build_app():\n    return None\n",
+      "solution": "from fastapi import FastAPI, HTTPException\ndef build_app():\n    app=FastAPI()\n    @app.get('/items/{key}')\n    async def read(key:int):\n        if key!=1:\n            raise HTTPException(status_code=404,detail='not found')\n        return {'name':'Tea'}\n    return app\n",
+      "checks": [
+        {
+          "name": "existing resource",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'GET','/items/1')).json()=={'name':'Tea'}\n"
+        },
+        {
+          "name": "missing resource",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nr=asyncio.run(request(build_app(),'GET','/items/2')); assert r.status_code==404 and r.json()=={'detail':'not found'}\n"
+        },
+        {
+          "name": "bad path still validates",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'GET','/items/no')).status_code==422\n"
+        }
+      ],
+      "hints": [
+        "Raise HTTPException for a missing integer key.",
+        "Keep key:int on the path parameter so malformed paths still receive FastAPI's validation response.",
+        "HTTPException is an explicit response boundary for an expected absence. A malformed path fails earlier in request validation, so it receives 422 rather than the domain-level 404."
+      ],
+      "explanation": "HTTPException is an explicit response boundary for an expected absence. A malformed path fails earlier in request validation, so it receives 422 rather than the domain-level 404."
+    },
+    {
+      "id": "api-dependencies",
+      "title": "Inject a request dependency",
+      "body": "# Inject a request dependency\n\nA dependency is a callable whose result FastAPI supplies to an endpoint. It can centralize parsing and validation that several routes share. Declaring it with Depends makes that relationship part of the application's request graph rather than a hidden global lookup.\n\nThis example reads a simple demonstration header, not a production identity system. Keep the dependency small and return its validated value. A dependency can raise HTTPException before the endpoint runs, so callers see one consistent error contract. Async dependencies also work in the browser without a thread pool.\n\n```python\nfrom fastapi import FastAPI, Depends\napp = FastAPI()\nasync def currency():\n    return \"EUR\"\n@app.get(\"/currency\")\nasync def read(code=Depends(currency)):\n    return {\"code\": code}\nprint(app.openapi()[\"paths\"].keys())\n```\n",
+      "task": "Implement build_app() with an async dependency requiring header X-Demo-Key equal to \"lesson\". GET /private returns {\"ok\":True}; absent or incorrect keys return 403 with detail \"denied\".",
+      "starter": "from fastapi import FastAPI, Depends, Header, HTTPException\n\ndef build_app():\n    return None\n",
+      "solution": "from fastapi import FastAPI, Depends, Header, HTTPException\ndef build_app():\n    app=FastAPI()\n    async def require_key(x_demo_key:str|None=Header(default=None)):\n        if x_demo_key!='lesson':\n            raise HTTPException(403,'denied')\n        return True\n    @app.get('/private')\n    async def read(allowed=Depends(require_key)):\n        return {'ok':allowed}\n    return app\n",
+      "checks": [
+        {
+          "name": "accepted header",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nr=asyncio.run(request(build_app(),'GET','/private',headers={'X-Demo-Key':'lesson'})); assert r.status_code==200 and r.json()=={'ok':True}\n"
+        },
+        {
+          "name": "missing header",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nr=asyncio.run(request(build_app(),'GET','/private')); assert r.status_code==403 and r.json()['detail']=='denied'\n"
+        },
+        {
+          "name": "incorrect header",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'GET','/private',headers={'X-Demo-Key':'no'})).status_code==403\n"
+        }
+      ],
+      "hints": [
+        "Declare the header with Header(default=None) in an async dependency.",
+        "Return its result through Depends and raise HTTPException(403,\"denied\") when the key differs.",
+        "The dependency owns the header check and the endpoint consumes its result. Header names map underscores to hyphens, so x_demo_key reads X-Demo-Key."
+      ],
+      "explanation": "The dependency owns the header check and the endpoint consumes its result. Header names map underscores to hyphens, so x_demo_key reads X-Demo-Key."
+    },
+    {
+      "id": "api-overrides",
+      "title": "Replace a dependency in a test",
+      "body": "# Replace a dependency in a test\n\nA dependency override replaces one callable in FastAPI's request graph. Tests can supply a fixed clock, repository or demonstration user while exercising the real route and serialization. The override key must be the original callable object, not its name as a string.\n\nKeep overrides scoped to the application under test and clear them after use when sharing an app. Fresh app factories avoid test state leaking between cases. The replacement should provide the same kind of value as the dependency it stands in for, so the endpoint still uses its ordinary contract.\n\n```python\nfrom fastapi import FastAPI, Depends\napp = FastAPI()\nasync def label():\n    return \"live\"\n@app.get(\"/label\")\nasync def read(value=Depends(label)):\n    return {\"label\": value}\nasync def fixed():\n    return \"test\"\napp.dependency_overrides[label] = fixed\nprint(len(app.dependency_overrides))\n```\n",
+      "task": "Implement build_app(label=\"live\"). An async get_label dependency supplies GET /label. When label differs from \"live\", install an async dependency override returning that label. Different app instances must remain independent.",
+      "starter": "from fastapi import FastAPI, Depends\n\ndef build_app(label='live'):\n    return None\n",
+      "solution": "from fastapi import FastAPI, Depends\ndef build_app(label='live'):\n    app=FastAPI()\n    async def get_label():\n        return 'live'\n    @app.get('/label')\n    async def read(value=Depends(get_label)):\n        return {'label':value}\n    if label!='live':\n        async def fixed():\n            return label\n        app.dependency_overrides[get_label]=fixed\n    return app\n",
+      "checks": [
+        {
+          "name": "normal dependency",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'GET','/label')).json()=={'label':'live'}\n"
+        },
+        {
+          "name": "override is used",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\napp=build_app('test'); assert len(app.dependency_overrides)==1\nassert asyncio.run(request(app,'GET','/label')).json()=={'label':'test'}\n"
+        },
+        {
+          "name": "app instances are isolated",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app('other'),'GET','/label')).json()['label']=='other'\nassert asyncio.run(request(build_app(),'GET','/label')).json()['label']=='live'\n"
+        }
+      ],
+      "hints": [
+        "Keep the original dependency callable so it can be a dependency_overrides key.",
+        "Create an async replacement inside the app factory; do not put an override in a shared global app.",
+        "dependency_overrides uses the original function as its key. Constructing both the app and dependency inside the factory prevents an override from changing another app instance."
+      ],
+      "explanation": "dependency_overrides uses the original function as its key. Constructing both the app and dependency inside the factory prevents an override from changing another app instance."
+    },
+    {
+      "id": "api-routers",
+      "title": "Compose routes under a prefix",
+      "body": "# Compose routes under a prefix\n\nAn APIRouter groups related routes without creating a separate network server. Including the router in an application composes its paths with a prefix. This separates feature-specific route definitions from the application's wiring.\n\nA prefix is part of the public URL contract. Test the resulting complete URL, not only the router's local path. The route should not accidentally remain available without its prefix. Multiple independently created apps can include equivalent routers, which is useful for tests and for keeping application state out of module-level imports.\n\n```python\nfrom fastapi import FastAPI, APIRouter\nrouter = APIRouter()\n@router.get(\"/ping\")\nasync def ping():\n    return {\"ok\": True}\napp = FastAPI()\napp.include_router(router, prefix=\"/v1\")\nprint(list(app.openapi()[\"paths\"]))\n```\n",
+      "task": "Implement build_app() using APIRouter: GET /api/v1/health returns {\"status\":\"ok\"}. The unprefixed /health path must return 404.",
+      "starter": "from fastapi import FastAPI, APIRouter\n\ndef build_app():\n    return None\n",
+      "solution": "from fastapi import FastAPI, APIRouter\ndef build_app():\n    router=APIRouter()\n    @router.get('/health')\n    async def health():\n        return {'status':'ok'}\n    app=FastAPI()\n    app.include_router(router,prefix='/api/v1')\n    return app\n",
+      "checks": [
+        {
+          "name": "composed URL",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'GET','/api/v1/health')).json()=={'status':'ok'}\n"
+        },
+        {
+          "name": "unprefixed URL absent",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'GET','/health')).status_code==404\n"
+        },
+        {
+          "name": "schema uses the prefix",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert '/api/v1/health' in build_app().openapi()['paths']\n"
+        }
+      ],
+      "hints": [
+        "Declare the local /health route on an APIRouter.",
+        "Include that router on the new app with prefix=\"/api/v1\".",
+        "include_router composes the prefix and each local route path. The OpenAPI paths document the resulting public URLs, which are also the paths the tests request."
+      ],
+      "explanation": "include_router composes the prefix and each local route path. The OpenAPI paths document the resulting public URLs, which are also the paths the tests request."
+    },
+    {
+      "id": "api-middleware",
+      "title": "Add a response header in middleware",
+      "body": "# Add a response header in middleware\n\nMiddleware wraps request handling and can observe or modify responses across several routes. An HTTP middleware function receives the request and calls the next application layer. It can then add a header to the returned response.\n\nAlways return the response after changing it, and keep unrelated business logic inside endpoints or dependencies. This example uses a fixed application marker instead of a clock-based timing header, so its behaviour is deterministic. Requests still pass through the real middleware stack when HTTPX uses an in-memory ASGI transport.\n\n```python\nfrom fastapi import FastAPI\napp = FastAPI()\n@app.middleware(\"http\")\nasync def marker(request, call_next):\n    response = await call_next(request)\n    response.headers[\"X-Lesson\"] = \"yes\"\n    return response\nprint(len(app.user_middleware))\n```\n",
+      "task": "Implement build_app() with GET /ping returning {\"ok\":True}. HTTP middleware must add X-Course: pythilo to every response, including a 404 response.",
+      "starter": "from fastapi import FastAPI\n\ndef build_app():\n    return None\n",
+      "solution": "from fastapi import FastAPI\ndef build_app():\n    app=FastAPI()\n    @app.middleware('http')\n    async def marker(request,call_next):\n        response=await call_next(request)\n        response.headers['X-Course']='pythilo'\n        return response\n    @app.get('/ping')\n    async def ping():\n        return {'ok':True}\n    return app\n",
+      "checks": [
+        {
+          "name": "successful response header",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nr=asyncio.run(request(build_app(),'GET','/ping')); assert r.status_code==200 and r.headers['x-course']=='pythilo'\n"
+        },
+        {
+          "name": "404 passes middleware",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nr=asyncio.run(request(build_app(),'GET','/absent')); assert r.status_code==404 and r.headers['x-course']=='pythilo'\n"
+        },
+        {
+          "name": "body is preserved",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nassert asyncio.run(request(build_app(),'GET','/ping')).json()=={'ok':True}\n"
+        }
+      ],
+      "hints": [
+        "The middleware must await call_next(request) before changing the response.",
+        "Set X-Course on that response and return it; this also applies to a generated 404.",
+        "The middleware changes the actual returned Response object. Running call_next first allows it to add the same header to endpoint responses and framework-generated 404 responses."
+      ],
+      "explanation": "The middleware changes the actual returned Response object. Running call_next first allows it to add the same header to endpoint responses and framework-generated 404 responses."
+    },
+    {
+      "id": "api-background",
+      "title": "Observe an awaited background task",
+      "body": "# Observe an awaited background task\n\nFastAPI can attach work to a response with BackgroundTasks. The task runs after the response is sent by the application. An in-memory test client waits for that ASGI application call to complete, so the test can inspect the task's effect after awaiting the request.\n\nThis is an in-process task, not a durable job queue. Keep the demonstration effect in a list supplied by the test. An async task avoids thread-pool dispatch in the browser. Do not infer that a real remote HTTP caller waits for background work merely because the in-memory test observes its completion.\n\n```python\nfrom fastapi import BackgroundTasks\nseen = []\nasync def record(value):\n    seen.append(value)\ntasks = BackgroundTasks()\ntasks.add_task(record, \"tea\")\nimport asyncio\nasyncio.run(tasks())\nprint(seen)\n```\n",
+      "task": "Implement build_app(seen). POST /record/{value} accepts an int, returns {\"queued\":value}, and adds an async background task appending the value to the supplied list. Invalid paths must not append.",
+      "starter": "from fastapi import FastAPI, BackgroundTasks\n\ndef build_app(seen):\n    return None\n",
+      "solution": "from fastapi import FastAPI, BackgroundTasks\ndef build_app(seen):\n    app=FastAPI()\n    async def record(value):\n        seen.append(value)\n    @app.post('/record/{value}')\n    async def enqueue(value:int,tasks:BackgroundTasks):\n        tasks.add_task(record,value)\n        return {'queued':value}\n    return app\n",
+      "checks": [
+        {
+          "name": "background effect is observed",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nseen=[]; r=asyncio.run(request(build_app(seen),'POST','/record/3')); assert r.json()=={'queued':3} and seen==[3]\n"
+        },
+        {
+          "name": "requests record in order",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nseen=[]; app=build_app(seen)\nasyncio.run(request(app,'POST','/record/2')); asyncio.run(request(app,'POST','/record/4')); assert seen==[2,4]\n"
+        },
+        {
+          "name": "invalid input has no effect",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\nseen=[]; assert asyncio.run(request(build_app(seen),'POST','/record/no')).status_code==422 and seen==[]\n"
+        }
+      ],
+      "hints": [
+        "Accept BackgroundTasks as an endpoint parameter.",
+        "Use add_task with an async recorder and the parsed value; append only inside the task.",
+        "The task receives the parsed integer and runs after the response is sent. Awaiting an in-memory ASGI request observes completion of that call, including its attached background tasks."
+      ],
+      "explanation": "The task receives the parsed integer and runs after the response is sent. Awaiting an in-memory ASGI request observes completion of that call, including its attached background tasks."
+    },
+    {
+      "id": "httpx-mock",
+      "title": "Inspect a client request with MockTransport",
+      "body": "# Inspect a client request with MockTransport\n\nA client can be tested without contacting the service it normally uses. MockTransport passes each HTTPX request to a handler that returns an HTTPX response. The handler can inspect the URL, query parameters, headers and body.\n\nInject the transport at the client's boundary rather than patching a low-level socket. This preserves HTTPX's request construction and response decoding while replacing only delivery. Close the client with a context manager. The example uses a reserved demonstration hostname and never attempts a network connection, so it runs offline in the app and browser.\n\n```python\nimport httpx\ndef handler(request):\n    return httpx.Response(200, json={\n        \"q\": request.url.params[\"q\"]})\nwith httpx.Client(transport=\n        httpx.MockTransport(handler)) as client:\n    print(client.get(\"https://demo.test/\",\n        params={\"q\": \"green tea\"}).json())\n```\n",
+      "task": "Implement fetch_name(user_id,transport). Create a client with base_url https://demo.test, GET /users/{user_id}, raise for a bad status, and return the JSON name. Use the supplied transport and close the client.",
+      "starter": "import httpx\n\ndef fetch_name(user_id, transport):\n    return None\n",
+      "solution": "import httpx\ndef fetch_name(user_id,transport):\n    with httpx.Client(transport=transport,base_url='https://demo.test') as client:\n        response=client.get(f'/users/{user_id}')\n        response.raise_for_status()\n        return response.json()['name']\n",
+      "checks": [
+        {
+          "name": "decodes a response",
+          "code": "import httpx\ndef handle(r):\n    assert str(r.url)=='https://demo.test/users/7'\n    return httpx.Response(200,json={'name':'Ada'})\nassert fetch_name(7,httpx.MockTransport(handle))=='Ada'\n"
+        },
+        {
+          "name": "raises on an error status",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nimport httpx\nassert _bad(lambda: fetch_name(2,httpx.MockTransport(lambda r:httpx.Response(404))),httpx.HTTPStatusError)\n"
+        },
+        {
+          "name": "different identifiers form different paths",
+          "code": "import httpx\nassert fetch_name(0,httpx.MockTransport(lambda r:httpx.Response(200,json={'name':r.url.path})))=='/users/0'\n"
+        }
+      ],
+      "hints": [
+        "Pass the supplied transport and base_url to a context-managed httpx.Client.",
+        "GET the user path, call raise_for_status, then read the JSON name.",
+        "The transport replaces delivery while HTTPX still constructs and validates the request. raise_for_status distinguishes a successful JSON response from an HTTP error before accessing name."
+      ],
+      "explanation": "The transport replaces delivery while HTTPX still constructs and validates the request. raise_for_status distinguishes a successful JSON response from an HTTP error before accessing name."
+    },
+    {
+      "id": "httpx-errors",
+      "title": "Separate HTTP status from transport failure",
+      "body": "# Separate HTTP status from transport failure\n\nAn HTTP error response and a failed connection are different events. A service can return a valid HTTP 503 response, while a timeout may produce no response at all. HTTPX exposes separate exception families for these cases.\n\nCall raise_for_status when unsuccessful status codes should become exceptions. Catch the specific family whose contract you want to convert, and leave unexpected programming errors visible. An injected MockTransport can generate both outcomes without internet access or waiting for a real timeout. The resulting function can return a small explicit status for its caller.\n\n```python\nimport httpx\ndef handler(request):\n    return httpx.Response(503)\nwith httpx.Client(transport=\n        httpx.MockTransport(handler)) as client:\n    response = client.get(\"https://demo.test\")\n    try:\n        response.raise_for_status()\n    except httpx.HTTPStatusError as error:\n        print(error.response.status_code)\n```\n",
+      "task": "Implement probe(transport): GET https://demo.test/health. Return \"ok\" for success, \"http:<status>\" after HTTPStatusError, or \"network\" after RequestError. Do not convert unrelated exceptions.",
+      "starter": "import httpx\n\ndef probe(transport):\n    return None\n",
+      "solution": "import httpx\ndef probe(transport):\n    with httpx.Client(transport=transport) as client:\n        try:\n            client.get('https://demo.test/health').raise_for_status()\n        except httpx.HTTPStatusError as error:\n            return f'http:{error.response.status_code}'\n        except httpx.RequestError:\n            return 'network'\n        return 'ok'\n",
+      "checks": [
+        {
+          "name": "successful response",
+          "code": "import httpx\nassert probe(httpx.MockTransport(lambda r:httpx.Response(204)))=='ok'\n"
+        },
+        {
+          "name": "HTTP failure",
+          "code": "import httpx\nassert probe(httpx.MockTransport(lambda r:httpx.Response(503)))=='http:503'\n"
+        },
+        {
+          "name": "transport failure",
+          "code": "import httpx\ndef fail(r):\n    raise httpx.ConnectError('offline',request=r)\nassert probe(httpx.MockTransport(fail))=='network'\n"
+        }
+      ],
+      "hints": [
+        "Call raise_for_status so an HTTP error becomes HTTPStatusError.",
+        "Catch HTTPStatusError and RequestError separately; leave other exception types unhandled.",
+        "HTTPStatusError carries a received response. RequestError represents delivery failure. Catching those separately retains information that would disappear in a blanket exception handler."
+      ],
+      "explanation": "HTTPStatusError carries a received response. RequestError represents delivery failure. Catching those separately retains information that would disappear in a blanket exception handler."
+    },
+    {
+      "id": "httpx-async",
+      "title": "Share one async client across a batch",
+      "body": "# Share one async client across a batch\n\nAn AsyncClient can serve several requests within one async context. Reusing it expresses one client lifetime for the batch, instead of constructing a client for every item. With an ASGI transport the requests still run through the application's real routes without opening sockets.\n\nGather returns results in input order, even when tasks finish in a different order. Keep status checking inside the per-request coroutine so an invalid response does not become a misleading decoded value. The caller must await the batch from an event loop; asyncio.run is the entry point used by these standalone examples.\n\n```python\nimport asyncio, httpx\nasync def demo():\n    transport = httpx.MockTransport(\n        lambda r: httpx.Response(200,\n            json={\"path\": r.url.path}))\n    async with httpx.AsyncClient(\n        transport=transport) as client:\n        result = await client.get(\n            \"https://demo.test/one\")\n        print(result.json())\nasyncio.run(demo())\n```\n",
+      "task": "Implement async read_squares(app,values) using one AsyncClient and ASGITransport. GET /square/{value} concurrently, raise for bad statuses, and return the square numbers in input order. An empty batch returns [].",
+      "starter": "import asyncio\n\nimport httpx\n\nasync def read_squares(app, values):\n    return None\n",
+      "solution": "import asyncio\nimport httpx\nasync def read_squares(app,values):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        async def one(value):\n            response=await client.get(f'/square/{value}')\n            response.raise_for_status()\n            return response.json()['square']\n        return list(await asyncio.gather(*(one(v) for v in values)))\n",
+      "checks": [
+        {
+          "name": "ordered batch",
+          "code": "from fastapi import FastAPI\nimport asyncio\napp=FastAPI()\n@app.get('/square/{value}')\nasync def square(value:int): return {'square':value*value}\nassert asyncio.run(read_squares(app,[3,1,-2]))==[9,1,4]\n"
+        },
+        {
+          "name": "empty batch",
+          "code": "from fastapi import FastAPI\nimport asyncio\nassert asyncio.run(read_squares(FastAPI(),[]))==[]\n"
+        },
+        {
+          "name": "bad status is raised",
+          "code": "def _bad(call, error=ValueError):\n    try:\n        call()\n    except error:\n        return True\n    return False\nfrom fastapi import FastAPI\nimport asyncio,httpx\nassert _bad(lambda: asyncio.run(read_squares(FastAPI(),[1])),httpx.HTTPStatusError)\n"
+        }
+      ],
+      "hints": [
+        "Open one AsyncClient with ASGITransport around the batch.",
+        "Use an inner coroutine that checks each status, and gather its results in input order.",
+        "One client context encloses the whole batch. gather preserves the order of the submitted coroutines, while each coroutine checks its response before returning a decoded square."
+      ],
+      "explanation": "One client context encloses the whole batch. gather preserves the order of the submitted coroutines, while each coroutine checks its response before returning a decoded square."
+    },
+    {
+      "id": "api-crud",
+      "title": "Build a small isolated CRUD application",
+      "body": "# Build a small isolated CRUD application\n\nA small application factory is a useful integration exercise: each test receives a fresh app and a fresh store. Creating, reading and deleting records then exercises several HTTP contracts without sharing mutable global data between tests.\n\nUse a Pydantic request model for creation, distinct status codes for creation and deletion, and explicit 404 responses for missing records. Return copies or response data rather than exposing the store object itself. This demonstration store is intentionally in memory; restarting the application loses its contents, which is different from a persistent database contract.\n\n```python\nfrom fastapi import FastAPI\n\ndef build_app():\n    app = FastAPI()\n    store = {}\n    @app.get(\"/count\")\n    async def count():\n        return {\"count\": len(store)}\n    return app\nprint(build_app().openapi()[\"paths\"].keys())\n```\n",
+      "task": "Implement build_app(): POST /notes with nonempty text creates {id,text}, IDs start at 1, HTTP 201. GET /notes/{id} reads it. DELETE returns 204 with no body. Missing records return 404. Every app has its own store.",
+      "starter": "from fastapi import FastAPI, HTTPException, Response\n\nfrom pydantic import BaseModel, Field\n\nclass NoteIn(BaseModel):\n    # Add the fields and rules here.\n    pass\n\ndef build_app():\n    return None\n",
+      "solution": "from fastapi import FastAPI, HTTPException, Response\nfrom pydantic import BaseModel, Field\nclass NoteIn(BaseModel):\n    text:str=Field(min_length=1)\ndef build_app():\n    app=FastAPI()\n    store={}\n    next_id=1\n    @app.post('/notes',status_code=201)\n    async def create(note:NoteIn):\n        nonlocal next_id\n        item={'id':next_id,'text':note.text}\n        store[next_id]=item\n        next_id+=1\n        return dict(item)\n    @app.get('/notes/{key}')\n    async def read(key:int):\n        if key not in store: raise HTTPException(404,'not found')\n        return dict(store[key])\n    @app.delete('/notes/{key}',status_code=204)\n    async def delete(key:int):\n        if key not in store: raise HTTPException(404,'not found')\n        del store[key]\n        return Response(status_code=204)\n    return app\n",
+      "checks": [
+        {
+          "name": "create and read",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\napp=build_app(); r=asyncio.run(request(app,'POST','/notes',json={'text':'one'})); assert r.status_code==201 and r.json()=={'id':1,'text':'one'}\nassert asyncio.run(request(app,'GET','/notes/1')).json()==r.json()\n"
+        },
+        {
+          "name": "delete and missing",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\napp=build_app(); asyncio.run(request(app,'POST','/notes',json={'text':'x'})); r=asyncio.run(request(app,'DELETE','/notes/1')); assert r.status_code==204 and r.content==b''\nassert asyncio.run(request(app,'GET','/notes/1')).status_code==404\n"
+        },
+        {
+          "name": "validation and isolation",
+          "code": "import asyncio\nimport httpx\nasync def request(app, method, path, **kwargs):\n    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:\n        return await client.request(method,path,**kwargs)\napp=build_app(); assert asyncio.run(request(app,'POST','/notes',json={'text':''})).status_code==422\nassert asyncio.run(request(build_app(),'GET','/notes/1')).status_code==404\n"
+        }
+      ],
+      "hints": [
+        "Keep both the store and the next ID in the app factory's closure.",
+        "Validate creation with NoteIn, raise 404 explicitly and return Response(status_code=204) for deletion.",
+        "The closure keeps the store and ID sequence private to one app instance. Model validation protects creation, explicit exceptions describe absence, and Response(204) supplies a genuinely empty deletion response."
+      ],
+      "explanation": "The closure keeps the store and ID sequence private to one app instance. Model validation protects creation, explicit exceptions describe absence, and Response(204) supplies a genuinely empty deletion response."
+    }
+  ]
+}
