@@ -56,3 +56,9 @@ controls. New Apple filenames are `03-learn-explicit-offline27.jpg` and
 were read back as COMPLETE on 7 November 2026 local time. Receipt:
 `build/release-receipts/manual27-screenshots.json`. English and Russian notes
 are saved in `testflight-27.json`.
+
+TestFlight 0.1.0 (27) is VALID and IN_BETA_TESTING for the existing internal group,
+confirmed at 2026-11-06T23:57:45.095Z. Both note locales match `testflight-27.json`.
+No Beta App Review submission exists; the App Store draft remains
+PREPARE_FOR_SUBMISSION with MANUAL release. Final readback:
+`build/release-receipts/testflight-27-ready.json`.

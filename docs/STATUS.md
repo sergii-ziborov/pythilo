@@ -611,3 +611,24 @@ The site and updated instructions are live. All 92 site tests, TypeScript,
 57 public payloads (43,530,947 bytes) match the signed catalog by SHA-256.
 Receipts: `build/release-receipts/manual27-site-release.json` and
 `build/release-receipts/manual27-public-integrity.json`.
+
+Release 0.1.0 (27) archives and exports successfully. The 83,469,924-byte IPA
+contains 36 course previews, six local project recipes and 21 signed backend links;
+full course bodies, Lab Python files, optional Python API trees, model weights and
+datasets are absent. All 42 retained Python runtime files and the 422-file source
+snapshot match the archive. Its binary contains the explicit course/category and
+project setup controls and no automatic-Create download claim. Archive proof:
+`build/release-receipts/testflight-27-archive-source.json`. Apple accepted the upload
+at 23:40:23 UTC on 6 November (7 November local time).
+
+TestFlight 0.1.0 (27) is VALID and IN_BETA_TESTING for the existing internal group,
+confirmed at 2026-11-06T23:57:45.095Z. The group has 1 tester and access to all builds.
+English and Russian notes exactly match `docs/app-store/testflight-27.json`.
+No Beta App Review submission exists. App Store 1.0 remains
+PREPARE_FOR_SUBMISSION with MANUAL release. All eight screenshot assets are
+COMPLETE, including the new actual course/category Download controls. Saved draft
+and beta descriptions, review notes and links match their local source. No App
+Review or Beta App Review was requested. Final proofs:
+`build/release-receipts/testflight-27-ready.json`,
+`build/release-receipts/manual27-screenshots.json` and
+`build/release-receipts/manual27-metadata.json`.
