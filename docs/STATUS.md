@@ -445,4 +445,10 @@ audits pass for 133 URLs, isolation headers and all 64 reciprocal link pairs.
 The Release archive for TestFlight 0.1.0 (24) matches 242 current source files,
 including 33 course JSON files and the new project engine. Archive proof:
 `build/release-receipts/testflight-24-archive-source.json`. Apple accepted upload
-at 15:51:24 UTC; internal TestFlight processing is being checked separately.
+at 15:51:24 UTC and processing reached `VALID` at 16:18:06 UTC. Internal TestFlight
+0.1.0 (24) is available to the existing group: `IN_BETA_TESTING`, one tester,
+automatic access to all builds, confirmed at 16:18:24 UTC. English and Russian
+notes exactly match `build/testflight/build-24-notes.json`. No Beta App Review
+submission exists; App Store 1.0 remains `PREPARE_FOR_SUBMISSION` with manual
+release. No App Review or Beta App Review was requested. Proof:
+`build/release-receipts/testflight-24-ready.json`.
