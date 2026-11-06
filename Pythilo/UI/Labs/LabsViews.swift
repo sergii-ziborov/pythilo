@@ -63,6 +63,10 @@ struct LabsView: View {
                                 .padding(.top, 10)
                                 .padding(.horizontal, 4)
                                 .accessibilityAddTraits(.isHeader)
+                            ContentSelectionButton(
+                                packIDs: LabCatalog.topics.filter { $0.section == section }.map { "labs-\($0.id)" },
+                                title: "Download entire category",
+                                downloadID: "download-category-\(section.rawValue)")
                             ForEach(LabCatalog.topics.filter { $0.section == section }) { topic in
                                 let matches = labs.filter { LabCatalog.topic(for: $0)?.id == topic.id }
                                 if !matches.isEmpty {

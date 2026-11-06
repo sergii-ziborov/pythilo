@@ -64,7 +64,6 @@ final class ProjectStore {
         if !template.requiredPacks.isEmpty {
             let data = try JSONEncoder().encode(template.requiredPacks)
             try data.write(to: url.appending(path: "pythilo-packages.json"), options: .atomic)
-            for id in template.requiredPacks { ContentStore.shared.download(id) }
         }
         refresh()
         return Project(url: url, modified: Date())

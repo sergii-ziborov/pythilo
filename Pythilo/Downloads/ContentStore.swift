@@ -54,6 +54,8 @@ final class ContentStore {
     func location(_ id: String) -> URL? { _ = revision; return locations[id] }
     func ready(_ id: String) -> Bool { catalog.pack(id) != nil && catalog.closure(id).allSatisfy { locations[$0.id] != nil } }
     func missingBytes(_ id: String) -> Int { catalog.closure(id).filter { locations[$0.id] == nil }.reduce(0) { $0 + max(0, $1.bytes - (received[$1.id] ?? 0)) } }
+    func ready(_ ids: [String]) -> Bool { ids.allSatisfy { ready($0) } }
+    func missingBytes(_ ids: [String]) -> Int { catalog.closure(ids).filter { locations[$0.id] == nil }.reduce(0) { $0 + max(0, $1.bytes - (received[$1.id] ?? 0)) } }
     var installedBytes: Int { catalog.packs.filter { locations[$0.id] != nil }.reduce(0) { $0 + $1.files.reduce(0) { $0 + $1.bytes } } }
     var packagePaths: [String] { catalog.packs.filter { $0.kind == "runtime" }.compactMap { locations[$0.id]?.appending(path: "app_packages").path } }
     var assetEnvironment: [String: String] {
@@ -64,12 +66,23 @@ final class ContentStore {
     }
 
     func download(_ id: String) {
-        for pack in catalog.closure(id) where locations[pack.id] == nil {
+        download([id])
+    }
+
+    /// Called only by an explicit Download or Continue action, never by opening or running content.
+    func download(_ ids: [String]) {
+        for pack in catalog.closure(ids) where locations[pack.id] == nil {
             guard phases[pack.id] != .downloading, phases[pack.id] != .installing else { continue }
             if !queue.contains(pack.id) { queue.append(pack.id) }
             phases[pack.id] = .queued
         }
         startWorker()
+    }
+
+    func pause(_ ids: [String]) {
+        for pack in catalog.closure(ids) where phase(pack.id) == .downloading || phase(pack.id) == .queued {
+            pause(pack.id)
+        }
     }
 
     func pause(_ id: String) {

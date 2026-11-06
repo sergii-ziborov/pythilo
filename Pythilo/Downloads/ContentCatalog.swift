@@ -34,6 +34,10 @@ struct DownloadCatalog: Decodable, Sendable {
     func pack(_ id: String) -> ContentPack? { packs.first { $0.id == id } }
 
     func closure(_ id: String) -> [ContentPack] {
+        closure([id])
+    }
+
+    func closure(_ ids: [String]) -> [ContentPack] {
         var result: [ContentPack] = [], seen = Set<String>()
         func visit(_ key: String) {
             guard seen.insert(key).inserted, let entry = pack(key) else { return }
@@ -41,7 +45,7 @@ struct DownloadCatalog: Decodable, Sendable {
             result.append(entry)
             for dependency in entry.dependencies { visit(dependency) }
         }
-        visit(id)
+        for id in ids { visit(id) }
         return result
     }
 }

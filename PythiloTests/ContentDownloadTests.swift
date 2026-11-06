@@ -78,6 +78,58 @@ final class ContentDownloadTests: XCTestCase {
         XCTAssertEqual(course.id, "foundations"); XCTAssertFalse(course.lessons[0].solution.isEmpty)
     }
 
+    @MainActor func testProjectCreationOpeningAndRunNeverStartDownloads() async throws {
+        let session = RunSession.shared
+        let deadline = Date().addingTimeInterval(30)
+        while session.phase != .idle || session.pythonVersion == nil {
+            guard Date() < deadline else { throw CancellationError() }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let downloads = ContentStore.shared
+        try downloads.remove("runtime-torch")
+        try await OfflineTestSupport.start()
+        let projects = ProjectStore(root: try temporary())
+        let project = try projects.create(name: "manual", template: .pyTorch)
+        let original = try String(contentsOf: project.url.appending(path: "main.py"), encoding: .utf8)
+        let model = WorkspaceModel(project: project)
+        XCTAssertEqual(model.project, project)
+        XCTAssertNil(session.submit(["kind": "script", "path": project.url.appending(path: "main.py").path,
+                                     "root": project.url.path, "cwd": project.url.path], label: "No automatic download"))
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(downloads.phase("runtime-torch"), .absent)
+        XCTAssertNil(downloads.received["runtime-torch"])
+        XCTAssertTrue(session.output.map(\.text).joined().contains("Nothing is downloaded by Run"))
+        XCTAssertEqual(try String(contentsOf: project.url.appending(path: "main.py"), encoding: .utf8), original)
+        try await OfflineTestSupport.stop()
+        // Test preparation is an explicit download, separate from every product action above.
+        downloads.download("runtime-torch")
+        let restoreDeadline = Date().addingTimeInterval(180)
+        while !downloads.ready("runtime-torch") {
+            guard Date() < restoreDeadline else { throw CancellationError() }
+            if case .failed(let message) = downloads.phase("runtime-torch") { throw ContentFailure.invalid(message) }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    @MainActor func testSelectionsIncludeEveryLessonLabAndSharedDependency() throws {
+        let catalog = DownloadCatalog.bundled
+        let courses = catalog.packs.filter { $0.kind == "course" }.map(\.id)
+        XCTAssertEqual(courses.count, 36)
+        XCTAssertEqual(catalog.courses.flatMap(\.lessons).count, 530)
+        let ml = LabCatalog.topics.filter { $0.section == .learning }.map { "labs-\($0.id)" }
+        let selection = catalog.closure(ml)
+        XCTAssertTrue(Set(ml).isSubset(of: Set(selection.map(\.id))))
+        for dependency in ["runtime-torch", "runtime-numpy", "runtime-math", "assets-finetune-data", "assets-bert-weights"] {
+            XCTAssertTrue(selection.contains { $0.id == dependency }, dependency)
+        }
+        XCTAssertEqual(Set(selection.map(\.id)).count, selection.count, "Shared requirements must download once")
+        let empty = ContentStore(root: try temporary())
+        XCTAssertFalse(empty.ready(courses))
+        XCTAssertFalse(empty.ready(ml))
+        XCTAssertEqual(empty.missingBytes(ml), selection.reduce(0) { $0 + $1.bytes })
+        XCTAssertTrue(empty.phases.isEmpty, "Inspecting a selection must never start downloads")
+    }
+
     @MainActor func testTemplateCodeExistsBeforePackagesFinishAndRemovalPreservesDrafts() throws {
         XCTAssertEqual(ProjectTemplate.pyTorch.requiredPacks, ["runtime-torch"])
         let store = ProjectStore(root: try temporary())

@@ -7,6 +7,7 @@ import XCTest
 final class RuntimeGateTests: XCTestCase {
     private var session: RunSession { RunSession.shared }
     private var root: URL!
+    private var offlineAudit: Bool { name.contains("testAllSixPretrainedProject") || name.contains("testCompletePretrainedProject") }
 
     override func setUp() async throws {
         root = FileManager.default.temporaryDirectory.appending(path: "gate-\(UUID().uuidString)")
@@ -14,9 +15,11 @@ final class RuntimeGateTests: XCTestCase {
         try await DownloadTestSupport.ensureAll()
         try await waitUntil(timeout: 60) { self.session.pythonVersion != nil && self.session.phase == .idle }
         session.clearOutput()
+        if offlineAudit { try await OfflineTestSupport.start() }
     }
 
     override func tearDown() async throws {
+        if offlineAudit { try await OfflineTestSupport.stop() }
         try? FileManager.default.removeItem(at: root)
     }
 

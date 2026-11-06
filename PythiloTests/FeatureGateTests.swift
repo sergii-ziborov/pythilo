@@ -7,6 +7,7 @@ import XCTest
 final class FeatureGateTests: XCTestCase {
     private var session: RunSession { RunSession.shared }
     private var root: URL!
+    private var offlineAudit: Bool { name.contains("testEveryDownloadedLesson") || name.contains("testEveryAdvancedStarter") || name.contains("testEveryReadingExample") }
 
     override func setUp() async throws {
         root = FileManager.default.temporaryDirectory.appending(path: "feature-\(UUID().uuidString)")
@@ -14,9 +15,11 @@ final class FeatureGateTests: XCTestCase {
         try await DownloadTestSupport.ensureAll()
         try await waitUntil(timeout: 60) { self.session.pythonVersion != nil && self.session.phase == .idle }
         session.clearOutput()
+        if offlineAudit { try await OfflineTestSupport.start() }
     }
 
     override func tearDown() async throws {
+        if offlineAudit { try await OfflineTestSupport.stop() }
         MCPHost.shared.stop()
         session.onCustom = nil
         session.onCell = nil

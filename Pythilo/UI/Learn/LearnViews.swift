@@ -421,6 +421,10 @@ private struct LessonRow: View {
         var parts: [String] = []
         if isInterview, let level = lesson.level { parts.append(level) }
         parts.append("\(lesson.minutes ?? 25) min")
+        if lesson.body.isEmpty {
+            parts.append("Download course to open")
+            return parts
+        }
         if !isInterview {
             let count = LessonOutline.sections(of: lesson).count
             parts.append("\(count) \(count == 1 ? "part" : "parts")")
@@ -1136,7 +1140,6 @@ private struct InstalledLessonView: View {
             let dependencies = ContentStore.shared.catalog.pack("course-\(course.id)")?.dependencies ?? []
             if !dependencies.isEmpty {
                 try JSONEncoder().encode(dependencies).write(to: project.url.appending(path: "pythilo-packages.json"), options: .atomic)
-                for id in dependencies { ContentStore.shared.download(id) }
             }
             onOpenProject(project)
         } catch {

@@ -3,6 +3,7 @@
 import collections
 import functools
 import time
+import sys
 import types
 
 from . import emit_json
@@ -224,10 +225,29 @@ def scale(job):
         module, name, _ = _load(job["source"], problem, _NoWrites())
         function = module.__dict__[name]
         args = by_size[n]
-        if n > 24 and problem != "edit":
-            return None
+        # Validate before timing. A fast device can reach n=32 cheaply and then
+        # jump into an exponential n=64 call; a budget checked between sizes
+        # cannot stop that individual call. Keep this guard out of measurements.
+        previous = sys.gettrace()
+        deadline = time.perf_counter() + 0.5
+        steps = 0
+
+        def bounded(frame, event, arg):
+            nonlocal steps
+            if event == "line" and frame.f_code.co_filename == "dp.py":
+                steps += 1
+                if steps > 250_000 or time.perf_counter() > deadline:
+                    raise _Stop
+            return bounded
+
         try:
-            result = function(*args)
+            sys.settrace(bounded)
+            try:
+                result = function(*args)
+            finally:
+                sys.settrace(previous)
+        except _Stop:
+            return "The validation work limit was reached. Use a faster algorithm or a smaller input."
         except RecursionError:
             return f"{_call(name, args)} recursed too deep."
         except Exception as error:
@@ -240,5 +260,6 @@ def scale(job):
         "coins": "Calls min_coins(amount) for growing amounts, with a fresh copy of your file each run.",
         "edit": "Calls edit_distance on two words of length n, with a fresh copy of your file each run.",
     }[problem]
-    run_scale(job["id"], "dp", problem, what, "length n" if problem == "edit" else "n", sorted(by_size),
+    sizes = sorted(by_size) if not job.get("sizes") else [n for n in sorted(by_size) if n in job["sizes"]]
+    run_scale(job["id"], "dp", problem, what, "length n" if problem == "edit" else "n", sizes,
               [("your " + PROBLEMS[problem]["function"], fresh)], check=check)

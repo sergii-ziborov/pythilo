@@ -48,7 +48,7 @@ struct WorkspaceView: View {
         .sheet(isPresented: $showingPackages) { PackagesView(model: model) }
         .sheet(isPresented: $showingDownloads) {
             NavigationStack {
-                DownloadsView().toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showingDownloads = false } } }
+                ProjectDownloadsView(project: model.project).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showingDownloads = false } } }
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -56,7 +56,7 @@ struct WorkspaceView: View {
                 Button { showingDownloads = true } label: {
                     HStack {
                         Image(systemName: "arrow.down.circle")
-                        Text("Project packages · tap to manage downloads").font(.footnote.weight(.semibold))
+                        Text("Prepare this project for offline use").font(.footnote.weight(.semibold))
                         Spacer()
                         Image(systemName: "chevron.right")
                     }.padding(12).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())

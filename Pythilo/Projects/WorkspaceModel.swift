@@ -94,7 +94,7 @@ final class WorkspaceModel {
         self.project = project
         self.session = session ?? RunSession.shared
         terminalDirectory = project.url
-        for pack in ProjectDependencies.refresh(project) { ContentStore.shared.download(pack) }
+        ProjectDependencies.refresh(project)
         reloadTree()
         let root = tree
         if let first = Self.firstEntry(in: root) { open(first) }

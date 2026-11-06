@@ -183,13 +183,13 @@ struct NewProjectSheet: View {
                     }
                 }
                 if let selected = ProjectTemplate.all.first(where: { $0.id == template }), !selected.requiredPacks.isEmpty {
-                    Section("Downloads automatically after Create") {
+                    Section("Packages for offline use") {
                         ForEach(selected.requiredPacks, id: \.self) { id in
                             if let pack = ContentStore.shared.catalog.pack(id) {
                                 Text("\(pack.title) · \(ByteCountFormatter.string(fromByteCount: Int64(ContentStore.shared.missingBytes(id)), countStyle: .file)) remaining")
                             }
                         }
-                        Text("Your project code is saved immediately. You can edit it while packages download, and pause or resume in Downloads.")
+                        Text("Creating this project saves its code without downloading anything. Open Project downloads and tap Download project packages before going offline.")
                             .font(.footnote).foregroundStyle(AppTheme.secondary)
                     }
                 }

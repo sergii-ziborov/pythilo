@@ -11,9 +11,11 @@ final class LabsTests: XCTestCase {
         try await DownloadTestSupport.ensureAll()
         try await waitUntil(timeout: 60) { self.session.pythonVersion != nil && self.session.phase == .idle }
         session.clearOutput()
+        try await OfflineTestSupport.start(diagnoseSlowRun: name.contains("testOldLabsScaleToo"))
     }
 
     override func tearDown() async throws {
+        try await OfflineTestSupport.stop()
         session.onCustom = nil
     }
 
@@ -162,6 +164,18 @@ final class LabsTests: XCTestCase {
         session.submit(["kind": "lab_dp_measure", "problem": "stairs", "source": DPLabView.templates[.stairs]!], label: "d")
         try await waitUntil(timeout: 90) { scale != nil && self.session.phase == .idle }
         XCTAssertGreaterThanOrEqual(scale?.series.first?.points.count ?? 0, 3, scale?.stopped ?? "")
+
+        scale = nil
+        session.submit(["kind": "lab_dp_measure", "problem": "stairs", "source": DPLabView.templates[.stairs]!, "sizes": [64]], label: "bounded recursion")
+        try await waitUntil(timeout: 15) { scale != nil && self.session.phase == .idle }
+        XCTAssertTrue(scale?.stopped.contains("validation work limit") == true, scale?.stopped ?? "")
+        XCTAssertEqual(scale?.series.first?.points.count, 0, "An exponential call must be rejected before timing starts")
+
+        scale = nil
+        let cached = "from functools import cache\n\n@cache\n" + DPLabView.templates[.stairs]!
+        session.submit(["kind": "lab_dp_measure", "problem": "stairs", "source": cached, "sizes": [64, 128, 256]], label: "cached recursion")
+        try await waitUntil(timeout: 15) { scale != nil && self.session.phase == .idle }
+        XCTAssertEqual(scale?.series.first?.points.count, 3, scale?.stopped ?? "")
 
         scale = nil
         session.submit(["kind": "lab_hash_scale", "source": HashLabView.template, "workload": "words", "sizes": [250, 500, 1000]], label: "h")

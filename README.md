@@ -53,8 +53,10 @@ open source (see [License](#license)).
 ### Downloads
 
 Courses and Lab topics download individually. Project source is saved locally immediately;
-creating a PyTorch, notebook, web or fine-tuning project automatically queues its required
-packages and assets. Downloads shows progress, pause, resume, cancellation and removal.
+opening or creating a project never starts a download. Explicitly select Download entire
+course, Download entire category, Download project packages or Download everything. Each
+selection includes its required packages and assets; then its code and checks run offline.
+Downloads shows progress, pause, resume, cancellation and removal.
 Removing downloads preserves projects, lesson drafts and completion history. Archives are
 checked against the catalog pinned inside the signed app before installation. Native
 Python extensions remain signed inside the app; their Python APIs download separately.

@@ -41,9 +41,10 @@ extension ProjectTemplate {
         \(summary). All project source stays local and is editable.
 
         In Pythilo, packages, the real UCI sentiment dataset/tokenizer and Google's pretrained
-        BERT-Tiny safetensors weights download automatically. Open Downloads for progress,
-        pause, resume or removal. Assets are shared between projects. Run main.py after
-        downloads finish; training and evaluation then work offline on CPU.
+        BERT-Tiny safetensors weights are a separate, shared download. Open Project downloads
+        and tap Download project packages once. Nothing downloads when creating, opening
+        or running a project. After that explicit download completes, main.py trains and
+        evaluates entirely offline on CPU. Progress, pause and resume are in Downloads.
 
         On a desktop: install requirements.txt, run python fetch_assets.py once, then
         python main.py. python main.py --quick explicitly runs the small contract fixture.

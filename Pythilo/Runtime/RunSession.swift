@@ -225,8 +225,7 @@ final class RunSession {
                 ? ProjectDependencies.refresh(project) : project.requiredPacks
             let missing = requirements.filter { !ContentStore.shared.ready($0) }
             if !missing.isEmpty {
-                for pack in missing { ContentStore.shared.download(pack) }
-                note("Preparing this project's packages. Open Downloads to see progress or pause; run again when ready.\n")
+                note("This project's offline packages are not downloaded. Open Project downloads and tap Download project packages. Nothing is downloaded by Run. Once the download finishes, this project can run offline.\n")
                 return nil
             }
         }

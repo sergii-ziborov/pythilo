@@ -6,28 +6,87 @@ struct ContentDownloadCard: View {
 
     var body: some View {
         if let pack = store.catalog.pack(packID) {
-            VStack(alignment: .leading, spacing: 12) {
-                Label(pack.title, systemImage: store.ready(packID) ? "checkmark.circle.fill" : "arrow.down.circle")
-                    .font(.headline)
-                Text("Download once to use offline. Removing a download keeps your code, drafts and progress.")
-                    .font(.footnote).foregroundStyle(AppTheme.secondary)
-                ForEach(store.catalog.closure(packID)) { entry in
-                    DownloadRow(pack: entry)
-                }
-                if !store.ready(packID) {
-                    Button {
-                        store.download(packID)
-                    } label: {
-                        Text("Download missing · \(ByteCountFormatter.string(fromByteCount: Int64(store.missingBytes(packID)), countStyle: .file))")
-                            .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("download-pack-\(packID)")
-                }
-            }.padding(16).frame(maxWidth: .infinity, alignment: .leading).panelCard(cornerRadius: 16)
+            let course = store.catalog.courses.first { "course-\($0.id)" == packID }
+            ContentSelectionCard(
+                title: pack.title, packIDs: [packID],
+                summary: course.map { "All \($0.lessons.count) lessons, examples and checks, with every required package, dataset and model. Download once, then use the entire course offline." }
+                    ?? "The entire Lab topic, with all required packages, datasets and models. Download once, then use every Lab offline.",
+                downloadTitle: course == nil ? "Download entire topic" : "Download entire course",
+                downloadID: "download-pack-\(packID)")
         } else {
             ContentUnavailableView("Download unavailable", systemImage: "exclamationmark.arrow.triangle.2.circlepath", description: Text("This build does not contain the download catalog. Update Pythilo and try again."))
         }
+    }
+}
+
+/// One explicit action prepares a complete selection, including shared dependencies.
+struct ContentSelectionButton: View {
+    let packIDs: [String]
+    let title: String
+    let downloadID: String
+    @State private var store = ContentStore.shared
+
+    var body: some View {
+        let packs = store.catalog.closure(packIDs)
+        let ready = store.ready(packIDs)
+        let busy = packs.contains { [.queued, .downloading, .installing].contains(store.phase($0.id)) }
+        let pausable = packs.contains { [.queued, .downloading].contains(store.phase($0.id)) }
+        let completed = packs.filter { store.location($0.id) != nil }.count
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button { store.download(packIDs) } label: {
+                    Label(ready ? "Available offline" : busy ? "Preparing offline…" : "\(title) · \(ByteCountFormatter.string(fromByteCount: Int64(store.missingBytes(packIDs)), countStyle: .file))",
+                          systemImage: ready ? "checkmark.circle.fill" : "arrow.down.circle")
+                        .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                }
+                .buttonStyle(.borderedProminent).disabled(ready || busy)
+                .accessibilityIdentifier(downloadID)
+                if pausable {
+                    Button { store.pause(packIDs) } label: {
+                        Label("Pause", systemImage: "pause.fill").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+                    }.buttonStyle(.bordered).accessibilityIdentifier("pause-\(downloadID)")
+                }
+            }
+            if !packs.isEmpty {
+                Text(ready ? "Complete selection stored on this device for offline use."
+                     : "\(completed) of \(packs.count) downloads ready. Offline ready appears only after everything is installed.")
+                    .font(.caption).foregroundStyle(AppTheme.secondary)
+                    .accessibilityIdentifier("\(ready ? "offline-ready" : "offline-status")-\(downloadID)")
+            }
+        }
+    }
+}
+
+struct ContentSelectionCard: View {
+    let title: String
+    let packIDs: [String]
+    let summary: String
+    let downloadTitle: String
+    let downloadID: String
+    @State private var store = ContentStore.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: store.ready(packIDs) ? "checkmark.circle.fill" : "arrow.down.circle").font(.headline)
+            Text(summary).font(.footnote).foregroundStyle(AppTheme.secondary)
+            ContentSelectionButton(packIDs: packIDs, title: downloadTitle, downloadID: downloadID)
+            ForEach(store.catalog.closure(packIDs)) { DownloadRow(pack: $0) }
+            Text("Nothing downloads until you tap Download. Removing downloads keeps your code, lesson drafts and progress.")
+                .font(.caption).foregroundStyle(AppTheme.secondary)
+        }.padding(16).frame(maxWidth: .infinity, alignment: .leading).panelCard(cornerRadius: 16)
+    }
+}
+
+struct ProjectDownloadsView: View {
+    let project: Project
+    var body: some View {
+        ScrollView {
+            ContentSelectionCard(title: project.name, packIDs: project.requiredPacks,
+                summary: "Download the packages and assets this project needs before going offline. Creating, opening and running a project never starts a download.",
+                downloadTitle: "Download project packages", downloadID: "download-project-packages")
+                .padding().frame(maxWidth: 760)
+            NavigationLink("All downloads") { DownloadsView() }.padding()
+        }.navigationTitle("Project downloads")
     }
 }
 
@@ -71,12 +130,15 @@ private struct DownloadRow: View {
     }
     private var status: String {
         switch store.phase(pack.id) {
-        case .absent: "\(size) download"
+        case .absent: "Not downloaded · \(size)"
         case .queued: "Queued · \(size)"
         case .downloading: "\(ByteCountFormatter.string(fromByteCount: Int64(store.received[pack.id] ?? 0), countStyle: .file)) of \(size)"
         case .installing: "Verifying and installing…"
         case .paused: "Paused · \(size)"
-        case .installed: "Available offline · \(ByteCountFormatter.string(fromByteCount: Int64(pack.files.reduce(0) { $0 + $1.bytes }), countStyle: .file))"
+        case .installed:
+            store.ready(pack.id)
+                ? "Available offline · \(ByteCountFormatter.string(fromByteCount: Int64(pack.files.reduce(0) { $0 + $1.bytes }), countStyle: .file))"
+                : "Saved · required downloads are still missing"
         case .failed(let message): message
         }
     }
@@ -88,8 +150,13 @@ struct DownloadsView: View {
         List {
             Section {
                 Text("\(ByteCountFormatter.string(fromByteCount: Int64(store.installedBytes), countStyle: .file)) stored on this device")
-                Text("Project code stays local. Download courses, Lab topics and Python packages when needed. Compiled Python backends are part of the signed app.")
+                Text("Choose what to download. A course includes all its lessons; a Lab category includes every topic. Each download includes the packages, data and models it needs. After Download completes, use it entirely offline. Nothing downloads automatically.")
                     .font(.footnote).foregroundStyle(AppTheme.secondary)
+            }
+            Section("Offline library") {
+                ContentSelectionButton(packIDs: store.catalog.packs.filter { $0.kind == "course" }.map(\.id), title: "Download all courses", downloadID: "download-all-courses")
+                ContentSelectionButton(packIDs: store.catalog.packs.filter { $0.kind == "labs" }.map(\.id), title: "Download all Labs", downloadID: "download-all-labs")
+                ContentSelectionButton(packIDs: store.catalog.packs.map(\.id), title: "Download everything", downloadID: "download-everything")
             }
             ForEach([("runtime", "Python packages"), ("asset", "Datasets & models"), ("course", "Courses"), ("labs", "Lab topics")], id: \.0) { kind, title in
                 Section(title) {

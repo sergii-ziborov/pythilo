@@ -17,7 +17,7 @@ import XCTest
         proof.name = "downloaded-course-opens-native-lesson"; proof.lifetime = .keepAlways; add(proof)
     }
 
-    func testNewPyTorchProjectHasLocalCodeAndVisibleAutomaticPackageDownload() throws {
+    func testNewPyTorchProjectDownloadsOnlyAfterExplicitAction() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["-removeDownload", "runtime-torch", "-openTemplate", "finetune-lora"]
@@ -25,14 +25,37 @@ import XCTest
         let banner = app.buttons["project-downloads"]
         XCTAssertTrue(banner.waitForExistence(timeout: 30))
         banner.tap()
-        XCTAssertTrue(app.navigationBars["Downloads"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Python packages"].exists)
+        XCTAssertTrue(app.navigationBars["Project downloads"].waitForExistence(timeout: 10))
+        let download = app.buttons["download-project-packages"]
+        XCTAssertTrue(download.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 3)
+        XCTAssertTrue(download.isEnabled, "Opening a project must leave its missing packages untouched")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Not downloaded")).firstMatch.exists)
+        download.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
         let pause = app.buttons["download-pause-runtime-torch"]
         if pause.waitForExistence(timeout: 5) {
             pause.tap()
             XCTAssertTrue(app.buttons["download-resume-runtime-torch"].waitForExistence(timeout: 10))
+            app.buttons["download-resume-runtime-torch"].tap()
         }
+        XCTAssertTrue(app.staticTexts["offline-ready-download-project-packages"].waitForExistence(timeout: 180))
         let proof = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        proof.name = "automatic-project-packages-download-manager"; proof.lifetime = .keepAlways; add(proof)
+        proof.name = "explicit-offline-project-download"; proof.lifetime = .keepAlways; add(proof)
+    }
+
+    func testDownloadCategoryPreparesAllItsLabs() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-tab", "labs", "-removeDownload", "labs-pytorch-training"]
+        app.launch()
+        XCTAssertTrue(app.buttons["ML · 57"].waitForExistence(timeout: 30))
+        app.buttons["ML · 57"].tap()
+        let download = app.buttons["download-category-Machine learning"]
+        XCTAssertTrue(download.waitForExistence(timeout: 10))
+        XCTAssertTrue(download.isEnabled)
+        download.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
+        XCTAssertTrue(app.staticTexts["offline-ready-download-category-Machine learning"].waitForExistence(timeout: 180))
+        let proof = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        proof.name = "complete-ml-category-offline"; proof.lifetime = .keepAlways; add(proof)
     }
 }

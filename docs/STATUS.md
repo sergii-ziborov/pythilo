@@ -572,3 +572,42 @@ notes exactly match `docs/app-store/testflight-26.json`. No Beta App Review
 submission exists. App Store 1.0 remains PREPARE_FOR_SUBMISSION with MANUAL release;
 no App Review or Beta App Review was requested. Final proof:
 `build/release-receipts/testflight-26-ready.json`.
+
+## Explicit whole-course downloads and offline audit (7 November 2026)
+
+Build 27 replaces the automatic download behavior described in the preceding
+release. Creating or opening a project, Run and Keep as project never queue
+content. Download entire course saves every lesson, example and check together
+with its required packages, datasets and model assets. Download entire category
+saves every Lab topic in the selected category, independent of search filters.
+Downloads also offers all courses, all Labs and everything. Project packages
+have a separate explicit Download action. Progress, pause/resume and removal
+remain available; removal preserves local code, drafts and completion history.
+Offline readiness requires the entire dependency closure to be installed.
+
+The embedded Python offline audit denies external DNS and socket connections,
+positively verifies that denial, checks the guard survived every run, and asserts
+zero external requests. All 530 lesson solutions, 587 independent reading
+programs, 122 advanced starters, every Lab answer/starter and 24 PyTorch Labs
+with 103 contracts pass under that guard. All six complete BERT/LoRA projects
+also train and evaluate on their full 3,000-row dataset offline; checkpoint
+continuation and merged-model reload parity pass. Loopback remains available
+for lessons that start local servers. Native UI tests cover whole-course and
+whole-category downloads plus explicit project download/pause/resume. A separate
+regression removes PyTorch and verifies creation, opening and Run leave it absent
+without starting any transfer.
+
+The audit found a pre-existing unbounded naive dynamic-programming benchmark.
+Validation now stops excessive learner-code work before the untraced timing run.
+Both naive n=64 termination and cached n=64/128/256 pass. The initial broad result
+bundle retains that superseded failure and its three cleanup cascades; all four
+targeted reruns pass after the fix. Proofs: `build/manual27-offline-all.xcresult`,
+`build/manual27-offline-fixed.xcresult`, `build/manual27-no-auto.xcresult`,
+`build/manual27-download-ui.xcresult` and
+`build/release-receipts/manual27-full-training-offline.json`.
+
+The site and updated instructions are live. All 92 site tests, TypeScript,
+191 public routes, 88 reciprocal pairs and the public smoke checks pass. All
+57 public payloads (43,530,947 bytes) match the signed catalog by SHA-256.
+Receipts: `build/release-receipts/manual27-site-release.json` and
+`build/release-receipts/manual27-public-integrity.json`.

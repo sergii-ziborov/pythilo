@@ -32,12 +32,12 @@ in `docs/STATUS.md` (bundled OpenSSL and libgit2 HTTPS) and complete Apple's App
 Privacy questionnaire against the final binary and the published privacy policy.
 
 The current saved draft and beta descriptions cover 430 lessons in 35 courses,
-100 interview tasks and 120 Labs in 15 topics. Courses and Lab topics download
-separately; project source stays local while packages, datasets and weights
-download automatically. Six complete real BERT/LoRA projects train and evaluate
+100 interview tasks and 120 Labs in 15 topics. Courses, Lab categories and the whole library have explicit Download actions.
+Each selection saves every lesson or Lab with all its dependencies; project source
+stays local while packages, datasets and weights download only after that action. Six complete real BERT/LoRA projects train and evaluate
 on the device. Compiled backends stay signed inside the application.
 
-The Learn and Labs artwork now says 430 lessons and 120 Labs/15 topics. The
+Build 26 Learn and Labs artwork said 430 lessons and 120 Labs/15 topics. The
 PyTorch artwork explains downloading packages before offline CPU training. Apple's
 replacement filenames are `03-learn-430-100.jpg`, `04-labs-120.jpg` and
 `05-pytorch-downloads.jpg`; local sources retain their original filenames.
@@ -46,3 +46,13 @@ in English and Russian are saved in `testflight-26.json`. TestFlight 0.1.0 (26)
 is VALID and IN_BETA_TESTING for the existing internal group, confirmed at
 22:07:20 UTC on 6 November 2026. No Beta App Review submission exists; the
 App Store draft stays PREPARE_FOR_SUBMISSION with MANUAL release.
+
+Build 27 updates the saved draft descriptions and beta instructions to explicit
+whole-course, whole-category and whole-library downloads. Creating/opening a
+project, Run and Keep as project never start transfers. Learn and Labs artwork
+now shows the actual Download entire course and Download entire category
+controls. New Apple filenames are `03-learn-explicit-offline27.jpg` and
+`04-labs-explicit-offline27.jpg`; the other six assets remain. All eight assets
+were read back as COMPLETE on 7 November 2026 local time. Receipt:
+`build/release-receipts/manual27-screenshots.json`. English and Russian notes
+are saved in `testflight-27.json`.

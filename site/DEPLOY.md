@@ -350,3 +350,29 @@ immutable; keep prior app versions' files reachable. The current iOS app pins th
 catalog inside its signature and verifies each archive and extracted file. Native
 extension markers refer to signed backends already inside that app. Never publish
 downloadable framework binaries or include model weights/data in its archive.
+
+## Explicit downloads release (7 November 2026)
+
+The current site explains explicit whole-course, whole-category and whole-library
+downloads. Creating/opening a project or pressing Run never downloads packages.
+The selected downloaded curriculum executes and checks offline; complete BERT
+projects train and evaluate locally with their explicitly downloaded assets.
+
+Source revision:
+`sha256:b047d93dbc55075bca08419c76cce8d1513f5ecadf823953deaefbce54477839`.
+Image: `sha256:d6d0b8f2afff4dda130ed218307c3c3d42b7c1252c496636e56c9cd7871dde83`.
+Registry manifest:
+`sha256:7e778c272c1ecfa80b621faa6aef06f646423076c811a2cb178bb8316623f4ed`.
+Verified serving revision:
+`sha256:a7822eb7e89809a8039faeeb3710736d2db22eb18d7b5339ee68238309d53ddd`.
+Hostwatch operation keys use `pythilo-explicit-offline-{build,publish,deploy}-20261107-v1`.
+Deployment completed at 23:14:53 UTC on 6 November (7 November local time).
+Receipt: `build/release-receipts/manual27-site-release.json`.
+
+All 92 web tests and TypeScript pass. The public audit passes 191 URLs, all
+88 reciprocal lesson/Lab pairs and isolation headers; room/runtime smoke passes.
+All 57 pinned payloads (43,530,947 bytes) were fetched and checked with SHA-256.
+Catalog hash: `eeafdc1b5bf814b0674f3a8700fdf9c9c09c84861fa3bd2a631abc95c3218ab4`.
+Only the fine-tuning course text pack changed; prior content-addressed URLs remain
+reachable for older builds. Public transport proof:
+`build/release-receipts/manual27-public-integrity.json`.

@@ -3,9 +3,9 @@
 Pythilo has no account, analytics or advertising. Projects stay on your device.
 
 Courses, Lab topics, Python package packs and optional training data download from
-pythilo.com when selected. Creating a project automatically queues its required
-dependencies. Optional pretrained BERT weights come from Hugging Face and its
-model-delivery CDN. Those services receive ordinary resource requests and connection
+pythilo.com only after an explicit Download action. Creating, opening or running
+a project never downloads anything. Optional pretrained BERT weights come from
+Hugging Face and its model-delivery CDN. Those services receive ordinary resource requests and connection
 information, including your IP address; your project code, lesson drafts, progress
 and training results are not uploaded. Installed content works offline.
 

@@ -12,7 +12,7 @@ export default function Page() {
     <Toc items={[["bundled", "Downloads"], ["pip", "pip"], ["packages-screen", "The Packages screen"], ["pytorch", "PyTorch"], ["coreml", "Core ML and the Neural Engine"], ["npm", "npm and esbuild"]]} />
 
     <h2 id="bundled">Download packages when needed</h2>
-    <p>New project saves your code immediately and automatically queues its required Python packages. Open Downloads to see sizes and progress, pause, resume or remove them. NumPy, symbolic math, PyTorch and web frameworks have separate shared downloads. Their compiled iOS backends remain part of the signed app. After setup the packages work offline:</p>
+    <p>New project saves your code immediately and never starts a download. Open Project downloads and explicitly choose Download project packages before going offline. Creating, opening or running a project never downloads anything. See sizes and progress, pause, resume or remove downloads. NumPy, symbolic math, PyTorch and web frameworks have separate shared downloads. Their compiled iOS backends remain part of the signed app. After setup the packages work offline:</p>
     <Table head={["Area", "Packages"]} rows={[
       ["Web", "Django, Flask, FastAPI, Pydantic, Starlette, Uvicorn, Werkzeug, Jinja2"],
       ["Science and ML", "NumPy, PyTorch, SymPy, NetworkX"],

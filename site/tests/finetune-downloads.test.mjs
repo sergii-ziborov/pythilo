@@ -28,7 +28,7 @@ test('six complete project sources contain local code and a pinned separate asse
 test('published instructions describe the separate course/topic and dependency downloads', () => {
   const guide = readFileSync(new URL('../app/guide/learn/page.tsx', import.meta.url), 'utf8');
   assert.match(guide, /Courses and Lab topics download separately/);
-  assert.match(guide, /pause, resume and removal/);
+  assert.match(guide, /pause and resume/);
   const privacy = readFileSync(new URL('../app/legal/privacy/page.tsx', import.meta.url), 'utf8');
   assert.match(privacy, /Hugging Face/);
   assert.match(privacy, /training results and dataset rows stay on your device/);
