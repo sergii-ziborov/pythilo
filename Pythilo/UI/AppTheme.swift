@@ -82,6 +82,23 @@ extension View {
     }
 }
 
+/// Custom controls must hit-test their entire label, including padding and spacers.
+/// Keep sizing/backgrounds inside the Button label so its visible area is interactive.
+struct AppButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(.interaction, Rectangle())
+            .opacity(isEnabled ? (configuration.isPressed ? 0.65 : 1) : 0.45)
+    }
+}
+
+extension ButtonStyle where Self == AppButtonStyle {
+    static var app: AppButtonStyle { AppButtonStyle() }
+}
+
 /// The round toolbar control that sits beside the camera.
 struct RoundIconButton: View {
     let systemImage: String
@@ -98,7 +115,7 @@ struct RoundIconButton: View {
                 .frame(width: 44, height: 44)
                 .background(fill, in: Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
         .accessibilityLabel(label)
     }
 }

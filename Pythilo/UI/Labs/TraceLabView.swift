@@ -39,7 +39,7 @@ struct TraceLabView: View {
                 }
                 .font(.system(size: 13.5, weight: .semibold))
                 .foregroundStyle(AppTheme.blue)
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 HStack(spacing: 8) {
                     LabActionButton(title: "Trace", primary: true, action: runTrace).accessibilityIdentifier("lab-trace")
                     if variant.scales { LabScaleButton(action: runScale) }
@@ -239,7 +239,7 @@ struct TraceLabView: View {
                 .frame(width: 40, height: 36)
                 .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 9))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
         .accessibilityLabel(label)
     }
 

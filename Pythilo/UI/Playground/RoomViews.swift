@@ -31,10 +31,13 @@ struct RoomView: View {
                     HStack(alignment: .firstTextBaseline) {
                         Text(notice).font(.system(size: 13.5)).foregroundStyle(AppTheme.secondary)
                         Spacer(minLength: 8)
-                        Button("Revoke") { room.host.revoke() }
-                            .font(.system(size: 13.5, weight: .semibold))
-                            .foregroundStyle(AppTheme.coralInk)
-                            .frame(minHeight: 44)
+                        Button { room.host.revoke() } label: {
+                            Text("Revoke")
+                                .font(.system(size: 13.5, weight: .semibold))
+                                .foregroundStyle(AppTheme.coralInk)
+                                .frame(minHeight: 44)
+                        }
+                        .buttonStyle(.app)
                     }
                 }
                 if room.isOwner, !room.leftOut.isEmpty { LeftOutList(files: room.leftOut) }
@@ -49,21 +52,21 @@ struct RoomView: View {
                     } label: {
                         Text(copied ? "Copied" : "Copy link").font(.system(size: 15, weight: .semibold)).playgroundButton(.secondary, height: 48)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     .accessibilityIdentifier("room-copy-link")
                     Button {
                         connecting = true
                     } label: {
                         Text("Connect AI").font(.system(size: 15, weight: .semibold)).playgroundButton(.secondary, height: 48)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                 }
                 .disabled(room.ended)
                 if let onOpen, let project = room.project {
                     Button { onOpen(project) } label: {
                         Text("Open in the editor").font(.system(size: 15, weight: .semibold)).playgroundButton(.secondary, height: 48)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                 }
             }
             .padding(.horizontal, 16)
@@ -75,15 +78,17 @@ struct RoomView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(room.isOwner ? "End room" : "Leave room") { confirmingEnd = true }
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(AppTheme.coralInk)
-                    .padding(.horizontal, 14)
-                    .frame(height: 36)
-                    .background(AppTheme.coralFill, in: Capsule())
-                    .overlay { Capsule().stroke(AppTheme.coral, lineWidth: 1) }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("room-end")
+                Button { confirmingEnd = true } label: {
+                    Text(room.isOwner ? "End room" : "Leave room")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(AppTheme.coralInk)
+                        .padding(.horizontal, 14)
+                        .frame(height: 36)
+                        .background(AppTheme.coralFill, in: Capsule())
+                        .overlay { Capsule().stroke(AppTheme.coral, lineWidth: 1) }
+                }
+                .buttonStyle(.app)
+                .accessibilityIdentifier("room-end")
             }
         }
         .confirmationDialog(room.isOwner ? "End this room for everyone?" : "Leave this room?", isPresented: $confirmingEnd, titleVisibility: .visible) {
@@ -263,7 +268,7 @@ struct RunApprovalCard: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 .accessibilityIdentifier("room-run-deny")
                 Button(action: onRun) {
                     Text("Run once").font(.system(size: 15, weight: .bold))
@@ -271,7 +276,7 @@ struct RunApprovalCard: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(AppTheme.run, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 .accessibilityIdentifier("room-run-once")
             }
             .padding(.top, 2)
@@ -297,10 +302,13 @@ private struct RunningCard: View {
                 Text(job.command).font(.system(size: 13, design: .monospaced)).foregroundStyle(AppTheme.muted)
             }
             Spacer(minLength: 6)
-            Button("Stop") { RunSession.shared.stop() }
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(AppTheme.coralInk)
-                .frame(minWidth: 44, minHeight: 44)
+            Button { RunSession.shared.stop() } label: {
+                Text("Stop")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(AppTheme.coralInk)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .buttonStyle(.app)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)

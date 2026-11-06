@@ -37,7 +37,7 @@ struct PackagesView: View {
                             .frame(height: 48)
                             .background(AppTheme.blue, in: RoundedRectangle(cornerRadius: 12))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.app)
                         .disabled(name.isEmpty || busy)
                         .accessibilityIdentifier("package-install")
                     }
@@ -74,7 +74,7 @@ struct PackagesView: View {
                                     } label: {
                                         Image(systemName: "trash").foregroundStyle(AppTheme.coralInk).frame(width: 40, height: 44)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(.app)
                                     .disabled(busy)
                                     .accessibilityLabel("Remove \(package.0)")
                                 }

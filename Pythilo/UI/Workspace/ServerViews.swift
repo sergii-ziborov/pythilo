@@ -28,18 +28,20 @@ struct ProjectCommandBar: View {
                         .frame(height: 40)
                         .background(command.servesSite ? AppTheme.mint.opacity(0.14) : AppTheme.raised, in: RoundedRectangle(cornerRadius: 9))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     .accessibilityLabel(command.line)
                     .accessibilityIdentifier("command-\(command.title)")
                 }
                 if commands.all.count > commands.featured.count {
-                    Button("All \(commands.all.count) commands") { showingAll = true }
-                        .font(.system(size: 13, weight: .semibold))
-                        .padding(.horizontal, 12)
-                        .frame(height: 40)
-                        .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 9))
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("all-commands")
+                    Button { showingAll = true } label: {
+                        Text("All \(commands.all.count) commands")
+                            .font(.system(size: 13, weight: .semibold))
+                            .padding(.horizontal, 12)
+                            .frame(height: 40)
+                            .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 9))
+                    }
+                    .buttonStyle(.app)
+                    .accessibilityIdentifier("all-commands")
                 }
                 if !commands.npm.isEmpty {
                     Text("NPM")
@@ -49,14 +51,16 @@ struct ProjectCommandBar: View {
                         .padding(.leading, commands.featured.isEmpty ? 0 : 6)
                         .padding(.trailing, 2)
                     ForEach(commands.npm) { command in
-                        Button(command.title) { model.use(command) }
-                            .font(.system(size: 13, design: .monospaced))
-                            .padding(.horizontal, 12)
-                            .frame(height: 40)
-                            .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 9))
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(command.line)
-                            .accessibilityIdentifier("npm-\(command.title)")
+                        Button { model.use(command) } label: {
+                            Text(command.title)
+                                .font(.system(size: 13, design: .monospaced))
+                                .padding(.horizontal, 12)
+                                .frame(height: 40)
+                                .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 9))
+                        }
+                        .buttonStyle(.app)
+                        .accessibilityLabel(command.line)
+                        .accessibilityIdentifier("npm-\(command.title)")
                     }
                 }
             }
@@ -150,7 +154,7 @@ struct ServerBanner: View {
                     .background(AppTheme.run, in: Capsule())
                     .fixedSize()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.app)
             .accessibilityIdentifier("migrate-restart")
         }
     }
@@ -177,7 +181,7 @@ struct ServerBanner: View {
                     .frame(height: 44)
                     .background(AppTheme.blue, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.app)
             .accessibilityIdentifier("open-site")
         }
         .accessibilityElement(children: .contain)

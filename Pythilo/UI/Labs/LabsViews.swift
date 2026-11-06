@@ -107,7 +107,7 @@ struct LabsView: View {
                 .background(selected == section ? AppTheme.violet.opacity(0.25) : AppTheme.secondary.opacity(0.08), in: Capsule())
                 .foregroundStyle(selected == section ? AppTheme.violet : AppTheme.secondary)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
         .accessibilityAddTraits(selected == section ? .isSelected : [])
     }
 
@@ -127,7 +127,7 @@ struct LabsView: View {
             .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
             .panelCard(cornerRadius: 16)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
         .accessibilityIdentifier("lab-\(info.id)")
     }
 }
@@ -221,13 +221,7 @@ struct SortingBenchView: View {
     }
 
     private func labButton(_ title: String, primary: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(title, action: action)
-            .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(primary ? AppTheme.onRun : AppTheme.primary)
-            .frame(maxWidth: .infinity, minHeight: 46)
-            .background(primary ? AppTheme.run : AppTheme.raised, in: RoundedRectangle(cornerRadius: 12))
-            .buttonStyle(.plain)
-            .disabled(session.isBusy && title != "Stop")
+        LabActionButton(title: title, primary: primary, action: action)
     }
 
     private func runTrace() {

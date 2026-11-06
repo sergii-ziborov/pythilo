@@ -109,7 +109,7 @@ struct ProjectsView: View {
             .frame(maxWidth: .infinity, minHeight: 72)
             .background(primary ? AppTheme.run : AppTheme.raised, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
     }
 
     private func row(_ project: Project) -> some View {
@@ -133,7 +133,7 @@ struct ProjectsView: View {
             .panelCard()
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
         .contextMenu {
             Button("Rename", systemImage: "pencil") {
                 renameText = project.name

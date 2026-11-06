@@ -54,7 +54,7 @@ struct RunControl: View {
                 .accessibilityIdentifier("stopping")
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
         .fixedSize()
     }
 
@@ -109,7 +109,7 @@ struct PanelDockBar: View {
             .frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
         .accessibilityLabel(panel.title)
         .accessibilityIdentifier("panel-\(panel.rawValue)")
         .accessibilityAddTraits(active ? .isSelected : [])
@@ -157,7 +157,7 @@ struct FileTabsBar: View {
                         }
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     .contextMenu {
                         Button("Close tab", systemImage: "xmark") { model.close(path) }
                     }
@@ -342,7 +342,7 @@ struct EditorPane: View {
                         .frame(height: 44)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                 }
             }
             .frame(width: 240)
@@ -394,7 +394,7 @@ struct ShortcutPill: View {
                     .frame(width: 40, height: 36)
                     .background(AppTheme.border, in: RoundedRectangle(cornerRadius: 9))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.app)
             .accessibilityLabel("Show on-screen keys")
         }
         .font(.system(size: 12, design: .monospaced))

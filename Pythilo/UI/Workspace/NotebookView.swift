@@ -271,11 +271,13 @@ struct NotebookView: View {
     }
 
     private func addButton(_ title: String, _ action: @escaping () -> Void) -> some View {
-        Button(title, action: action)
-            .font(.system(size: 14, weight: .semibold))
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 11))
-            .buttonStyle(.plain)
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 11))
+        }
+        .buttonStyle(.app)
     }
 
     private func restart(_ document: NotebookDocument) {
@@ -363,7 +365,7 @@ private struct CellView: View {
                             Image(systemName: "play.fill").font(.system(size: 12)).foregroundStyle(AppTheme.run).frame(width: 44, height: 32)
                                 .background(Color.black.opacity(0.001))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.app)
                         .disabled(busy)
                         .accessibilityLabel("Run cell")
                     }

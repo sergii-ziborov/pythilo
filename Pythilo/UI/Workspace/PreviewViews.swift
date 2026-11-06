@@ -61,7 +61,7 @@ struct PreviewColumn: View {
                 Button { backs += 1 } label: {
                     Image(systemName: "chevron.left").frame(width: 40, height: 44)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 .accessibilityLabel("Back")
                 Circle().fill(AppTheme.mint).frame(width: 8, height: 8).accessibilityHidden(true)
                 Text(origin)
@@ -87,7 +87,7 @@ struct PreviewColumn: View {
                 } label: {
                     Image(systemName: "arrow.clockwise").frame(width: 44, height: 44)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 .accessibilityLabel("Reload")
             }
             .padding(.leading, 4)

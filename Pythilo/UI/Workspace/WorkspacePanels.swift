@@ -103,7 +103,7 @@ struct ProblemsPanel: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .background(problem.severity == "error" ? AppTheme.dangerPanel : AppTheme.warnPanel, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.app)
                             }
                         }
                     }
@@ -154,18 +154,20 @@ struct OutputPanel: View {
                         .overlay { RoundedRectangle(cornerRadius: 10).stroke(AppTheme.run, lineWidth: 1) }
                         .accessibilityIdentifier("stdin-field")
                         .onSubmit(send)
-                    Button("EOF") { session.sendEndOfInput() }
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(height: 44)
-                        .padding(.horizontal, 10)
-                        .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 10))
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Send end of input")
+                    Button { session.sendEndOfInput() } label: {
+                        Text("EOF")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(height: 44)
+                            .padding(.horizontal, 10)
+                            .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.app)
+                    .accessibilityLabel("Send end of input")
                     Button(action: send) {
                         Image(systemName: "arrow.up").font(.system(size: 16, weight: .bold)).foregroundStyle(AppTheme.onRun)
                             .frame(width: 44, height: 44).background(AppTheme.run, in: Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     .accessibilityLabel("Send line")
                 }
                 .padding(.horizontal, 10)
@@ -255,12 +257,14 @@ struct TerminalPanel: View {
     }
 
     private func key(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(title, action: action)
-            .font(.system(size: 13, design: .monospaced))
-            .padding(.horizontal, 13)
-            .frame(height: 44)
-            .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 9))
-            .buttonStyle(.plain)
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 13, design: .monospaced))
+                .padding(.horizontal, 13)
+                .frame(height: 44)
+                .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 9))
+        }
+        .buttonStyle(.app)
     }
 
     private func insert(_ text: String) {
@@ -334,7 +338,7 @@ struct DebugPanel: View {
                         .frame(height: 48)
                         .background(AppTheme.run, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 .disabled(session.phase != .idle)
                 .accessibilityIdentifier("debug-start")
             }
@@ -388,7 +392,7 @@ struct DebugPanel: View {
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(primary ? AppTheme.run : AppTheme.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
     }
 
     private func paused(_ pause: DebugPause) -> some View {
@@ -430,7 +434,7 @@ struct DebugPanel: View {
                                 .background(index == min(frameIndex, pause.frames.count - 1) ? AppTheme.selection : Color.clear, in: RoundedRectangle(cornerRadius: 8))
                                 .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.app)
                         }
                     }
                     VStack(alignment: .leading, spacing: 6) {

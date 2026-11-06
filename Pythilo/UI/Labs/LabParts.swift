@@ -35,13 +35,15 @@ struct LabActionButton: View {
     private let session = RunSession.shared
 
     var body: some View {
-        Button(title, action: action)
-            .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(primary ? AppTheme.onRun : AppTheme.primary)
-            .frame(maxWidth: .infinity, minHeight: 46)
-            .background(primary ? AppTheme.run : AppTheme.raised, in: RoundedRectangle(cornerRadius: 12))
-            .buttonStyle(.plain)
-            .disabled(session.isBusy && title != "Stop")
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(primary ? AppTheme.onRun : AppTheme.primary)
+                .frame(maxWidth: .infinity, minHeight: 46)
+                .background(primary ? AppTheme.run : AppTheme.raised, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.app)
+        .disabled(session.isBusy && title != "Stop")
     }
 }
 
@@ -53,13 +55,15 @@ struct LabChoice<Value: Hashable>: View {
     var body: some View {
         HStack(spacing: 4) {
             ForEach(options, id: \.0) { value, title in
-                Button(title) { selection = value }
-                    .font(.system(size: 14.5, weight: .semibold))
-                    .foregroundStyle(selection == value ? AppTheme.primary : AppTheme.muted)
-                    .frame(maxWidth: .infinity, minHeight: 38)
-                    .background(selection == value ? AppTheme.raised : .clear, in: RoundedRectangle(cornerRadius: 9))
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selection == value ? .isSelected : [])
+                Button { selection = value } label: {
+                    Text(title)
+                        .font(.system(size: 14.5, weight: .semibold))
+                        .foregroundStyle(selection == value ? AppTheme.primary : AppTheme.muted)
+                        .frame(maxWidth: .infinity, minHeight: 38)
+                        .background(selection == value ? AppTheme.raised : .clear, in: RoundedRectangle(cornerRadius: 9))
+                }
+                .buttonStyle(.app)
+                .accessibilityAddTraits(selection == value ? .isSelected : [])
             }
         }
         .padding(4)
@@ -75,15 +79,17 @@ struct LabChips<Value: Hashable>: View {
     var body: some View {
         HStack(spacing: 6) {
             ForEach(options, id: \.0) { value, title in
-                Button(title) { selection = value }
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundStyle(selection == value ? AppTheme.selectionInk : AppTheme.secondary)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 34)
-                    .background(selection == value ? AppTheme.selection : .clear, in: Capsule())
-                    .overlay { if selection != value { Capsule().stroke(AppTheme.border, lineWidth: 1) } }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selection == value ? .isSelected : [])
+                Button { selection = value } label: {
+                    Text(title)
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(selection == value ? AppTheme.selectionInk : AppTheme.secondary)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 34)
+                        .background(selection == value ? AppTheme.selection : .clear, in: Capsule())
+                        .overlay { if selection != value { Capsule().stroke(AppTheme.border, lineWidth: 1) } }
+                }
+                .buttonStyle(.app)
+                .accessibilityAddTraits(selection == value ? .isSelected : [])
             }
         }
     }

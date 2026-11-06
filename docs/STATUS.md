@@ -286,3 +286,26 @@ the App Store draft is still PREPARE_FOR_SUBMISSION with MANUAL release, the
 No App Review or Beta App Review was requested. Public health is 200. Local
 verification servers are stopped; the workspace retains only its preexisting
 untracked `.cortex-loom/` directory.
+
+## Button hit targets — 6 November 2026
+
+Trace and several other title/action buttons sized their Button from the outside,
+leaving padding and background outside the label's tap region. Moved presentation
+into the labels and replaced custom plain styles with `AppButtonStyle` across
+Labs, Learn, Projects, the workspace and shared rooms (96 style applications).
+The shared style gives the entire label a rectangular interaction shape, a minimum
+44 × 44 pt target, pressed feedback and a visible disabled state. Sorting Bench
+now uses the same action component as the other labs.
+
+Before the fix, all four single corner taps on Trace failed to run. After the fix,
+all four pass on both iPhone and iPad. Seven new UI regression cases cover Trace,
+classic sorting, lab filters/cards/choices/chips, lesson Check, project/sharing
+buttons and editor Run. The existing attention answer/trace route also passes on
+both devices. Run is checked against real Python stdout on both devices, since
+the iPad panel tabs do not expose the phone dock's selected accessibility trait.
+Evidence: `build/verification/hit-target-before.xcresult`,
+`hit-target-after-iphone.xcresult`, `hit-target-after-ipad.xcresult` and
+`editor-run-output.xcresult`. The initial iPad suite had one assertion failure for
+that trait; the corrected stdout assertion passes on both devices. The release
+archive and export for version 0.1.0, build 20, succeeded. TestFlight upload is in
+progress; no App Review or Beta App Review is requested.

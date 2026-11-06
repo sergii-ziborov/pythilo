@@ -97,7 +97,7 @@ struct ProjectColumn: View {
                     ShareLink(item: model.project.url) {
                         footerLabel("square.and.arrow.up", "Share", AppTheme.blue)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -116,12 +116,12 @@ struct ProjectColumn: View {
                 .frame(width: compact ? 36 : 44, height: 44)
                 .background(compact ? Color.clear : AppTheme.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
         .accessibilityLabel(label)
     }
 
     private func footerButton(_ symbol: String, _ title: String, _ tint: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) { footerLabel(symbol, title, tint) }.buttonStyle(.plain)
+        Button(action: action) { footerLabel(symbol, title, tint) }.buttonStyle(.app)
     }
 
     private func footerLabel(_ symbol: String, _ title: String, _ tint: Color) -> some View {

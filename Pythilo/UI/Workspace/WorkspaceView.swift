@@ -416,7 +416,7 @@ struct WorkspaceView: View {
                 .frame(width: 30, height: 40)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
         .accessibilityLabel(panel.title)
     }
 
@@ -459,7 +459,7 @@ struct WorkspaceView: View {
                             .foregroundStyle(AppTheme.blue)
                             .frame(width: 92, height: 44)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                 }
             }
             .frame(height: 50)
@@ -704,7 +704,7 @@ struct WorkspaceView: View {
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 .accessibilityIdentifier("panel-\(panel.rawValue)")
             }
             }
@@ -715,7 +715,7 @@ struct WorkspaceView: View {
             } label: {
                 Image(systemName: "chevron.down").font(.system(size: 13, weight: .bold)).foregroundStyle(AppTheme.muted).frame(width: 44, height: 42)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.app)
             .accessibilityLabel("Hide panel")
         }
     }

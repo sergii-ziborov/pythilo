@@ -85,7 +85,7 @@ struct GitView: View {
                     .frame(height: 48)
                     .background(AppTheme.blue, in: RoundedRectangle(cornerRadius: 12))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.app)
             .accessibilityIdentifier("git-init")
         }
         .padding(24)
@@ -148,7 +148,7 @@ struct GitView: View {
                     } label: {
                         Image(systemName: "key").frame(width: 44, height: 44).background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 10))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     .accessibilityLabel("HTTPS token")
                 }
                 .padding(.top, 4)
@@ -172,7 +172,7 @@ struct GitView: View {
     }
 
     private func networkButton(_ title: String, _ action: @escaping @Sendable (GitCredential?) throws -> String) -> some View {
-        Button(title) {
+        Button {
             let credential = GitCredentialVault.credential(for: snapshot?.remoteURL)
             working = true
             status = "\(title)…"
@@ -187,11 +187,13 @@ struct GitView: View {
                 model.reloadTree()
                 model.reloadChangedBuffers()
             }
+        } label: {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 10))
         }
-        .font(.system(size: 14, weight: .semibold))
-        .frame(maxWidth: .infinity, minHeight: 44)
-        .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 10))
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
         .disabled(working)
     }
 
@@ -225,15 +227,17 @@ struct GitView: View {
                 }
                 HStack(spacing: 8) {
                     TextField("Commit message", text: $message).gitField().accessibilityIdentifier("git-message")
-                    Button("Commit \(selection.count)", action: commit)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(AppTheme.onBlue)
-                        .padding(.horizontal, 14)
-                        .frame(height: 48)
-                        .background(AppTheme.blue, in: RoundedRectangle(cornerRadius: 12))
-                        .buttonStyle(.plain)
-                        .disabled(selection.isEmpty || message.isEmpty)
-                        .accessibilityIdentifier("git-commit")
+                    Button(action: commit) {
+                        Text("Commit \(selection.count)")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(AppTheme.onBlue)
+                            .padding(.horizontal, 14)
+                            .frame(height: 48)
+                            .background(AppTheme.blue, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.app)
+                    .disabled(selection.isEmpty || message.isEmpty)
+                    .accessibilityIdentifier("git-commit")
                 }
             }
         }
@@ -249,7 +253,7 @@ struct GitView: View {
                     .foregroundStyle(selection.contains(change.path) ? AppTheme.blue : AppTheme.muted)
                     .frame(width: 34, height: 48)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.app)
             .accessibilityLabel("Include \(change.path)")
             Button {
                 selectedDiff = change.path
@@ -265,7 +269,7 @@ struct GitView: View {
                 .frame(minHeight: 48)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.app)
         }
         .padding(.trailing, 12)
         .padding(.leading, 4)
@@ -313,7 +317,7 @@ struct GitView: View {
                         .frame(minHeight: 48)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                 }
             }
             .panelCard()

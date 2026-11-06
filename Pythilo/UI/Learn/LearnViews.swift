@@ -16,7 +16,7 @@ struct LearnView: View {
                         NavigationLink(value: LessonRoute(course: course, lesson: lesson)) {
                             ContinueCard(course: course, lesson: lesson)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.app)
                         .accessibilityIdentifier("learn-continue")
                     }
                     VStack(alignment: .leading, spacing: 10) {
@@ -26,7 +26,7 @@ struct LearnView: View {
                                 NavigationLink(value: course) {
                                     PathRow(course: course, number: index + 1, isLast: index == library.paths.count - 1)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.app)
                             }
                         }
                     }
@@ -34,7 +34,7 @@ struct LearnView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("PRACTICE").sectionLabel()
                             NavigationLink(value: interview) { PracticeCard(course: interview) }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.app)
                         }
                     }
                 }
@@ -298,7 +298,7 @@ struct CourseView: View {
                             .frame(maxWidth: .infinity, minHeight: 48)
                             .background(AppTheme.blue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.app)
                         .padding(.top, 16)
                     }
                 }
@@ -317,7 +317,7 @@ struct CourseView: View {
                                 isLast: index == course.lessons.count - 1
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.app)
                         .accessibilityIdentifier("lesson-\(lesson.id)")
                     }
                 }
@@ -603,7 +603,7 @@ struct LessonView: View {
             .background(active ? AppTheme.blue : AppTheme.panel, in: Capsule())
             .overlay { if !active { Capsule().stroke(AppTheme.border, lineWidth: 1) } }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.app)
     }
 
     private static let taskID = 10_000
@@ -694,7 +694,7 @@ struct LessonView: View {
                     .frame(maxWidth: .infinity, minHeight: 48)
                     .background(AppTheme.blue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 .accessibilityIdentifier("lesson-start-coding")
             }
         }
@@ -717,7 +717,7 @@ struct LessonView: View {
                         Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).foregroundStyle(AppTheme.muted)
                             .frame(width: 28, height: 28)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     .accessibilityLabel("Hide hint")
                 }
                 .padding(.horizontal, 14)
@@ -761,7 +761,7 @@ struct LessonView: View {
                 .frame(minHeight: 40)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.app)
             .accessibilityIdentifier("lesson-task-toggle")
             if showTask {
                 Text(MarkdownRenderer.inlineText(lesson.task))
@@ -801,7 +801,7 @@ struct LessonView: View {
                             .frame(minHeight: 46)
                             .background(AppTheme.coral, in: Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                 } else {
                     hintButton
                     Button(action: run) {
@@ -811,7 +811,7 @@ struct LessonView: View {
                             .frame(width: 46, height: 46)
                             .background(AppTheme.raised, in: Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     .accessibilityLabel("Run")
                     .accessibilityIdentifier("lesson-run")
                     Button(action: check) {
@@ -824,7 +824,7 @@ struct LessonView: View {
                             .frame(minHeight: 46)
                             .background(AppTheme.run, in: Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     .accessibilityIdentifier("lesson-check")
                 }
             } else if let next = library.next(after: lesson, in: course), library.completed.contains(lesson.id), let onNext {
@@ -835,7 +835,7 @@ struct LessonView: View {
                         .frame(width: 46, height: 46)
                         .background(AppTheme.blue, in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 .accessibilityLabel("Next lesson")
             }
         }
@@ -856,7 +856,7 @@ struct LessonView: View {
                     .frame(width: 46, height: 46)
                     .background(AppTheme.raised, in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.app)
             .accessibilityLabel("Hint \(hintsShown + 1) of \(lesson.hints.count)")
         } else if !showSolution, !lesson.hints.isEmpty {
             Menu {
@@ -953,16 +953,18 @@ struct LessonView: View {
                     .frame(maxWidth: .infinity, minHeight: 48)
                     .background(AppTheme.blue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 .accessibilityIdentifier("lesson-next")
             }
         }
         if !results.isEmpty {
-            Button(allPassed ? "Keep as a project" : "Debug in a project", action: keepAsProject)
-                .font(.system(size: 15, weight: .semibold))
-                .frame(maxWidth: .infinity, minHeight: 46)
-                .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .buttonStyle(.plain)
+            Button(action: keepAsProject) {
+                Text(allPassed ? "Keep as a project" : "Debug in a project")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.app)
         }
     }
 
@@ -1118,7 +1120,7 @@ struct MarkdownBlocks: View {
                                     .foregroundStyle(AppTheme.selectionInk)
                                     .frame(maxWidth: .infinity, minHeight: 40)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.app)
                             .background(AppTheme.raised.opacity(0.6))
                         }
                     }

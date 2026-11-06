@@ -419,7 +419,7 @@ struct DatabaseView: View {
                         .padding(.horizontal, 14).frame(height: 34)
                         .background(AppTheme.run, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 .disabled(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityIdentifier("database-run")
             }

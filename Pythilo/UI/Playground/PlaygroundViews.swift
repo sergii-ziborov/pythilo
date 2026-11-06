@@ -30,7 +30,7 @@ struct PlaygroundView: View {
                         Label("Share a project", systemImage: "plus")
                             .playgroundButton(.primary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     .accessibilityIdentifier("room-share")
                     Button {
                         joinLink = nil
@@ -38,7 +38,7 @@ struct PlaygroundView: View {
                     } label: {
                         Text("Join with a link").playgroundButton(.secondary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     .accessibilityIdentifier("room-join")
                     if let reason = rooms.unavailableReason {
                         Text(reason).font(.system(size: 13)).foregroundStyle(AppTheme.muted)
@@ -49,7 +49,7 @@ struct PlaygroundView: View {
                             Text("ACTIVE ROOMS").sectionLabel()
                             ForEach(rooms.live) { room in
                                 NavigationLink(value: PlaygroundRoute.room(room.id)) { RoomRow(room: room) }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(.app)
                             }
                         }
                     }
@@ -139,7 +139,7 @@ struct PlaygroundView: View {
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.app)
             .accessibilityIdentifier("mcp-manage")
         }
         .padding(14)
@@ -212,7 +212,7 @@ struct SegmentedChoice<Value: Hashable>: View {
                         .background(selection == value ? AppTheme.raised : .clear, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 .accessibilityAddTraits(selection == value ? .isSelected : [])
             }
         }
@@ -251,7 +251,7 @@ struct ShareProjectSheet: View {
                             .frame(minHeight: 52)
                             .panelCard()
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.app)
                         .accessibilityIdentifier("room-share-\(project.name)")
                     }
                 }
@@ -334,12 +334,12 @@ struct RoomShareForm: View {
                     Button { create(connect: false) } label: {
                         Text(creating ? "Encrypting and creating…" : "Create room and copy link").playgroundButton(.primary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     .accessibilityIdentifier("room-create")
                     Button { create(connect: true) } label: {
                         Text("Create room and connect an AI client").font(.system(size: 15.5, weight: .semibold)).playgroundButton(.secondary, height: 48)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                 }
                 .disabled(creating || selection == nil || !rooms.isAvailable)
                 .opacity(creating || selection == nil || !rooms.isAvailable ? 0.5 : 1)
@@ -448,7 +448,7 @@ struct LeftOutList: View {
                 .frame(minHeight: 32)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.app)
             ForEach(expanded ? files : Array(files.prefix(3))) { file in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(file.path).font(.system(size: 13, design: .monospaced)).lineLimit(1).truncationMode(.middle)
@@ -495,11 +495,14 @@ struct JoinRoomSheet: View {
                             .background(AppTheme.background, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                             .overlay { RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(AppTheme.border, lineWidth: 1) }
                             .accessibilityIdentifier("room-link")
-                        Button("Paste") {
+                        Button {
                             if let value = UIPasteboard.general.string { text = value }
+                        } label: {
+                            Text("Paste")
+                                .font(.system(size: 14, weight: .semibold))
+                                .frame(minHeight: 44)
                         }
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(minHeight: 44)
+                        .buttonStyle(.app)
                     }
                     if let failure {
                         Text(failure).font(.system(size: 14)).foregroundStyle(AppTheme.coralInk)
@@ -510,7 +513,7 @@ struct JoinRoomSheet: View {
                     Button(action: join) {
                         Text(joining ? "Joining · decrypting files…" : "Join room").playgroundButton(.primary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     .disabled(joining || text.isEmpty || !rooms.isAvailable)
                     .opacity(joining || text.isEmpty || !rooms.isAvailable ? 0.5 : 1)
                     .accessibilityIdentifier("room-join-confirm")
@@ -586,7 +589,7 @@ struct MCPConnectionView: View {
                     } label: {
                         Text(host.isRunning ? "Switch the connection to \(project.name)" : "Connect an AI client on this network").playgroundButton(.primary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                 } else {
                     Text("Work on one project with an AI client on your computer. It reaches this device over your local network, with no account or cloud service. Editing and running code are separate permissions.")
                         .font(.system(size: 15))
@@ -610,7 +613,7 @@ struct MCPConnectionView: View {
                                 .frame(minHeight: 52)
                                 .panelCard()
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.app)
                             .accessibilityIdentifier("mcp-share-\(project.name)")
                         }
                     }
@@ -624,14 +627,16 @@ struct MCPConnectionView: View {
                         Text("Give the room link to an AI client that has the Pythilo MCP bridge. It joins the room like a person, and runs code here only as this room allows.")
                             .font(.system(size: 14))
                             .foregroundStyle(AppTheme.secondary)
-                        Button(copied ? "Copied" : "Copy room link") {
+                        Button {
                             UIPasteboard.general.string = room.shareURL.absoluteString
                             copied = true
+                        } label: {
+                            Text(copied ? "Copied" : "Copy room link")
+                                .font(.system(size: 14, weight: .semibold))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 10))
                         }
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 10))
-                        .buttonStyle(.plain)
+                        .buttonStyle(.app)
                     }
                     .padding(12)
                     .panelCard()
@@ -672,15 +677,17 @@ struct MCPActiveCard: View {
                     Text("Sharing \(host.project?.name ?? "") · keep Pythilo open").font(.system(size: 13.5)).foregroundStyle(AppTheme.muted)
                 }
                 Spacer()
-                Button("Stop sharing") { host.stop() }
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(AppTheme.coralInk)
-                    .padding(.horizontal, 12)
-                    .frame(height: 44)
-                    .background(AppTheme.coralFill, in: Capsule())
-                    .overlay { Capsule().stroke(AppTheme.coral, lineWidth: 1) }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("mcp-stop")
+                Button { host.stop() } label: {
+                    Text("Stop sharing")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(AppTheme.coralInk)
+                        .padding(.horizontal, 12)
+                        .frame(height: 44)
+                        .background(AppTheme.coralFill, in: Capsule())
+                        .overlay { Capsule().stroke(AppTheme.coral, lineWidth: 1) }
+                }
+                .buttonStyle(.app)
+                .accessibilityIdentifier("mcp-stop")
             }
 
             ForEach(host.pending) { request in
@@ -700,19 +707,23 @@ struct MCPActiveCard: View {
                             .foregroundStyle(AppTheme.secondary)
                     }
                     HStack(spacing: 8) {
-                        Button("Deny") { host.answer(request, allow: false) }
-                            .font(.system(size: 15, weight: .semibold))
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 11))
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("mcp-deny")
-                        Button("Allow once") { host.answer(request, allow: true) }
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(AppTheme.onRun)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(AppTheme.run, in: RoundedRectangle(cornerRadius: 11))
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("mcp-allow")
+                        Button { host.answer(request, allow: false) } label: {
+                            Text("Deny")
+                                .font(.system(size: 15, weight: .semibold))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 11))
+                        }
+                        .buttonStyle(.app)
+                        .accessibilityIdentifier("mcp-deny")
+                        Button { host.answer(request, allow: true) } label: {
+                            Text("Allow once")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(AppTheme.onRun)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(AppTheme.run, in: RoundedRectangle(cornerRadius: 11))
+                        }
+                        .buttonStyle(.app)
+                        .accessibilityIdentifier("mcp-allow")
                     }
                 }
                 .padding(12)
@@ -739,14 +750,16 @@ struct MCPActiveCard: View {
                             .font(.system(size: 12.5, design: .monospaced))
                             .textSelection(.enabled)
                     }
-                    Button(copied ? "Copied" : "Copy command") {
+                    Button {
                         UIPasteboard.general.string = host.command(for: client)
                         copied = true
+                    } label: {
+                        Text(copied ? "Copied" : "Copy command")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 10))
                     }
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(AppTheme.raised, in: RoundedRectangle(cornerRadius: 10))
-                    .buttonStyle(.plain)
+                    .buttonStyle(.app)
                     Text("Any other MCP client: Streamable HTTP at \(host.address ?? ""), with the same bearer token. The token ends when you stop sharing.")
                         .font(.system(size: 13))
                         .foregroundStyle(AppTheme.muted)
@@ -817,7 +830,7 @@ struct RoomSheet: View {
                             } label: {
                                 Label("Share as a room", systemImage: "plus").playgroundButton(.primary)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.app)
                             .accessibilityIdentifier("workspace-room-share")
                             if let reason = rooms.unavailableReason {
                                 Text(reason).font(.system(size: 13)).foregroundStyle(AppTheme.muted)
@@ -832,7 +845,7 @@ struct RoomSheet: View {
                                 } label: {
                                     Text("Connect an AI client").playgroundButton(.secondary)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.app)
                             }
                         }
                         .padding(16)

@@ -155,7 +155,7 @@ struct FileTreeView: View {
                 .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.app)
             if node.isDirectory {
                 Button {
                     creatingIn = NewItemTarget(folder: node.path)
@@ -166,7 +166,7 @@ struct FileTreeView: View {
                         .frame(width: 36, height: rowHeight)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.app)
                 .accessibilityLabel("New item in \(node.name)")
             }
         }
@@ -332,13 +332,15 @@ struct NewItemSheet: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
                                     ForEach(templates, id: \.0) { item in
-                                        Button(item.0) { template = item.0 }
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .foregroundStyle(template == item.0 ? AppTheme.selectionInk : AppTheme.primary)
-                                            .padding(.horizontal, 12)
-                                            .frame(height: 44)
-                                            .background(template == item.0 ? AppTheme.selection : AppTheme.raised, in: RoundedRectangle(cornerRadius: 10))
-                                            .buttonStyle(.plain)
+                                        Button { template = item.0 } label: {
+                                            Text(item.0)
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundStyle(template == item.0 ? AppTheme.selectionInk : AppTheme.primary)
+                                                .padding(.horizontal, 12)
+                                                .frame(height: 44)
+                                                .background(template == item.0 ? AppTheme.selection : AppTheme.raised, in: RoundedRectangle(cornerRadius: 10))
+                                        }
+                                        .buttonStyle(.app)
                                     }
                                 }
                             }
