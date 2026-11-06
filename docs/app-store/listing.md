@@ -42,4 +42,7 @@ PyTorch artwork explains downloading packages before offline CPU training. Apple
 replacement filenames are `03-learn-430-100.jpg`, `04-labs-120.jpg` and
 `05-pytorch-downloads.jpg`; local sources retain their original filenames.
 All eight assets were read back as COMPLETE on 6 November 2026. Build 26 notes
-in English and Russian are saved in `testflight-26.json`. No review is requested.
+in English and Russian are saved in `testflight-26.json`. TestFlight 0.1.0 (26)
+is VALID and IN_BETA_TESTING for the existing internal group, confirmed at
+22:07:20 UTC on 6 November 2026. No Beta App Review submission exists; the
+App Store draft stays PREPARE_FOR_SUBMISSION with MANUAL release.

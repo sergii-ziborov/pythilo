@@ -564,3 +564,11 @@ Proof: `build/release-receipts/testflight-26-archive-source.json`. Apple accepte
 the upload at 21:46:55 UTC on 6 November 2026. Notes are preserved in
 `docs/app-store/testflight-26.json`. All eight screenshot assets are COMPLETE;
 the App Store draft remains PREPARE_FOR_SUBMISSION with manual release.
+
+TestFlight 0.1.0 (26) reached VALID at 22:06:20 UTC and is IN_BETA_TESTING for
+the existing internal group, confirmed at 22:07:20 UTC on 6 November 2026. The
+group has one tester and automatic access to all builds. English and Russian
+notes exactly match `docs/app-store/testflight-26.json`. No Beta App Review
+submission exists. App Store 1.0 remains PREPARE_FOR_SUBMISSION with MANUAL release;
+no App Review or Beta App Review was requested. Final proof:
+`build/release-receipts/testflight-26-ready.json`.
