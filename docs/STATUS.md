@@ -495,6 +495,13 @@ on the exact verified image at 17:04:02 UTC; receipts are in
 `build/release-receipts/torch18-site-release.json`. Public audit passes 179 URLs,
 isolation headers and all 82 pairs; smoke and real-browser checks pass. Public
 proofs: `build/verification/pythilo-torch18-catalog-live.png` and
-`build/verification/pythilo-torch18-lesson-mobile-live.png`. TestFlight upload and
-processing are being checked separately; no App Review or Beta App Review was
-requested.
+`build/verification/pythilo-torch18-lesson-mobile-live.png`.
+
+TestFlight 0.1.0 (25) is available to the existing internal group, confirmed at
+17:33:59 UTC on 6 November 2026: Apple processing `VALID`, internal state
+`IN_BETA_TESTING`, one tester, automatic access to all builds. Upload completed
+at 17:06:34 UTC; processing reached `VALID` at 17:33:42 UTC. English and Russian
+notes exactly match `build/testflight/build-25-notes.json`. No Beta App Review
+submission exists; App Store 1.0 remains `PREPARE_FOR_SUBMISSION` with manual
+release. No App Review or Beta App Review was requested. Proof:
+`build/release-receipts/testflight-25-ready.json`.
