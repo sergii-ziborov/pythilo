@@ -307,5 +307,14 @@ Evidence: `build/verification/hit-target-before.xcresult`,
 `hit-target-after-iphone.xcresult`, `hit-target-after-ipad.xcresult` and
 `editor-run-output.xcresult`. The initial iPad suite had one assertion failure for
 that trait; the corrected stdout assertion passes on both devices. The release
-archive and export for version 0.1.0, build 20, succeeded. TestFlight upload is in
-progress; no App Review or Beta App Review is requested.
+archive and export for version 0.1.0, build 20, succeeded. Apple accepted the
+TestFlight upload at 06:59:05 UTC on 6 November 2026. Build upload
+`b126c843-4ae6-45c4-9776-868cd1b73968` completed processing at 07:25:22 UTC
+(09:25 locally) and is VALID / IN_BETA_TESTING for the existing internal group
+with one tester. Final readback confirms build 20, its tap-target test notes,
+and the App Store 1.0 draft still PREPARE_FOR_SUBMISSION with MANUAL release.
+No App Review or Beta App Review was requested. Upload validation has no errors
+or warnings; Xcode separately reported missing dSYMs in 92 vendored Python
+frameworks. Pythilo's own app dSYM is present. Receipt:
+`build/release-receipts/button-targets-build-20.json`. Both dedicated Pythilo
+simulators have been shut down.
