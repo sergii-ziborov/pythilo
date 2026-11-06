@@ -54,7 +54,7 @@ boundary, and the app says so.
 
 | Item | State |
 | --- | --- |
-| 256 lessons in 19 courses and 100 interview tasks | Every solution passes inside the app on the simulator (`testEveryBundledLessonSolutionPassesOnTheDevice`); all 120 lessons/tasks in the expanded courses pass the authoring verifier, including starter failures |
+| 308 lessons in 23 courses and 100 interview tasks | All 408 solutions pass inside the app on the simulator (`testEveryBundledLessonSolutionPassesOnTheDevice`). All 465 reading blocks also execute independently (`testEveryReadingExampleRunsIndependentlyOnTheDevice`). |
 | PyTorch on the device | torch-ios conformance suite matches a Mac on 203 groups of operations in the simulator (`testPyTorchMatchesTheReferenceBuild`); not yet run on a physical iPhone |
 | Learn screens: path, course timeline, lesson read and code modes, check sheet | Checked on the simulator. Drawn on the canvas, iPad lesson included |
 | Failed checks say what came back and what was expected | Checked against every lesson's starter code on the Mac |
@@ -318,3 +318,28 @@ or warnings; Xcode separately reported missing dSYMs in 92 vendored Python
 frameworks. Pythilo's own app dSYM is present. Receipt:
 `build/release-receipts/button-targets-build-20.json`. Both dedicated Pythilo
 simulators have been shut down.
+
+## Library lessons and executable reading audit — 6 November 2026
+
+Added 52 lessons: Pydantic 2 (20), FastAPI/HTTPX (14), practical testing (10), and
+file/data formats (8). The catalog now contains 308 path lessons in 23 courses and
+100 interview tasks. The lesson sources and runtime version matrix are documented
+in `docs/LESSON-SOURCES.md`. Pydantic validators, RootModel/TypeAdapter, ASGI and
+mock HTTP transports, actual pytest fixtures, and format examples run using real
+libraries. Each new lesson has three checks and three topic-specific hints.
+
+Native simulator gates executed all 408 worked solutions and all 465 reading
+blocks independently, without skips. This caught and repaired eight old reading
+examples and a module-registration bug in the checker affecting Pydantic generics.
+Two UI tests pass: a reading example opens a correctly titled Output sheet, and
+a RootModel solution passes through the actual Check button. The report sheet now
+uses its run/check kind as the presentation identity, fixing a stale zero-check
+heading on successful Run output.
+
+The website is published; `site/DEPLOY.md` records the final image and receipts.
+All 82 site tests and production checks pass, including 362 browser solutions,
+417 browser reading examples, all 52 new URLs, and cold-start package discovery.
+Native-only reading blocks now explicitly say which package/feature requires the
+app. Production browser checks ran Pydantic and FastAPI/HTTPX examples and passed
+their exercise checks. The package catalog has a content-derived URL to avoid
+stale browser caches after adding libraries.

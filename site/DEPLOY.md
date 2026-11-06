@@ -181,3 +181,36 @@ same 112 blocks inside the app and passes. The production build and public smoke
 check pass. A browser check on production ran the first task's example and showed
 `[4, 1, 2, 3]`, exit 0; existing Home/Labs tabs were refreshed to the current counts.
 The screenshot is `build/verification/pythilo-interview-example-fixed-live.jpg`.
+
+The library-course expansion was verified in production on 6 November 2026. It
+adds 52 lessons: Pydantic 2 (20), FastAPI/HTTPX (14), practical testing (10), and
+data/file formats (8). Totals are 308 path lessons in 23 courses plus 100 interview
+tasks; Labs remain 52 native and 30 browser. Eight older reading blocks were made
+self-contained. The shared checker registers its temporary module so Pydantic
+RootModel generics work, and restores interpreter state after checking.
+
+The final follow-up deployed at 09:08:31 UTC as image
+`sha256:4b3365290a3f5064436ea0a853e912d1ecc6922df2bc620fa63387f0641f9c59`,
+source revision
+`sha256:16999fd244d67cc89bb7dbaa798aa0e2deb6900aff507a24ac553a78655b8c60`,
+receipt `pythilo-package-catalog-deploy-20261106-v2`. Build receipt:
+`pythilo-package-catalog-build-20261106-v2`; registry receipt:
+`pythilo-package-catalog-publish-20261106-v2`. The initial content deployment
+`pythilo-library-courses-deploy-20261106-v1` was superseded by this fix for a cached
+package catalog. The worker now requests a catalog URL derived from its SHA-256,
+so an earlier browser visit cannot hide newly bundled Pydantic/FastAPI packages.
+Receipts are archived in `build/release-receipts/`.
+
+All 82 site tests, TypeScript and the 506-page production build pass. A fresh
+Pyodide instance discovers and executes Pydantic/FastAPI/HTTPX imports without
+manual package preloading. All 362 browser-compatible solutions and 417 reading
+blocks execute; 48 reading blocks explicitly require native packages or threads.
+All 52 new lesson routes return 200 with their expected title and isolation
+headers; the served worker matches the prepared artifact byte for byte. Public
+smoke checks pass for the relay, pages, worker, Wasm and headers. Production browser
+checks ran Pydantic and an async HTTPX ASGI request, both exit 0, then passed all
+three checks for each lesson. Home shows 308/23. Proof:
+`build/verification/pythilo-pydantic-live-passed.png`; logs:
+`build/logs/library-new-live-audit.json`, `library-final-public-smoke.log`,
+`expanded-site-tests-cold-start.log`. Native verification additionally executed
+all 408 solutions and all 465 reading blocks without skips.
