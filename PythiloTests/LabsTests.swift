@@ -45,9 +45,9 @@ final class LabsTests: XCTestCase {
     }
 
     func testTheCatalogHasSectionsAndManyLabs() {
-        XCTAssertEqual(LabCatalog.all.count, 72)
-        XCTAssertEqual(LabCatalog.all.filter { $0.section == .learning }.count, 33)
-        XCTAssertEqual(LabCatalog.all.filter { $0.section == .intelligence }.count, 16)
+        XCTAssertEqual(LabCatalog.all.count, 96)
+        XCTAssertEqual(LabCatalog.all.filter { $0.section == .learning }.count, 45)
+        XCTAssertEqual(LabCatalog.all.filter { $0.section == .intelligence }.count, 28)
         XCTAssertNotNil(LabCatalog.lab("attention"))
         XCTAssertNotNil(LabCatalog.lab("bellmanford"))
         XCTAssertNotNil(LabCatalog.lab("logistic"))

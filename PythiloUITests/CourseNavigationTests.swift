@@ -2,6 +2,51 @@ import XCTest
 
 @MainActor
 final class CourseNavigationTests: XCTestCase {
+    func testSystemsProjectLabRunsAndOpensItsLesson() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-tab", "labs", "-openLab", "indexproject"]
+        app.launch()
+        let answer = app.buttons["lab-answer"]
+        XCTAssertTrue(answer.waitForExistence(timeout: 30))
+        for _ in 0..<8 {
+            if answer.isHittable { break }
+            app.swipeUp()
+        }
+        answer.tap()
+        app.buttons["Use it"].tap()
+        app.buttons["lab-trace"].coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.82)).tap()
+        XCTAssertTrue(app.staticTexts["Every check passed"].waitForExistence(timeout: 30))
+        let lesson = app.buttons["lab-lesson-project-indexproject"]
+        for _ in 0..<10 {
+            if lesson.isHittable { break }
+            app.swipeDown()
+        }
+        lesson.tap()
+        XCTAssertTrue(app.buttons["lesson-lab-indexproject"].waitForExistence(timeout: 10))
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "systems-project-native-linked"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    func testRidgeProjectSolutionPassesThroughTheLessonUI() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-tab", "learn", "-openLesson", "project-ridgeworkflow", "-lessonMode", "code"]
+        app.launch()
+        XCTAssertTrue(app.buttons["lesson-check"].waitForExistence(timeout: 30))
+        for number in 1...3 { app.buttons["Hint \(number) of 3"].tap() }
+        app.buttons["Solution"].tap()
+        app.buttons["Show the solution"].tap()
+        app.buttons["lesson-check"].coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.18)).tap()
+        XCTAssertTrue(app.navigationBars["All checks passed"].waitForExistence(timeout: 30))
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "ridge-project-native-passed"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testLabTabCanOpenItsRelatedLessonAndReturnToPractice() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

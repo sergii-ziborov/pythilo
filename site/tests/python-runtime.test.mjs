@@ -125,7 +125,7 @@ test("lesson checks register their module and restore module/path state on succe
 });
 
 test("course content is built from the app's files, and lessons needing missing packages say so", () => {
-  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview", "algorithm-patterns", "data-practice", "reliable-python", "ml-practice", "ml-evaluation", "ai-building-blocks", "pydantic", "fastapi-httpx", "testing-practice", "data-formats", "python-runtime", "python-systems", "ml-statistics", "ml-production", "ai-production", "deep-learning-practice", "senior-projects"]);
+  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview", "algorithm-patterns", "data-practice", "reliable-python", "ml-practice", "ml-evaluation", "ai-building-blocks", "pydantic", "fastapi-httpx", "testing-practice", "data-formats", "python-runtime", "python-systems", "ml-statistics", "ml-production", "ai-production", "deep-learning-practice", "senior-projects", "ml-systems", "ai-systems"]);
   const all = courses.flatMap(course => course.lessons);
   assert.ok(all.every(lesson => lesson.sections[0].chip === "Idea" && lesson.checks.length && lesson.starter));
   const lessonsOf = id => courses.find(course => course.id === id).lessons;
@@ -145,6 +145,30 @@ test("lesson Markdown keeps sections, fenced Python and inline code", () => {
   assert.deepEqual(tokens.filter(token => token.className).map(token => [token.text, token.className]), [["def", "py-keyword"], ["f", "py-function"], ["return", "py-keyword"], ["'x'", "py-string"], ["# c", "py-comment"]]);
 });
 
+
+test("a fresh Lab runtime discovers NumPy and completes a model project", async () => {
+  const fresh = await loadPyodide({ indexURL: site + "node_modules/pyodide/", lockFileURL: fileURLToPath(lock), packageCacheDir: site + "public/pyodide/" });
+  assert.equal(fresh.runPython("import importlib.util; importlib.util.find_spec('numpy') is None"), true);
+  const lab = browserLabs.find(item => item.id === 'ridgeworkflow');
+  const files = labFiles(lab.id, lab.answer);
+  const python = Object.entries(files).filter(([path]) => path.endsWith('.py')).map(([,source]) => source).join('\n');
+  await fresh.loadPackagesFromImports(python, { messageCallback: () => {}, errorCallback: () => {} });
+  let stdout = '', stderr = '';
+  fresh.setStdout({ write: bytes => { stdout += new TextDecoder().decode(bytes); return bytes.length; } });
+  fresh.setStderr({ write: bytes => { stderr += new TextDecoder().decode(bytes); return bytes.length; } });
+  fresh.FS.mkdirTree(SHIM_ROOT + '/pythilo_runtime');
+  fresh.FS.writeFile(SHIM_ROOT + '/pythilo_runtime/__init__.py', LESSON_SHIM);
+  fresh.FS.writeFile(SHIM_ROOT + '/pythilo_runtime/lessons.py', JSON.parse(readFileSync(new URL('../content/lessons-checker.json', import.meta.url))).source);
+  fresh.runPython(`import sys, types\nsys.path.append(${JSON.stringify(SHIM_ROOT)})\nm = types.ModuleType('_pythilo_cold_lab')\nexec(compile(${JSON.stringify(RUNNER_SOURCE)}, '<pythilo>', 'exec'), m.__dict__)\nsys.modules['_pythilo_cold_lab'] = m`);
+  const coldRunner = fresh.pyimport('_pythilo_cold_lab');
+  const response = JSON.parse(coldRunner.run(JSON.stringify(files), 'main.py'));
+  assert.equal(response.exitCode, 0, stderr);
+  const report = readLabResult(stdout);
+  assert.equal(report.correct, true, report.message);
+  assert.equal(report.checks.length, 4);
+  assert.equal(report.truncated, false);
+  assert.ok(report.frames.length >= 3);
+});
 
 test("all browser labs trace actual edited code, accept worked answers and reject starters in Pyodide", () => {
   for (const lab of browserLabs) {
@@ -193,7 +217,7 @@ test("every browser-compatible reading example in all courses runs independently
     checked++;
   }
   assert.deepEqual(failures, []);
-  assert.equal(checked + unavailable, 539);
+  assert.equal(checked + unavailable, 563);
   assert.ok(checked > 400);
   console.log(`Reading examples verified in browser: ${checked}; app-only: ${unavailable}`);
 });

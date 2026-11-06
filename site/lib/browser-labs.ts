@@ -17,8 +17,11 @@ const RESULT = '__PYTHILO_LAB_RESULT__';
 export function labFiles(id: string, source: string): Record<string,string> {
   return {
     ...Object.fromEntries(Object.entries(labSources).map(([name,text]) => [`pythilo_labs_web/${name}`,text])),
+    // Package discovery scans actual Python files before execution. Keeping
+    // learner code only inside a JSON string hides its NumPy imports.
+    '_pythilo_lab_solution.py': source,
     'pythilo_labs_web/__init__.py': 'events = []\ndef emit_json(kind, payload):\n    events.append((kind, payload))\n',
-    'main.py': `import json\nfrom pythilo_labs_web import events, labs_engine\nlabs_engine.MAXIMUM_FRAMES = 180\nlabs_engine.run(${JSON.stringify({id:'web',lab:id,variant:'practice',source})})\nprint(${JSON.stringify(RESULT)} + json.dumps(events[-1][1], ensure_ascii=False))\n`,
+    'main.py': `import json\nfrom pathlib import Path\nfrom pythilo_labs_web import events, labs_engine\nlabs_engine.MAXIMUM_FRAMES = 180\njob = ${JSON.stringify({id:'web',lab:id,variant:'practice'})}\njob['source'] = Path('_pythilo_lab_solution.py').read_text()\nlabs_engine.run(job)\nprint(${JSON.stringify(RESULT)} + json.dumps(events[-1][1], ensure_ascii=False))\n`,
   };
 }
 export function readLabResult(stdout: string): LabResult {

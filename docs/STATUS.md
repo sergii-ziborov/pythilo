@@ -403,3 +403,46 @@ submission exists; App Store 1.0 remains `PREPARE_FOR_SUBMISSION` with manual
 release. Proof: `build/release-receipts/testflight-23-ready.json`. Upload completed
 at 11:58:56 UTC; Apple finished processing at 12:30:24 UTC. No App Review or Beta
 App Review was requested.
+
+## ML/AI systems projects and Labs (6 November 2026)
+
+Added 24 linked lessons and Labs, including 12 composed projects: 12 ML Labs and
+12 AI Labs. Totals are 406 path lessons in 32 courses plus 100 interview tasks,
+96 native Labs (45 ML, 28 AI), 74 browser Labs and 64 reciprocal lesson/Lab pairs.
+The advanced paths now contain 98 lessons, including 18 integration projects.
+
+The ML projects train real NumPy ridge/logistic models, audit nested group
+selection, walk-forward evaluation and OOF stacking, restore a validation
+checkpoint and track delayed-label cohort rollout state. AI projects implement
+authorized BM25, versioned index updates/tombstones, bounded context and exact
+evidence spans, approved local tool DAGs, scheduling and paired release evidence.
+Saved provider-output fixtures and discrete serving simulations are explicitly
+identified. Project traces follow the main orchestration function; helper
+computations execute and have independent checks. Local state copies do not claim
+durable distributed effects, and a valid quote does not prove claim entailment.
+
+All 506 solutions, 563 independent reading blocks, 98 advanced starters and every
+Lab variant answer/starter pass in iOS Simulator. The 20 selected native tests
+also cover project Check/Trace through the UI, lesson links in both directions,
+catalog counts and seven button padding/corner scenarios. Result bundle:
+`build/verification/projects24-native.xcresult`. Proofs:
+`build/verification/pythilo-projects24-ridge-native.png` and
+`build/verification/pythilo-projects24-linked-native.png`.
+
+All 87 site tests pass, including 452 browser solutions, 507 reading blocks and
+all 74 browser Lab answers/starters. A fresh-interpreter regression verifies
+NumPy discovery and a complete model-project trace. Learner source now has its
+own Python file in the worker request so package discovery can see its imports;
+embedding it solely in a JSON string had hidden NumPy on first Lab use. The
+scoped Lab lesson-link style wraps long project titles; a real 390px browser
+check confirms no horizontal overflow. The public model project runs its example,
+passes four lesson checks, traces to 31/31 with four passing Lab checks and links
+back to the lesson. Proofs: `build/verification/pythilo-projects24-ridge-live.png`
+and `build/verification/pythilo-projects24-ridge-mobile.png`.
+
+The final website image and receipts are recorded in `site/DEPLOY.md`. Production
+audits pass for 133 URLs, isolation headers and all 64 reciprocal link pairs.
+The Release archive for TestFlight 0.1.0 (24) matches 242 current source files,
+including 33 course JSON files and the new project engine. Archive proof:
+`build/release-receipts/testflight-24-archive-source.json`. Apple accepted upload
+at 15:51:24 UTC; internal TestFlight processing is being checked separately.

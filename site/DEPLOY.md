@@ -240,3 +240,31 @@ checking. Production audits cover all 94 new lesson/Lab routes, three paths and
 reading example, passed the ROC AUC lesson's three checks, replayed its Lab to
 step 11/11 with three passing checks and returned through the lesson link after
 client navigation. Proof: `build/verification/pythilo-senior-lab-live.png`.
+
+The ML/AI systems expansion adds 24 lessons and 24 Labs, including 12 larger
+projects. Totals are 406 path lessons in 32 courses plus 100 interview tasks,
+96 native Labs (45 ML, 28 AI), 74 browser Labs and 64 reciprocal lesson/Lab pairs.
+The advanced paths list 18 integration projects. All new code uses stdlib or the
+NumPy already bundled in both runtimes. Saved provider outputs and scheduling
+simulations are explicitly distinguished from actual model/GPU serving.
+
+Final deployment `pythilo-projects24-layout-deploy-20261106-v3` succeeded at
+15:56:01 UTC on 6 November 2026. Serving image:
+`sha256:d96b323fc0e4480f5cbe35731aefd4163c6b0ae86e2cc673afa3f017acbdcffd`;
+source revision:
+`sha256:981d04a257397a797b118bb2e3aa20bc50da3bea9d8c82cffbf6f92af927c69e`.
+Build/publish receipts use the corresponding `pythilo-projects24-layout-…-20261106-v3`
+keys; archive: `build/release-receipts/projects24-layout-site-release.json`.
+Earlier content and cold-start receipts are retained in `projects24-site-release.json`
+and `projects24-cold-site-release.json` in that directory.
+
+The worker receives learner code as an actual Python file before import discovery,
+so an independent Lab runtime loads NumPy without relying on an earlier lesson.
+A scoped wrapping style prevents a long Read lesson link from widening the page.
+All 87 site tests, TypeScript and the 658-page production build pass. Production
+audits cover 133 URLs/headers and all 64 reciprocal pairs; the public smoke suite
+passes. Real-browser verification runs the ridge example and four lesson checks,
+loads and traces the Lab answer to step 31/31 with four passing checks, confirms
+390px page width at a 390px viewport and follows the lesson link back. Desktop
+and mobile screenshots: `build/verification/pythilo-projects24-ridge-live.png` and
+`build/verification/pythilo-projects24-ridge-mobile.png`.

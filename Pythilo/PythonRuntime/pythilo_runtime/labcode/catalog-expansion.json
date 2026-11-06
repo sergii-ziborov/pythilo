@@ -1018,5 +1018,509 @@
         "scales": false
       }
     ]
+  },
+  {
+    "id": "multiclassloss",
+    "title": "Weight stable multiclass cross-entropy by observations",
+    "summary": "Return the weighted mean multiclass negative log likelihood.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "mint",
+    "section": "Machine learning",
+    "idea": "Compare shifted and unshifted logits, duplicated weighted observations and a confidently wrong class. Review label identities and the weight denominator before optimizing the kernel.",
+    "lessons": [
+      "systems-multiclassloss"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Return the weighted mean multiclass negative log likelihood. Subtract each row maximum before exponentiation. Require aligned nonempty batches, rectangular logits with at least two classes, finite values, integer class indices, nonnegative finite weights and a positive total weight. The denominator is total observation weight, not batch length.",
+        "file": "multiclassloss.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "ndcg",
+    "title": "Evaluate graded ranking with a normalized ideal order",
+    "summary": "Return NDCG at positive integer k.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "mint",
+    "section": "Machine learning",
+    "idea": "Inspect judgments, deduplication and the undefined all-zero case. A perfect NDCG on a tiny fixture says nothing about an unmeasured query population.",
+    "lessons": [
+      "systems-ndcg"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Return NDCG at positive integer k. Deduplicate ranked IDs in first-occurrence order before applying k. Missing IDs have relevance zero. Use gain 2**grade-1 and discount log2(rank+1), with rank starting at one. The ideal order uses all grades sorted descending. Return None when ideal gain is zero. Grades must be integers in 0..10.",
+        "file": "ndcg.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "clusterbootstrap",
+    "title": "Bootstrap independent groups rather than correlated rows",
+    "summary": "Compute each string group's mean paired difference; give groups equal weight.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "mint",
+    "section": "Machine learning",
+    "idea": "Defend the independent unit, weighting and interval method. A bootstrap does not repair biased logging, nonstationarity or unrepresentative evaluation cases.",
+    "lessons": [
+      "systems-clusterbootstrap"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Compute each string group's mean paired difference; give groups equal weight. With random.Random(seed), resample that list of means with replacement, drawing the same number of groups per repetition. Return estimate, low, high and groups. The 95% percentile bounds linearly interpolate sorted bootstrap estimates at positions (R-1)*.025 and (R-1)*.975. Require at least two groups, aligned nonempty finite deltas and integer repetitions>=2.",
+        "file": "clusterbootstrap.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "offpolicy",
+    "title": "Audit a clipped inverse-propensity estimate",
+    "summary": "Events are [reward, logging_probability, target_probability].",
+    "symbol": "chart.xyaxis.line",
+    "tint": "mint",
+    "section": "Machine learning",
+    "idea": "Review propensity provenance, exploration support, clipping bias and the independent unit. A large ESS does not establish unbiased logged data.",
+    "lessons": [
+      "systems-offpolicy"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Events are [reward, logging_probability, target_probability]. Return value=mean(reward*min(target/logging,clip)), mean_weight, and ESS=(sum weights)**2/sum squared weights (zero if all weights vanish). This is clipped IPS, not self-normalized IPS. Require nonempty finite events, logging probabilities in (0,1], target probabilities in [0,1], and positive finite clip.",
+        "file": "offpolicy.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "temperature",
+    "title": "Select temperature on a held-out calibration split",
+    "summary": "Evaluate stable mean multiclass log loss for each distinct positive finite temperature in grid.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "mint",
+    "section": "Machine learning",
+    "idea": "Keep calibration, model development and final evaluation populations separate. Inspect subgroup calibration and proper scoring rules rather than only classification accuracy.",
+    "lessons": [
+      "systems-temperature"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Evaluate stable mean multiclass log loss for each distinct positive finite temperature in grid. Divide logits by temperature; choose minimum loss with smaller temperature breaking exact ties. Return temperature and loss. Require aligned nonempty rectangular finite logits with >=2 classes and integer target identities. These inputs are calibration data, never training or final test labels.",
+        "file": "temperature.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "isotonic",
+    "title": "Pool adjacent violations in weighted isotonic calibration",
+    "summary": "Combine equal finite scores before fitting.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "mint",
+    "section": "Machine learning",
+    "idea": "Fit on held-out calibration data. Define prediction behavior between blocks and outside the observed range before using the mapping in a serving artifact.",
+    "lessons": [
+      "systems-isotonic"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Combine equal finite scores before fitting. Each tied score starts one block with total positive weight and total weight. Visit ascending scores and merge adjacent blocks while their positive-weight ratios decrease. Return [minimum_score, maximum_score, fitted_probability] per remaining block. Require aligned nonempty scores, binary integer labels and strictly positive finite weights. Keep equal neighboring fitted probabilities as separate blocks unless a decrease triggers a merge.",
+        "file": "isotonic.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "ridgeworkflow",
+    "title": "Project: fit, select, refit and serialize a ridge workflow",
+    "summary": "Rows contain unique string id, numeric feature list x and target y.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "mint",
+    "section": "Machine learning",
+    "idea": "Review every fitted statistic's provenance. Reproduce predictions after JSON serialization, test constant columns, poison held-out labels and explain how dataset/schema versions would enter a real artifact registry. Replay follows the main orchestration function; helper computations execute and are checked separately.",
+    "lessons": [
+      "project-ridgeworkflow"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Rows contain unique string id, numeric feature list x and target y. Require three nonempty identity-disjoint finite rectangular partitions and positive finite penalties. For each penalty, fit population means/stds and centered-target ridge only on train; constant-feature scale is one. Select minimum validation MSE, smaller penalty on an exact tie. Refit preprocessing and ridge on train+validation, then evaluate test once. Return alpha, validation_mse, test_mse, predictions, fit_ids and a JSON-compatible artifact with means, scales, coefficients and unpenalized intercept. Solve (Z.T@Z+alpha*I)w=Z.T@(y-mean_y).",
+        "file": "ridgeworkflow.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "nestedridge",
+    "title": "Project: nested group validation with auditable outer predictions",
+    "summary": "Rows have unique id, string group, finite scalar x,y.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "mint",
+    "section": "Machine learning",
+    "idea": "Explain inner selection versus outer evaluation, group weighting and the final refit that would follow evaluation. Audit sample identities, not only aggregate scores. Replay follows the main orchestration function; helper computations execute and are checked separately.",
+    "lessons": [
+      "project-nestedridge"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Rows have unique id, string group, finite scalar x,y. Require at least three groups and positive finite penalties. Outer leave-one-group-out evaluation must exclude that group's rows from both tuning and fitting. For each penalty, inner leave-one-group-out validation over the remaining groups computes equal-fold mean MSE; choose (MSE,penalty) minimum. Fit centered one-feature ridge with slope=sum((x-mx)*(y-my))/(sum((x-mx)**2)+alpha), unpenalized intercept. Return oof mapping, row-weighted outer mse and folds with group, alpha, fit_ids, held_ids.",
+        "file": "nestedridge.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "walkforward",
+    "title": "Project: walk-forward forecasts with delayed labels and a purge gap",
+    "summary": "Rows have unique id and finite t, available, x,y; available>=t.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "mint",
+    "section": "Machine learning",
+    "idea": "Review both clocks, the gap convention, overlapping windows and insufficient history. A production backtest also needs historical feature availability and immutable data snapshots. Replay follows the main orchestration function; helper computations execute and are checked separately.",
+    "lessons": [
+      "project-walkforward"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Rows have unique id and finite t, available, x,y; available>=t. Cutoffs are finite, unique and strictly increasing; horizon>0 and gap>=0 are finite. At each cutoff, fit only rows with t<=cutoff-gap and label available<=cutoff. Forecast rows cutoff<t<=cutoff+horizon. Fit the centered one-feature ridge formula with penalty .1. Return one window with cutoff,status; evaluated windows also contain train_ids,held_ids,predictions,mse. Return status insufficient if fewer than two fitting rows or no held rows. Evaluation uses offline future truth; it must not enter fitting.",
+        "file": "walkforward.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "stackingproject",
+    "title": "Project: train a stacking model from out-of-fold base predictions",
+    "summary": "Training rows have disjoint unique id, fold, finite scalar x,y; test rows need id,x only.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "mint",
+    "section": "Machine learning",
+    "idea": "Audit that every OOF feature excludes its target row's fold. Use an outer evaluation loop for the complete stack and defend fold construction before trusting an ensemble score. Replay follows the main orchestration function; helper computations execute and are checked separately.",
+    "lessons": [
+      "project-stackingproject"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Training rows have disjoint unique id, fold, finite scalar x,y; test rows need id,x only. Require >=4 training rows, >=2 folds and >=2 fitting rows per held fold. Base learners are centered raw polynomial ridge models of degree 1 and 2, penalty .1 and unpenalized intercept. Form two OOF features per training row using only other folds. Fit a centered two-feature ridge meta-model with penalty .001 on OOF features. Refit bases on all training rows for test prediction. Return oof, folds with fit_ids/held_ids, meta weights,bias and predictions.",
+        "file": "stackingproject.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "logisticproject",
+    "title": "Project: train logistic regression and restore the best validation checkpoint",
+    "summary": "Require nonempty identity-disjoint rectangular finite feature partitions with binary integer y, positive finite learning_rate, integer steps>=1 and finite l2>=0.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "mint",
+    "section": "Machine learning",
+    "idea": "Review gradient normalization, regularization, fitted transformations and checkpoint ownership. Explain validation selection bias and preserve an independent final test population. Replay follows the main orchestration function; helper computations execute and are checked separately.",
+    "lessons": [
+      "project-logisticproject"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Require nonempty identity-disjoint rectangular finite feature partitions with binary integer y, positive finite learning_rate, integer steps>=1 and finite l2>=0. Standardize from train population means/stds only; constant scales become one. Start weights/bias at zero. Each full-batch gradient step uses mean sigmoid error, L2 on weights only, then measures unregularized validation log loss. Keep the earliest strict best checkpoint by copying weights. Restore it for final test evaluation. Return weights,bias,means,scales,best_step,validation_loss,test_loss,predictions and validation history. Use stable logaddexp for sigmoid and loss.",
+        "file": "logisticproject.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "rolloutmonitor",
+    "title": "Project: make a replay-safe, cohort-aware rollout monitor",
+    "summary": "Predictions have unique id,cohort,baseline,candidate probabilities; outcomes have unique id,binary integer y,finite available.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "mint",
+    "section": "Machine learning",
+    "idea": "Review delayed-label coverage, cohort policy, sequential monitoring and replay state. A two-window rule is an operational policy, not a statistical significance test. Replay follows the main orchestration function; helper computations execute and are checked separately.",
+    "lessons": [
+      "project-rolloutmonitor"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Predictions have unique id,cohort,baseline,candidate probabilities; outcomes have unique id,binary integer y,finite available. Pair only outcomes available<=finite asof. For every predicted cohort compute count and mean(candidate squared error - baseline squared error). A window has enough evidence only if every cohort reaches positive integer min_pairs. It is bad if sufficient and any cohort delta>nonnegative finite tolerance. Track consecutive bad windows, resetting on all other windows; rollback after two and latch rollback forever. Otherwise return continue for sufficient good evidence, hold otherwise. Window is a nonnegative increasing integer; identical canonical payload replay returns copied state, conflicting or older windows raise ValueError. Never mutate input state.",
+        "file": "rolloutmonitor.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "mmr",
+    "title": "Diversify retrieved evidence with maximal marginal relevance",
+    "summary": "Documents contain unique string id and finite vector matching a nonempty finite query vector.",
+    "symbol": "cpu",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Review the embedding metric, relevance weight, duplicate policy and tie behavior. Permission filtering must happen before these candidates reach the reranker.",
+    "lessons": [
+      "systems-mmr"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Documents contain unique string id and finite vector matching a nonempty finite query vector. Require integer k>=0 and relevance_weight in [0,1]. Greedily maximize weight*cos(query,document)-(1-weight)*maximum cosine to an already selected document, using zero redundancy for the first choice. A zero vector has cosine zero. Break score ties by smaller id. Return selected IDs, never repeating a document.",
+        "file": "mmr.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "stopdecoder",
+    "title": "Stop token decoding across chunk boundaries",
+    "summary": "chunks and stops are lists of nonnegative integer-token lists; stop sequences cannot be empty.",
+    "symbol": "cpu",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Review overlapping stops, chunk splitting, budget precedence and incomplete prefixes. Token identities are fixtures; no model tokenizer or network stream is claimed to run here.",
+    "lessons": [
+      "systems-stopdecoder"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "chunks and stops are lists of nonnegative integer-token lists; stop sequences cannot be empty. Consume chunks incrementally, retaining output across chunk boundaries. After each token, first check complete stop suffixes and remove the longest matching stop; otherwise stop when output length reaches integer max_tokens>=0. Return tokens, reason (stop,budget,eof), consumed. Stop tokens count as consumed. A hard budget may expose an incomplete stop prefix; this contract does not promise prefix buffering.",
+        "file": "stopdecoder.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "kvplanner",
+    "title": "Reserve KV-cache memory with explicit grouped-query dimensions",
+    "summary": "Compute unpaged KV bytes per token as 2*layers*kv_heads*head_dim*bytes_per_element.",
+    "symbol": "cpu",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Compare the estimate with real accelerator measurements and paged-cache behavior. Treat memory reservation, throughput, fairness and latency as separate constraints.",
+    "lessons": [
+      "systems-kvplanner"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Compute unpaged KV bytes per token as 2*layers*kv_heads*head_dim*bytes_per_element. Reserve each request's prompt+maximum-output tokens. In input order admit requests that fit remaining byte capacity, skipping those that do not fit. Return admitted,rejected,reserved_bytes,bytes_per_token. IDs are unique. Dimensions are positive integers; capacity and token counts are nonnegative integers. This estimate excludes model weights, activations, allocator/page overhead and tensor parallel replication.",
+        "file": "kvplanner.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "strictschema",
+    "title": "Validate a closed structured-output schema without coercion",
+    "summary": "Return ordered path errors from root $.",
+    "symbol": "cpu",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Review schema-version compatibility and unsupported vocabulary. Structural validity alone does not establish permission, factual correctness or safe execution.",
+    "lessons": [
+      "systems-strictschema"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Return ordered path errors from root $. Support only type (object,array,string,integer,number,boolean,null), enum, closed-object properties/required/additionalProperties=False, array items/maxItems, string maxLength. Unknown or inapplicable schema keywords raise ValueError before checking data. Object children visit sorted keys, missing requirements first; arrays visit index order. Errors use :type,:enum,:missing,:extra,:length. Numeric booleans are not integers/numbers and numbers must be finite. enum uses exact Python type and equality. Omitted additionalProperties means closed. This is an explicit JSON-like subset, not a general JSON Schema implementation.",
+        "file": "strictschema.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "evalmatrix",
+    "title": "Require complete evaluation coverage before reporting category rates",
+    "summary": "expected is a nonempty versioned inventory of unique id,category rows.",
+    "symbol": "cpu",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Review inventory versioning, category balance and the definition of a passing case. Missing observations are not successful evaluations.",
+    "lessons": [
+      "systems-evalmatrix"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "expected is a nonempty versioned inventory of unique id,category rows. results contains unique id and explicit boolean passed. Require exactly the same identity set; missing, unknown and repeated cases raise ValueError. Return a category-sorted mapping with total,passed,rate and sorted failed IDs. Aggregate by inventory category, not a category supplied by the candidate. These are descriptive rates, not confidence estimates.",
+        "file": "evalmatrix.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "provenance",
+    "title": "Verify citation spans against versioned source digests",
+    "summary": "Sources have unique id,tenant,version,text,sha256 (UTF-8 digest).",
+    "symbol": "cpu",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Review source approval, version changes, Unicode offset conventions and claim support. Literal span matching is not an answer-faithfulness classifier.",
+    "lessons": [
+      "systems-provenance"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Sources have unique id,tenant,version,text,sha256 (UTF-8 digest). Each claim has text and citations containing source,start,end,quote. For each claim return ok and sorted unique errors. No citations gives missing. For each citation check known ID, exact tenant/version, recomputed source digest, integer code-point range 0<=start<end<=len(text), and exact quoted substring, in that order. Errors are id:unknown,scope,digest,range,quote. Duplicate source IDs raise ValueError. This validates provenance structure and literal spans, never semantic entailment.",
+        "file": "provenance.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "bm25project",
+    "title": "Project: rank an authorized corpus with real BM25 statistics",
+    "summary": "Documents have tenant,id,roles,text; (tenant,id) must be unique.",
+    "symbol": "cpu",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Review tenant/ACL provenance, corpus-statistic scope, tokenizer changes, ranking evaluation and tie stability. Production indexes also need versioned updates, revocation handling and access-aware caches. Replay follows the main orchestration function; helper computations execute and are checked separately.",
+    "lessons": [
+      "project-bm25project"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Documents have tenant,id,roles,text; (tenant,id) must be unique. Admit only the requested tenant and public documents (roles empty) or any role intersection. Tokenize query and documents using lowercase ASCII [a-z0-9]+; deduplicate query terms. Compute all corpus statistics after permission filtering. BM25 uses k1=1.2,b=.75, idf=log(1+(N-df+.5)/(df+.5)), term contribution=idf*tf*2.2/(tf+1.2*(.25+.75*length/average_length)). Return positive-score {id,score} rows sorted by descending score then id, cut at integer k>=0. Empty/no-match/empty-length corpora return [].",
+        "file": "bm25project.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "indexproject",
+    "title": "Project: apply atomic versioned index updates and revocations",
+    "summary": "State has tenant,integer version,documents mapping and seen event-digest mapping.",
+    "symbol": "cpu",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Review replay identities, CAS retries, ACL revocation and stale resurrection. A content digest is a consistency key, not approval of a document's instructions. Replay follows the main orchestration function; helper computations execute and are checked separately.",
+    "lessons": [
+      "project-indexproject"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "State has tenant,integer version,documents mapping and seen event-digest mapping. Require expected_version==state.version. Work on a deep copy. Events contain tenant,event,id,positive integer revision,op=upsert/delete; upsert also needs string text and list of string roles. Reject unknown event fields and cross-tenant events. Canonical JSON SHA-256 identifies an event: identical event replay is ignored, changed replay rejected. Every new document revision must exceed the previous revision, including tombstones. Store revision,deleted,text,sorted unique roles; deletion clears text/roles but retains revision. Advance state version once if any new event applied. Errors leave the original state unchanged.",
+        "file": "indexproject.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "ragproject",
+    "title": "Project: assemble and verify a permission-scoped RAG response",
+    "summary": "Use the secure_bm25 contract with k1=1.2,b=.75 over authorized documents.",
+    "symbol": "cpu",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Review each boundary independently: ACLs, corpus statistics, context budget, citation provenance, faithfulness and abstention. A valid structural response is not proof against prompt injection. Replay follows the main orchestration function; helper computations execute and are checked separately.",
+    "lessons": [
+      "project-ragproject"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Use the secure_bm25 contract with k1=1.2,b=.75 over authorized documents. Request has exactly tenant,roles,query,k,word_budget (nonnegative integer). Visit top-k ranked chunks, admitting whole text only when its whitespace-word count fits remaining budget, skipping oversized chunks. output is a saved provider-output fixture with exactly claims: a list of closed records text,source,start,end,quote. Require nonempty claim text, a source in admitted context, valid integer code-point offsets, and exact quoted text. Return context_ids,words,claims,joined answer and abstained. Empty claims mean abstention. No model inference or semantic entailment judgment is implemented.",
+        "file": "ragproject.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "planproject",
+    "title": "Project: validate, authorize and replay a dependency-aware tool plan",
+    "summary": "Implement the closed local tools read(key) and set(key,JSON scalar value) on state.records[tenant].",
+    "symbol": "cpu",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Review trusted approval provenance, current permissions, dependency validation, replay conflicts and transactional publication. Remote tools need their own durable idempotency and uncertain-outcome recovery. Replay follows the main orchestration function; helper computations execute and are checked separately.",
+    "lessons": [
+      "project-planproject"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Implement the closed local tools read(key) and set(key,JSON scalar value) on state.records[tenant]. Each plan operation has exactly id,tool,args,deps; IDs and dependencies are unique, all dependencies exist, no cycles. Prevalidate all schemas and current scopes (records:read/write), byte-limit canonical operation payloads to 4096, and require set approval membership. Approval identity is SHA256(canonical JSON {'tenant':tenant,**op}, sorted keys, compact separators, allow_nan=False); approved is a trusted controller-provided allowlist, not a secret or authority created by hashing. Topologically choose the lexicographically smallest ready ID. Verify tenant-scoped receipt fingerprints before reuse. Budget counts new operations only; reject before effects. Execute on a deep copy, return state,order,outputs,executed; exceptions preserve original state. Receipts store fingerprint,result by tenant and operation ID.",
+        "file": "planproject.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "batchproject",
+    "title": "Project: simulate bounded continuous batching with deadlines",
+    "summary": "Requests have unique string id and integer arrival>=0, deadline>arrival, prompt>=0, output>=1.",
+    "symbol": "cpu",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Review reservations, FIFO blocking, deadline boundaries and cancellation. Real serving requires measured prefill/decode costs, paged memory, admission telemetry and model-specific benchmarks. Replay follows the main orchestration function; helper computations execute and are checked separately.",
+    "lessons": [
+      "project-batchproject"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Requests have unique string id and integer arrival>=0, deadline>arrival, prompt>=0, output>=1. Capacities are positive integers. Reserve prompt+full output tokens while active; oversized requests are rejected. At each integer tick cancel pending/active requests with deadline<=tick, admit FIFO by (arrival,id) up to slots and reserved capacity without skipping a waiting head, then generate one token for every active request. Completion time is tick+1, so finishing exactly at deadline is allowed. Jump to the next arrival when idle. Return completed time mapping, sorted cancelled/rejected IDs and per-tick events (tick,admitted,completed,cancelled,active after generation,reserved before generation). This is a deterministic scheduling simulation, not model inference or a throughput benchmark.",
+        "file": "batchproject.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "releaseproject",
+    "title": "Project: gate an AI release with paired coverage, uncertainty and hard limits",
+    "summary": "Baseline/candidate rows have unique id,category,string independent group,quality in [0,1], explicit boolean safe, and nonnegative finite cost/latency.",
+    "symbol": "cpu",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "idea": "Review evaluation independence, representative/adversarial coverage, grading provenance, hard safety constraints and rollout authority. Passing a seeded bootstrap is not a guarantee about future traffic. Replay follows the main orchestration function; helper computations execute and are checked separately.",
+    "lessons": [
+      "project-releaseproject"
+    ],
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Baseline/candidate rows have unique id,category,string independent group,quality in [0,1], explicit boolean safe, and nonnegative finite cost/latency. Require identical case IDs and paired category/group identities. Policy has exactly minimum (positive integer counts by category), max_cost,p95_latency,tolerance (finite nonnegative), repetitions>=2 and seed. Compute candidate-minus-baseline quality using the equal-group bootstrap contract: group means, local seeded resampling and interpolated 95% percentile bounds. Require >=2 groups. Report promote,reasons,coverage,quality interval,mean_cost and nearest-rank p95 latency. Reasons in order: coverage for category/count mismatch, safety for any unsafe candidate, quality for lower bound < -tolerance, cost and latency for exceeded limits. Measurements are supplied evaluation fixtures, not calls to a model or judge.",
+        "file": "releaseproject.py",
+        "scales": false
+      }
+    ]
   }
 ]

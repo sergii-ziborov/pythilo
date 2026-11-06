@@ -52,7 +52,7 @@ open source (see [License](#license)).
 
 ### Learn
 
-- **382 lessons in 30 courses** (including 74 advanced lessons and six integration projects): Python foundations and Python deeper (30 each), clean
+- **406 lessons in 32 courses**, including 98 advanced lessons (18 integration projects): Python foundations and Python deeper (30 each), clean
   code, testing, the tools around Python, architecture, concurrency and async, the web,
   data, the mathematics of neural networks, machine learning with PyTorch (30), language
   models from the inside, working with AI tools, and four practical courses on
@@ -70,12 +70,12 @@ open source (see [License](#license)).
 
 ### Labs
 
-72 labs that trace **your own code** while it runs, with scaling measurements where
-available. Thirty also run in the browser at [pythilo.com/labs](https://pythilo.com/labs/),
+96 labs that trace **your own code** while it runs, with scaling measurements where
+available. Seventy-four also run in the browser at [pythilo.com/labs](https://pythilo.com/labs/),
 using the same tracer and correctness checks.
 Correctness first, then time. The catalogue now covers Basics, Data structures,
 Algorithms, Machine learning and Artificial intelligence. Search the catalog or use
-the ML (33 labs) and AI (16 labs) filters. For example:
+the ML (45 labs) and AI (28 labs) filters. For example:
 
 - **ML evaluation and optimization**: train-only standardization, confusion matrices,
   precision/recall/F1, threshold selection, folds, ridge regression, gradient checks,
@@ -83,6 +83,11 @@ the ML (33 labs) and AI (16 labs) filters. For example:
 - **AI building blocks**: stable softmax and temperature, scaled dot-product attention,
   causal masks, nucleus candidates, beam search, BPE merging, cosine retrieval and
   layer normalization.
+- **ML systems projects**: train/select/refit ridge workflows, nested group validation,
+  walk-forward forecasts, OOF stacking, logistic checkpoints and cohort rollout state.
+- **AI systems projects**: permission-scoped BM25, versioned index updates, verified
+  response context, approved tool DAGs, a serving scheduler simulation and paired
+  release evidence. Saved provider outputs and simulations are explicitly identified.
 
 - **Sorting Bench**: every read and write your sort makes, on four kinds of input.
 - **Graph Explorer**: your BFS, DFS or Dijkstra expanding a grid, tree or random graph,

@@ -1,0 +1,392 @@
+{
+  "id": "ml-systems",
+  "title": "ML systems: experiments, training and rollout projects",
+  "summary": "Twelve runnable ML systems lessons: stable metrics, calibration, independent-group uncertainty and six projects that actually train models, audit held-out boundaries and track rollout evidence.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "systems-multiclassloss",
+      "title": "Weight stable multiclass cross-entropy by observations",
+      "body": "# Weight stable multiclass cross-entropy by observations\n\nA production metric must match the training objective and the population it summarizes. Class logits are unnormalized scores; treating them as probabilities or exponentiating large absolute values produces meaningless losses. Shift each row before computing its log normalizer, then weight complete observations. A zero-weight observation contributes nothing, but its schema still needs validation. The example uses an extreme score without overflowing. This is an exact small-batch reference for auditing a vectorized implementation.\n\n```python\nimport math\nrow = [1000., 999.]\npeak = max(row)\nloss = math.log(sum(math.exp(x-peak) for x in row)) + peak-row[0]\nprint(round(loss, 6))\n```\n\n## Review the design\n\nCompare shifted and unshifted logits, duplicated weighted observations and a confidently wrong class. Review label identities and the weight denominator before optimizing the kernel.\n",
+      "task": "Return the weighted mean multiclass negative log likelihood. Subtract each row maximum before exponentiation. Require aligned nonempty batches, rectangular logits with at least two classes, finite values, integer class indices, nonnegative finite weights and a positive total weight. The denominator is total observation weight, not batch length.",
+      "starter": "def multiclass_loss(logits, labels, weights):\n    inputs_ready = True\n    draft = []\n    result = None\n    return result\n",
+      "solution": "import math\n\n\ndef multiclass_loss(logits, labels, weights):\n    if not logits or len(logits) != len(labels) or len(labels) != len(weights):\n        raise ValueError('aligned nonempty batches required')\n    width = len(logits[0])\n    if width < 2 or any(len(row) != width for row in logits):\n        raise ValueError('a rectangular multiclass matrix is required')\n    if any(not math.isfinite(x) for row in logits for x in row):\n        raise ValueError('finite logits required')\n    if any(type(y) is not int or not 0 <= y < width for y in labels):\n        raise ValueError('class index outside the matrix')\n    if any(not math.isfinite(w) or w < 0 for w in weights) or sum(weights) <= 0:\n        raise ValueError('nonnegative weights with positive total required')\n    losses = []\n    for row, target in zip(logits, labels):\n        maximum = max(row)\n        normalizer = math.log(sum(math.exp(x - maximum) for x in row))\n        losses.append(normalizer + maximum - row[target])\n    result = sum(w * loss for w, loss in zip(weights, losses)) / sum(weights)\n    return result\n",
+      "checks": [
+        {
+          "name": "large logits stay finite",
+          "code": "assert abs(multiclass_loss([[1000,999]],[0],[1])-0.3132616875182066)<1e-10, 'Use a stable log normalizer.'\n"
+        },
+        {
+          "name": "weight denominator",
+          "code": "import math\nassert abs(multiclass_loss([[0,0],[0,0]],[0,1],[1,9])-math.log(2))<1e-12, 'Normalize by total weight.'\n"
+        },
+        {
+          "name": "shift and zero weight invariance",
+          "code": "a=multiclass_loss([[3,1],[1,4]],[0,1],[2,0])\nb=multiclass_loss([[103,101]],[0],[2])\nassert abs(a-b)<1e-12, 'Row shifts and zero-weight rows must preserve the metric.'\n"
+        },
+        {
+          "name": "bad label and zero denominator",
+          "code": "try:\n    multiclass_loss([[0,0]],[True],[1])\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\ntry:\n    multiclass_loss([[0,0]],[0],[0])\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\n"
+        }
+      ],
+      "hints": [
+        "Compute one log normalizer per row after subtracting its maximum.",
+        "The target logit is selected by the integer class identity, not by the largest value.",
+        "Sum weight times per-row loss, then divide by the sum of weights."
+      ],
+      "explanation": "Compare shifted and unshifted logits, duplicated weighted observations and a confidently wrong class. Review label identities and the weight denominator before optimizing the kernel."
+    },
+    {
+      "id": "systems-ndcg",
+      "title": "Evaluate graded ranking with a normalized ideal order",
+      "body": "# Evaluate graded ranking with a normalized ideal order\n\nRanking quality depends on position and on the value of the retrieved item. A binary hit metric cannot distinguish a highly relevant first result from a marginal one. NDCG compares discounted observed gain with the ideal ranking for the same relevance inventory. Duplicating an identifier must not create extra evidence or consume several rank positions. The inventory belongs to a versioned evaluation set; an unjudged document receives zero here, which is a declared convention rather than proof of irrelevance.\n\n```python\nimport math\ngrades = [3, 1]\ndcg = sum((2**g-1)/math.log2(i+2) for i,g in enumerate(grades))\nprint(round(dcg, 6))\n```\n\n## Review the design\n\nInspect judgments, deduplication and the undefined all-zero case. A perfect NDCG on a tiny fixture says nothing about an unmeasured query population.\n",
+      "task": "Return NDCG at positive integer k. Deduplicate ranked IDs in first-occurrence order before applying k. Missing IDs have relevance zero. Use gain 2**grade-1 and discount log2(rank+1), with rank starting at one. The ideal order uses all grades sorted descending. Return None when ideal gain is zero. Grades must be integers in 0..10.",
+      "starter": "def ndcg(ranking, grades, k):\n    inputs_ready = True\n    draft = []\n    result = None\n    return result\n",
+      "solution": "import math\n\n\ndef ndcg(ranking, grades, k):\n    if type(k) is not int or k <= 0:\n        raise ValueError('positive integer cutoff required')\n    if any(type(g) is not int or not 0 <= g <= 10 for g in grades.values()):\n        raise ValueError('integer relevance grades in 0..10 required')\n    unique = list(dict.fromkeys(ranking))[:k]\n    gains = [2 ** grades.get(key, 0) - 1 for key in unique]\n    ideal = sorted((2 ** g - 1 for g in grades.values()), reverse=True)[:k]\n    dcg = sum(gain / math.log2(i + 2) for i, gain in enumerate(gains))\n    best = sum(gain / math.log2(i + 2) for i, gain in enumerate(ideal))\n    result = dcg / best if best else None\n    return result\n",
+      "checks": [
+        {
+          "name": "ideal and reversed rankings",
+          "code": "assert ndcg(['a','b'],{'a':3,'b':1},2)==1, 'The ideal ranking must score one.'\nassert abs(ndcg(['b','a'],{'a':3,'b':1},2)-0.7098097413968655)<1e-10, 'Discount graded gains by position.'\n"
+        },
+        {
+          "name": "duplicates do not steal positions",
+          "code": "assert ndcg(['a','a','b'],{'a':3,'b':1},2)==1, 'Deduplicate before applying the cutoff.'\n"
+        },
+        {
+          "name": "unknown and undefined relevance",
+          "code": "assert ndcg(['unknown'],{'a':3},1)==0, 'Unjudged IDs have zero gain in this contract.'\nassert ndcg(['a'],{'a':0},2) is None, 'No relevance makes normalized gain undefined.'\n"
+        },
+        {
+          "name": "invalid grade rejected",
+          "code": "try:\n    ndcg(['a'],{'a':True},1)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\n"
+        }
+      ],
+      "hints": [
+        "Remove repeated identities before slicing the top-k list.",
+        "Compute the ideal denominator from the relevance inventory, not the returned ranking.",
+        "Use exponential graded gains and logarithmic position discounts; keep the zero-denominator result explicit."
+      ],
+      "explanation": "Inspect judgments, deduplication and the undefined all-zero case. A perfect NDCG on a tiny fixture says nothing about an unmeasured query population."
+    },
+    {
+      "id": "systems-clusterbootstrap",
+      "title": "Bootstrap independent groups rather than correlated rows",
+      "body": "# Bootstrap independent groups rather than correlated rows\n\nRepeated measurements from one customer are correlated. Resampling individual rows can make a large customer's repeated events look like independent evidence. This exercise first averages each independent group, then bootstraps those means. Its estimand gives customers equal weight; it is deliberately different from an event-weighted business metric. Group identities are sorted before seeded sampling so input row order does not change the result. Independence remains a domain assumption, and a narrow interval from two synthetic customers is not evidence for a rollout.\n\n```python\nfrom collections import defaultdict\nbuckets = defaultdict(list)\nfor group, delta in [('a',1),('a',3),('b',0)]:\n    buckets[group].append(delta)\nmeans = [sum(v)/len(v) for v in buckets.values()]\nprint(sum(means)/len(means))\n```\n\n## Review the design\n\nDefend the independent unit, weighting and interval method. A bootstrap does not repair biased logging, nonstationarity or unrepresentative evaluation cases.\n",
+      "task": "Compute each string group's mean paired difference; give groups equal weight. With random.Random(seed), resample that list of means with replacement, drawing the same number of groups per repetition. Return estimate, low, high and groups. The 95% percentile bounds linearly interpolate sorted bootstrap estimates at positions (R-1)*.025 and (R-1)*.975. Require at least two groups, aligned nonempty finite deltas and integer repetitions>=2.",
+      "starter": "def cluster_interval(groups, deltas, repetitions, seed):\n    inputs_ready = True\n    draft = []\n    result = None\n    return result\n",
+      "solution": "import math\nimport random\n\n\ndef cluster_interval(groups, deltas, repetitions, seed):\n    if not groups or len(groups) != len(deltas):\n        raise ValueError('aligned groups and deltas required')\n    if any(not isinstance(g, str) for g in groups):\n        raise ValueError('string group identities required')\n    if any(not math.isfinite(x) for x in deltas):\n        raise ValueError('finite paired differences required')\n    if type(repetitions) is not int or repetitions < 2:\n        raise ValueError('at least two repetitions required')\n    buckets = {}\n    for group, delta in zip(groups, deltas):\n        buckets.setdefault(group, []).append(delta)\n    means = [sum(buckets[g]) / len(buckets[g]) for g in sorted(buckets)]\n    if len(means) < 2:\n        raise ValueError('at least two independent groups required')\n    rng = random.Random(seed)\n    samples = []\n    for _ in range(repetitions):\n        draw = [rng.choice(means) for _ in means]\n        samples.append(sum(draw) / len(draw))\n    samples.sort()\n    def percentile(q):\n        position = (len(samples) - 1) * q\n        left = math.floor(position)\n        right = math.ceil(position)\n        return samples[left] + (samples[right] - samples[left]) * (position - left)\n    return {'estimate': sum(means) / len(means), 'low': percentile(.025),\n            'high': percentile(.975), 'groups': len(means)}\n",
+      "checks": [
+        {
+          "name": "equal group weighting",
+          "code": "r=cluster_interval(['a','a','b'],[1,3,0],50,7)\nassert r['estimate']==1 and r['groups']==2 and 0<=r['low']<=r['high']<=2, 'Weight independent groups equally.'\n"
+        },
+        {
+          "name": "constant paired improvement",
+          "code": "r=cluster_interval(['a','b','c'],[.2,.2,.2],20,1)\nassert abs(r['low']-.2)<1e-12 and abs(r['high']-.2)<1e-12, 'Constant group effects have a degenerate bootstrap interval.'\n"
+        },
+        {
+          "name": "seeded permutation invariance",
+          "code": "a=cluster_interval(['a','b','a'],[1,5,3],60,3)\nb=cluster_interval(['a','a','b'],[3,1,5],60,3)\nassert a==b, 'Row order must not change sorted group resampling.'\n"
+        },
+        {
+          "name": "one independent unit is rejected",
+          "code": "try:\n    cluster_interval(['a','a'],[1,2],20,1)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\n"
+        }
+      ],
+      "hints": [
+        "Aggregate rows to one mean per group before sampling.",
+        "Sort group identities and use a local seeded generator.",
+        "Interpolate percentile positions in the sorted bootstrap distribution; do not round to a different quantile convention."
+      ],
+      "explanation": "Defend the independent unit, weighting and interval method. A bootstrap does not repair biased logging, nonstationarity or unrepresentative evaluation cases."
+    },
+    {
+      "id": "systems-offpolicy",
+      "title": "Audit a clipped inverse-propensity estimate",
+      "body": "# Audit a clipped inverse-propensity estimate\n\nOffline policy evaluation depends on the probability with which the logging policy chose the observed action. Rarely logged actions can create large importance weights and unstable estimates. Clipping limits variance while introducing bias; the effective sample size reports weight concentration rather than the number of independent users. Only the logged action is represented in each row. This fixture assumes correct propensities and overlap and does not recover rewards for actions never explored. Keep clipped IPS separate from a self-normalized estimator.\n\n```python\nweights = [1., 4.]\nrewards = [1., 0.]\nprint(sum(w*r for w,r in zip(weights,rewards))/len(rewards))\nprint(sum(weights)**2/sum(w*w for w in weights))\n```\n\n## Review the design\n\nReview propensity provenance, exploration support, clipping bias and the independent unit. A large ESS does not establish unbiased logged data.\n",
+      "task": "Events are [reward, logging_probability, target_probability]. Return value=mean(reward*min(target/logging,clip)), mean_weight, and ESS=(sum weights)**2/sum squared weights (zero if all weights vanish). This is clipped IPS, not self-normalized IPS. Require nonempty finite events, logging probabilities in (0,1], target probabilities in [0,1], and positive finite clip.",
+      "starter": "def offpolicy_value(events, clip):\n    inputs_ready = True\n    draft = []\n    result = None\n    return result\n",
+      "solution": "import math\n\n\ndef offpolicy_value(events, clip):\n    if not events or not math.isfinite(clip) or clip <= 0:\n        raise ValueError('events and a positive clipping bound required')\n    weights = []\n    contributions = []\n    for event in events:\n        reward, propensity, target = event\n        if not all(math.isfinite(x) for x in event):\n            raise ValueError('finite logged values required')\n        if not 0 < propensity <= 1 or not 0 <= target <= 1:\n            raise ValueError('logging support and valid target probabilities required')\n        weight = min(target / propensity, clip)\n        weights.append(weight)\n        contributions.append(weight * reward)\n    squared = sum(w * w for w in weights)\n    return {'value': sum(contributions) / len(events),\n            'ess': sum(weights) ** 2 / squared if squared else 0,\n            'mean_weight': sum(weights) / len(events)}\n",
+      "checks": [
+        {
+          "name": "IPS differs from self normalization",
+          "code": "r=offpolicy_value([[1,.5,1],[0,.25,1]],10)\nassert r['value']==1 and r['mean_weight']==3 and abs(r['ess']-1.8)<1e-12, 'Use the declared IPS denominator and squared-weight ESS.'\n"
+        },
+        {
+          "name": "clipping is explicit",
+          "code": "r=offpolicy_value([[2,.01,1]],3)\nassert r['value']==6 and r['mean_weight']==3 and r['ess']==1, 'Clip before aggregation.'\n"
+        },
+        {
+          "name": "zero target weight",
+          "code": "r=offpolicy_value([[9,.5,0]],2)\nassert r=={'value':0,'mean_weight':0,'ess':0}, 'Handle a target with no observed-action mass.'\n"
+        },
+        {
+          "name": "unsupported logging action rejected",
+          "code": "try:\n    offpolicy_value([[1,0,1]],2)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\n"
+        }
+      ],
+      "hints": [
+        "Form the target-to-logging probability ratio for the observed action.",
+        "Apply clipping before computing both contributions and ESS.",
+        "Divide IPS contributions by event count, not by total importance weight."
+      ],
+      "explanation": "Review propensity provenance, exploration support, clipping bias and the independent unit. A large ESS does not establish unbiased logged data."
+    },
+    {
+      "id": "systems-temperature",
+      "title": "Select temperature on a held-out calibration split",
+      "body": "# Select temperature on a held-out calibration split\n\nTemperature scaling changes confidence without changing the within-row ordering of classes. It must be fitted using held-out labels because minimizing calibration loss is itself model selection. A fixed candidate grid makes the selection inspectable and deterministic. Large logits still need stable log-sum-exp after scaling. The demonstration compares two temperatures on the same score difference; the project later separates selection from final evaluation. This local optimizer does not imply that calibrated probabilities will survive deployment drift.\n\n```python\nimport math\nfor temperature in [1., 2.]:\n    gap = 4/temperature\n    wrong_class_loss = math.log1p(math.exp(gap))\n    print(temperature, round(wrong_class_loss, 4))\n```\n\n## Review the design\n\nKeep calibration, model development and final evaluation populations separate. Inspect subgroup calibration and proper scoring rules rather than only classification accuracy.\n",
+      "task": "Evaluate stable mean multiclass log loss for each distinct positive finite temperature in grid. Divide logits by temperature; choose minimum loss with smaller temperature breaking exact ties. Return temperature and loss. Require aligned nonempty rectangular finite logits with >=2 classes and integer target identities. These inputs are calibration data, never training or final test labels.",
+      "starter": "def fit_temperature(logits, labels, grid):\n    inputs_ready = True\n    draft = []\n    result = None\n    return result\n",
+      "solution": "import math\n\n\ndef fit_temperature(logits, labels, grid):\n    if not grid or any(not math.isfinite(t) or t <= 0 for t in grid):\n        raise ValueError('positive finite temperature grid required')\n    if not logits or len(logits) != len(labels):\n        raise ValueError('aligned calibration data required')\n    width = len(logits[0])\n    if width < 2 or any(len(row) != width for row in logits):\n        raise ValueError('rectangular multiclass logits required')\n    if any(not math.isfinite(x) for row in logits for x in row):\n        raise ValueError('finite logits required')\n    if any(type(y) is not int or not 0 <= y < width for y in labels):\n        raise ValueError('invalid class identity')\n    scores = []\n    for temperature in sorted(set(grid)):\n        losses = []\n        for row, target in zip(logits, labels):\n            scaled = [x / temperature for x in row]\n            peak = max(scaled)\n            losses.append(math.log(sum(math.exp(x - peak) for x in scaled))\n                          + peak - scaled[target])\n        scores.append((sum(losses) / len(losses), temperature))\n    loss, temperature = min(scores)\n    return {'temperature': temperature, 'loss': loss}\n",
+      "checks": [
+        {
+          "name": "overconfident errors soften",
+          "code": "r=fit_temperature([[4,0],[4,0]],[0,1],[1,2,4])\nassert r['temperature']==4 and abs(r['loss']-.8132616875182228)<1e-10, 'Select on held-out log loss.'\n"
+        },
+        {
+          "name": "confident correct scores sharpen",
+          "code": "assert fit_temperature([[4,0],[0,4]],[0,1],[1,2,4])['temperature']==1, 'Correct logits can favor the smallest candidate.'\n"
+        },
+        {
+          "name": "ties and shift invariance",
+          "code": "a=fit_temperature([[0,0]],[0],[2,1,2])\nb=fit_temperature([[1000,1000]],[0],[1,2])\nassert a['temperature']==1 and abs(a['loss']-b['loss'])<1e-10, 'Use deterministic ties and stable row shifts.'\n"
+        },
+        {
+          "name": "zero temperature rejected",
+          "code": "try:\n    fit_temperature([[0,0]],[0],[0])\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\n"
+        }
+      ],
+      "hints": [
+        "Divide every logit in a row by the candidate temperature.",
+        "Compute stable target log loss and average observations.",
+        "Compare (loss, temperature) pairs so exact ties select the smaller candidate."
+      ],
+      "explanation": "Keep calibration, model development and final evaluation populations separate. Inspect subgroup calibration and proper scoring rules rather than only classification accuracy."
+    },
+    {
+      "id": "systems-isotonic",
+      "title": "Pool adjacent violations in weighted isotonic calibration",
+      "body": "# Pool adjacent violations in weighted isotonic calibration\n\nAn isotonic calibrator learns a nondecreasing mapping from scores to event probability. Sorting labels alone does not solve the constrained fit: a low-scored positive can force several neighboring score groups to pool. Weighted pool-adjacent-violators preserves each block's total observation weight and positive weight, which yields the least-squares block mean. Tied scores must share one fitted value before later merging. This exercise returns explicit calibration blocks so a reviewer can inspect their boundaries, support and probability estimates.\n\n```python\nblocks = [[0.,0.,1.,1.],[1.,1.,3.,0.]]\nleft, right = blocks\nweight = left[2] + right[2]\npositive = left[3] + right[3]\nprint([left[0], right[1], positive/weight])\n```\n\n## Review the design\n\nFit on held-out calibration data. Define prediction behavior between blocks and outside the observed range before using the mapping in a serving artifact.\n",
+      "task": "Combine equal finite scores before fitting. Each tied score starts one block with total positive weight and total weight. Visit ascending scores and merge adjacent blocks while their positive-weight ratios decrease. Return [minimum_score, maximum_score, fitted_probability] per remaining block. Require aligned nonempty scores, binary integer labels and strictly positive finite weights. Keep equal neighboring fitted probabilities as separate blocks unless a decrease triggers a merge.",
+      "starter": "def isotonic_fit(scores, labels, weights):\n    inputs_ready = True\n    draft = []\n    result = None\n    return result\n",
+      "solution": "import math\n\n\ndef isotonic_fit(scores, labels, weights):\n    if not scores or not len(scores) == len(labels) == len(weights):\n        raise ValueError('aligned nonempty observations required')\n    if any(not math.isfinite(s) for s in scores):\n        raise ValueError('finite scores required')\n    if any(type(y) is not int or y not in (0, 1) for y in labels):\n        raise ValueError('binary labels required')\n    if any(not math.isfinite(w) or w <= 0 for w in weights):\n        raise ValueError('positive weights required')\n    tied = {}\n    for score, label, weight in zip(scores, labels, weights):\n        total, positive = tied.get(score, (0, 0))\n        tied[score] = (total + weight, positive + label * weight)\n    blocks = []\n    for score in sorted(tied):\n        weight, positive = tied[score]\n        blocks.append([score, score, weight, positive])\n        while len(blocks) > 1 and blocks[-2][3] / blocks[-2][2] > blocks[-1][3] / blocks[-1][2]:\n            right = blocks.pop()\n            left = blocks.pop()\n            blocks.append([left[0], right[1], left[2] + right[2], left[3] + right[3]])\n    result = [[low, high, positive / weight] for low, high, weight, positive in blocks]\n    return result\n",
+      "checks": [
+        {
+          "name": "weighted violations merge",
+          "code": "assert isotonic_fit([0,1],[1,0],[1,3])==[[0,1,.25]], 'Pool positive and total weights, not unweighted block means.'\n"
+        },
+        {
+          "name": "ties are one score group",
+          "code": "assert isotonic_fit([1,1,2],[1,0,1],[1,1,1])==[[1,1,.5],[2,2,1]], 'Tied scores share a fitted probability.'\n"
+        },
+        {
+          "name": "backward cascading merges",
+          "code": "assert isotonic_fit([0,1,2],[1,1,0],[1,1,1])==[[0,2,2/3]], 'Continue merging after the first violation.'\n"
+        },
+        {
+          "name": "nonpositive observation weight rejected",
+          "code": "try:\n    isotonic_fit([0],[1],[0])\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\n"
+        }
+      ],
+      "hints": [
+        "Aggregate identical scores into weighted positive and total counts.",
+        "A block probability is positive weight divided by total weight.",
+        "Merge backward repeatedly until neighboring probabilities are nondecreasing."
+      ],
+      "explanation": "Fit on held-out calibration data. Define prediction behavior between blocks and outside the observed range before using the mapping in a serving artifact."
+    },
+    {
+      "id": "project-ridgeworkflow",
+      "title": "Project: fit, select, refit and serialize a ridge workflow",
+      "body": "# Project: fit, select, refit and serialize a ridge workflow\n\nA model workflow owns more than a coefficient vector. Preprocessing statistics, hyperparameter selection, refitting and final evaluation each have a different data boundary. This project trains actual NumPy ridge models and exports the complete transformation needed to reproduce predictions. Validation chooses a penalty; after that decision, train and validation may be combined for a final fit. Test labels are used only to measure the frozen artifact. The fixture is small and local; it does not implement experiment storage, a feature service or a production deployment.\n\n```python\nimport numpy as np\nx = np.array([[0.,7.],[1.,7.],[2.,7.]])\nscale = x.std(axis=0)\nscale[scale == 0] = 1\nz = (x-x.mean(axis=0))/scale\nprint(z.mean(axis=0).round(8).tolist())\n```\n\n## Review the design\n\nReview every fitted statistic's provenance. Reproduce predictions after JSON serialization, test constant columns, poison held-out labels and explain how dataset/schema versions would enter a real artifact registry.\n",
+      "task": "Rows contain unique string id, numeric feature list x and target y. Require three nonempty identity-disjoint finite rectangular partitions and positive finite penalties. For each penalty, fit population means/stds and centered-target ridge only on train; constant-feature scale is one. Select minimum validation MSE, smaller penalty on an exact tie. Refit preprocessing and ridge on train+validation, then evaluate test once. Return alpha, validation_mse, test_mse, predictions, fit_ids and a JSON-compatible artifact with means, scales, coefficients and unpenalized intercept. Solve (Z.T@Z+alpha*I)w=Z.T@(y-mean_y).",
+      "starter": "def ridge_workflow(train, validation, test, alphas):\n    inputs_ready = True\n    draft = []\n    result = None\n    return result\n",
+      "solution": "import math\nimport numpy as np\n\n\ndef _ridge_fit(rows, alpha):\n    x = np.asarray([row['x'] for row in rows], dtype=float)\n    y = np.asarray([row['y'] for row in rows], dtype=float)\n    means = x.mean(axis=0)\n    scales = x.std(axis=0)\n    scales[scales == 0] = 1\n    z = (x - means) / scales\n    intercept = float(y.mean())\n    coefficients = np.linalg.solve(z.T @ z + alpha * np.eye(z.shape[1]),\n                                   z.T @ (y - intercept))\n    return {'means': means.tolist(), 'scales': scales.tolist(),\n            'coefficients': coefficients.tolist(), 'intercept': intercept}\n\n\ndef _ridge_predict(model, rows):\n    return [model['intercept'] + sum((x - m) / s * w for x, m, s, w in\n            zip(row['x'], model['means'], model['scales'], model['coefficients']))\n            for row in rows]\n\n\ndef ridge_workflow(train, validation, test, alphas):\n    partitions = [train, validation, test]\n    if any(not part for part in partitions) or not alphas:\n        raise ValueError('three nonempty partitions and regularization candidates required')\n    rows = train + validation + test\n    ids = [row['id'] for row in rows]\n    if any(not isinstance(key, str) for key in ids) or len(set(ids)) != len(ids):\n        raise ValueError('sample identities must be unique across partitions')\n    width = len(train[0]['x'])\n    if not width or any(len(row['x']) != width for row in rows):\n        raise ValueError('feature dimensions must agree')\n    if any(not math.isfinite(v) for row in rows for v in row['x'] + [row['y']]):\n        raise ValueError('finite numeric observations required')\n    if any(not math.isfinite(alpha) or alpha <= 0 for alpha in alphas):\n        raise ValueError('positive finite ridge penalties required')\n    trials = []\n    for alpha in sorted(set(alphas)):\n        model = _ridge_fit(train, alpha)\n        predictions = _ridge_predict(model, validation)\n        mse = sum((p - row['y']) ** 2 for p, row in zip(predictions, validation)) / len(validation)\n        trials.append((mse, alpha))\n    validation_mse, selected = min(trials)\n    artifact = _ridge_fit(train + validation, selected)\n    predictions = _ridge_predict(artifact, test)\n    test_mse = sum((p - row['y']) ** 2 for p, row in zip(predictions, test)) / len(test)\n    result = {'alpha': selected, 'validation_mse': validation_mse,\n              'test_mse': test_mse, 'predictions': predictions, 'artifact': artifact,\n              'fit_ids': [row['id'] for row in train + validation]}\n    return result\n",
+      "checks": [
+        {
+          "name": "learned signal and constant feature",
+          "code": "train=[{'id': 't0', 'x': [0, 7], 'y': 1}, {'id': 't1', 'x': [1, 7], 'y': 3}, {'id': 't2', 'x': [2, 7], 'y': 5}]\nvalidation=[{'id': 'v', 'x': [3, 7], 'y': 7}]\ntest=[{'id': 'z', 'x': [4, 7], 'y': 9}]\nr=ridge_workflow(train,validation,test,[10,.1])\nassert r['alpha']==.1 and r['test_mse']<.02, 'Train and select an actual ridge model.'\nassert r['artifact']['means']==[1.5,7] and r['artifact']['scales'][1]==1, 'Refit preprocessing on train+validation only.'\n"
+        },
+        {
+          "name": "test labels cannot select or fit",
+          "code": "train=[{'id': 't0', 'x': [0, 7], 'y': 1}, {'id': 't1', 'x': [1, 7], 'y': 3}, {'id': 't2', 'x': [2, 7], 'y': 5}]\nvalidation=[{'id': 'v', 'x': [3, 7], 'y': 7}]\ntest=[{'id': 'z', 'x': [4, 7], 'y': 9}]\nimport copy\na=ridge_workflow(train,validation,test,[.1,10])\npoison=copy.deepcopy(test);poison[0]['y']=10000\nb=ridge_workflow(train,validation,poison,[.1,10])\nassert a['artifact']==b['artifact'] and a['alpha']==b['alpha'] and a['predictions']==b['predictions'], 'Test targets must not influence the artifact.'\nassert a['test_mse']!=b['test_mse'], 'Test targets still determine the reported held-out error.'\n"
+        },
+        {
+          "name": "artifact independently reproduces predictions",
+          "code": "train=[{'id': 't0', 'x': [0, 7], 'y': 1}, {'id': 't1', 'x': [1, 7], 'y': 3}, {'id': 't2', 'x': [2, 7], 'y': 5}]\nvalidation=[{'id': 'v', 'x': [3, 7], 'y': 7}]\ntest=[{'id': 'z', 'x': [4, 7], 'y': 9}]\nimport json\nr=ridge_workflow(train,validation,test,[.1])\nm=json.loads(json.dumps(r['artifact']))\np=m['intercept']+sum((x-a)/s*w for x,a,s,w in zip(test[0]['x'],m['means'],m['scales'],m['coefficients']))\nassert abs(p-r['predictions'][0])<1e-12 and r['fit_ids']==['t0','t1','t2','v'], 'Export all fitted transformation state.'\n"
+        },
+        {
+          "name": "partition identity leakage rejected",
+          "code": "train=[{'id': 't0', 'x': [0, 7], 'y': 1}, {'id': 't1', 'x': [1, 7], 'y': 3}, {'id': 't2', 'x': [2, 7], 'y': 5}]\nvalidation=[{'id': 'v', 'x': [3, 7], 'y': 7}]\ntest=[{'id': 'z', 'x': [4, 7], 'y': 9}]\ntry:\n    ridge_workflow(train,train,test,[.1])\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\n"
+        }
+      ],
+      "hints": [
+        "Fit means, scales and coefficients separately for each train-only candidate.",
+        "Select on validation MSE, then recompute all fitted statistics on train plus validation.",
+        "Store the unpenalized target mean and transformation arrays; never refit using test observations."
+      ],
+      "explanation": "Review every fitted statistic's provenance. Reproduce predictions after JSON serialization, test constant columns, poison held-out labels and explain how dataset/schema versions would enter a real artifact registry."
+    },
+    {
+      "id": "project-nestedridge",
+      "title": "Project: nested group validation with auditable outer predictions",
+      "body": "# Project: nested group validation with auditable outer predictions\n\nUsing cross-validation to choose a hyperparameter and then reporting the same best score is optimistic. Nested validation gives the selection procedure its own outer evaluation boundary. Group identities must remain intact in both loops. This project repeatedly fits real ridge regressors and exposes which samples trained each outer model. Poisoning an outer group's labels must leave its predictions and selected penalty unchanged, although its measured error changes. The result estimates this small selection procedure under the declared grouping; it does not establish independence or deployment representativeness.\n\n```python\ngroups = ['a','a','b','b','c','c']\nfor held in sorted(set(groups)):\n    train_ids = [i for i,g in enumerate(groups) if g != held]\n    print(held, train_ids)\n```\n\n## Review the design\n\nExplain inner selection versus outer evaluation, group weighting and the final refit that would follow evaluation. Audit sample identities, not only aggregate scores.\n",
+      "task": "Rows have unique id, string group, finite scalar x,y. Require at least three groups and positive finite penalties. Outer leave-one-group-out evaluation must exclude that group's rows from both tuning and fitting. For each penalty, inner leave-one-group-out validation over the remaining groups computes equal-fold mean MSE; choose (MSE,penalty) minimum. Fit centered one-feature ridge with slope=sum((x-mx)*(y-my))/(sum((x-mx)**2)+alpha), unpenalized intercept. Return oof mapping, row-weighted outer mse and folds with group, alpha, fit_ids, held_ids.",
+      "starter": "def nested_group_ridge(rows, alphas):\n    inputs_ready = True\n    draft = []\n    result = None\n    return result\n",
+      "solution": "import math\n\n\ndef _fit(rows, alpha):\n    mx = sum(row['x'] for row in rows) / len(rows)\n    my = sum(row['y'] for row in rows) / len(rows)\n    numerator = sum((row['x'] - mx) * (row['y'] - my) for row in rows)\n    denominator = sum((row['x'] - mx) ** 2 for row in rows) + alpha\n    slope = numerator / denominator\n    return slope, my - slope * mx\n\n\ndef nested_group_ridge(rows, alphas):\n    if not rows or not alphas:\n        raise ValueError('rows and penalty candidates required')\n    ids = [row['id'] for row in rows]\n    if any(not isinstance(row['id'], str) or not isinstance(row['group'], str) for row in rows):\n        raise ValueError('string sample and group identities required')\n    if len(ids) != len(set(ids)):\n        raise ValueError('sample identities must be unique')\n    groups = sorted(set(row['group'] for row in rows))\n    if len(groups) < 3:\n        raise ValueError('at least three independent groups required')\n    if any(not math.isfinite(row[key]) for row in rows for key in ('x', 'y')):\n        raise ValueError('finite observations required')\n    if any(not math.isfinite(alpha) or alpha <= 0 for alpha in alphas):\n        raise ValueError('positive penalties required')\n    oof, audits = {}, []\n    for outer in groups:\n        remaining = [row for row in rows if row['group'] != outer]\n        trials = []\n        for alpha in sorted(set(alphas)):\n            errors = []\n            for inner in groups:\n                if inner == outer:\n                    continue\n                fit = [row for row in remaining if row['group'] != inner]\n                held = [row for row in remaining if row['group'] == inner]\n                slope, intercept = _fit(fit, alpha)\n                errors.append(sum((slope * row['x'] + intercept - row['y']) ** 2\n                                  for row in held) / len(held))\n            trials.append((sum(errors) / len(errors), alpha))\n        _, selected = min(trials)\n        slope, intercept = _fit(remaining, selected)\n        held = [row for row in rows if row['group'] == outer]\n        for row in held:\n            oof[row['id']] = slope * row['x'] + intercept\n        audits.append({'group': outer, 'alpha': selected,\n                       'fit_ids': [row['id'] for row in remaining],\n                       'held_ids': [row['id'] for row in held]})\n    mse = sum((oof[row['id']] - row['y']) ** 2 for row in rows) / len(rows)\n    return {'oof': oof, 'mse': mse, 'folds': audits}\n",
+      "checks": [
+        {
+          "name": "honest outer predictions cover the population",
+          "code": "rows=[{'id': '0', 'group': 'a', 'x': -2, 'y': -3}, {'id': '1', 'group': 'a', 'x': -1, 'y': -1}, {'id': '2', 'group': 'b', 'x': 0, 'y': 1}, {'id': '3', 'group': 'b', 'x': 1, 'y': 3}, {'id': '4', 'group': 'c', 'x': 2, 'y': 5}, {'id': '5', 'group': 'c', 'x': 3, 'y': 7}]\nr=nested_group_ridge(rows,[.01,.1])\nassert set(r['oof'])=={row['id'] for row in rows} and r['mse']<.01, 'Train real outer models and predict every sample once.'\n"
+        },
+        {
+          "name": "outer labels cannot tune their own model",
+          "code": "rows=[{'id': '0', 'group': 'a', 'x': -2, 'y': -3}, {'id': '1', 'group': 'a', 'x': -1, 'y': -1}, {'id': '2', 'group': 'b', 'x': 0, 'y': 1}, {'id': '3', 'group': 'b', 'x': 1, 'y': 3}, {'id': '4', 'group': 'c', 'x': 2, 'y': 5}, {'id': '5', 'group': 'c', 'x': 3, 'y': 7}]\nimport copy\na=nested_group_ridge(rows,[.01,10])\npoison=copy.deepcopy(rows)\nfor row in poison:\n    if row['group']=='a': row['y']+=1000\nb=nested_group_ridge(poison,[.01,10])\nassert all(a['oof'][row['id']]==b['oof'][row['id']] for row in rows if row['group']=='a'), 'The outer group must never enter its own tuning loop.'\nassert a['folds'][0]['alpha']==b['folds'][0]['alpha'], 'Outer labels cannot choose the inner winner.'\n"
+        },
+        {
+          "name": "auditable fit and held identities",
+          "code": "rows=[{'id': '0', 'group': 'a', 'x': -2, 'y': -3}, {'id': '1', 'group': 'a', 'x': -1, 'y': -1}, {'id': '2', 'group': 'b', 'x': 0, 'y': 1}, {'id': '3', 'group': 'b', 'x': 1, 'y': 3}, {'id': '4', 'group': 'c', 'x': 2, 'y': 5}, {'id': '5', 'group': 'c', 'x': 3, 'y': 7}]\nr=nested_group_ridge(rows,[.1])\nfor fold in r['folds']:\n    assert not set(fold['fit_ids'])&set(fold['held_ids']), 'An outer fit contains held-out identities.'\n    assert len(fold['fit_ids'])==4 and len(fold['held_ids'])==2, 'Preserve complete groups.'\n"
+        },
+        {
+          "name": "two groups are insufficient for nested selection",
+          "code": "rows=[{'id': '0', 'group': 'a', 'x': -2, 'y': -3}, {'id': '1', 'group': 'a', 'x': -1, 'y': -1}, {'id': '2', 'group': 'b', 'x': 0, 'y': 1}, {'id': '3', 'group': 'b', 'x': 1, 'y': 3}, {'id': '4', 'group': 'c', 'x': 2, 'y': 5}, {'id': '5', 'group': 'c', 'x': 3, 'y': 7}]\ntry:\n    nested_group_ridge(rows[:4],[.1])\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\n"
+        }
+      ],
+      "hints": [
+        "Remove the outer group before constructing every inner split.",
+        "Average inner fold MSEs equally and break exact ties by the smaller penalty.",
+        "Refit using all remaining outer-training groups and write predictions only for the held-out group."
+      ],
+      "explanation": "Explain inner selection versus outer evaluation, group weighting and the final refit that would follow evaluation. Audit sample identities, not only aggregate scores."
+    },
+    {
+      "id": "project-walkforward",
+      "title": "Project: walk-forward forecasts with delayed labels and a purge gap",
+      "body": "# Project: walk-forward forecasts with delayed labels and a purge gap\n\nA random split cannot reproduce what an online forecaster knew at a historical decision time. Event timestamps and label-availability timestamps are different clocks. This backtest repeatedly fits an actual regression using only eligible history, applies an explicit gap and measures a future window. Delayed labels remain unavailable even when their event occurred long ago. Future targets may change reported error but cannot change an earlier forecast. Overlapping forecast windows are allowed and reported separately; treating their errors as independent would require additional justification.\n\n```python\nrows = [{'event':1,'available':1}, {'event':2,'available':5}]\ncutoff = 3\neligible = [r for r in rows if r['event']<=cutoff and r['available']<=cutoff]\nprint(eligible)\n```\n\n## Review the design\n\nReview both clocks, the gap convention, overlapping windows and insufficient history. A production backtest also needs historical feature availability and immutable data snapshots.\n",
+      "task": "Rows have unique id and finite t, available, x,y; available>=t. Cutoffs are finite, unique and strictly increasing; horizon>0 and gap>=0 are finite. At each cutoff, fit only rows with t<=cutoff-gap and label available<=cutoff. Forecast rows cutoff<t<=cutoff+horizon. Fit the centered one-feature ridge formula with penalty .1. Return one window with cutoff,status; evaluated windows also contain train_ids,held_ids,predictions,mse. Return status insufficient if fewer than two fitting rows or no held rows. Evaluation uses offline future truth; it must not enter fitting.",
+      "starter": "def walkforward_forecast(rows, cutoffs, horizon, gap):\n    inputs_ready = True\n    draft = []\n    result = None\n    return result\n",
+      "solution": "import math\n\n\ndef _fit(rows):\n    mx = sum(row['x'] for row in rows) / len(rows)\n    my = sum(row['y'] for row in rows) / len(rows)\n    slope = sum((row['x'] - mx) * (row['y'] - my) for row in rows)\n    slope /= sum((row['x'] - mx) ** 2 for row in rows) + .1\n    return slope, my - slope * mx\n\n\ndef walkforward_forecast(rows, cutoffs, horizon, gap):\n    if not cutoffs or not math.isfinite(horizon) or horizon <= 0 or gap < 0 or not math.isfinite(gap):\n        raise ValueError('cutoffs, positive horizon and nonnegative gap required')\n    if any(not math.isfinite(t) for t in cutoffs):\n        raise ValueError('finite cutoffs required')\n    if len(set(cutoffs)) != len(cutoffs) or cutoffs != sorted(cutoffs):\n        raise ValueError('strictly increasing cutoffs required')\n    if len({row['id'] for row in rows}) != len(rows):\n        raise ValueError('unique sample identities required')\n    if any(not math.isfinite(row[key]) for row in rows for key in ('t', 'available', 'x', 'y')):\n        raise ValueError('finite rows required')\n    if any(row['available'] < row['t'] for row in rows):\n        raise ValueError('label availability cannot precede its event')\n    windows = []\n    for cutoff in cutoffs:\n        train = [row for row in rows if row['t'] <= cutoff - gap and row['available'] <= cutoff]\n        held = [row for row in rows if cutoff < row['t'] <= cutoff + horizon]\n        if len(train) < 2 or not held:\n            windows.append({'cutoff': cutoff, 'status': 'insufficient'})\n            continue\n        slope, intercept = _fit(train)\n        predictions = [slope * row['x'] + intercept for row in held]\n        mse = sum((p - row['y']) ** 2 for p, row in zip(predictions, held)) / len(held)\n        windows.append({'cutoff': cutoff, 'status': 'evaluated',\n                        'train_ids': [row['id'] for row in train],\n                        'held_ids': [row['id'] for row in held],\n                        'predictions': predictions, 'mse': mse})\n    return windows\n",
+      "checks": [
+        {
+          "name": "late labels excluded from fitting",
+          "code": "rows=[{'id': '0', 't': 0, 'available': 0, 'x': 0, 'y': 1}, {'id': '1', 't': 1, 'available': 1, 'x': 1, 'y': 3}, {'id': '2', 't': 2, 'available': 5, 'x': 2, 'y': 5}, {'id': '3', 't': 3, 'available': 3, 'x': 3, 'y': 7}, {'id': '4', 't': 4, 'available': 4, 'x': 4, 'y': 9}]\nr=walkforward_forecast(rows,[2],2,0)[0]\nassert r['train_ids']==['0','1'] and r['held_ids']==['3','4'], 'Filter on label availability as well as event time.'\nassert abs(r['predictions'][0]-37/6)<1e-10, 'Fit the declared centered ridge model.'\n"
+        },
+        {
+          "name": "future labels cannot change a past forecast",
+          "code": "rows=[{'id': '0', 't': 0, 'available': 0, 'x': 0, 'y': 1}, {'id': '1', 't': 1, 'available': 1, 'x': 1, 'y': 3}, {'id': '2', 't': 2, 'available': 5, 'x': 2, 'y': 5}, {'id': '3', 't': 3, 'available': 3, 'x': 3, 'y': 7}, {'id': '4', 't': 4, 'available': 4, 'x': 4, 'y': 9}]\nimport copy\na=walkforward_forecast(rows,[2],2,0)[0]\npoison=copy.deepcopy(rows)\nfor row in poison:\n    if row['t']>=2: row['y']+=1000\nb=walkforward_forecast(poison,[2],2,0)[0]\nassert a['predictions']==b['predictions'] and a['mse']!=b['mse'], 'Future truth must affect evaluation only.'\n"
+        },
+        {
+          "name": "gap and insufficient history",
+          "code": "rows=[{'id': '0', 't': 0, 'available': 0, 'x': 0, 'y': 1}, {'id': '1', 't': 1, 'available': 1, 'x': 1, 'y': 3}, {'id': '2', 't': 2, 'available': 5, 'x': 2, 'y': 5}, {'id': '3', 't': 3, 'available': 3, 'x': 3, 'y': 7}, {'id': '4', 't': 4, 'available': 4, 'x': 4, 'y': 9}]\nr=walkforward_forecast(rows,[0,3],1,1)\nassert r[0]=={'cutoff':0,'status':'insufficient'}, 'Report insufficient history explicitly.'\nassert r[1]['train_ids']==['0','1'], 'The purge gap must precede model fitting.'\n"
+        },
+        {
+          "name": "unsorted cutoffs rejected",
+          "code": "rows=[{'id': '0', 't': 0, 'available': 0, 'x': 0, 'y': 1}, {'id': '1', 't': 1, 'available': 1, 'x': 1, 'y': 3}, {'id': '2', 't': 2, 'available': 5, 'x': 2, 'y': 5}, {'id': '3', 't': 3, 'available': 3, 'x': 3, 'y': 7}, {'id': '4', 't': 4, 'available': 4, 'x': 4, 'y': 9}]\ntry:\n    walkforward_forecast(rows,[3,2],1,0)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\n"
+        }
+      ],
+      "hints": [
+        "Apply event-time and label-availability predicates before fitting.",
+        "Use an unpenalized intercept and the fixed .1 slope penalty.",
+        "Keep window identities and predictions so late-label and future-target perturbations can be audited."
+      ],
+      "explanation": "Review both clocks, the gap convention, overlapping windows and insufficient history. A production backtest also needs historical feature availability and immutable data snapshots."
+    },
+    {
+      "id": "project-stackingproject",
+      "title": "Project: train a stacking model from out-of-fold base predictions",
+      "body": "# Project: train a stacking model from out-of-fold base predictions\n\nA stacked learner can silently train on unrealistically good in-sample base predictions. Its meta-model must see the kind of prediction available for unseen examples. This project builds out-of-fold features with real linear and quadratic ridge models, trains a second regression and refits the base learners for inference. Test inputs deliberately omit targets. The orchestration trace shows fold boundaries and the assembled OOF matrix; helper fits execute normally. This fixture does not choose the fold scheme or estimate the stack's generalization error.\n\n```python\nfolds = ['a','a','b','b']\noof = {}\nfor fold in sorted(set(folds)):\n    fitting = [i for i,g in enumerate(folds) if g!=fold]\n    for i,g in enumerate(folds):\n        if g==fold: oof[i]=fitting\nprint(oof)\n```\n\n## Review the design\n\nAudit that every OOF feature excludes its target row's fold. Use an outer evaluation loop for the complete stack and defend fold construction before trusting an ensemble score.\n",
+      "task": "Training rows have disjoint unique id, fold, finite scalar x,y; test rows need id,x only. Require >=4 training rows, >=2 folds and >=2 fitting rows per held fold. Base learners are centered raw polynomial ridge models of degree 1 and 2, penalty .1 and unpenalized intercept. Form two OOF features per training row using only other folds. Fit a centered two-feature ridge meta-model with penalty .001 on OOF features. Refit bases on all training rows for test prediction. Return oof, folds with fit_ids/held_ids, meta weights,bias and predictions.",
+      "starter": "def stacked_regression(rows, test):\n    inputs_ready = True\n    draft = []\n    result = None\n    return result\n",
+      "solution": "import math\nimport numpy as np\n\n\ndef _fit_base(rows, degree):\n    x = np.asarray([[row['x'] ** p for p in range(1, degree + 1)] for row in rows])\n    y = np.asarray([row['y'] for row in rows])\n    mx, my = x.mean(axis=0), float(y.mean())\n    centered = x - mx\n    w = np.linalg.solve(centered.T @ centered + .1 * np.eye(degree), centered.T @ (y - my))\n    return w, my - float(mx @ w)\n\n\ndef _predict_base(model, row):\n    w, b = model\n    return b + sum(float(weight) * row['x'] ** (i + 1) for i, weight in enumerate(w))\n\n\ndef stacked_regression(rows, test):\n    if len(rows) < 4 or not test:\n        raise ValueError('at least four training rows and test features required')\n    if len({row['id'] for row in rows + test}) != len(rows + test):\n        raise ValueError('disjoint unique sample identities required')\n    if any(not math.isfinite(row['x']) for row in rows + test):\n        raise ValueError('finite features required')\n    if any(not math.isfinite(row['y']) for row in rows):\n        raise ValueError('finite targets required')\n    folds = sorted(set(row['fold'] for row in rows))\n    if len(folds) < 2:\n        raise ValueError('at least two folds required')\n    oof, audits = {}, []\n    for fold in folds:\n        train = [row for row in rows if row['fold'] != fold]\n        held = [row for row in rows if row['fold'] == fold]\n        if len(train) < 2:\n            raise ValueError('every base fit needs two rows')\n        models = [_fit_base(train, degree) for degree in (1, 2)]\n        for row in held:\n            oof[row['id']] = [_predict_base(model, row) for model in models]\n        audits.append({'fold': fold, 'fit_ids': [row['id'] for row in train],\n                       'held_ids': [row['id'] for row in held]})\n    z = np.asarray([oof[row['id']] for row in rows])\n    y = np.asarray([row['y'] for row in rows])\n    means, center = z.mean(axis=0), float(y.mean())\n    centered = z - means\n    weights = np.linalg.solve(centered.T @ centered + .001 * np.eye(2), centered.T @ (y - center))\n    bias = center - float(means @ weights)\n    full = [_fit_base(rows, degree) for degree in (1, 2)]\n    predictions = [bias + sum(float(w) * _predict_base(model, row)\n                   for w, model in zip(weights, full)) for row in test]\n    return {'oof': oof, 'folds': audits, 'weights': weights.tolist(),\n            'bias': bias, 'predictions': predictions}\n",
+      "checks": [
+        {
+          "name": "OOF matrix and test features",
+          "code": "rows=[{'id': '0', 'fold': 'a', 'x': -2, 'y': 4}, {'id': '1', 'fold': 'a', 'x': -1, 'y': 1}, {'id': '2', 'fold': 'b', 'x': 0, 'y': 0}, {'id': '3', 'fold': 'b', 'x': 1, 'y': 1}, {'id': '4', 'fold': 'c', 'x': 2, 'y': 4}, {'id': '5', 'fold': 'c', 'x': 3, 'y': 9}]\ntest=[{\"id\":\"new\",\"x\":4}]\nr=stacked_regression(rows,test)\nassert len(r['oof'])==6 and all(len(v)==2 for v in r['oof'].values()), 'Every row needs two out-of-fold base features.'\nassert len(r['predictions'])==1 and len(r['weights'])==2, 'Train and apply a real meta-model without test targets.'\n"
+        },
+        {
+          "name": "held fold labels cannot affect its OOF features",
+          "code": "rows=[{'id': '0', 'fold': 'a', 'x': -2, 'y': 4}, {'id': '1', 'fold': 'a', 'x': -1, 'y': 1}, {'id': '2', 'fold': 'b', 'x': 0, 'y': 0}, {'id': '3', 'fold': 'b', 'x': 1, 'y': 1}, {'id': '4', 'fold': 'c', 'x': 2, 'y': 4}, {'id': '5', 'fold': 'c', 'x': 3, 'y': 9}]\ntest=[{\"id\":\"new\",\"x\":4}]\nimport copy\na=stacked_regression(rows,test)\npoison=copy.deepcopy(rows)\nfor row in poison:\n    if row['fold']=='a': row['y']+=1000\nb=stacked_regression(poison,test)\nassert a['oof']['0']==b['oof']['0'] and a['oof']['1']==b['oof']['1'], 'OOF features must exclude the entire held fold.'\n"
+        },
+        {
+          "name": "constant targets are reproduced",
+          "code": "rows=[{'id': '0', 'fold': 'a', 'x': -2, 'y': 4}, {'id': '1', 'fold': 'a', 'x': -1, 'y': 1}, {'id': '2', 'fold': 'b', 'x': 0, 'y': 0}, {'id': '3', 'fold': 'b', 'x': 1, 'y': 1}, {'id': '4', 'fold': 'c', 'x': 2, 'y': 4}, {'id': '5', 'fold': 'c', 'x': 3, 'y': 9}]\ntest=[{\"id\":\"new\",\"x\":4}]\nimport copy\nconstant=copy.deepcopy(rows)\nfor row in constant: row['y']=5\nr=stacked_regression(constant,test)\nassert abs(r['predictions'][0]-5)<1e-10 and all(abs(w)<1e-10 for w in r['weights']), 'Keep unpenalized intercepts in base and meta fits.'\nfor fold in r['folds']: assert not set(fold['fit_ids'])&set(fold['held_ids']), 'Fold identity leakage detected.'\n"
+        },
+        {
+          "name": "overlapping test identity rejected",
+          "code": "rows=[{'id': '0', 'fold': 'a', 'x': -2, 'y': 4}, {'id': '1', 'fold': 'a', 'x': -1, 'y': 1}, {'id': '2', 'fold': 'b', 'x': 0, 'y': 0}, {'id': '3', 'fold': 'b', 'x': 1, 'y': 1}, {'id': '4', 'fold': 'c', 'x': 2, 'y': 4}, {'id': '5', 'fold': 'c', 'x': 3, 'y': 9}]\ntest=[{\"id\":\"new\",\"x\":4}]\ntry:\n    stacked_regression(rows,[{'id':'0','x':8}])\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\n"
+        }
+      ],
+      "hints": [
+        "Fit both base models on other folds and fill held-out identities exactly once.",
+        "Train the meta-model from OOF features, never from predictions of full-data bases.",
+        "Only after the meta-model is frozen should bases refit on all training rows for test features."
+      ],
+      "explanation": "Audit that every OOF feature excludes its target row's fold. Use an outer evaluation loop for the complete stack and defend fold construction before trusting an ensemble score."
+    },
+    {
+      "id": "project-logisticproject",
+      "title": "Project: train logistic regression and restore the best validation checkpoint",
+      "body": "# Project: train logistic regression and restore the best validation checkpoint\n\nTraining correctness includes the state selected for deployment. A reference to a mutable weight array is not a saved checkpoint, and a final training iterate is not necessarily the best validation model. This project trains a real NumPy logistic classifier, fits preprocessing on training observations and restores a copied validation checkpoint before evaluating test. The fixtures include a deliberately contradictory validation population so the best step occurs early. This is a deterministic full-batch optimizer, without minibatch scheduling, distributed training or a production checkpoint store.\n\n```python\nimport numpy as np\nweights = np.array([1.,2.])\ncheckpoint = weights.copy()\nweights += 3\nprint(checkpoint.tolist(), weights.tolist())\n```\n\n## Review the design\n\nReview gradient normalization, regularization, fitted transformations and checkpoint ownership. Explain validation selection bias and preserve an independent final test population.\n",
+      "task": "Require nonempty identity-disjoint rectangular finite feature partitions with binary integer y, positive finite learning_rate, integer steps>=1 and finite l2>=0. Standardize from train population means/stds only; constant scales become one. Start weights/bias at zero. Each full-batch gradient step uses mean sigmoid error, L2 on weights only, then measures unregularized validation log loss. Keep the earliest strict best checkpoint by copying weights. Restore it for final test evaluation. Return weights,bias,means,scales,best_step,validation_loss,test_loss,predictions and validation history. Use stable logaddexp for sigmoid and loss.",
+      "starter": "def train_logistic(train, validation, test, learning_rate, steps, l2):\n    inputs_ready = True\n    draft = []\n    result = None\n    return result\n",
+      "solution": "import math\nimport numpy as np\n\n\ndef train_logistic(train, validation, test, learning_rate, steps, l2):\n    if any(not part for part in (train, validation, test)):\n        raise ValueError('nonempty train, validation and test partitions required')\n    all_rows = train + validation + test\n    if len({row['id'] for row in all_rows}) != len(all_rows):\n        raise ValueError('sample identities must be disjoint')\n    width = len(train[0]['x'])\n    if not width or any(len(row['x']) != width for row in all_rows):\n        raise ValueError('consistent feature dimensions required')\n    if any(not math.isfinite(x) for row in all_rows for x in row['x']):\n        raise ValueError('finite features required')\n    if any(type(row['y']) is not int or row['y'] not in (0, 1) for row in all_rows):\n        raise ValueError('binary integer labels required')\n    if not math.isfinite(learning_rate) or learning_rate <= 0 or type(steps) is not int or steps < 1:\n        raise ValueError('positive learning rate and integer step budget required')\n    if not math.isfinite(l2) or l2 < 0:\n        raise ValueError('nonnegative finite penalty required')\n    x = np.asarray([row['x'] for row in train], dtype=float)\n    y = np.asarray([row['y'] for row in train], dtype=float)\n    means, scales = x.mean(axis=0), x.std(axis=0)\n    scales[scales == 0] = 1\n    x = (x - means) / scales\n    vx = (np.asarray([row['x'] for row in validation]) - means) / scales\n    vy = np.asarray([row['y'] for row in validation])\n    w, b = np.zeros(width), 0.0\n    best, history = None, []\n    for step in range(1, steps + 1):\n        logits = x @ w + b\n        probabilities = np.exp(-np.logaddexp(0, -logits))\n        error = probabilities - y\n        w = w - learning_rate * (x.T @ error / len(y) + l2 * w)\n        b = b - learning_rate * float(error.mean())\n        score = vx @ w + b\n        loss = float(np.mean(np.logaddexp(0, score) - vy * score))\n        history.append(loss)\n        if best is None or loss < best[0]:\n            best = (loss, step, w.copy(), b)\n    validation_loss, best_step, w, b = best\n    tx = (np.asarray([row['x'] for row in test]) - means) / scales\n    ty = np.asarray([row['y'] for row in test])\n    logits = tx @ w + b\n    test_loss = float(np.mean(np.logaddexp(0, logits) - ty * logits))\n    return {'weights': w.tolist(), 'bias': b, 'means': means.tolist(),\n            'scales': scales.tolist(), 'best_step': best_step, 'history': history,\n            'validation_loss': validation_loss, 'test_loss': test_loss,\n            'predictions': (logits >= 0).astype(int).tolist()}\n",
+      "checks": [
+        {
+          "name": "actual model learns the boundary",
+          "code": "train=[{'id': '0', 'x': [-2, 7], 'y': 0}, {'id': '1', 'x': [-1, 7], 'y': 0}, {'id': '2', 'x': [1, 7], 'y': 1}, {'id': '3', 'x': [2, 7], 'y': 1}]\nvalidation=[{'id': 'v0', 'x': [-1.5, 7], 'y': 0}, {'id': 'v1', 'x': [1.5, 7], 'y': 1}]\ntest=[{'id': 'e0', 'x': [-3, 7], 'y': 0}, {'id': 'e1', 'x': [3, 7], 'y': 1}]\nr=train_logistic(train,validation,test,.5,20,.01)\nassert r['predictions']==[0,1] and r['test_loss']<.2, 'Train a classifier rather than returning fixture labels.'\nassert r['means']==[0,7] and r['scales'][1]==1 and r['weights'][1]==0, 'Keep constant columns well-defined.'\n"
+        },
+        {
+          "name": "earliest validation checkpoint is restored",
+          "code": "train=[{'id': '0', 'x': [-2, 7], 'y': 0}, {'id': '1', 'x': [-1, 7], 'y': 0}, {'id': '2', 'x': [1, 7], 'y': 1}, {'id': '3', 'x': [2, 7], 'y': 1}]\nvalidation=[{'id': 'v0', 'x': [-1.5, 7], 'y': 0}, {'id': 'v1', 'x': [1.5, 7], 'y': 1}]\ntest=[{'id': 'e0', 'x': [-3, 7], 'y': 0}, {'id': 'e1', 'x': [3, 7], 'y': 1}]\nimport copy\nbad=copy.deepcopy(validation)\nfor row in bad: row['y']=1-row['y']\na=train_logistic(train,bad,test,.5,10,.01)\nb=train_logistic(train,bad,test,.5,1,.01)\nassert a['best_step']==1 and a['weights']==b['weights'] and a['bias']==b['bias'], 'Restore copied weights from the strict validation minimum.'\n"
+        },
+        {
+          "name": "test labels cannot change trained parameters",
+          "code": "train=[{'id': '0', 'x': [-2, 7], 'y': 0}, {'id': '1', 'x': [-1, 7], 'y': 0}, {'id': '2', 'x': [1, 7], 'y': 1}, {'id': '3', 'x': [2, 7], 'y': 1}]\nvalidation=[{'id': 'v0', 'x': [-1.5, 7], 'y': 0}, {'id': 'v1', 'x': [1.5, 7], 'y': 1}]\ntest=[{'id': 'e0', 'x': [-3, 7], 'y': 0}, {'id': 'e1', 'x': [3, 7], 'y': 1}]\nimport copy\na=train_logistic(train,validation,test,.5,8,.01)\npoison=copy.deepcopy(test)\nfor row in poison: row['y']=1-row['y']\nb=train_logistic(train,validation,poison,.5,8,.01)\nassert a['weights']==b['weights'] and a['best_step']==b['best_step'] and a['test_loss']!=b['test_loss'], 'Test truth belongs only to final evaluation.'\n"
+        },
+        {
+          "name": "invalid optimizer budget rejected",
+          "code": "train=[{'id': '0', 'x': [-2, 7], 'y': 0}, {'id': '1', 'x': [-1, 7], 'y': 0}, {'id': '2', 'x': [1, 7], 'y': 1}, {'id': '3', 'x': [2, 7], 'y': 1}]\nvalidation=[{'id': 'v0', 'x': [-1.5, 7], 'y': 0}, {'id': 'v1', 'x': [1.5, 7], 'y': 1}]\ntest=[{'id': 'e0', 'x': [-3, 7], 'y': 0}, {'id': 'e1', 'x': [3, 7], 'y': 1}]\ntry:\n    train_logistic(train,validation,test,.5,0,.01)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\n"
+        }
+      ],
+      "hints": [
+        "Fit standardization only on the training partition.",
+        "Use a stable sigmoid, average sample gradients and leave the intercept unpenalized.",
+        "Copy a strict best checkpoint after each update, then restore it before computing test metrics."
+      ],
+      "explanation": "Review gradient normalization, regularization, fitted transformations and checkpoint ownership. Explain validation selection bias and preserve an independent final test population."
+    },
+    {
+      "id": "project-rolloutmonitor",
+      "title": "Project: make a replay-safe, cohort-aware rollout monitor",
+      "body": "# Project: make a replay-safe, cohort-aware rollout monitor\n\nA rollout can improve an average while harming a small cohort or relying on labels not yet observed. This project joins delayed outcomes, requires per-cohort evidence and maintains a conservative decision state across windows. Two consecutive sufficiently observed regressions latch rollback; an incomplete window holds and breaks the bad-window streak. Payload identity makes a repeated monitoring window idempotent while rejecting changed evidence under the same identity. State is a local immutable-value contract: durable storage, concurrent writers and an actual traffic switch remain production responsibilities.\n\n```python\nbaseline, candidate, outcome = .1, .9, 0\nbrier_delta = (candidate-outcome)**2-(baseline-outcome)**2\nprint(round(brier_delta, 4))\nprint('regression' if brier_delta>.05 else 'within tolerance')\n```\n\n## Review the design\n\nReview delayed-label coverage, cohort policy, sequential monitoring and replay state. A two-window rule is an operational policy, not a statistical significance test.\n",
+      "task": "Predictions have unique id,cohort,baseline,candidate probabilities; outcomes have unique id,binary integer y,finite available. Pair only outcomes available<=finite asof. For every predicted cohort compute count and mean(candidate squared error - baseline squared error). A window has enough evidence only if every cohort reaches positive integer min_pairs. It is bad if sufficient and any cohort delta>nonnegative finite tolerance. Track consecutive bad windows, resetting on all other windows; rollback after two and latch rollback forever. Otherwise return continue for sufficient good evidence, hold otherwise. Window is a nonnegative increasing integer; identical canonical payload replay returns copied state, conflicting or older windows raise ValueError. Never mutate input state.",
+      "starter": "def monitor_rollout(state, window, predictions, outcomes, asof, min_pairs, tolerance):\n    inputs_ready = True\n    draft = []\n    result = None\n    return result\n",
+      "solution": "import copy\nimport hashlib\nimport json\nimport math\n\n\ndef monitor_rollout(state, window, predictions, outcomes, asof, min_pairs, tolerance):\n    if type(window) is not int or window < 0 or type(min_pairs) is not int or min_pairs < 1:\n        raise ValueError('valid window and minimum paired sample count required')\n    if not math.isfinite(asof) or not math.isfinite(tolerance) or tolerance < 0:\n        raise ValueError('finite cutoff and nonnegative tolerance required')\n    payload = [window, predictions, outcomes, asof, min_pairs, tolerance]\n    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, allow_nan=False).encode()).hexdigest()\n    previous = state.get('window', -1)\n    if window == previous:\n        if digest != state.get('digest'):\n            raise ValueError('conflicting replay of a monitoring window')\n        return copy.deepcopy(state)\n    if window < previous:\n        raise ValueError('monitoring windows must move forward')\n    ids = [row['id'] for row in predictions]\n    if len(ids) != len(set(ids)) or len({row['id'] for row in outcomes}) != len(outcomes):\n        raise ValueError('unique prediction and outcome identities required')\n    if any(not math.isfinite(row[key]) or not 0 <= row[key] <= 1\n           for row in predictions for key in ('baseline', 'candidate')):\n        raise ValueError('valid probability predictions required')\n    if any(type(row['y']) is not int or row['y'] not in (0, 1)\n           or not math.isfinite(row['available']) for row in outcomes):\n        raise ValueError('binary outcomes and finite availability times required')\n    known = {row['id']: row for row in outcomes if row['available'] <= asof}\n    cohorts = {}\n    for row in predictions:\n        if row['id'] not in known:\n            continue\n        y = known[row['id']]['y']\n        delta = (row['candidate'] - y) ** 2 - (row['baseline'] - y) ** 2\n        cohorts.setdefault(row['cohort'], []).append(delta)\n    expected = sorted(set(row['cohort'] for row in predictions))\n    coverage = {cohort: len(cohorts.get(cohort, [])) for cohort in expected}\n    deltas = {cohort: sum(values) / len(values) for cohort, values in cohorts.items()}\n    enough = bool(expected) and all(coverage[cohort] >= min_pairs for cohort in expected)\n    bad = enough and any(delta > tolerance for delta in deltas.values())\n    bad_windows = state.get('bad_windows', 0) + 1 if bad else 0\n    status = 'rollback' if state.get('status') == 'rollback' or bad_windows >= 2 else 'hold'\n    if status != 'rollback' and enough and not bad:\n        status = 'continue'\n    return {'window': window, 'digest': digest, 'bad_windows': bad_windows,\n            'status': status, 'coverage': coverage, 'deltas': deltas}\n",
+      "checks": [
+        {
+          "name": "two bad windows trigger a latched rollback",
+          "code": "predictions=[{'id': 'a', 'cohort': 'small', 'baseline': 0.1, 'candidate': 0.9}, {'id': 'b', 'cohort': 'large', 'baseline': 0.1, 'candidate': 0.9}]\noutcomes=[{'id': 'a', 'y': 0, 'available': 1}, {'id': 'b', 'y': 0, 'available': 1}]\na=monitor_rollout({},0,predictions,outcomes,2,1,.05)\nb=monitor_rollout(a,1,predictions,outcomes,2,1,.05)\nassert a['status']=='hold' and b['status']=='rollback' and b['bad_windows']==2, 'Rollback requires two consecutive sufficiently observed bad windows.'\ngood=[{**r,'candidate':.1} for r in predictions]\nc=monitor_rollout(b,2,good,outcomes,2,1,.05)\nassert c['status']=='rollback', 'Rollback is latched, not silently reversed.'\n"
+        },
+        {
+          "name": "missing cohort labels cannot promote",
+          "code": "predictions=[{'id': 'a', 'cohort': 'small', 'baseline': 0.1, 'candidate': 0.9}, {'id': 'b', 'cohort': 'large', 'baseline': 0.1, 'candidate': 0.9}]\noutcomes=[{'id': 'a', 'y': 0, 'available': 1}, {'id': 'b', 'y': 0, 'available': 1}]\nr=monitor_rollout({},0,predictions,outcomes[:1],2,1,.05)\nassert r['status']=='hold' and r['coverage']=={'large':0,'small':1}, 'Do not hide an unobserved cohort.'\nlate=monitor_rollout({},0,predictions,outcomes,0,1,.05)\nassert late['deltas']=={} and late['status']=='hold', 'Future labels are unavailable evidence.'\n"
+        },
+        {
+          "name": "identical replay is immutable",
+          "code": "predictions=[{'id': 'a', 'cohort': 'small', 'baseline': 0.1, 'candidate': 0.9}, {'id': 'b', 'cohort': 'large', 'baseline': 0.1, 'candidate': 0.9}]\noutcomes=[{'id': 'a', 'y': 0, 'available': 1}, {'id': 'b', 'y': 0, 'available': 1}]\nimport copy\ns=monitor_rollout({},0,predictions,outcomes,2,1,.05)\nold=copy.deepcopy(s)\nr=monitor_rollout(s,0,predictions,outcomes,2,1,.05)\nr['coverage']['small']=99\nassert s==old, 'Replay must not return mutable aliases into stored state.'\n"
+        },
+        {
+          "name": "changed window replay rejected",
+          "code": "predictions=[{'id': 'a', 'cohort': 'small', 'baseline': 0.1, 'candidate': 0.9}, {'id': 'b', 'cohort': 'large', 'baseline': 0.1, 'candidate': 0.9}]\noutcomes=[{'id': 'a', 'y': 0, 'available': 1}, {'id': 'b', 'y': 0, 'available': 1}]\ns=monitor_rollout({},0,predictions,outcomes,2,1,.05)\ntry:\n    monitor_rollout(s,0,predictions,outcomes,3,1,.05)\nexcept ValueError:\n    pass\nelse:\n    assert False, 'Reject invalid input before producing a result.'\n"
+        }
+      ],
+      "hints": [
+        "Join only unique outcomes available by the observation cutoff.",
+        "Require enough paired observations in every expected cohort before judging regression.",
+        "Hash the complete window evidence, reject conflicting replay and preserve the rollback latch across later good windows."
+      ],
+      "explanation": "Review delayed-label coverage, cohort policy, sequential monitoring and replay state. A two-window rule is an operational policy, not a statistical significance test."
+    }
+  ]
+}

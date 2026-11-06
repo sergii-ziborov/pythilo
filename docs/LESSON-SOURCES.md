@@ -83,3 +83,39 @@ Primary references checked for the audit:
 - [Google SRE: implementing SLOs](https://sre.google/workbook/implementing-slos/):
   objectives, user-event denominators and error budgets inform the local burn-rate
   and rollout exercises, rather than universal automatic release claims.
+
+## ML/AI systems projects — 6 November 2026
+
+Courses 32–33 add 24 lessons with 24 linked Labs: 12 ML and 12 AI. Twelve are
+composed projects with 4–5 independent check groups each. Model projects train
+real NumPy ridge/logistic regressions, construct OOF stacking features, run nested
+group selection and walk-forward evaluation, and test delayed-label rollout
+state. Perturbation checks ensure held-out targets and inaccessible documents
+cannot affect their own fitted predictions or authorized retrieval scores.
+
+The AI projects implement BM25, immutable index-batch/CAS/tombstone handling,
+context packing with exact citation spans, approved local tool DAG execution,
+bounded continuous-batching simulation and paired release evidence. RAG receives
+a saved provider-output fixture; it does not claim live LLM inference or semantic
+faithfulness. The serving scheduler is explicitly a discrete simulation. Exact
+approval hashes are identities in a trusted controller-provided allowlist, not
+permission created by hashing. Local copied-state publication does not claim
+durable distributed exactly-once effects.
+
+Large project replays follow the orchestration function so the complete scenario
+fits the browser's 180-frame budget. Helpers still execute; independent checks
+exercise full datasets and failure cases. Reading blocks remain standalone
+Python programs. All new exercises use stdlib or the NumPy already bundled in
+both runtimes, with no credentials, remote model or new native package required.
+
+Primary references:
+
+- scikit-learn [nested versus non-nested cross-validation](https://scikit-learn.org/stable/auto_examples/model_selection/plot_nested_cross_validation_iris.html),
+  [cross-validation](https://scikit-learn.org/stable/modules/cross_validation.html)
+  and [probability calibration](https://scikit-learn.org/stable/modules/calibration.html).
+- Stanford's [Introduction to Information Retrieval: ranked evaluation](https://nlp.stanford.edu/IR-book/pdf/08eval.pdf)
+  informs the graded NDCG exercise; tokenization and BM25 constants are stated in
+  the runnable contract rather than implied to match an external search engine.
+- [OWASP RAG security guidance](https://cheatsheetseries.owasp.org/cheatsheets/RAG_Security_Cheat_Sheet.html)
+  informs access filtering, versioned provenance and the distinction between
+  digest consistency, instruction trust and semantic answer support.

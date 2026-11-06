@@ -4,3 +4,13 @@
 .lab-card-kind em{display:inline-block;color:#8cdec0;font-size:10px;font-style:normal;letter-spacing:0;margin-left:10px}.labs-index .eyebrow,.lab-title .eyebrow{font-size:11px;letter-spacing:.15em;color:#a6b8cc}
 
 .lab-matrix{overflow-x:auto}.lab-matrix table{border-collapse:collapse;margin:12px 0}.lab-matrix td{border:1px solid #334258;padding:12px;text-align:right;min-width:60px;background:#172235}
+
+.lab-workspace > p .pill-button {
+  max-width: 100%;
+  height: auto;
+  min-height: 44px;
+  padding: 10px 16px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}

@@ -252,7 +252,7 @@ final class FeatureGateTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(count, 482)
+        XCTAssertEqual(count, 506)
         XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
     }
 
@@ -261,7 +261,7 @@ final class FeatureGateTests: XCTestCase {
         try XCTSkipIf(library.courses.isEmpty, "Courses are not in this build yet")
         var failures: [String] = []
         var count = 0
-        for course in library.courses where ["python-runtime", "python-systems", "ml-statistics", "ml-production", "ai-production", "deep-learning-practice", "senior-projects"].contains(course.id) {
+        for course in library.courses where ["python-runtime", "python-systems", "ml-statistics", "ml-production", "ai-production", "deep-learning-practice", "senior-projects", "ml-systems", "ai-systems"].contains(course.id) {
             for lesson in course.lessons {
                 let folder = root.appending(path: lesson.id)
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -285,7 +285,7 @@ final class FeatureGateTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(count, 74)
+        XCTAssertEqual(count, 98)
         XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
     }
 
@@ -315,7 +315,7 @@ final class FeatureGateTests: XCTestCase {
         let audit = try JSONSerialization.data(withJSONObject: ["count": count, "failures": failures], options: [.prettyPrinted])
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         try audit.write(to: documents.appending(path: "reading-audit.json"))
-        XCTAssertEqual(count, 539)
+        XCTAssertEqual(count, 563)
         XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
     }
 
