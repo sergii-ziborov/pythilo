@@ -21,7 +21,7 @@ There is no manual age override. No advertising, gambling, health or mature cont
 is built into Pythilo.
 
 The public beta has no signup link: only the internal TestFlight group is enabled.
-Build 15 (0.1.0) is valid and in internal beta testing; What to Test is saved.
+Completed internal releases and their readback receipts are recorded in `docs/STATUS.md`.
 The website uses support@pythilo.com, privacy@pythilo.com and security@pythilo.com,
 forwarded to the owner via Forward Email with DNS on Vercel. TestFlight feedback and
 public GitHub issues are also available. The terms follow Crabrix in not choosing a
@@ -31,7 +31,15 @@ Before a future App Review submission, settle the existing export-compliance que
 in `docs/STATUS.md` (bundled OpenSSL and libgit2 HTTPS) and complete Apple's App
 Privacy questionnaire against the final binary and the published privacy policy.
 
-The learning expansion updates the saved draft and beta descriptions to 236 lessons
-in 17 courses, plus 20 interview tasks, and 32 labs. The Learn artwork now says
-236 lessons. Apple's replacement asset is named `03-learn-236.jpg`; its local
-source remains `screenshots/en-US/03-learn.jpg`. All eight assets are COMPLETE.
+The current saved draft and beta descriptions cover 430 lessons in 35 courses,
+100 interview tasks and 120 Labs in 15 topics. Courses and Lab topics download
+separately; project source stays local while packages, datasets and weights
+download automatically. Six complete real BERT/LoRA projects train and evaluate
+on the device. Compiled backends stay signed inside the application.
+
+The Learn and Labs artwork now says 430 lessons and 120 Labs/15 topics. The
+PyTorch artwork explains downloading packages before offline CPU training. Apple's
+replacement filenames are `03-learn-430-100.jpg`, `04-labs-120.jpg` and
+`05-pytorch-downloads.jpg`; local sources retain their original filenames.
+All eight assets were read back as COMPLETE on 6 November 2026. Build 26 notes
+in English and Russian are saved in `testflight-26.json`. No review is requested.

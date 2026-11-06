@@ -301,3 +301,52 @@ App required controls. At 390px the lesson, Lab and expanded catalog have no
 horizontal overflow. Viewport overrides were reset. Proofs:
 `build/verification/pythilo-torch18-catalog-live.png` and
 `build/verification/pythilo-torch18-lesson-mobile-live.png`.
+
+## Downloadable content and complete BERT projects (6 November 2026)
+
+The site publishes 430 path lessons in 35 courses, 100 interview tasks, 120 native
+Labs in 15 topics, 24 PyTorch Labs and 88 reciprocal lesson/Lab pairs. Six complete
+BERT project source ZIPs include a pinned asset fetcher, editable code and
+instructions for full-data training and evaluation. PyTorch execution is marked
+App required; 74 compatible Labs also run in the browser.
+
+The final release is live from source revision
+`sha256:8d42153f446c95ed282039cca3bc240f3974d64d2cac07f62c7002bd4544a7c5`,
+image `sha256:4471bf526558d9bcc054a978e3114dc58281254011d634342f56323aecafa903`,
+registry manifest
+`sha256:2e0444c684edbed80cd3e9212f0676408ff32dc0e8a80872798f7686dc724c4e`.
+Serving readback at 21:38 UTC confirms the exact image, healthy running container
+and revision `sha256:c1536e9c94b04a278444b934397f41769737fcbdaa07dd900a81c90f63076ee1`.
+Operation keys are `pythilo-native-markers-{build,publish,deploy}-20261106-6`.
+Receipt: `build/release-receipts/downloads26-final-site-release.json`.
+
+All 57 catalog-pinned HTTPS payloads (43,530,882 bytes, including the external
+Hugging Face weight asset) were fetched completely and verified with SHA-256.
+The app's catalog hash is
+`d46905be67cdbc1a2672be9ef097d2a5b93ce66dedfda7c53b9b6e05ef9932bf`.
+Native transport tests then downloaded the actual published course and PyTorch
+archives, paused and immediately resumed, verified inventory and embedded backend
+links, and opened the automatic project download manager. All seven tests pass:
+`build/downloads26-public-transport.xcresult`. Public integrity receipt:
+`build/release-receipts/downloads26-public-integrity.json`.
+
+All 92 web tests, TypeScript and the 709-page production build pass. The final
+public audit passes 191 URLs, all 88 link pairs and isolation headers; the room
+and runtime smoke checks also pass. Browser proof:
+`build/verification/pythilo-finetuning-downloads-live.png`.
+
+Before releasing an app catalog that references new payloads, prepare and publish
+those files first. On the authoring Mac, after native package preparation:
+
+```sh
+python3 scripts/generate-finetune-content.py
+python3 scripts/build-content-packs.py
+python3 scripts/build-finetune-projects.py
+```
+
+Stage new `site/public/content-packs/` and `site/public/projects/` files in bounded
+source overlays along with prepared site content. Content-addressed pack URLs are
+immutable; keep prior app versions' files reachable. The current iOS app pins the
+catalog inside its signature and verifies each archive and extracted file. Native
+extension markers refer to signed backends already inside that app. Never publish
+downloadable framework binaries or include model weights/data in its archive.

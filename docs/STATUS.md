@@ -545,3 +545,22 @@ covers 191 URLs and all 88 reciprocal pairs; production room smoke tests and the
 real-browser lesson/Lab flow pass. Proof:
 `build/verification/pythilo-finetuning-downloads-live.png`. Release archive and
 public package transport verification are recorded with the final release receipt.
+
+The final website and packs are live on the exact verified image recorded in
+`site/DEPLOY.md`. All 57 public payloads (43,530,882 bytes, including the external
+model asset) match the signed app catalog by SHA-256. Six native download tests
+and the automatic-project-download UI test pass against those actual public
+files: `build/downloads26-public-transport.xcresult`. A fresh copy of the public
+LoRA ZIP also fetches its own assets and completes the full 448-step experiment,
+with 3,000 original rows, 599 held-out test examples and exact adapter reload.
+Receipt: `build/release-receipts/downloads26-public-project.json`.
+
+Release 0.1.0 (26) archives and exports successfully. The 83,444,791-byte IPA
+contains catalog previews, six local project recipes and 21 signed backend links;
+full courses, Lab Python source files, optional Python API trees, pretrained
+weights and training data are absent. All 42 retained Python runtime source files
+match the archive, and a 422-file source snapshot is unchanged before upload.
+Proof: `build/release-receipts/testflight-26-archive-source.json`. Apple accepted
+the upload at 21:46:55 UTC on 6 November 2026. Notes are preserved in
+`docs/app-store/testflight-26.json`. All eight screenshot assets are COMPLETE;
+the App Store draft remains PREPARE_FOR_SUBMISSION with manual release.
