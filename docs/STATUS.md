@@ -343,3 +343,12 @@ Native-only reading blocks now explicitly say which package/feature requires the
 app. Production browser checks ran Pydantic and FastAPI/HTTPX examples and passed
 their exercise checks. The package catalog has a content-derived URL to avoid
 stale browser caches after adding libraries.
+
+TestFlight 0.1.0 (22) is available to the existing internal group, confirmed at
+09:37:53 UTC on 6 November 2026: Apple processing `VALID`, internal state
+`IN_BETA_TESTING`, one tester, automatic access to all builds. English and Russian
+build-22 notes are attached. There is no Beta App Review submission; App Store 1.0
+remains `PREPARE_FOR_SUBMISSION`, manual release. The archive contains the exact
+24 course files and checker verified above. Receipt:
+`build/release-receipts/testflight-22-ready.json`. Build 21 was superseded before
+its upload completed; build 22 includes the verified report-title fix.
