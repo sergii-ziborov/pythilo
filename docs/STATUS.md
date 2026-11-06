@@ -452,3 +452,49 @@ notes exactly match `build/testflight/build-24-notes.json`. No Beta App Review
 submission exists; App Store 1.0 remains `PREPARE_FOR_SUBMISSION` with manual
 release. No App Review or Beta App Review was requested. Proof:
 `build/release-receipts/testflight-24-ready.json`.
+
+## PyTorch projects and topic navigation (6 November 2026)
+
+Added 18 real PyTorch CPU Labs and linked lessons, including six projects:
+validation-selected nonlinear classification, exact AdamW/sampling/dropout
+continuation, frozen-base low-rank adapter training/merge, a causal pre-norm
+decoder block, a trainable tiny tied-embedding language model and a padding-safe
+sequence classifier. Focused tasks cover clipping, optimizer ownership,
+distillation, contrastive learning, EMA including tied weights, token accumulation,
+attention masks, rotary positions, KV chunks, packed documents, GQA and RMSNorm.
+All fixtures use small local models; no pretrained download or GPU is claimed.
+
+The app now has 114 Labs (54 ML, 37 AI) in 13 expandable topics, with concept
+search. One shared topic index owns every Lab. The site provides section/runtime
+filters, search, expandable groups and 18 App required PyTorch pages alongside
+74 runnable browser Labs. The 82 lesson/Lab pairs link in both directions.
+Totals: 424 path lessons in 34 courses, 100 interview tasks, 116 advanced lessons
+including 24 integration projects, and 581 standalone reading programs.
+
+All 524 solutions, 116 advanced starters, 581 reading programs and all Lab
+answers/starters pass the native gates. The 22-test suite also covers seven
+button-padding scenarios, six lesson/navigation flows and three catalog/project
+UI flows. Result: `build/verification/torch18-native-stable.xcresult`. A final
+18-Lab native parity gate passes all 79 PyTorch check groups after the tied-EMA
+fix and compares answers/check names with their lesson contracts:
+`build/verification/torch18-contract-final.xcresult`. Current bundled engine,
+answer and topic bytes match canonical files.
+
+All 90 site tests, TypeScript and the 696-page production build pass. After the
+final content update, seven catalog/path tests pass. Real-browser checks cover
+topic expand/collapse, search, combined filters, empty results, App required
+execution controls and reciprocal links. A long Practice in Lab button was found
+to widen lessons to 552px; scoped wrapping fixes it. Lesson, Lab and expanded
+catalog pages now remain 390px wide at a 390px viewport. Local route/header/link
+audit passes 179 URLs and all 82 pairs.
+
+Release 0.1.0 (25) archives and exports successfully. All 304 checked runtime and
+course files, including 35 course JSON files, match the archive byte for byte.
+Proof: `build/release-receipts/testflight-25-archive-source.json`. The site is live
+on the exact verified image at 17:04:02 UTC; receipts are in
+`build/release-receipts/torch18-site-release.json`. Public audit passes 179 URLs,
+isolation headers and all 82 pairs; smoke and real-browser checks pass. Public
+proofs: `build/verification/pythilo-torch18-catalog-live.png` and
+`build/verification/pythilo-torch18-lesson-mobile-live.png`. TestFlight upload and
+processing are being checked separately; no App Review or Beta App Review was
+requested.

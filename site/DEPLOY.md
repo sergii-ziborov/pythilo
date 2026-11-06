@@ -268,3 +268,34 @@ loads and traces the Lab answer to step 31/31 with four passing checks, confirms
 390px page width at a 390px viewport and follows the lesson link back. Desktop
 and mobile screenshots: `build/verification/pythilo-projects24-ridge-live.png` and
 `build/verification/pythilo-projects24-ridge-mobile.png`.
+
+The PyTorch/topic expansion adds 18 native CPU Labs, 18 lessons and six projects.
+The app catalog has 114 Labs in 13 expandable topics (54 ML, 37 AI); the web
+catalog offers 74 runnable Labs and 18 explicitly App required PyTorch pages.
+Search, section/runtime filters and topic expand/collapse use the shared topic
+assignments. There are 82 reciprocal lesson/Lab pairs and 24 integration projects.
+
+Deployment `pythilo-torch18-topics-deploy-20261106-v2` succeeded at 17:04:02 UTC on
+6 November 2026. Fresh readback confirms the serving image:
+`sha256:e0e3566dccbe26dc21f3a41f36612f554379166f73c0668deb1c76af9b1a8ef4`.
+Source revision:
+`sha256:5505f4f2b7dd1045ced8fc2792de892c0744576944ec9908d85117a7dda946a5`.
+The corresponding build and publish operation keys use
+`pythilo-torch18-topics-build-20261106-v2` and
+`pythilo-torch18-topics-publish-20261106-v2`. Completed receipts and serving
+readback: `build/release-receipts/torch18-site-release.json`.
+
+The sealed partial source archive contains 17 files, 585092 bytes, SHA-256
+`1eb4d43f78f84a1f4608551a55b6070e449df71bc96f2f5c8a3257d9c9145ece`.
+Baseline hashes matched the approved preceding source. The first archive was
+never accepted during agent maintenance; v2 includes a lesson-link wrapping fix
+found during mobile QA. No running service was changed during that maintenance.
+
+All 90 web tests pass; the final content-specific seven checks, TypeScript and
+696-page build also pass. Public audit passes 179 URLs with isolation headers and
+all 82 reciprocal pairs; public smoke checks pass. Real browser verification
+covers search, combined filters, topics, the tiny-transformer Lab/lesson links and
+App required controls. At 390px the lesson, Lab and expanded catalog have no
+horizontal overflow. Viewport overrides were reset. Proofs:
+`build/verification/pythilo-torch18-catalog-live.png` and
+`build/verification/pythilo-torch18-lesson-mobile-live.png`.
