@@ -7,9 +7,19 @@ struct ProjectTemplate: Identifiable, Sendable {
     let systemImage: String
     let files: [String: String]
 
+    var requiredPacks: [String] {
+        if id.hasPrefix("finetune-") { return ["runtime-torch", "assets-finetune-data", "assets-bert-weights"] }
+        return switch id {
+        case "torch": ["runtime-torch"]
+        case "notebook", "coreml": ["runtime-numpy"]
+        case "django", "flask", "fastapi", "react", "asgi": ["runtime-web"]
+        default: []
+        }
+    }
+
     private static let ignore = ".pythilo/\n__pycache__/\n*.sqlite3\n"
 
-    static let all: [ProjectTemplate] = [blank, csvCleaner, djangoNotes, flaskAPI, fastAPI, reactFastAPI, asgiAPI, notebook, pyTorch, coreML]
+    static let all: [ProjectTemplate] = [blank, csvCleaner, djangoNotes, flaskAPI, fastAPI, reactFastAPI, asgiAPI, notebook, pyTorch, coreML] + finetuning
 
     static let blank = ProjectTemplate(
         id: "blank",

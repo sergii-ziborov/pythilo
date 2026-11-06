@@ -11,6 +11,7 @@ final class FeatureGateTests: XCTestCase {
     override func setUp() async throws {
         root = FileManager.default.temporaryDirectory.appending(path: "feature-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try await DownloadTestSupport.ensureAll()
         try await waitUntil(timeout: 60) { self.session.pythonVersion != nil && self.session.phase == .idle }
         session.clearOutput()
     }
@@ -221,7 +222,7 @@ final class FeatureGateTests: XCTestCase {
         }
     }
 
-    func testEveryBundledLessonSolutionPassesOnTheDevice() async throws {
+    func testEveryDownloadedLessonSolutionPassesOnTheDevice() async throws {
         let library = CourseLibrary()
         try XCTSkipIf(library.courses.isEmpty, "Courses are not in this build yet")
         var failures: [String] = []
@@ -252,7 +253,7 @@ final class FeatureGateTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(count, 524)
+        XCTAssertEqual(count, 530)
         XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
     }
 
@@ -261,7 +262,7 @@ final class FeatureGateTests: XCTestCase {
         try XCTSkipIf(library.courses.isEmpty, "Courses are not in this build yet")
         var failures: [String] = []
         var count = 0
-        for course in library.courses where ["python-runtime", "python-systems", "ml-statistics", "ml-production", "ai-production", "deep-learning-practice", "senior-projects", "ml-systems", "ai-systems", "pytorch-training", "transformer-engineering"].contains(course.id) {
+        for course in library.courses where ["python-runtime", "python-systems", "ml-statistics", "ml-production", "ai-production", "deep-learning-practice", "senior-projects", "ml-systems", "ai-systems", "pytorch-training", "transformer-engineering", "finetuning-projects"].contains(course.id) {
             for lesson in course.lessons {
                 let folder = root.appending(path: lesson.id)
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -285,7 +286,7 @@ final class FeatureGateTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(count, 116)
+        XCTAssertEqual(count, 122)
         XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
     }
 
@@ -315,7 +316,7 @@ final class FeatureGateTests: XCTestCase {
         let audit = try JSONSerialization.data(withJSONObject: ["count": count, "failures": failures], options: [.prettyPrinted])
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         try audit.write(to: documents.appending(path: "reading-audit.json"))
-        XCTAssertEqual(count, 581)
+        XCTAssertEqual(count, 587)
         XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
     }
 

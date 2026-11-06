@@ -11,6 +11,8 @@ struct WorkspaceView: View {
     @State private var fold = FoldReading.none
     @State private var showingGit = false
     @State private var showingPackages = false
+    @State private var showingDownloads = false
+    @State private var contentStore = ContentStore.shared
     @State private var showingRoom = false
     @State private var showingOpenFile = false
     @State private var sidebarVisible = true
@@ -44,6 +46,23 @@ struct WorkspaceView: View {
         .defersSystemGestures(on: .bottom)
         .sheet(isPresented: $showingGit) { GitView(model: model) }
         .sheet(isPresented: $showingPackages) { PackagesView(model: model) }
+        .sheet(isPresented: $showingDownloads) {
+            NavigationStack {
+                DownloadsView().toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showingDownloads = false } } }
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if model.project.requiredPacks.contains(where: { !contentStore.ready($0) }) {
+                Button { showingDownloads = true } label: {
+                    HStack {
+                        Image(systemName: "arrow.down.circle")
+                        Text("Project packages · tap to manage downloads").font(.footnote.weight(.semibold))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }.padding(12).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                }.buttonStyle(.app).background(AppTheme.panel).accessibilityIdentifier("project-downloads")
+            }
+        }
         .sheet(isPresented: $showingRoom) { RoomSheet(model: model) }
         .sheet(isPresented: $showingOpenFile) { QuickOpenSheet(model: model) }
         .sheet(isPresented: $model.previewOpen) { PreviewSheet(model: model) }

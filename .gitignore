@@ -6,3 +6,4 @@ xcuserdata/
 __pycache__/
 Vendor/Python.xcframework
 .env
+site/public/content-packs/

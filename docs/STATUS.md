@@ -2,6 +2,7 @@
 
 Written against product plan 1.1 (1 November 2026). "Checked" means it ran for real
 inside the app on the iOS Simulator. Nothing here has been checked for App Review.
+Later dated release entries record the current catalog and replace earlier counts.
 
 ## Runtime (plan sections 9 to 11, P0-A and P0-B)
 
@@ -505,3 +506,42 @@ notes exactly match `build/testflight/build-25-notes.json`. No Beta App Review
 submission exists; App Store 1.0 remains `PREPARE_FOR_SUBMISSION` with manual
 release. No App Review or Beta App Review was requested. Proof:
 `build/release-receipts/testflight-25-ready.json`.
+
+## Downloadable learning content and pretrained projects (6 November 2026)
+
+Courses and Lab topics now download individually from an app-pinned catalog.
+Projects save their source immediately and queue shared Python packages, datasets
+and model weights. Downloads exposes streamed byte progress, pause, resume,
+cancellation and storage removal. Removal preserves project code, lesson drafts
+and completion history. Existing projects discover supported dependencies from
+imports without rewriting their code. Compiled Python backends remain signed in
+the application; only their Python API trees download. Installation validates
+archive and file hashes, inventories, paths and sizes before atomic activation.
+
+Six complete local-source project templates use real Google BERT-Tiny weights,
+WordPiece and the 3,000-row UCI sentiment dataset: full fine-tuning, Q/V LoRA,
+domain holdout, full/LoRA comparison, exact continuation and adapter merge/export.
+Default CLI runs use the full dataset; short Lab fixtures are marked explicitly.
+The app has 430 path lessons in 35 courses, 100 interview tasks and 120 Labs in
+15 topics (57 ML, 40 AI), with 88 reciprocal lesson/Lab pairs. There are 122
+advanced lessons, including 30 integration projects, and 587 reading programs.
+
+Native checks pass for all 530 lesson solutions, 122 advanced starters and 587
+reading programs, 41 runtime gates and all 24 PyTorch Labs/103 check groups. A
+separate full-data native run executes all six complete project CLIs, evaluates
+held-out data and verifies exact resume and merge/reload parity. All Lab answers
+trace correctly after adding the merge export's actual logits to its evidence
+frames. Migration tests, downloaded-course reading/code transitions, seven button
+padding/corner scenarios and all existing course/Lab navigation flows pass.
+Proofs: `build/downloads26-native-pinned-content.xcresult`,
+`build/downloads26-full-projects-ui.xcresult`,
+`build/downloads26-migration-course.xcresult` and
+`build/release-receipts/finetune-native-full-training.json`.
+The first two result bundles retain superseded failures (the corrected merge
+frame count and a reading-mode UI-test assertion); targeted reruns pass.
+
+All 92 site tests, TypeScript and the production build pass. Public route auditing
+covers 191 URLs and all 88 reciprocal pairs; production room smoke tests and the
+real-browser lesson/Lab flow pass. Proof:
+`build/verification/pythilo-finetuning-downloads-live.png`. Release archive and
+public package transport verification are recorded with the final release receipt.

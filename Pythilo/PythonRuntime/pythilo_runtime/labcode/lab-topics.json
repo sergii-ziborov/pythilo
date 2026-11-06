@@ -64,6 +64,16 @@
       "id": "algorithms",
       "title": "Graphs & dynamic programming",
       "section": "Algorithms"
+    },
+    {
+      "id": "finetuning-training",
+      "title": "Pretrained model training",
+      "section": "Machine learning"
+    },
+    {
+      "id": "finetuning-adapters",
+      "title": "LoRA & model deployment",
+      "section": "Artificial intelligence"
     }
   ],
   "assignments": {
@@ -180,6 +190,12 @@
     "topological": "algorithms",
     "knapsack": "algorithms",
     "bellmanford": "algorithms",
-    "editrows": "algorithms"
+    "editrows": "algorithms",
+    "torchbertfull": "finetuning-training",
+    "torchbertlora": "finetuning-adapters",
+    "torchbertdomain": "finetuning-training",
+    "torchbertcompare": "finetuning-training",
+    "torchbertresume": "finetuning-adapters",
+    "torchbertmerge": "finetuning-adapters"
   }
 }

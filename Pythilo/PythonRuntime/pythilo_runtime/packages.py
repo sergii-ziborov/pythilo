@@ -8,20 +8,16 @@ import time
 
 def _bundled_native_packages():
     """Top-level packages Pythilo ships with compiled code, pinned by this build."""
-    root = None
-    for entry in sys.path:
-        if entry.endswith("/app_packages"):
-            root = entry
-            break
-    if root is None:
-        return {}
     pinned = {}
-    for name in os.listdir(root):
-        if not name.endswith(".dist-info"):
+    for root in sys.path:
+        if not root.endswith("/app_packages") or not os.path.isdir(root):
             continue
-        stem = name[: -len(".dist-info")]
-        distribution, _, version = stem.rpartition("-")
-        pinned[distribution.lower().replace("_", "-")] = version
+        for name in os.listdir(root):
+            if not name.endswith(".dist-info"):
+                continue
+            stem = name[: -len(".dist-info")]
+            distribution, _, version = stem.rpartition("-")
+            pinned[distribution.lower().replace("_", "-")] = version
     return pinned
 
 

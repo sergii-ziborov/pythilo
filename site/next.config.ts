@@ -25,6 +25,7 @@ const nextConfig: NextConfig = {
       { source: "/learn/:path*", headers: isolated },
       { source: "/labs/:path*", headers: isolated },
       { source: "/_next/static/:path*", headers: [{ key: "Cross-Origin-Embedder-Policy", value: "require-corp" }] },
+      { source: "/content-packs/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }, { key: "X-Robots-Tag", value: "noindex" }] },
       { source: "/pyodide/:path*", headers: [{ key: "Cross-Origin-Embedder-Policy", value: "require-corp" }, { key: "Cross-Origin-Resource-Policy", value: "same-origin" }, { key: "Cache-Control", value: "public, max-age=86400" }] },
     ];
   },

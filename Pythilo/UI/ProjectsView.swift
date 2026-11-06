@@ -51,6 +51,7 @@ struct ProjectsView: View {
             .background(AppTheme.background)
             .navigationTitle("Projects")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) { DownloadsLink() }
                 ToolbarItem(placement: .primaryAction) {
                     Button("Settings", systemImage: "gearshape", action: onSettings)
                 }
@@ -179,6 +180,17 @@ struct NewProjectSheet: View {
                             }
                         }
                         .accessibilityIdentifier("template-\(item.id)")
+                    }
+                }
+                if let selected = ProjectTemplate.all.first(where: { $0.id == template }), !selected.requiredPacks.isEmpty {
+                    Section("Downloads automatically after Create") {
+                        ForEach(selected.requiredPacks, id: \.self) { id in
+                            if let pack = ContentStore.shared.catalog.pack(id) {
+                                Text("\(pack.title) · \(ByteCountFormatter.string(fromByteCount: Int64(ContentStore.shared.missingBytes(id)), countStyle: .file)) remaining")
+                            }
+                        }
+                        Text("Your project code is saved immediately. You can edit it while packages download, and pause or resume in Downloads.")
+                            .font(.footnote).foregroundStyle(AppTheme.secondary)
                     }
                 }
                 if let failure { Text(failure).foregroundStyle(AppTheme.coralInk) }

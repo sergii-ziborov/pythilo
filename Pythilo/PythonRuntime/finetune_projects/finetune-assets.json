@@ -1,0 +1,44 @@
+{
+  "model": "google/bert_uncased_L-2_H-128_A-2",
+  "revision": "30b0a37ccaaa32f332884b96992754e246e48c5f",
+  "modelLicense": "Apache-2.0",
+  "dataset": {
+    "url": "https://archive.ics.uci.edu/static/public/331/sentiment%2Blabelled%2Bsentences.zip",
+    "sha256": "afc26626d710899948693e1a61405dce197f57ffa719fa1130d346b4cc095343",
+    "bytes": 84188,
+    "license": "CC-BY-4.0",
+    "citation": "Kotzias, D. (2015). Sentiment Labelled Sentences. UCI Machine Learning Repository. DOI: 10.24432/C57604. From Group to Individual Labels Using Deep Features, Kotzias, Denil, de Freitas and Smyth, KDD 2015."
+  },
+  "files": {
+    "vocab.txt": {
+      "bytes": 231508,
+      "sha256": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
+    },
+    "config.json": {
+      "bytes": 382,
+      "sha256": "508e1f01aae55d73355cbdd82609be2f43ba5a0d3428837adbe56cf8391f8b39"
+    }
+  },
+  "weights": {
+    "id": "assets-bert-weights",
+    "title": "Pretrained BERT-Tiny weights",
+    "kind": "asset",
+    "url": "https://huggingface.co/google/bert_uncased_L-2_H-128_A-2/resolve/30b0a37ccaaa32f332884b96992754e246e48c5f/model.safetensors",
+    "bytes": 17739144,
+    "sha256": "7fb69ad9f6866d8983183c930e33828f326470bf6ad8bbb2ad4ed957a92e9414",
+    "format": "raw",
+    "files": [
+      {
+        "path": "model.safetensors",
+        "bytes": 17739144,
+        "sha256": "7fb69ad9f6866d8983183c930e33828f326470bf6ad8bbb2ad4ed957a92e9414"
+      }
+    ],
+    "dependencies": []
+  },
+  "modelLicenseFile": {
+    "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+    "bytes": 11358,
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  }
+}

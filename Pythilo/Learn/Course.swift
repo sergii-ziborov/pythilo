@@ -41,7 +41,7 @@ struct LessonReport: Decodable, Sendable {
     let error: String?
 }
 
-/// The courses bundled in the app, and progress kept on this device.
+/// Lightweight course previews, downloaded lessons and progress kept on this device.
 @MainActor
 @Observable
 final class CourseLibrary {
@@ -56,19 +56,16 @@ final class CourseLibrary {
     init() {
         completed = Set(defaults.stringArray(forKey: "pythilo.completedLessons") ?? [])
         lastLessonID = defaults.string(forKey: "pythilo.lastLesson")
-        load()
+        reload()
     }
 
-    private func load() {
-        guard let folder = Bundle.main.url(forResource: "Courses", withExtension: nil),
-              let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { return }
-        courses = files
-            .filter { $0.pathExtension == "json" }
-            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
-            .compactMap { url in
-                guard let data = try? Data(contentsOf: url) else { return nil }
-                return try? JSONDecoder().decode(Course.self, from: data)
-            }
+    func reload() {
+        courses = DownloadCatalog.bundled.courses.map { preview in
+            guard let folder = ContentStore.shared.location("course-\(preview.id)"),
+                  let data = try? Data(contentsOf: folder.appending(path: "course.json")),
+                  let course = try? JSONDecoder().decode(Course.self, from: data), course.id == preview.id else { return preview }
+            return course
+        }
     }
 
     var paths: [Course] { courses.filter { $0.kind == "path" } }

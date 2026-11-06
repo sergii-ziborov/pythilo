@@ -2,6 +2,9 @@
 
 | Component | Licence | Where |
 | --- | --- | --- |
+| ZIPFoundation 0.9.20 | MIT | Swift package; its copyright notice is included in the app |
+| Google BERT-Tiny, revision 30b0a37ccaaa32f332884b96992754e246e48c5f | Apache-2.0 | Optional verified model/tokenizer download from Google’s Hugging Face repository |
+| UCI Sentiment Labelled Sentences, Kotzias (2015), DOI 10.24432/C57604 | CC BY 4.0 | Optional download with attribution and source manifest; original files retained verbatim, normalization and splitting in memory |
 | CPython 3.14.10 | PSF License | `Vendor/Python.xcframework`, fetched by `scripts/fetch-python.sh` |
 | Python-Apple-support (BeeWare) | BSD 3-Clause | Same package |
 | OpenSSL, libFFI, XZ, BZip2, mpdecimal, Zstandard | Their own licences | Same package, listed in its `VERSIONS` |

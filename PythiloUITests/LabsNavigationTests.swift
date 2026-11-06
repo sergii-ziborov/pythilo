@@ -8,8 +8,8 @@ final class LabsNavigationTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-tab", "labs"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["114 interactive labs"].waitForExistence(timeout: 30))
-        app.buttons["ML · 54"].tap()
+        XCTAssertTrue(app.staticTexts["120 interactive labs"].waitForExistence(timeout: 30))
+        app.buttons["ML · 57"].tap()
         let topic = app.buttons["labs-topic-pytorch-training"]
         for _ in 0..<5 { if topic.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(topic.exists)
@@ -18,7 +18,7 @@ final class LabsNavigationTests: XCTestCase {
         XCTAssertTrue(app.buttons["lab-torchclip"].waitForExistence(timeout: 5))
         topic.tap()
         XCTAssertFalse(app.buttons["lab-torchclip"].exists)
-        app.buttons["AI · 37"].tap()
+        app.buttons["AI · 40"].tap()
         app.swipeDown()
         let search = app.searchFields.firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 5))
@@ -56,13 +56,13 @@ final class LabsNavigationTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-tab", "labs"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["114 interactive labs"].waitForExistence(timeout: 30))
-        XCTAssertTrue(app.buttons["ML · 54"].exists)
-        app.buttons["AI · 37"].tap()
-        XCTAssertTrue(app.staticTexts["ARTIFICIAL INTELLIGENCE · 37"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["120 interactive labs"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["ML · 57"].exists)
+        app.buttons["AI · 40"].tap()
+        XCTAssertTrue(app.staticTexts["ARTIFICIAL INTELLIGENCE · 40"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["lab-descent"].exists)
         let catalog = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        catalog.name = "114-labs-ai-catalog"
+        catalog.name = "120-labs-ai-catalog"
         catalog.lifetime = .keepAlways
         add(catalog)
         app.buttons["labs-topic-transformer-internals"].tap()

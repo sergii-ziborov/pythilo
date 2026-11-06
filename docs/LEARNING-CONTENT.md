@@ -5,8 +5,8 @@ The website and app share authored content. Change that source first; generated
 
 ## Courses
 
-Courses live in `Pythilo/Resources/Courses/<number>-<id>.json`. The app bundles this
-folder, and `site/scripts/prepare-assets.mjs` converts it into browser sections and
+Courses live in `Pythilo/Resources/Courses/<number>-<id>.json`. The app bundles only
+catalog previews and downloads each full course separately. `site/scripts/prepare-assets.mjs` converts the canonical courses into browser sections and
 computes package availability. Keep existing course and lesson IDs stable: they
 are URLs and saved-progress keys.
 
@@ -65,7 +65,32 @@ The native catalog assertion is deliberately exact: update the expected total in
 `PythiloTests/LabsTests.swift` when adding entries. The focused tests to run are
 `testTheCatalogHasSectionsAndManyLabs`, `testEveryAnswerTracesAndPassesItsChecks`,
 `testEveryStarterFailsWithAReadableMessage` and
-`FeatureGateTests/testEveryBundledLessonSolutionPassesOnTheDevice`.
+`FeatureGateTests/testEveryDownloadedLessonSolutionPassesOnTheDevice`.
+
+## Downloadable content and complete model projects
+
+Run `scripts/generate-project.sh` after changing authored content or runtime payloads.
+It generates deterministic ZIPs with `scripts/build-content-packs.py` and a catalog
+under `build/ContentCatalog/`. The signed app pins every archive and extracted file
+by SHA-256; publish all referenced `site/public/content-packs/` files before shipping
+that app. Never replace bytes at an existing content-addressed URL. The embed step
+checks every native extension marker against its signed backend before stripping
+the optional Python API trees, full course JSON and Lab source files from the app.
+
+Lab metadata, course previews and project source remain local. Full course bodies
+and Lab topic source download on demand. Project templates declare required package
+IDs, and existing projects infer known packages from imports without executing or
+rewriting their source. Dependencies, model weights and data share one download
+cache. Removal must preserve project folders, lesson drafts and completion records.
+
+The six BERT project recipes live in `Pythilo/PythonRuntime/finetune_projects/` and
+share `pythilo_finetune.py`. `scripts/generate-finetune-content.py` generates their
+linked course, Lab contracts and source from those implementations. Default CLI
+runs train and evaluate the full dataset; `--quick` is explicitly a short fixture.
+Use `scripts/build-finetune-projects.py` for the six website source ZIPs. Their
+fetchers and the native catalog share `runtime/finetune-assets.json` provenance,
+immutable revisions, hashes and license files. Do not bundle weights or datasets
+into the iOS archive, and do not describe these CPU projects as GPU experiments.
 
 ## Publishing
 

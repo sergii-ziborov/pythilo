@@ -28,11 +28,11 @@ final class ButtonHitTargetTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-tab", "labs"]
         app.launch()
-        let filter = app.buttons["AI · 37"]
+        let filter = app.buttons["AI · 40"]
         XCTAssertTrue(filter.waitForExistence(timeout: 20))
         XCTAssertGreaterThanOrEqual(filter.frame.height, 44)
         filter.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.8)).tap()
-        XCTAssertTrue(app.staticTexts["ARTIFICIAL INTELLIGENCE · 37"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["ARTIFICIAL INTELLIGENCE · 40"].waitForExistence(timeout: 5))
         app.buttons["labs-topic-transformer-internals"].tap()
         let attention = app.buttons["lab-attention"]
         XCTAssertTrue(attention.exists)

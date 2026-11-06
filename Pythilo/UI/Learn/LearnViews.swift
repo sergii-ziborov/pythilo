@@ -46,9 +46,10 @@ struct LearnView: View {
             }
             .background(AppTheme.background)
             .navigationTitle("Learn")
+            .toolbar { DownloadsLink() }
             .navigationDestination(for: Course.self) { CourseView(course: $0) }
             .navigationDestination(for: String.self) { id in
-                if let lab = LabCatalog.lab(id) { TraceLabView(lab: lab) }
+                LabDestination(id: id)
             }
             .navigationDestination(for: LessonRoute.self) { route in
                 LessonView(course: route.course, lesson: route.lesson, onOpenProject: onOpenProject) { next in
@@ -272,10 +273,12 @@ struct CourseView: View {
     private var isInterview: Bool { course.kind == "interview" }
 
     var body: some View {
+        let course = library.courses.first(where: { $0.id == self.course.id }) ?? self.course
         let done = library.completedCount(course)
         let next = course.lessons.first { !library.completed.contains($0.id) }
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                ContentDownloadCard(packID: "course-\(course.id)").padding(.bottom, 16)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(course.summary)
                         .font(.system(size: 15.5))
@@ -475,6 +478,23 @@ private enum LessonMode: String, CaseIterable {
 /// whole screen; Run and Check sit at the bottom, under the thumb. On a wide screen
 /// they stand side by side.
 struct LessonView: View {
+    let course: Course
+    let lesson: Lesson
+    let onOpenProject: (Project) -> Void
+    var onNext: ((Lesson) -> Void)?
+    @State private var library = CourseLibrary.shared
+
+    var body: some View {
+        DownloadGate(packID: "course-\(course.id)") {
+            if let resolved = library.courses.first(where: { $0.id == course.id }),
+               let current = resolved.lessons.first(where: { $0.id == lesson.id }) {
+                InstalledLessonView(course: resolved, lesson: current, onOpenProject: onOpenProject, onNext: onNext)
+            }
+        }.navigationTitle(lesson.title)
+    }
+}
+
+private struct InstalledLessonView: View {
     let course: Course
     let lesson: Lesson
     let onOpenProject: (Project) -> Void
@@ -1082,6 +1102,18 @@ struct LessonView: View {
     }
 
     private func keepAsProject() {
+        if course.id == "finetuning-projects",
+           let offset = course.lessons.firstIndex(where: { $0.id == lesson.id }),
+           offset < ProjectTemplate.finetuning.count {
+            let selected = ProjectTemplate.finetuning[offset]
+            do {
+                let project = try ProjectStore.shared.create(name: lesson.id, template: selected)
+                let name = selected.id.replacingOccurrences(of: "finetune-", with: "")
+                try code.write(to: project.url.appending(path: "finetune_projects/\(name).py"), atomically: true, encoding: .utf8)
+                reportKind = nil; onOpenProject(project)
+            } catch { failure = error.localizedDescription }
+            return
+        }
         let tests = lesson.checks.enumerated().map { index, check in
             let body = check.code.split(separator: "\n", omittingEmptySubsequences: false).map { "    " + $0 }.joined(separator: "\n")
             return "def test_\(index + 1)():\n    # \(check.name)\n\(body)\n"
@@ -1100,7 +1132,13 @@ struct LessonView: View {
         )
         do {
             reportKind = nil
-            onOpenProject(try ProjectStore.shared.create(name: lesson.id, template: template))
+            let project = try ProjectStore.shared.create(name: lesson.id, template: template)
+            let dependencies = ContentStore.shared.catalog.pack("course-\(course.id)")?.dependencies ?? []
+            if !dependencies.isEmpty {
+                try JSONEncoder().encode(dependencies).write(to: project.url.appending(path: "pythilo-packages.json"), options: .atomic)
+                for id in dependencies { ContentStore.shared.download(id) }
+            }
+            onOpenProject(project)
         } catch {
             failure = error.localizedDescription
         }

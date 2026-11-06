@@ -61,6 +61,11 @@ final class ProjectStore {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             try text.write(to: file, atomically: true, encoding: .utf8)
         }
+        if !template.requiredPacks.isEmpty {
+            let data = try JSONEncoder().encode(template.requiredPacks)
+            try data.write(to: url.appending(path: "pythilo-packages.json"), options: .atomic)
+            for id in template.requiredPacks { ContentStore.shared.download(id) }
+        }
         refresh()
         return Project(url: url, modified: Date())
     }
@@ -108,5 +113,13 @@ final class ProjectStore {
             return "Notebook"
         }
         return "Python"
+    }
+}
+
+extension Project {
+    var requiredPacks: [String] {
+        guard let data = try? Data(contentsOf: url.appending(path: "pythilo-packages.json")),
+              data.count < 16_384, let ids = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return Array(Set(ids)).sorted()
     }
 }

@@ -12,17 +12,17 @@ test('three advanced paths resolve real courses and distinct integration project
  for(const path of seniorPaths){
   for(const id of [...path.prerequisites,...path.courses])assert.ok(ids.has(id),id);
   for(const id of path.projects){assert.ok(lessons.get(id)?.title.startsWith('Project:'),id);projects.add(id);}
-  assert.equal(path.projects.length,path.id==='python'?2:11);assert.ok(path.fieldwork.length>=2);assert.ok(path.review.length>=3);
+  assert.equal(path.projects.length,path.id==='python'?2:14);assert.ok(path.fieldwork.length>=2);assert.ok(path.review.length>=3);
  }
- assert.equal(projects.size,24);
- assert.equal(courses.filter(c=>c.order>=25).flatMap(c=>c.lessons).length,116);
+ assert.equal(projects.size,30);
+ assert.equal(courses.filter(c=>c.order>=25).flatMap(c=>c.lessons).length,122);
 });
 test('advanced labs link to existing lessons with runnable code and independent check cases',()=>{
  const linked=labs.filter(lab=>lab.lessons?.some(id=>lessons.get(id)?.course.order>=25));
- assert.equal(linked.length,62);assert.equal(labs.length,92);
+ assert.equal(linked.length,68);assert.equal(labs.length,98);
  for(const lab of labs.filter(lab=>lab.lessons?.length))for(const id of lab.lessons){assert.ok(lessons.has(id),`${lab.id}: ${id}`);assert.ok(lab.answer.includes('def '));assert.notEqual(lab.answer,lab.starter);}
- assert.equal(linked.filter(l=>l.section==='Machine learning').length,33);
- assert.equal(linked.filter(l=>l.section==='Artificial intelligence').length,29);
+ assert.equal(linked.filter(l=>l.section==='Machine learning').length,36);
+ assert.equal(linked.filter(l=>l.section==='Artificial intelligence').length,32);
 });
 
 test('twenty-four systems labs include twelve composed projects with adversarial checks',()=>{
@@ -33,11 +33,11 @@ test('twenty-four systems labs include twelve composed projects with adversarial
   assert.ok(labs.some(lab=>lab.lessons?.includes(lesson.id)),lesson.id);
   assert.ok(lesson.checks.length>=4,lesson.id);
  }
- assert.equal(labs.reduce((count,lab)=>count+(lab.lessons?.length??0),0),82);
+ assert.equal(labs.reduce((count,lab)=>count+(lab.lessons?.length??0),0),88);
 });
 test('advanced tensor lessons require native PyTorch and the other new lessons run in the browser',()=>{
  for(const course of courses.filter(c=>c.order>=25))for(const lesson of course.lessons){
-  if(['deep-learning-practice','pytorch-training','transformer-engineering'].includes(course.id))assert.ok(lesson.missing.includes('torch'),lesson.id);
+  if(['deep-learning-practice','pytorch-training','transformer-engineering','finetuning-projects'].includes(course.id))assert.ok(lesson.missing.includes('torch'),lesson.id);
   else assert.deepEqual(lesson.missing,[],lesson.id);
   assert.ok(lesson.checks.length>=3);assert.equal(lesson.hints.length,3);
  }

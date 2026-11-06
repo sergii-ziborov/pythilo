@@ -218,11 +218,27 @@ final class RunSession {
     func submit(_ job: [String: Any], label: String, channel: OutputChannel = .output) -> String? {
         // A job sent while Python starts waits in the host's queue.
         guard phase == .idle || phase == .starting else { return nil }
+        if let root = job["root"] as? String {
+            let project = Project(url: URL(filePath: root))
+            let projectsRoot = ProjectStore.shared.root.standardizedFileURL.path + "/"
+            let requirements = project.url.standardizedFileURL.path.hasPrefix(projectsRoot)
+                ? ProjectDependencies.refresh(project) : project.requiredPacks
+            let missing = requirements.filter { !ContentStore.shared.ready($0) }
+            if !missing.isEmpty {
+                for pack in missing { ContentStore.shared.download(pack) }
+                note("Preparing this project's packages. Open Downloads to see progress or pause; run again when ready.\n")
+                return nil
+            }
+        }
         activeChannel = channel
         runStartedAt = Date()
         let id = UUID().uuidString
         var job = job
         job["id"] = id
+        job["packagePaths"] = ContentStore.shared.packagePaths
+        var environment = ContentStore.shared.assetEnvironment
+        environment.merge(job["env"] as? [String: String] ?? [:]) { _, explicit in explicit }
+        job["env"] = environment
         phase = .running
         runLabel = label
         debugEvaluations = []

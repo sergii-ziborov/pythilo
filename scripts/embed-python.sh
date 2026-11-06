@@ -24,3 +24,6 @@ else
 fi
 
 install_python Vendor/Python.xcframework app_packages
+
+# Keep signed native backends; their Python APIs and teaching material are on demand.
+python3 "$PROJECT_DIR/scripts/strip-downloadable-content.py" "$CODESIGNING_FOLDER_PATH"

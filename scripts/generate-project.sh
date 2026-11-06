@@ -2,4 +2,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ./scripts/fetch-python.sh
+python3 scripts/generate-finetune-content.py
+python3 scripts/build-content-packs.py
 xcodegen generate

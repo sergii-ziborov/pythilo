@@ -69,7 +69,9 @@ app" at the App Store page. Without it, the button opens the beta section of the
 ## Clients
 
 - iOS app: `PythiloRelayOrigin` in Info.plist (`project.yml`) is `https://pythilo.com`.
-  The app is offline otherwise; only a shared room reaches the relay.
+  Shared rooms use the relay. Courses, Lab topics and Python API packages download
+  from the site; pinned public model weights use Hugging Face. Execution works
+  offline once its required content has downloaded.
 - MCP bridge: creates rooms on `https://pythilo.com` unless `PYTHILO_RELAY` or `--relay`
   names another relay; joining uses the origin inside the room link.
 

@@ -11,6 +11,7 @@ final class RuntimeGateTests: XCTestCase {
     override func setUp() async throws {
         root = FileManager.default.temporaryDirectory.appending(path: "gate-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try await DownloadTestSupport.ensureAll()
         try await waitUntil(timeout: 60) { self.session.pythonVersion != nil && self.session.phase == .idle }
         session.clearOutput()
     }
@@ -536,6 +537,45 @@ final class RuntimeGateTests: XCTestCase {
         let accuracy = Int(last.components(separatedBy: "accuracy ").last?.dropLast() ?? "") ?? 0
         XCTAssertGreaterThanOrEqual(accuracy, 95, outputText())
         XCTAssertTrue(outputText().contains("Saved the weights to spirals.pt"), outputText())
+    }
+
+    func testAllSixPretrainedProjectTemplatesRunFromTheirLocalSource() async throws {
+        XCTAssertEqual(ProjectTemplate.finetuning.count, 6)
+        let store = ProjectStore(root: root.appending(path: "projects"))
+        for template in ProjectTemplate.finetuning {
+            let project = try store.create(name: template.id, template: template)
+            let outcome = try await runJob(["kind": "script", "path": project.url.appending(path: "main.py").path,
+                                           "root": project.url.path, "cwd": project.url.path, "args": ["--quick"]], timeout: 120)
+            XCTAssertEqual(outcome.code, 0, "\(template.id): \(outputText())")
+            XCTAssertTrue(outputText().contains("0.000") || outputText().contains("loss"), outputText())
+            XCTAssertTrue(FileManager.default.fileExists(atPath: project.url.appending(path: "pythilo_finetune.py").path))
+        }
+    }
+
+    func testCompletePretrainedProjectsTrainAndEvaluateTheFullRealDataset() async throws {
+        let store = ProjectStore(root: root.appending(path: "full-projects"))
+        var evidence: [[String: Any]] = []
+        for template in ProjectTemplate.finetuning {
+            let project = try store.create(name: template.id, template: template)
+            let started = Date()
+            let outcome = try await runJob(["kind": "script", "path": project.url.appending(path: "main.py").path,
+                                           "root": project.url.path, "cwd": project.url.path, "args": []], timeout: 360)
+            XCTAssertEqual(outcome.code, 0, "\(template.id): \(outputText())")
+            let name = template.id.replacingOccurrences(of: "finetune-", with: "")
+            let reportFile = name == "compare" ? "comparison.json" : name == "merge" ? "merge-report.json" : "report.json"
+            let data = try Data(contentsOf: project.url.appending(path: "artifacts/\(name)/\(reportFile)"))
+            let report = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            let training = (report["training"] as? [String: Any]) ?? (report["full"] as? [String: Any]) ?? report
+            XCTAssertEqual(training["original_rows"] as? Int, 3000, template.id)
+            XCTAssertEqual(training["quick"] as? Bool, false, template.id)
+            let metrics = try XCTUnwrap(training["test"] as? [String: Any])
+            XCTAssertGreaterThan(metrics["examples"] as? Int ?? 0, 500, template.id)
+            evidence.append(["project": template.id, "seconds": Date().timeIntervalSince(started), "report": report])
+        }
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        try JSONSerialization.data(withJSONObject: evidence, options: [.prettyPrinted, .sortedKeys])
+            .write(to: documents.appending(path: "finetune-native-full-audit.json"))
+        XCTAssertEqual(evidence.count, 6)
     }
 
     /// torch-ios's conformance suite, run here and compared with the same suite on the

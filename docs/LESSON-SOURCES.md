@@ -153,3 +153,36 @@ Primary references checked for this expansion:
 The shared `lab-topics.json` assigns every native Lab to exactly one topic in its
 section. Native and web catalogs use those same assignments, with expandable topic
 groups, concept search and visible runtime requirements on the site.
+
+## Complete pretrained fine-tuning projects — 6 November 2026
+
+Course 36 adds six linked projects and Labs: full BERT fine-tuning, query/value
+LoRA, Amazon/Yelp-to-IMDb domain transfer, equal-step full/LoRA comparison, exact
+AdamW/dropout/sampler continuation and adapter merge/export/reload. Totals are
+430 path lessons in 35 courses, 100 interview tasks, 122 advanced lessons with
+30 integration projects, 120 native Labs in 15 topics and 88 reciprocal pairs.
+
+These projects use actual pretrained Google BERT-Tiny weights at revision
+`30b0a37ccaaa32f332884b96992754e246e48c5f` and all 3,000 original UCI Sentiment
+Labelled Sentences rows. Newline parsing preserves the two IMDb rows containing
+NEL characters. Normalized duplicate texts stay in one split; conflicting labels
+are removed. Validation selects the checkpoint, with held-out test evaluation
+reported separately. Domain transfer holds IMDb out entirely. The comparison
+records tensor/optimizer bytes; it does not claim a peak-memory measurement.
+
+Primary sources and provenance:
+
+- [Google BERT-Tiny model](https://huggingface.co/google/bert_uncased_L-2_H-128_A-2/tree/30b0a37ccaaa32f332884b96992754e246e48c5f),
+  including its Apache 2.0 license, tokenizer vocabulary, configuration and weights.
+- [UCI Sentiment Labelled Sentences](https://doi.org/10.24432/C57604), licensed
+  CC BY 4.0, with Amazon, IMDb and Yelp review sources attributed in every data pack.
+- [BERT](https://arxiv.org/abs/1810.04805) and
+  [LoRA](https://arxiv.org/abs/2106.09685) for the model and low-rank update method.
+
+The self-contained BERT/WordPiece implementation was checked against the upstream
+Transformers model: maximum hidden-state error 5.85e-6, pooler error 2.26e-6,
+matching tokenization for all 3,000 source texts. All six complete project CLIs
+also run on the native CPU runtime using the full dataset. Separate explicitly
+short Lab fixtures cover correctness, frozen parameters, resume identity and
+merge/reload parity. These are compact educational sentiment experiments, with
+no claim of representative LLM quality, GPU training or production serving.

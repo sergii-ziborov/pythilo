@@ -22,6 +22,7 @@ export default async function LessonPage({ params }: Params) {
   const course = courseById(courseId), lesson = course && lessonById(course, lessonId);
   if (!course || !lesson) notFound();
   const index = course.lessons.indexOf(lesson), next = course.lessons[index + 1];
+  const project = ({'project-torchbertfull':'full','project-torchbertlora':'lora','project-torchbertdomain':'domain','project-torchbertcompare':'compare','project-torchbertresume':'resume','project-torchbertmerge':'merge'} as Record<string,string>)[lesson.id];
   let example = 0;
   // Python blocks get a Run button; the rest of the reading is static.
   const code = (source: string, language: string) => language === "python" || language === "py"
@@ -29,7 +30,7 @@ export default async function LessonPage({ params }: Params) {
     : <pre className="code-block"><code>{source}</code></pre>;
   const position = course.kind === "interview" ? `${lesson.level ?? ""}${lesson.minutes ? ` · ${lesson.minutes} min` : ""} · Task ${index + 1} of ${course.lessons.length}` : `Lesson ${index + 1} of ${course.lessons.length}`;
   return <LessonWorkspace
-    practice={allLabs.filter(lab => lab.lessons?.includes(lesson.id)).map(lab => <p key={lab.id}><Link className="pill-button" href={`/labs/${lab.id}/`}>Practice in Lab: {lab.title} →</Link></p>)}
+    practice={<>{allLabs.filter(lab => lab.lessons?.includes(lesson.id)).map(lab => <p key={lab.id}><Link className="pill-button" href={`/labs/${lab.id}/`}>Practice in Lab: {lab.title} →</Link></p>)}{project && <p><a className="pill-button" href={`/projects/bert-${project}.zip`} download>Download complete project source →</a></p>}</>}
     course={course.id} lesson={lesson.id} breadcrumb={{ courseTitle: course.title, lessonTitle: lesson.title }} position={position.replace(/^ · /, "")}
     sections={lesson.sections.map(section => ({ chip: section.chip, title: section.title, content: <Markdown source={section.markdown} code={code} /> }))}
     task={<Inline text={lesson.task} />} starter={lesson.starter} checks={lesson.checks}

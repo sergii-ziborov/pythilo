@@ -70,9 +70,11 @@ enum LabCatalog {
         topics.first { $0.id == topicIndex.assignments[lab.id] }
     }
 
-    static func code(_ lab: String, _ variant: String, _ kind: Code) -> String {
-        let url = Bundle.main.bundleURL.appending(path: "app/pythilo_runtime/labcode/\(lab).\(variant).\(kind.rawValue).py")
-        return (try? String(contentsOf: url, encoding: .utf8)) ?? "# The \(kind.rawValue) for this lab is missing from the app.\n"
+    @MainActor static func code(_ lab: String, _ variant: String, _ kind: Code) -> String {
+        guard let info = self.lab(lab), let topic = topic(for: info),
+              let root = ContentStore.shared.location("labs-\(topic.id)") else { return "" }
+        let url = root.appending(path: "labcode/\(lab).\(variant).\(kind.rawValue).py")
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }
 
     static func lab(_ id: String) -> LabInfo? { all.first { $0.id == id } }

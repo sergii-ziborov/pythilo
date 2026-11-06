@@ -6,6 +6,9 @@
 export type Component = { name: string; version?: string; license: string; url: string; note?: string };
 
 export const appRuntime: Component[] = [
+  { name: "ZIPFoundation", version: "0.9.20", license: "MIT", url: "https://github.com/weichsel/ZIPFoundation/blob/0.9.20/LICENSE", note: "Verified course, Lab and Python API downloads" },
+  { name: "Google BERT-Tiny", license: "Apache License 2.0", url: "https://huggingface.co/google/bert_uncased_L-2_H-128_A-2", note: "Optional pretrained-model download, revision 30b0a37ccaaa32f332884b96992754e246e48c5f" },
+  { name: "UCI Sentiment Labelled Sentences", license: "CC BY 4.0", url: "https://archive.ics.uci.edu/dataset/331/sentiment+labelled+sentences", note: "Optional dataset. Kotzias (2015), DOI 10.24432/C57604. Original files retained; normalization and splitting happen in memory." },
   { name: "CPython", version: "3.14.10", license: "Python Software Foundation License", url: "https://docs.python.org/3/license.html" },
   { name: "Python-Apple-support (BeeWare)", version: "3.14-b14", license: "BSD 3-Clause", url: "https://github.com/beeware/Python-Apple-support" },
   { name: "OpenSSL", version: "3.5.9", license: "Apache License 2.0", url: "https://www.openssl.org/source/license.html", note: "Part of the Python support package" },

@@ -87,7 +87,7 @@ struct PackagesView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("BUNDLED WITH PYTHILO, WORK OFFLINE").sectionLabel()
+                        Text("AVAILABLE TO THIS PYTHON SESSION").sectionLabel()
                         VStack(spacing: 0) {
                             ForEach(bundled, id: \.0) { package in
                                 HStack(spacing: 8) {
@@ -112,7 +112,10 @@ struct PackagesView: View {
             .background(AppTheme.background, ignoresSafeAreaEdges: [])
             .navigationTitle("Packages")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
+                ToolbarItem(placement: .primaryAction) { DownloadsLink() }
+            }
             .onAppear(perform: reload)
             .onChange(of: session.phase) { _, phase in
                 guard phase == .idle, let id = runningID else { return }

@@ -1918,5 +1918,137 @@
         "scales": false
       }
     ]
+  },
+  {
+    "id": "torchbertfull",
+    "title": "Project: Fine-tune pretrained BERT",
+    "summary": "Update the complete pretrained encoder; select a checkpoint on validation macro-F1 and evaluate the test once.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Update the complete pretrained encoder; select a checkpoint on validation macro-F1 and evaluate the test once. Implement run_project(output, quick=False). Follow the reference report/artifact schema; the checks run quick=True with actual pretrained weights and real data. The full dataset is the default.",
+        "file": "full.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "project-torchbertfull"
+    ],
+    "runtime": "pytorch",
+    "idea": "Full fine-tuning updates all 4.39 million classifier parameters. The random classification head is initialized once, while the encoder starts from Google’s published BERT-Tiny weights. AdamW state is substantially larger than the exported model because each trainable parameter receives optimizer moments. This project uses real positive and negative review sentences rather than a synthetic token rule."
+  },
+  {
+    "id": "torchbertlora",
+    "title": "Project: Train query/value LoRA adapters",
+    "summary": "Freeze BERT, insert rank-four Q/V adapters, train the classifier and export the exact base/tokenizer identity.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Freeze BERT, insert rank-four Q/V adapters, train the classifier and export the exact base/tokenizer identity. Implement run_project(output, quick=False). Follow the reference report/artifact schema; the checks run quick=True with actual pretrained weights and real data. The full dataset is the default.",
+        "file": "lora.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "project-torchbertlora"
+    ],
+    "runtime": "pytorch",
+    "idea": "A small adapter is meaningful only together with its exact base model and tokenizer. Insert LoRA into the query and value projections in both encoder layers, freeze all original encoder weights, and optimize only A, B and the classification head. Zero-initialize B so the adapter initially preserves the pretrained projection. The project proves that frozen parameters remain unchanged and reloads the adapter for numerical comparison."
+  },
+  {
+    "id": "torchbertdomain",
+    "title": "Project: Transfer sentiment across domains",
+    "summary": "Train on Amazon and Yelp, select on their validation partition, then report untouched IMDb performance.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Train on Amazon and Yelp, select on their validation partition, then report untouched IMDb performance. Implement run_project(output, quick=False). Follow the reference report/artifact schema; the checks run quick=True with actual pretrained weights and real data. The full dataset is the default.",
+        "file": "domain.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "project-torchbertdomain"
+    ],
+    "runtime": "pytorch",
+    "idea": "An IID split does not measure domain transfer. Keep every IMDb review group out of training and validation. Normalize duplicate identities across all three sources before assigning a split; a repeated sentence that occurs in IMDb belongs only to the held-out domain. Select the checkpoint using Amazon/Yelp validation rows. Report IMDb results as a domain-shift measurement without tuning against those labels."
+  },
+  {
+    "id": "torchbertcompare",
+    "title": "Project: Compare full tuning and LoRA budgets",
+    "summary": "Compare identical splits and step budgets; measure trainable tensors, AdamW state and export bytes.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Compare identical splits and step budgets; measure trainable tensors, AdamW state and export bytes. Implement run_project(output, quick=False). Follow the reference report/artifact schema; the checks run quick=True with actual pretrained weights and real data. The full dataset is the default.",
+        "file": "compare.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "project-torchbertcompare"
+    ],
+    "runtime": "pytorch",
+    "idea": "A fair comparison records what is held constant and what differs. Both methods start from the same pretrained revision and classification head, see the same row order, use the same sequence length and receive the same number of optimizer steps. The method-specific learning rates are declared in the report. Parameter bytes, AdamW tensor bytes and file sizes answer different questions; none is a measurement of peak resident memory."
+  },
+  {
+    "id": "torchbertresume",
+    "title": "Project: Resume real transformer training exactly",
+    "summary": "Interrupt LoRA mid-epoch, save AdamW and both RNGs, restore a fresh process state and match the uninterrupted trajectory.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Interrupt LoRA mid-epoch, save AdamW and both RNGs, restore a fresh process state and match the uninterrupted trajectory. Implement run_project(output, quick=False). Follow the reference report/artifact schema; the checks run quick=True with actual pretrained weights and real data. The full dataset is the default.",
+        "file": "resume.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "project-torchbertresume"
+    ],
+    "runtime": "pytorch",
+    "idea": "Restoring model weights alone is not an exact continuation. AdamW moments and step counters affect the next update; dropout consumes the Torch RNG; the sampler owns a Python RNG, an explicit permutation and a cursor. Save these together at an optimizer-step boundary. Construct a fresh model and optimizer, restore every component, then compare every final tensor and every observed loss against an uninterrupted CPU run."
+  },
+  {
+    "id": "torchbertmerge",
+    "title": "Project: Merge and deploy a trained BERT adapter",
+    "summary": "Train and reload an adapter, merge Q/V deltas, export the complete classifier and check held-out logits after reload.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Train and reload an adapter, merge Q/V deltas, export the complete classifier and check held-out logits after reload. Implement run_project(output, quick=False). Follow the reference report/artifact schema; the checks run quick=True with actual pretrained weights and real data. The full dataset is the default.",
+        "file": "merge.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "project-torchbertmerge"
+    ],
+    "runtime": "pytorch",
+    "idea": "An adapter artifact is small because it omits the frozen base. A merged classifier contains the complete encoder again. Merge W plus alpha/r times B@A in evaluation mode, remove the LoRA modules, and compare actual inference logits. Export the resulting state and load it into a fresh ordinary classifier. This demonstrates a real deployment transformation; it does not imply quantization, acceleration or a smaller full-model file."
   }
 ]

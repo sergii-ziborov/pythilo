@@ -1,9 +1,9 @@
 # Pythilo
 
-**Real Python on your iPhone and iPad.** Pythilo is an IDE, a course and 32 interactive
+**Real Python on your iPhone and iPad.** Pythilo is an IDE, a course and 120 interactive
 algorithm and machine learning labs in one app. CPython 3.14 runs on the device itself: your code, your
-tests, your Django site and your debugger session never leave the phone, and none of
-it needs a network.
+tests, your Django site and your debugger session never leave the phone. Execution
+works offline after the required packages and data have been downloaded.
 
 Pythilo is a paid app, in TestFlight now. This repository is public to read; it is not
 open source (see [License](#license)).
@@ -39,8 +39,8 @@ open source (see [License](#license)).
 - **A debugger** with breakpoints, stepping and variables, which also stops inside
   threads, web request handlers and async code.
 - **Tests and packages.** pytest runs as it would on a computer. pip installs
-  pure-Python packages from PyPI into the project; NumPy and the web frameworks come
-  bundled.
+  pure-Python packages from PyPI into the project; NumPy, PyTorch and the web
+  frameworks have verified downloadable Python packages and signed native backends.
 - **Git, for real.** A genuine `.git` folder: commit, branches, diff, `git merge` with
   conflict markers and `--abort`, `git rebase`, and HTTPS clone.
 - **Notebooks** that open and save ordinary `.ipynb` files.
@@ -50,9 +50,18 @@ open source (see [License](#license)).
 - **Core ML from Python.** `pythilo.coreml` runs a converted model on the CPU, the GPU
   or the Neural Engine, times each one and checks they agree.
 
+### Downloads
+
+Courses and Lab topics download individually. Project source is saved locally immediately;
+creating a PyTorch, notebook, web or fine-tuning project automatically queues its required
+packages and assets. Downloads shows progress, pause, resume, cancellation and removal.
+Removing downloads preserves projects, lesson drafts and completion history. Archives are
+checked against the catalog pinned inside the signed app before installation. Native
+Python extensions remain signed inside the app; their Python APIs download separately.
+
 ### Learn
 
-- **424 lessons in 34 courses**, including 116 advanced lessons (24 integration projects): Python foundations and Python deeper (30 each), clean
+- **430 lessons in 35 courses**, including 122 advanced lessons (30 integration projects): Python foundations and Python deeper (30 each), clean
   code, testing, the tools around Python, architecture, concurrency and async, the web,
   data, the mathematics of neural networks, machine learning with PyTorch (30), language
   models from the inside, working with AI tools, and four practical courses on
@@ -70,13 +79,14 @@ open source (see [License](#license)).
 
 ### Labs
 
-114 labs in 13 topics that trace **your own code** while it runs, with scaling measurements where
+120 labs in 15 topics that trace **your own code** while it runs, with scaling measurements where
 available. Seventy-four also run in the browser at [pythilo.com/labs](https://pythilo.com/labs/),
-using the same tracer and correctness checks. Eighteen new PyTorch Labs run in the app,
-including six composed projects. Expand a topic or search by concept to find them.
+using the same tracer and correctness checks. Twenty-four PyTorch Labs run in the app,
+including twelve composed projects. Six train real pretrained BERT models with the UCI
+sentiment dataset, LoRA, domain transfer, exact resume and merged-artifact evaluation. Expand a topic or search by concept to find them.
 Correctness first, then time. The catalogue now covers Basics, Data structures,
 Algorithms, Machine learning and Artificial intelligence. Search the catalog or use
-the ML (54 labs) and AI (37 labs) filters. For example:
+the ML (57 labs) and AI (40 labs) filters. For example:
 
 - **ML evaluation and optimization**: train-only standardization, confusion matrices,
   precision/recall/F1, threshold selection, folds, ridge regression, gradient checks,
@@ -170,6 +180,7 @@ Needs Xcode 27, xcodegen, Python 3.14, and Rust with the `aarch64-apple-ios` and
 ```sh
 scripts/build-pydantic-core.sh
 python3 scripts/vendor-packages.py
+python3 scripts/fetch-finetune-assets.py
 scripts/generate-project.sh
 open Pythilo.xcodeproj
 ```

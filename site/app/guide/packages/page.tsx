@@ -4,22 +4,22 @@ import { GuideHeader, Note, Pager, Table, Toc } from "@/components/guide/doc";
 import { DeviceShot } from "@/components/site/phone";
 import { shots } from "@/lib/shots";
 
-export const metadata: Metadata = { title: "Packages, PyTorch and Core ML", description: "pip per project, the packages bundled with Pythilo (NumPy, PyTorch, Django, FastAPI and more), npm with esbuild, and Core ML from Python." };
+export const metadata: Metadata = { title: "Packages, downloads, PyTorch and Core ML", description: "Download Python packages, courses and Lab topics on demand. See progress, pause and resume, use pip per project, train with PyTorch and run Core ML." };
 
 export default function Page() {
   return <>
     <GuideHeader slug="packages" />
-    <Toc items={[["bundled", "Bundled with the app"], ["pip", "pip"], ["packages-screen", "The Packages screen"], ["pytorch", "PyTorch"], ["coreml", "Core ML and the Neural Engine"], ["npm", "npm and esbuild"]]} />
+    <Toc items={[["bundled", "Downloads"], ["pip", "pip"], ["packages-screen", "The Packages screen"], ["pytorch", "PyTorch"], ["coreml", "Core ML and the Neural Engine"], ["npm", "npm and esbuild"]]} />
 
-    <h2 id="bundled">Bundled with the app</h2>
-    <p>These ship inside Pythilo, compiled for iOS where they need to be, and work offline in every project:</p>
+    <h2 id="bundled">Download packages when needed</h2>
+    <p>New project saves your code immediately and automatically queues its required Python packages. Open Downloads to see sizes and progress, pause, resume or remove them. NumPy, symbolic math, PyTorch and web frameworks have separate shared downloads. Their compiled iOS backends remain part of the signed app. After setup the packages work offline:</p>
     <Table head={["Area", "Packages"]} rows={[
       ["Web", "Django, Flask, FastAPI, Pydantic, Starlette, Uvicorn, Werkzeug, Jinja2"],
       ["Science and ML", "NumPy, PyTorch, SymPy, NetworkX"],
       ["HTTP", "Requests, httpx"],
       ["Tools", "pytest, pip, Jedi, pyflakes, Pygments"],
     ]} />
-    <p>Their own dependencies come along too. <code>pip list</code> shows every bundled package and its version, and <Link href="/legal/licenses/">Open-source licences</Link> lists them all with their licences.</p>
+    <p>Their own dependencies come along too. <code>pip list</code> shows the packages currently available to the project, and <Link href="/legal/licenses/">Open-source licences</Link> lists their licences. Downloads are checksum-verified before installation. Removing a course, Lab topic or package keeps project source, lesson drafts and progress.</p>
 
     <h2 id="pip">pip</h2>
     <p><code>pip install name</code> downloads wheels from PyPI and installs them into the project&apos;s <code>.pythilo/site-packages</code> folder, which comes first on the path when the project runs. Every project has its own, so two projects can use different versions, and nothing is installed for the whole app.</p>
@@ -32,7 +32,7 @@ export default function Page() {
     </ul>
 
     <h2 id="packages-screen">The Packages screen</h2>
-    <p>Open <span className="ui">Packages</span> from the file drawer or the <span className="ui">⋯</span> menu. Type a <span className="ui">Package name</span> and tap <span className="ui">Install</span>. <span className="ui">In this project</span> lists what you installed, each with a button to remove it. <span className="ui">Bundled with Pythilo, work offline</span> lists the main bundled packages.</p>
+    <p>Open <span className="ui">Packages</span> from the file drawer or the <span className="ui">⋯</span> menu for project-specific pip packages. <span className="ui">In this project</span> lists what you installed, each with a removal button. <span className="ui">Available to this Python session</span> lists the main packages currently installed. Use Downloads in Learn, Labs or Projects to manage the shared NumPy, PyTorch, math and web package packs.</p>
 
     <h2 id="pytorch">PyTorch</h2>
     <p>PyTorch 2.15 is built for iOS from source by <a href="https://github.com/sergii-ziborov/torch-ios" target="_blank" rel="noreferrer">torch-ios</a>: the full library with autograd and the Python API, running on the CPU with matrix maths through Apple&apos;s Accelerate. Training, <code>torch.func</code>, <code>torch.jit</code>, <code>DataLoader</code>, saving and loading all work. The PyTorch template trains a small network on the device, and the machine learning course uses it throughout.</p>
@@ -60,7 +60,7 @@ print(coreml.report(rows))`}</code></pre>
       <li>Scripts that need Node itself, such as Vite or webpack, say so.</li>
     </ul>
     <p>The <strong>React and FastAPI</strong> template puts it together: <code>npm install</code>, <code>npm run build</code>, then <code>uvicorn main:app</code> serves the built site and its API.</p>
-    <Note>Network access is needed only to download: pip from PyPI and npm from the npm registry. Everything bundled works offline.</Note>
+    <Note>Download courses, Lab topics, package packs and optional training assets before going offline. Project code stays local. pip uses PyPI, npm uses the npm registry, and optional BERT weights come from Hugging Face.</Note>
     <Pager slug="packages" />
   </>;
 }

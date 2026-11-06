@@ -106,6 +106,7 @@ struct RootView: View {
     /// For screenshots: -openTemplate django -panel terminal -drawer YES.
     private func openFromLaunchArguments() {
         let defaults = UserDefaults.standard
+        if let id = defaults.string(forKey: "removeDownload") { try? ContentStore.shared.remove(id) }
         if let tab = defaults.string(forKey: "tab").flatMap(AppSection.init(rawValue:)) { section = tab }
         if let link = defaults.string(forKey: "roomLink") {
             incomingRoomLink = link
@@ -119,6 +120,7 @@ struct RootView: View {
               let template = ProjectTemplate.all.first(where: { $0.id == id }) else { return }
         let existing = store.projects.first { $0.name == "shot-\(id)" }
         guard let project = existing ?? (try? store.create(name: "shot-\(id)", template: template)) else { return }
+        for pack in project.requiredPacks { ContentStore.shared.download(pack) }
         let model = WorkspaceModel(project: project)
         if let panel = defaults.string(forKey: "panel").flatMap(WorkspacePanel.init(rawValue:)) { model.panel = panel }
         for path in (defaults.string(forKey: "expand") ?? "").split(separator: ",") { model.expanded.insert(String(path)) }

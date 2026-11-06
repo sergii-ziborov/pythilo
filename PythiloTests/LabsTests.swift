@@ -8,6 +8,7 @@ final class LabsTests: XCTestCase {
     private var session: RunSession { RunSession.shared }
 
     override func setUp() async throws {
+        try await DownloadTestSupport.ensureAll()
         try await waitUntil(timeout: 60) { self.session.pythonVersion != nil && self.session.phase == .idle }
         session.clearOutput()
     }
@@ -45,9 +46,9 @@ final class LabsTests: XCTestCase {
     }
 
     func testTheCatalogHasSectionsAndManyLabs() {
-        XCTAssertEqual(LabCatalog.all.count, 114)
-        XCTAssertEqual(LabCatalog.all.filter { $0.section == .learning }.count, 54)
-        XCTAssertEqual(LabCatalog.all.filter { $0.section == .intelligence }.count, 37)
+        XCTAssertEqual(LabCatalog.all.count, 120)
+        XCTAssertEqual(LabCatalog.all.filter { $0.section == .learning }.count, 57)
+        XCTAssertEqual(LabCatalog.all.filter { $0.section == .intelligence }.count, 40)
         XCTAssertNotNil(LabCatalog.lab("attention"))
         XCTAssertNotNil(LabCatalog.lab("bellmanford"))
         XCTAssertNotNil(LabCatalog.lab("logistic"))
@@ -55,7 +56,7 @@ final class LabsTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(LabCatalog.all.filter { $0.section == section }.count, 4, section.rawValue)
         }
         XCTAssertEqual(Set(LabCatalog.all.map(\.id)).count, LabCatalog.all.count, "ids are unique")
-        XCTAssertEqual(LabCatalog.topics.count, 13)
+        XCTAssertEqual(LabCatalog.topics.count, 15)
         for lab in LabCatalog.all {
             XCTAssertEqual(LabCatalog.topic(for: lab)?.section, lab.section, "\(lab.id) must have one topic in its section")
         }
@@ -85,7 +86,7 @@ final class LabsTests: XCTestCase {
 
     func testPyTorchLabsShareRunnableLessonContracts() async throws {
         let tensorLabs = LabCatalog.all.filter { $0.id.hasPrefix("torch") }
-        XCTAssertEqual(tensorLabs.count, 18)
+        XCTAssertEqual(tensorLabs.count, 24)
         var checkCount = 0
         for lab in tensorLabs {
             let lessons = CourseLibrary.shared.courses.flatMap(\.lessons).filter { lab.lessons?.contains($0.id) == true }
@@ -99,7 +100,7 @@ final class LabsTests: XCTestCase {
             XCTAssertEqual(result?.truncated, false, lab.id)
             checkCount += result?.checks.count ?? 0
         }
-        XCTAssertEqual(checkCount, 79)
+        XCTAssertEqual(checkCount, 103)
     }
 
     func testEveryStarterFailsWithAReadableMessage() async throws {

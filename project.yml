@@ -27,6 +27,9 @@ settings:
     "SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator27.2*]": "$(inherited) PYTHILO_DUO_SDK"
 
 packages:
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation.git
+    exactVersion: 0.9.20
   PythiloGitCore:
     path: Vendor/PythiloGitCore
 
@@ -42,7 +45,7 @@ targets:
           - Resources/Courses
           - Resources/Bundler
           - Resources/Models
-      - path: Pythilo/Resources/Courses
+      - path: build/ContentCatalog
         type: folder
         buildPhase: resources
       - path: Pythilo/Resources/Bundler
@@ -60,6 +63,7 @@ targets:
         embed: true
       - package: PythiloGitCore
         product: PythiloGit
+      - package: ZIPFoundation
     info:
       path: Pythilo/Resources/Info.plist
       properties:
@@ -74,8 +78,7 @@ targets:
         UILaunchScreen: {}
         UIRequiresFullScreen: false
         UIUserInterfaceStyle: Automatic
-        # Shared rooms relay origin, https only: the only thing the app reaches over
-        # the network on its own, and only for a shared room.
+        # Shared rooms relay origin. Content downloads use their pinned HTTPS catalog.
         # Debug builds take -pythiloRelay http://127.0.0.1:3212 instead.
         PythiloRelayOrigin: "https://pythilo.com"
         CFBundleURLTypes:
@@ -112,6 +115,7 @@ targets:
       - path: PythiloTests
     dependencies:
       - target: Pythilo
+      - package: ZIPFoundation
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sergiiziborov.PythiloTests

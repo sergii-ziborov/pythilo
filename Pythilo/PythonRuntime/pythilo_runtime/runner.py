@@ -217,6 +217,9 @@ def exit_code(error):
 def project_environment(job):
     """Puts the project's own files and packages first on the import path."""
     root = job.get("root")
+    for package_path in reversed(job.get("packagePaths") or []):
+        if os.path.isdir(package_path):
+            sys.path.insert(0, package_path)
     if root:
         site = os.path.join(root, ".pythilo", "site-packages")
         if os.path.isdir(site):

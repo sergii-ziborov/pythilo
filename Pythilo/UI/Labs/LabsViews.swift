@@ -86,17 +86,11 @@ struct LabsView: View {
             }
             .background(AppTheme.background)
             .navigationTitle("Labs")
+            .toolbar { DownloadsLink() }
             .searchable(text: $query, prompt: "Search all labs")
             .onChange(of: query) { collapsedSearchTopics = [] }
             .navigationDestination(for: String.self) { id in
-                switch id {
-                case "graph": GraphLabView()
-                case "hash": HashLabView()
-                case "dp": DPLabView()
-                case "sorting": SortingBenchView()
-                default:
-                    if let lab = LabCatalog.lab(id), !lab.isClassic { TraceLabView(lab: lab) } else { SortingBenchView() }
-                }
+                LabDestination(id: id)
             }
             .navigationDestination(for: LessonRoute.self) { route in
                 LessonView(course: route.course, lesson: route.lesson, onOpenProject: onOpenProject)
@@ -136,6 +130,7 @@ struct LabsView: View {
             .accessibilityIdentifier("labs-topic-\(topic.id)")
             .accessibilityValue(expanded ? "Expanded" : "Collapsed")
             if expanded {
+                ContentDownloadCard(packID: "labs-\(topic.id)")
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 10)], spacing: 10) {
                     ForEach(labs) { lab($0) }
                 }
@@ -172,6 +167,23 @@ struct LabsView: View {
         }
         .buttonStyle(.app)
         .accessibilityIdentifier("lab-\(info.id)")
+    }
+}
+
+struct LabDestination: View {
+    let id: String
+    var body: some View {
+        if let lab = LabCatalog.lab(id), let topic = LabCatalog.topic(for: lab) {
+            DownloadGate(packID: "labs-\(topic.id)") {
+                switch id {
+                case "graph": GraphLabView()
+                case "hash": HashLabView()
+                case "dp": DPLabView()
+                case "sorting": SortingBenchView()
+                default: TraceLabView(lab: lab)
+                }
+            }.navigationTitle(lab.title)
+        }
     }
 }
 
