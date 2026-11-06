@@ -6,6 +6,7 @@ not a boundary: it stops one project's modules, paths and settings from leaking
 into the next run, but it is not a sandbox and is never described as one.
 """
 
+import atexit
 import gc
 import logging
 import os
@@ -28,6 +29,10 @@ _baseline_path = []
 _baseline_environment = {}
 _baseline_filters = []
 _baseline_cwd = ""
+_process_register = atexit.register
+_process_unregister = atexit.unregister
+_job_exit_callbacks = []
+_job_exit_root = None
 
 
 def capture_baseline():
@@ -82,13 +87,60 @@ def _leftover_threads():
     ]
 
 
+def _owns_exit_registration(frame):
+    # The immediate registration site owns the callback. In particular,
+    # weakref.finalize registers its PROCESS exit hook from the stdlib; running
+    # that hook after a job destroys live PyTorch operator registrations.
+    origin = frame.f_globals.get("__file__") or frame.f_code.co_filename
+    if origin.startswith("<frozen "):
+        return False
+    if not os.path.isabs(origin):
+        return True  # REPL, notebook and lab source use virtual filenames.
+    try:
+        return os.path.commonpath((os.path.realpath(origin), _job_exit_root)) == _job_exit_root
+    except ValueError:
+        return False
+
+
+def _register_job_exit(callback, *args, **kwargs):
+    if not callable(callback):
+        raise TypeError("the first argument must be callable")
+    if _job_exit_root is not None and _owns_exit_registration(sys._getframe(1)):
+        _job_exit_callbacks.append((callback, args, kwargs))
+        return callback
+    return _process_register(callback, *args, **kwargs)
+
+
+def _unregister_job_exit(callback):
+    _job_exit_callbacks[:] = [item for item in _job_exit_callbacks if item[0] != callback]
+    _process_unregister(callback)
+
+
+def _begin_exit_handlers(job):
+    global _job_exit_root
+    root = job.get("root") or os.path.dirname(job.get("path") or "") or os.getcwd()
+    _job_exit_root = os.path.realpath(root)
+    _job_exit_callbacks.clear()
+    atexit.register = _register_job_exit
+    atexit.unregister = _unregister_job_exit
+
+
 def _run_exit_handlers():
-    import atexit
+    global _job_exit_root
 
     try:
-        atexit._run_exitfuncs()
+        # Only callbacks registered by the running project's code belong to
+        # its lifetime. Imported bundled libraries retain process callbacks.
+        for callback, args, kwargs in reversed(_job_exit_callbacks[:]):
+            try:
+                callback(*args, **kwargs)
+            except BaseException as error:
+                print_exception(error)
     finally:
-        atexit._clear()
+        _job_exit_callbacks.clear()
+        _job_exit_root = None
+        atexit.register = _process_register
+        atexit.unregister = _process_unregister
 
 
 def restore_interpreter():
@@ -187,6 +239,7 @@ def run_job(job):
         # A stop that arrived after the previous run ended must not end this one.
         time.sleep(0)
         project_environment(job)
+        _begin_exit_handlers(job)
         outcome.update(_perform(job) or {})
     except KeyboardInterrupt:
         outcome.update(status="cancelled", code=130)

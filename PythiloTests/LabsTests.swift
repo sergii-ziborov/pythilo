@@ -45,9 +45,9 @@ final class LabsTests: XCTestCase {
     }
 
     func testTheCatalogHasSectionsAndManyLabs() {
-        XCTAssertEqual(LabCatalog.all.count, 52)
-        XCTAssertEqual(LabCatalog.all.filter { $0.section == .learning }.count, 21)
-        XCTAssertEqual(LabCatalog.all.filter { $0.section == .intelligence }.count, 8)
+        XCTAssertEqual(LabCatalog.all.count, 72)
+        XCTAssertEqual(LabCatalog.all.filter { $0.section == .learning }.count, 33)
+        XCTAssertEqual(LabCatalog.all.filter { $0.section == .intelligence }.count, 16)
         XCTAssertNotNil(LabCatalog.lab("attention"))
         XCTAssertNotNil(LabCatalog.lab("bellmanford"))
         XCTAssertNotNil(LabCatalog.lab("logistic"))
@@ -55,6 +55,10 @@ final class LabsTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(LabCatalog.all.filter { $0.section == section }.count, 4, section.rawValue)
         }
         XCTAssertEqual(Set(LabCatalog.all.map(\.id)).count, LabCatalog.all.count, "ids are unique")
+        let lessonIDs = Set(CourseLibrary.shared.courses.flatMap { $0.lessons.map(\.id) })
+        for lab in LabCatalog.all {
+            for id in lab.lessons ?? [] { XCTAssertTrue(lessonIDs.contains(id), "\(lab.id): missing lesson \(id)") }
+        }
         for (lab, variant) in everyVariant {
             XCTAssertFalse(LabCatalog.code(lab.id, variant.id, .starter).contains("missing from the app"), "\(lab.id).\(variant.id) starter")
             XCTAssertFalse(LabCatalog.code(lab.id, variant.id, .answer).contains("missing from the app"), "\(lab.id).\(variant.id) answer")

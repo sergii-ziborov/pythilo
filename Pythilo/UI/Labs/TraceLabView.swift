@@ -23,6 +23,18 @@ struct TraceLabView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                ForEach(CourseLibrary.shared.courses) { course in
+                    ForEach(course.lessons.filter { (lab.lessons ?? []).contains($0.id) }) { lesson in
+                        NavigationLink(value: LessonRoute(course: course, lesson: lesson)) {
+                            Label("Read lesson: \(lesson.title)", systemImage: "book")
+                                .font(.system(size: 14, weight: .semibold))
+                                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.app)
+                        .accessibilityIdentifier("lab-lesson-\(lesson.id)")
+                    }
+                }
                 if lab.variants.count > 1 {
                     LabChoice(options: lab.variants.map { ($0.id, $0.title) }, selection: $variantID)
                 }

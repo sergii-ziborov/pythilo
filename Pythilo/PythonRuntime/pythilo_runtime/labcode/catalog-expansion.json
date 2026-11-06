@@ -73,7 +73,7 @@
   },
   {
     "id": "bellmanford",
-    "title": "Bellman\u2013Ford",
+    "title": "Bellman–Ford",
     "summary": "Relax weighted edges and detect reachable negative cycles",
     "symbol": "point.3.connected.trianglepath.dotted",
     "tint": "violet",
@@ -195,6 +195,9 @@
         "file": "standardize.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-standardize"
     ]
   },
   {
@@ -213,6 +216,9 @@
         "file": "confusion.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-confusion"
     ]
   },
   {
@@ -231,6 +237,9 @@
         "file": "precisionrecall.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-precisionrecall"
     ]
   },
   {
@@ -249,6 +258,9 @@
         "file": "threshold.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-threshold"
     ]
   },
   {
@@ -267,6 +279,9 @@
         "file": "crossvalidation.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-crossvalidation"
     ]
   },
   {
@@ -285,6 +300,9 @@
         "file": "ridge.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-ridge"
     ]
   },
   {
@@ -303,6 +321,9 @@
         "file": "gradientcheck.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-gradientcheck"
     ]
   },
   {
@@ -321,6 +342,9 @@
         "file": "adam.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-adam"
     ]
   },
   {
@@ -339,6 +363,9 @@
         "file": "minibatch.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-minibatch"
     ]
   },
   {
@@ -357,6 +384,9 @@
         "file": "naivebayes.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-naivebayes"
     ]
   },
   {
@@ -375,6 +405,9 @@
         "file": "pca.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-pca"
     ]
   },
   {
@@ -384,7 +417,7 @@
     "symbol": "chart.xyaxis.line",
     "tint": "coral",
     "section": "Machine learning",
-    "idea": "A cluster assignment can be compact yet poorly separated. Compare each point\u2019s mean distance within its cluster with the nearest other cluster; singletons score zero.",
+    "idea": "A cluster assignment can be compact yet poorly separated. Compare each point’s mean distance within its cluster with the nearest other cluster; singletons score zero.",
     "variants": [
       {
         "id": "practice",
@@ -393,6 +426,9 @@
         "file": "silhouette.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-silhouette"
     ]
   },
   {
@@ -411,6 +447,9 @@
         "file": "softmax.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-softmax"
     ]
   },
   {
@@ -429,6 +468,9 @@
         "file": "attention.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-attention"
     ]
   },
   {
@@ -447,6 +489,9 @@
         "file": "causalmask.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-causalmask"
     ]
   },
   {
@@ -465,6 +510,9 @@
         "file": "nucleus.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-nucleus"
     ]
   },
   {
@@ -483,6 +531,9 @@
         "file": "beamsearch.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-beamsearch"
     ]
   },
   {
@@ -501,6 +552,9 @@
         "file": "bpe.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-bpe"
     ]
   },
   {
@@ -519,22 +573,448 @@
         "file": "retrieval.py",
         "scales": false
       }
+    ],
+    "lessons": [
+      "practice-retrieval"
     ]
   },
   {
     "id": "layernorm",
     "title": "Layer Normalization",
-    "summary": "Normalize within one token\u2019s feature vector, using population variance and epsilon inside the square root.",
+    "summary": "Normalize within one token’s feature vector, using population variance and epsilon inside the square root.",
     "symbol": "brain.head.profile",
     "tint": "violet",
     "section": "Artificial intelligence",
-    "idea": "Normalize within one token\u2019s feature vector, using population variance and epsilon inside the square root. Learned gain and bias then restore useful scale.",
+    "idea": "Normalize within one token’s feature vector, using population variance and epsilon inside the square root. Learned gain and bias then restore useful scale.",
     "variants": [
       {
         "id": "practice",
         "title": "Practice",
         "prompt": "layer_norm(values, gain, bias, epsilon) returns per-feature gain*(x-mean)/sqrt(variance+epsilon)+bias. Inputs are nonempty with matching widths; epsilon > 0.",
         "file": "layernorm.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "practice-layernorm"
+    ]
+  },
+  {
+    "id": "groupfolds",
+    "title": "Split identities before splitting examples",
+    "summary": "Implement group_folds(groups,k) returning k lists of row indices.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "lessons": [
+      "stat-group-folds"
+    ],
+    "idea": "The split unit should match the deployment question. Group separation estimates new-group performance; it does not estimate future drift within groups, so a time-aware design may also be required.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement group_folds(groups,k) returning k lists of row indices. Sort distinct group names and assign group number modulo k. Require 2<=k<=number of distinct groups.",
+        "file": "groupfolds.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "temporal",
+    "title": "Purge a gap before a temporal validation window",
+    "summary": "Implement temporal_split(times,start,end,gap) returning (train_indices,validation_indices), preserving row order.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "lessons": [
+      "stat-time-gap"
+    ],
+    "idea": "A temporal split must be combined with point-in-time feature joins and train-only preprocessing. Time order alone does not prevent using a feature published after the prediction timestamp.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement temporal_split(times,start,end,gap) returning (train_indices,validation_indices), preserving row order. Train if t<start-gap; validate if start<=t<=end. Require start<=end and gap>=0.",
+        "file": "temporal.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "rocauc",
+    "title": "Treat tied ranking scores explicitly in ROC AUC",
+    "summary": "Implement roc_auc(labels,scores) for equal nonempty lists, binary integer labels and finite scores.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "lessons": [
+      "stat-roc-auc"
+    ],
+    "idea": "The quadratic reference is transparent for tiny evaluation fixtures. Large datasets should use a tie-aware rank algorithm. A high AUC can coexist with poor calibration or unacceptable errors at the chosen threshold.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement roc_auc(labels,scores) for equal nonempty lists, binary integer labels and finite scores. Compute exact positive-negative pair credit, half for ties. Reject single-class data.",
+        "file": "rocauc.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "averageprecision",
+    "title": "Compute average precision at tied score boundaries",
+    "summary": "Implement average_precision(labels,scores).",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "lessons": [
+      "stat-average-precision"
+    ],
+    "idea": "Average precision depends on prevalence and the evaluation population. Compare models on the same test population and retain class counts; a number alone does not establish business value.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement average_precision(labels,scores). Group equal scores descending, accumulate TP and seen count, and sum (new positives/total positives)*precision at each group. Return 0 with no positives; validate nonempty equal lengths, binary labels and finite scores.",
+        "file": "averageprecision.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "brierscore",
+    "title": "Measure probability error instead of only decisions",
+    "summary": "Implement brier(labels,probabilities), validating equal nonempty sequences, binary integer labels and finite probabilities in [0,1].",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "lessons": [
+      "stat-brier"
+    ],
+    "idea": "A proper scoring rule rewards truthful probabilities in expectation, but finite test scores still have uncertainty. Use held-out calibration data and avoid choosing a calibrator on the final test set.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement brier(labels,probabilities), validating equal nonempty sequences, binary integer labels and finite probabilities in [0,1]. Return mean squared probability error.",
+        "file": "brierscore.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "calibration",
+    "title": "Estimate calibration with explicit bin semantics",
+    "summary": "Implement ece(labels,probs,bins) using equal-width bins [i/bins,(i+1)/bins), with 1 in the last.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "lessons": [
+      "stat-calibration-bins"
+    ],
+    "idea": "ECE depends on discretization and sample size. Treat it as an inspectable diagnostic rather than a calibrated confidence interval or a substitute for a proper scoring rule.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement ece(labels,probs,bins) using equal-width bins [i/bins,(i+1)/bins), with 1 in the last. Validate binary labels, finite [0,1] probabilities, equal nonempty lengths and positive integer bins.",
+        "file": "calibration.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "wilson",
+    "title": "Report uncertainty for a measured success rate",
+    "summary": "Implement wilson(successes,total,z=1.96) returning lower,upper.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "lessons": [
+      "stat-wilson"
+    ],
+    "idea": "The z value determines the nominal confidence level through a normal approximation. Independence and representative sampling matter more than the number of decimals printed in the interval.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement wilson(successes,total,z=1.96) returning lower,upper. Require integer 0<=successes<=total, total>0, and finite z>0. Clamp floating roundoff to [0,1].",
+        "file": "wilson.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "bhadjust",
+    "title": "Adjust a family of discoveries without losing original order",
+    "summary": "Implement bh_adjust(pvalues) returning BH adjusted values in original order, capped at 1.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "lessons": [
+      "stat-multiple-testing"
+    ],
+    "idea": "BH controls a false-discovery rate under conditions such as independent or suitable positively dependent tests. It does not establish a causal effect or replace a predeclared experiment and a meaningful effect-size threshold.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement bh_adjust(pvalues) returning BH adjusted values in original order, capped at 1. Accept empty input. Reject nonfinite values or values outside [0,1].",
+        "file": "bhadjust.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "asofjoin",
+    "title": "Join only features available at prediction time",
+    "summary": "Implement asof_values(events,queries).",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "lessons": [
+      "ml-point-in-time"
+    ],
+    "idea": "Point-in-time correctness is a data-lineage property, not just a split choice. Backfills should preserve availability history so offline experiments can reconstruct what the online system actually knew.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement asof_values(events,queries). Events are (entity,event_time,available_time,value); queries are (entity,time). Return latest eligible value ordered by (event_time,available_time), or None. No mutation; ties with identical timestamp pairs are outside this contract.",
+        "file": "asofjoin.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "boostedstumps",
+    "title": "Fit residual trees in a tiny gradient-boosted regressor",
+    "summary": "Implement fit_boost(x,y,rounds,rate) and predict_boost(model,x).",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "lessons": [
+      "ml-boosting"
+    ],
+    "idea": "A trainable baseline makes every later gain measurable. This tiny learner demonstrates gradient boosting correctly, while production libraries add numerical, categorical, performance and distributed engineering that must be evaluated separately.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement fit_boost(x,y,rounds,rate) and predict_boost(model,x). Fit a mean baseline, then squared-error optimal residual stumps at midpoints of distinct x; ties choose smallest cut. Model is dict base, rate, stumps (cut,left,right). Constant x uses a constant residual stump with cut=inf. Validate nonempty equal finite data, rounds>=0 integer, 0<rate<=1.",
+        "file": "boostedstumps.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "populationdrift",
+    "title": "Measure binned drift with smoothing and fixed boundaries",
+    "summary": "Implement psi(reference,current,epsilon=1e-6) for equal nonempty nonnegative finite bin counts with positive totals.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "lessons": [
+      "ml-psi"
+    ],
+    "idea": "Smoothing reduces instability but changes the estimate, especially on tiny windows. PSI thresholds are not universal laws; calibrate alerts against reference variation and observed model outcomes.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement psi(reference,current,epsilon=1e-6) for equal nonempty nonnegative finite bin counts with positive totals. Add epsilon to every bin count before normalizing each histogram; return sum((q-p)*log(q/p)). Require finite epsilon>0.",
+        "file": "populationdrift.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "conformal",
+    "title": "Use the finite-sample conformal rank",
+    "summary": "Implement conformal_radius(residuals,alpha) with finite nonnegative residuals, nonempty input and 0<alpha<1.",
+    "symbol": "chart.xyaxis.line",
+    "tint": "coral",
+    "section": "Machine learning",
+    "lessons": [
+      "ml-conformal"
+    ],
+    "idea": "The guarantee depends on exchangeable calibration and future scores. An infinite interval honestly reports insufficient calibration information at the requested error level rather than silently overstating confidence.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement conformal_radius(residuals,alpha) with finite nonnegative residuals, nonempty input and 0<alpha<1. Return sorted residual at one-based rank ceil((n+1)*(1-alpha)); return inf if rank>n.",
+        "file": "conformal.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "rankfusion",
+    "title": "Fuse retriever rankings without comparing incompatible scores",
+    "summary": "Implement rrf(rankings,k=60) returning all ids sorted by descending sum 1/(k+rank), then id.",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "lessons": [
+      "ai-rank-fusion"
+    ],
+    "idea": "RRF uses ranking evidence instead of uncalibrated score scales. Tune and evaluate it on representative relevance judgments, keeping final evaluation queries separate from parameter selection.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement rrf(rankings,k=60) returning all ids sorted by descending sum 1/(k+rank), then id. Rank unique ids within each list starting at 1, ignoring repeated appearances without consuming another rank. Require k>0.",
+        "file": "rankfusion.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "tokenwindows",
+    "title": "Chunk token identities without losing the tail",
+    "summary": "Implement token_windows(tokens,size,overlap) returning (start,list_of_tokens) windows.",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "lessons": [
+      "ai-token-windows"
+    ],
+    "idea": "Offsets make chunks auditable against the original token sequence. They must be mapped to the original source through a real tokenizer before showing quotations or citations to a user.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement token_windows(tokens,size,overlap) returning (start,list_of_tokens) windows. Require integer size>0 and 0<=overlap<size. Advance by size-overlap and stop once the last emitted window reaches the end. Empty input returns [].",
+        "file": "tokenwindows.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "contextbudget",
+    "title": "Reserve output space before adding retrieval context",
+    "summary": "Implement pack_context(chunks,window,fixed,output).",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "lessons": [
+      "ai-context-pack"
+    ],
+    "idea": "The allocator enforces the supplied accounting contract. Incorrect tokenizer counts or omitted tool/message formatting overhead can still overflow a model context window, so the final serialized request needs a separate budget check.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement pack_context(chunks,window,fixed,output). chunks are (id,token_count), already ranked. Return admitted ids and total used context tokens. Skip oversized chunks, deduplicate admitted ids, require nonnegative integer counts/budgets and fixed+output<=window.",
+        "file": "contextbudget.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "retrievalquality",
+    "title": "Evaluate retrieval with relevance and rank",
+    "summary": "Implement retrieval_metrics(ranked,relevant,k) returning dict recall,mrr.",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "lessons": [
+      "ai-retrieval-metrics"
+    ],
+    "idea": "Retrieval metrics evaluate the judged identifiers and ordering. They do not establish answer faithfulness, citation correctness or resistance to prompt injection; those require separate evaluation cases.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement retrieval_metrics(ranked,relevant,k) returning dict recall,mrr. Deduplicate ranked preserving order, then take k. mrr is reciprocal first relevant rank or 0. No relevant ids gives None values. Require k>=1 integer.",
+        "file": "retrievalquality.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "citationcheck",
+    "title": "Reject citations outside the supplied evidence set",
+    "summary": "Implement citation_errors(claims,allowed).",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "lessons": [
+      "ai-citation-contract"
+    ],
+    "idea": "Identifier validation proves only that a reference belongs to the supplied set. Faithfulness needs a separate check against the referenced content, and uncertain claims should remain qualified rather than acquiring false certainty from a valid citation id.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement citation_errors(claims,allowed). Each claim has text and citations list. Return ordered strings \"i:missing\" if no citations and \"i:unknown:key\" for each distinct unknown id in that claim, preserving first occurrence. Empty claims return [].",
+        "file": "citationcheck.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "tenantretrieval",
+    "title": "Filter retrieval permissions before selecting context",
+    "summary": "Implement authorized_topk(docs,tenant,roles,k).",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "lessons": [
+      "ai-authorized-retrieval"
+    ],
+    "idea": "Authorization must precede data disclosure. This local policy tests access filtering; it does not claim that role checks detect prompt injection or that a model will obey instructions once untrusted text enters its context.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement authorized_topk(docs,tenant,roles,k). Each doc has id,tenant,roles (empty means tenant-public),score,text. Keep same-tenant docs whose roles intersect caller roles or are empty; rank by descending score then id; return at most k ids. Reject k<0. Do not mutate docs.",
+        "file": "tenantretrieval.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "toolpolicy",
+    "title": "Authorize a tool call outside the model",
+    "summary": "Implement tool_allowed(call,tenant,scopes,policy).",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "lessons": [
+      "ai-tool-permissions"
+    ],
+    "idea": "The executor owns authorization. This deliberately small policy does not implement a full identity system, object ACLs or human confirmation; each must be supplied by trusted application infrastructure, never inferred from model output.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement tool_allowed(call,tenant,scopes,policy). call has tool,tenant. policy maps tool->required scope. Return True only for a known tool, matching tenant and granted required scope; missing fields fail closed.",
+        "file": "toolpolicy.py",
+        "scales": false
+      }
+    ]
+  },
+  {
+    "id": "agentbudget",
+    "title": "Stop an agent loop before exceeding its execution budget",
+    "summary": "Implement admitted_steps(costs,max_steps,max_tokens), returning (number_admitted,tokens_used).",
+    "symbol": "brain.head.profile",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "lessons": [
+      "ai-agent-budget"
+    ],
+    "idea": "A deterministic replay proves the admission arithmetic only. Actual tools still need authorization and outcome handling; provider usage, elapsed time and retries must be reconciled with the budget after every real operation.",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Practice",
+        "prompt": "Implement admitted_steps(costs,max_steps,max_tokens), returning (number_admitted,tokens_used). Nonnegative integer costs and budgets only. Stop at the first exceeded limit; zero-cost steps still consume a step.",
+        "file": "agentbudget.py",
         "scales": false
       }
     ]

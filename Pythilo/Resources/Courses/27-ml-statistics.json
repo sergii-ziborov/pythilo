@@ -1,0 +1,344 @@
+{
+  "id": "ml-statistics",
+  "title": "ML: statistical evaluation",
+  "summary": "Twelve executable studies of group/time splits, ranking metrics, calibration, confidence intervals, paired experiments, multiple comparisons, out-of-fold predictions and nested selection. Assumptions and failure cases accompany the arithmetic.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "stat-group-folds",
+      "title": "Split identities before splitting examples",
+      "body": "# Split identities before splitting examples\n\nRandomly splitting rows leaks information when several rows belong to the same person, device or document. Validation must separate the unit that will actually be new at deployment. Keeping a group intact can produce uneven fold sizes; equal row counts are less important than avoiding leakage.\n\nThis deterministic allocator sorts group names and assigns them round-robin to folds. It is a simple reproducible policy rather than an optimal balance algorithm. Evaluate whether labels and groups are confounded before interpreting a fold score. A grouped split cannot repair a target that already contains future information.\n\n```python\ngroups=[\"a\",\"a\",\"b\",\"c\"]\nassigned={g:i%2 for i,g in enumerate(sorted(set(groups)))}\nprint([assigned[g] for g in groups])\n```\n\n## Review the design\n\nThe split unit should match the deployment question. Group separation estimates new-group performance; it does not estimate future drift within groups, so a time-aware design may also be required.\n",
+      "task": "Implement group_folds(groups,k) returning k lists of row indices. Sort distinct group names and assign group number modulo k. Require 2<=k<=number of distinct groups.",
+      "starter": "def group_folds(groups, k):\n    return None\n",
+      "solution": "def group_folds(groups,k):\n    names=sorted(set(groups))\n    if not 2<=k<=len(names):raise ValueError('insufficient groups')\n    assignment={g:i%k for i,g in enumerate(names)};folds=[[] for _ in range(k)]\n    for i,g in enumerate(groups):folds[assignment[g]].append(i)\n    return folds\n",
+      "checks": [
+        {
+          "name": "identity never crosses folds",
+          "code": "g=['a','b','a','c','d'];f=group_folds(g,2);assert f==[[0,2,3],[1,4]];assert set(g[i] for i in f[0]).isdisjoint(g[i] for i in f[1])\n"
+        },
+        {
+          "name": "every row occurs once",
+          "code": "f=group_folds(['z','a','a','m','z'],3);assert sorted(i for fold in f for i in fold)==list(range(5))\n"
+        },
+        {
+          "name": "rejects impossible split counts",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:group_folds(['a','a'],2));assert _bad(lambda:group_folds(['a','b'],1))\n"
+        }
+      ],
+      "hints": [
+        "Build the fold mapping from distinct group identities.",
+        "Append original row indices rather than sorting or copying the observations.",
+        "The split unit should match the deployment question. Group separation estimates new-group performance; it does not estimate future drift within groups, so a time-aware design may also be required."
+      ],
+      "explanation": "The split unit should match the deployment question. Group separation estimates new-group performance; it does not estimate future drift within groups, so a time-aware design may also be required."
+    },
+    {
+      "id": "stat-time-gap",
+      "title": "Purge a gap before a temporal validation window",
+      "body": "# Purge a gap before a temporal validation window\n\nFuture deployment requires validation in the future of the training data. Shuffling time series can teach a model from later observations and then evaluate it on earlier ones. A gap additionally separates training from the validation boundary when features or labels have a lookahead horizon.\n\nThis contract uses integer timestamps and an inclusive validation interval. Training observations must be strictly earlier than start minus gap. Choosing the gap requires knowledge of feature availability and label construction; an arbitrary gap is not proof that the pipeline is free of leakage.\n\n```python\ntimes=[1,2,3,4,5,6]\nstart,gap=5,1\nprint([i for i,t in enumerate(times) if t<start-gap])\n```\n\n## Review the design\n\nA temporal split must be combined with point-in-time feature joins and train-only preprocessing. Time order alone does not prevent using a feature published after the prediction timestamp.\n",
+      "task": "Implement temporal_split(times,start,end,gap) returning (train_indices,validation_indices), preserving row order. Train if t<start-gap; validate if start<=t<=end. Require start<=end and gap>=0.",
+      "starter": "def temporal_split(times, start, end, gap):\n    return None\n",
+      "solution": "def temporal_split(times,start,end,gap):\n    if start>end or gap<0:raise ValueError('invalid window')\n    return ([i for i,t in enumerate(times) if t<start-gap],[i for i,t in enumerate(times) if start<=t<=end])\n",
+      "checks": [
+        {
+          "name": "purges the boundary gap",
+          "code": "assert temporal_split([1,2,3,4,5,6],5,6,1)==([0,1,2],[4,5])\n"
+        },
+        {
+          "name": "preserves original row order and ties",
+          "code": "assert temporal_split([5,1,5,9],5,5,0)==([1],[0,2])\n"
+        },
+        {
+          "name": "empty and invalid windows",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert temporal_split([],1,2,0)==([],[]);assert _bad(lambda:temporal_split([],2,1,0));assert _bad(lambda:temporal_split([],1,2,-1))\n"
+        }
+      ],
+      "hints": [
+        "Use strict comparison for training and inclusive bounds for validation.",
+        "The gap excludes boundary rows; it does not move them into validation.",
+        "A temporal split must be combined with point-in-time feature joins and train-only preprocessing. Time order alone does not prevent using a feature published after the prediction timestamp."
+      ],
+      "explanation": "A temporal split must be combined with point-in-time feature joins and train-only preprocessing. Time order alone does not prevent using a feature published after the prediction timestamp."
+    },
+    {
+      "id": "stat-roc-auc",
+      "title": "Treat tied ranking scores explicitly in ROC AUC",
+      "body": "# Treat tied ranking scores explicitly in ROC AUC\n\nROC AUC is the probability that a randomly selected positive example receives a higher score than a negative example, with half credit for a tie. This interpretation yields a small exact reference implementation that is useful for testing a faster ranking implementation.\n\nAUC evaluates ranking, not probability calibration or the cost of one operating threshold. With no positive or no negative examples the pairwise probability is undefined. Returning zero would confuse an impossible evaluation with a perfectly reversed ranking. Report the population and class counts alongside the metric.\n\n```python\npositive=[.8,.5]\nnegative=[.5,.1]\ncredits=[(p>n)+.5*(p==n) for p in positive for n in negative]\nprint(sum(credits)/len(credits))\n```\n\n## Review the design\n\nThe quadratic reference is transparent for tiny evaluation fixtures. Large datasets should use a tie-aware rank algorithm. A high AUC can coexist with poor calibration or unacceptable errors at the chosen threshold.\n",
+      "task": "Implement roc_auc(labels,scores) for equal nonempty lists, binary integer labels and finite scores. Compute exact positive-negative pair credit, half for ties. Reject single-class data.",
+      "starter": "import math\n\ndef roc_auc(labels, scores):\n    return None\n",
+      "solution": "import math\ndef roc_auc(labels,scores):\n    if not labels or len(labels)!=len(scores) or any(type(y) is not int or y not in (0,1) for y in labels) or any(not math.isfinite(s) for s in scores):raise ValueError('invalid ranking')\n    pos=[s for y,s in zip(labels,scores) if y];neg=[s for y,s in zip(labels,scores) if not y]\n    if not pos or not neg:raise ValueError('both classes required')\n    return sum((p>n)+.5*(p==n) for p in pos for n in neg)/(len(pos)*len(neg))\n",
+      "checks": [
+        {
+          "name": "correct and reversed ranks",
+          "code": "assert roc_auc([0,1],[0,1])==1;assert roc_auc([0,1],[1,0])==0\n"
+        },
+        {
+          "name": "all ties receive half credit",
+          "code": "assert roc_auc([1,0,1,0],[2,2,2,2])==.5\n"
+        },
+        {
+          "name": "undefined or invalid rankings fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:roc_auc([1],[.2]));assert _bad(lambda:roc_auc([0,1],[0,float('nan')]));assert _bad(lambda:roc_auc([0,1],[1]))\n"
+        }
+      ],
+      "hints": [
+        "Separate scores by true label, then compare every positive-negative pair.",
+        "Do not use >= for a full point on tied scores.",
+        "The quadratic reference is transparent for tiny evaluation fixtures. Large datasets should use a tie-aware rank algorithm. A high AUC can coexist with poor calibration or unacceptable errors at the chosen threshold."
+      ],
+      "explanation": "The quadratic reference is transparent for tiny evaluation fixtures. Large datasets should use a tie-aware rank algorithm. A high AUC can coexist with poor calibration or unacceptable errors at the chosen threshold."
+    },
+    {
+      "id": "stat-average-precision",
+      "title": "Compute average precision at tied score boundaries",
+      "body": "# Compute average precision at tied score boundaries\n\nPrecision-recall metrics expose failure under class imbalance that accuracy can hide. Average precision weights each precision value by the increase in recall at a score threshold. It is not the trapezoidal area obtained by linearly interpolating precision between thresholds.\n\nRows with equal scores must enter together. Breaking ties by input order can produce different metrics for the same model predictions. The contract returns zero for no positive labels, a deliberate reporting convention that should accompany the metric. It rejects invalid labels and mismatched lengths rather than silently truncating pairs.\n\n```python\nlabels=[1,0,1]\nprecision_at_positive=[1,2/3]\nprint(sum(precision_at_positive)/sum(labels))\n```\n\n## Review the design\n\nAverage precision depends on prevalence and the evaluation population. Compare models on the same test population and retain class counts; a number alone does not establish business value.\n",
+      "task": "Implement average_precision(labels,scores). Group equal scores descending, accumulate TP and seen count, and sum (new positives/total positives)*precision at each group. Return 0 with no positives; validate nonempty equal lengths, binary labels and finite scores.",
+      "starter": "import math\n\ndef average_precision(labels, scores):\n    return None\n",
+      "solution": "import math\ndef average_precision(labels,scores):\n    if not labels or len(labels)!=len(scores) or any(type(y) is not int or y not in (0,1) for y in labels) or any(not math.isfinite(s) for s in scores):raise ValueError('invalid data')\n    total=sum(labels)\n    if total==0:return 0.0\n    groups={}\n    for y,s in zip(labels,scores):groups.setdefault(s,[]).append(y)\n    tp=seen=0;ap=0.0\n    for score in sorted(groups,reverse=True):\n        ys=groups[score];added=sum(ys);tp+=added;seen+=len(ys);ap+=added/total*tp/seen\n    return ap\n",
+      "checks": [
+        {
+          "name": "precision is weighted by recall increments",
+          "code": "assert abs(average_precision([1,0,1],[3,2,1])-5/6)<1e-12\n"
+        },
+        {
+          "name": "ties are invariant to row order",
+          "code": "assert average_precision([1,0],[.5,.5])==.5;assert average_precision([0,1],[.5,.5])==.5\n"
+        },
+        {
+          "name": "no positives and invalid data",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert average_precision([0,0],[1,2])==0;assert _bad(lambda:average_precision([1],[float('inf')]));assert _bad(lambda:average_precision([],[]))\n"
+        }
+      ],
+      "hints": [
+        "Accumulate all labels at one score before measuring its precision.",
+        "Weight precision by the fraction of positives newly found at that score.",
+        "Average precision depends on prevalence and the evaluation population. Compare models on the same test population and retain class counts; a number alone does not establish business value."
+      ],
+      "explanation": "Average precision depends on prevalence and the evaluation population. Compare models on the same test population and retain class counts; a number alone does not establish business value."
+    },
+    {
+      "id": "stat-brier",
+      "title": "Measure probability error instead of only decisions",
+      "body": "# Measure probability error instead of only decisions\n\nTwo classifiers can make identical binary decisions while assigning very different probabilities. Brier score measures the mean squared difference between each predicted positive probability and its binary outcome. It is sensitive to probability quality, while thresholded accuracy discards that information.\n\nThe score alone does not separate reliability, resolution and label uncertainty. Compare it with a prevalence baseline and inspect calibration across useful slices. Validate probabilities before calculating: clipping an invalid model output would hide a broken probability contract and make a metric look better than the actual system behavior.\n\n```python\nlabels=[1,0]\nprobabilities=[.8,.2]\nprint(sum((p-y)**2 for y,p in zip(labels,probabilities))/2)\n```\n\n## Review the design\n\nA proper scoring rule rewards truthful probabilities in expectation, but finite test scores still have uncertainty. Use held-out calibration data and avoid choosing a calibrator on the final test set.\n",
+      "task": "Implement brier(labels,probabilities), validating equal nonempty sequences, binary integer labels and finite probabilities in [0,1]. Return mean squared probability error.",
+      "starter": "import math\n\ndef brier(labels, probabilities):\n    return None\n",
+      "solution": "import math\ndef brier(labels,probabilities):\n    if not labels or len(labels)!=len(probabilities) or any(type(y) is not int or y not in (0,1) for y in labels) or any(not math.isfinite(p) or not 0<=p<=1 for p in probabilities):raise ValueError('invalid probabilities')\n    squared_errors=[(p-y)**2 for y,p in zip(labels,probabilities)]\n    total_error=sum(squared_errors)\n    result=total_error/len(labels)\n    return result\n",
+      "checks": [
+        {
+          "name": "probability quality changes the score",
+          "code": "assert abs(brier([1,0],[.8,.2])-.04)<1e-12;assert brier([1,0],[.6,.4])>brier([1,0],[.8,.2])\n"
+        },
+        {
+          "name": "perfect and reversed predictions",
+          "code": "assert brier([0,1],[0,1])==0;assert brier([0,1],[1,0])==1\n"
+        },
+        {
+          "name": "rejects hidden clipping and truncation",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:brier([1],[1.1]));assert _bad(lambda:brier([1],[float('nan')]));assert _bad(lambda:brier([1,0],[.5]))\n"
+        }
+      ],
+      "hints": [
+        "Square each probability error, then average over observations.",
+        "Validate before arithmetic; zip by itself hides mismatched lengths.",
+        "A proper scoring rule rewards truthful probabilities in expectation, but finite test scores still have uncertainty. Use held-out calibration data and avoid choosing a calibrator on the final test set."
+      ],
+      "explanation": "A proper scoring rule rewards truthful probabilities in expectation, but finite test scores still have uncertainty. Use held-out calibration data and avoid choosing a calibrator on the final test set."
+    },
+    {
+      "id": "stat-calibration-bins",
+      "title": "Estimate calibration with explicit bin semantics",
+      "body": "# Estimate calibration with explicit bin semantics\n\nA calibration diagram compares average confidence with observed frequency. Expected calibration error summarizes absolute gaps weighted by bin occupancy. The binning rule is part of the metric: changing the bin count can change the score without changing the model.\n\nThe final bin must include probability one. Empty bins contribute no weight and should not invent an observed frequency. ECE is a diagnostic, not a universal proper scoring rule; a small value on coarse bins can conceal substantial errors. Keep Brier score or log loss and examine subgroup reliability as well.\n\n```python\nprobabilities=[.1,.9,1.0]\nprint([min(int(p*2),1) for p in probabilities])\n```\n\n## Review the design\n\nECE depends on discretization and sample size. Treat it as an inspectable diagnostic rather than a calibrated confidence interval or a substitute for a proper scoring rule.\n",
+      "task": "Implement ece(labels,probs,bins) using equal-width bins [i/bins,(i+1)/bins), with 1 in the last. Validate binary labels, finite [0,1] probabilities, equal nonempty lengths and positive integer bins.",
+      "starter": "import math\n\ndef ece(labels, probs, bins):\n    return None\n",
+      "solution": "import math\ndef ece(labels,probs,bins):\n    if type(bins) is not int or bins<1 or not labels or len(labels)!=len(probs) or any(type(y) is not int or y not in (0,1) for y in labels) or any(not math.isfinite(p) or not 0<=p<=1 for p in probs):raise ValueError('invalid calibration data')\n    groups=[[] for _ in range(bins)]\n    for y,p in zip(labels,probs):groups[min(int(p*bins),bins-1)].append((y,p))\n    return sum(abs(sum(p for y,p in g)-sum(y for y,p in g))/len(labels) for g in groups if g)\n",
+      "checks": [
+        {
+          "name": "perfect probabilities calibrate exactly",
+          "code": "assert ece([0,1],[0,1],5)==0\n"
+        },
+        {
+          "name": "known confidence gap",
+          "code": "assert abs(ece([0,0],[.2,.8],2)-.5)<1e-12\n"
+        },
+        {
+          "name": "rejects invalid bins and probabilities",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:ece([1],[.5],0));assert _bad(lambda:ece([1],[1.2],2));assert _bad(lambda:ece([],[],2))\n"
+        }
+      ],
+      "hints": [
+        "Collect observations by their probability bin, clamping only the valid endpoint 1.",
+        "The weighted gap is abs(sum probabilities - sum outcomes)/total count per occupied bin.",
+        "ECE depends on discretization and sample size. Treat it as an inspectable diagnostic rather than a calibrated confidence interval or a substitute for a proper scoring rule."
+      ],
+      "explanation": "ECE depends on discretization and sample size. Treat it as an inspectable diagnostic rather than a calibrated confidence interval or a substitute for a proper scoring rule."
+    },
+    {
+      "id": "stat-wilson",
+      "title": "Report uncertainty for a measured success rate",
+      "body": "# Report uncertainty for a measured success rate\n\nA success rate from ten examples should not carry the same confidence as one from ten thousand. A Wilson interval adjusts a binomial proportion using the sample count and a chosen normal quantile. Unlike a naive symmetric interval, it behaves sensibly near zero and one.\n\nThe calculation assumes independent Bernoulli observations. Correlated sessions or repeated users violate that simple sampling model; resample at the independent group level instead. The exercise accepts z explicitly so the confidence convention is visible and testable. An interval describes sampling uncertainty under assumptions, not protection from dataset bias.\n\n```python\nimport math\nn=10;p=.5;z=1.96\nden=1+z*z/n\ncenter=(p+z*z/(2*n))/den\nhalf=z*math.sqrt(p*(1-p)/n+z*z/(4*n*n))/den\nprint(round(center-half,3),round(center+half,3))\n```\n\n## Review the design\n\nThe z value determines the nominal confidence level through a normal approximation. Independence and representative sampling matter more than the number of decimals printed in the interval.\n",
+      "task": "Implement wilson(successes,total,z=1.96) returning lower,upper. Require integer 0<=successes<=total, total>0, and finite z>0. Clamp floating roundoff to [0,1].",
+      "starter": "import math\n\ndef wilson(successes, total, z=1.96):\n    return None\n",
+      "solution": "import math\ndef wilson(successes,total,z=1.96):\n    if type(successes) is not int or type(total) is not int or not 0<=successes<=total or total<1 or not math.isfinite(z) or z<=0:raise ValueError('invalid sample')\n    p=successes/total;den=1+z*z/total\n    center=(p+z*z/(2*total))/den\n    half=z*math.sqrt(p*(1-p)/total+z*z/(4*total*total))/den\n    return max(0.0,center-half),min(1.0,center+half)\n",
+      "checks": [
+        {
+          "name": "known symmetric interval",
+          "code": "lo,hi=wilson(5,10);assert abs(lo-.2365895936)<1e-8;assert abs(hi-.7634104064)<1e-8\n"
+        },
+        {
+          "name": "uncertainty remains at extremes",
+          "code": "lo,hi=wilson(0,10);assert lo==0 and 0<hi<.3;lo,hi=wilson(10,10);assert .7<lo<1 and hi==1\n"
+        },
+        {
+          "name": "sample size matters and invalid inputs fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\na=wilson(5,10);b=wilson(50,100);assert b[1]-b[0]<a[1]-a[0];assert _bad(lambda:wilson(0,0));assert _bad(lambda:wilson(3,2))\n"
+        }
+      ],
+      "hints": [
+        "Use the Wilson center and denominator, not p plus or minus a naive standard error.",
+        "Keep successes and total validated as counts.",
+        "The z value determines the nominal confidence level through a normal approximation. Independence and representative sampling matter more than the number of decimals printed in the interval."
+      ],
+      "explanation": "The z value determines the nominal confidence level through a normal approximation. Independence and representative sampling matter more than the number of decimals printed in the interval."
+    },
+    {
+      "id": "stat-paired-bootstrap",
+      "title": "Resample paired model differences with a local RNG",
+      "body": "# Resample paired model differences with a local RNG\n\nTwo models evaluated on the same cases produce paired measurements. Resampling their scores independently discards that pairing and changes the uncertainty question. Resample case indices once per replicate and compute the mean of paired differences.\n\nThis exercise takes precomputed per-case differences, a local random seed and an explicit nearest-rank quantile rule. It does not modify the process-global random generator. The percentile bootstrap has limitations for small or dependent samples; user-level or time-block resampling is needed when rows are not independent. Fix the analysis plan before comparing many candidate models.\n\n```python\nimport random\nrng=random.Random(4)\ndifferences=[1,-1,2]\nprint([rng.choice(differences) for _ in range(3)])\n```\n\n## Review the design\n\nPairing preserves the shared test cases. This interval is conditional on the chosen dataset and resampling assumptions; it does not account for selecting the best model after looking at many bootstrap intervals.\n",
+      "task": "Implement bootstrap_interval(differences,repeats,seed,alpha=.05). Draw n indices with replacement for each replicate, sort replicate means, and return indices floor((alpha/2)*(repeats-1)) and ceil((1-alpha/2)*(repeats-1)). Require nonempty finite data, repeats>=2, and 0<alpha<1.",
+      "starter": "import math, random\n\ndef bootstrap_interval(differences, repeats, seed, alpha=0.05):\n    return None\n",
+      "solution": "import math,random\ndef bootstrap_interval(differences,repeats,seed,alpha=.05):\n    if not differences or type(repeats) is not int or repeats<2 or not 0<alpha<1 or any(not math.isfinite(d) for d in differences):raise ValueError('invalid bootstrap')\n    rng=random.Random(seed);n=len(differences)\n    means=sorted(sum(differences[rng.randrange(n)] for _ in range(n))/n for _ in range(repeats))\n    return means[math.floor(alpha/2*(repeats-1))],means[math.ceil((1-alpha/2)*(repeats-1))]\n",
+      "checks": [
+        {
+          "name": "constant paired effect has a constant interval",
+          "code": "assert bootstrap_interval([2,2,2],50,7)==(2,2)\n"
+        },
+        {
+          "name": "seeded and does not change global RNG",
+          "code": "import random\nstate=random.getstate();a=bootstrap_interval([-1,0,2,4],100,9);assert a==bootstrap_interval([-1,0,2,4],100,9);assert random.getstate()==state;assert -1<=a[0]<=a[1]<=4\n"
+        },
+        {
+          "name": "invalid resampling contracts",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:bootstrap_interval([],10,0));assert _bad(lambda:bootstrap_interval([1],1,0));assert _bad(lambda:bootstrap_interval([float('nan')],10,0))\n"
+        }
+      ],
+      "hints": [
+        "Resample one index per case from a local Random instance.",
+        "Make the empirical quantile indexing convention explicit.",
+        "Pairing preserves the shared test cases. This interval is conditional on the chosen dataset and resampling assumptions; it does not account for selecting the best model after looking at many bootstrap intervals."
+      ],
+      "explanation": "Pairing preserves the shared test cases. This interval is conditional on the chosen dataset and resampling assumptions; it does not account for selecting the best model after looking at many bootstrap intervals."
+    },
+    {
+      "id": "stat-sign-flip",
+      "title": "Enumerate a tiny paired randomization test",
+      "body": "# Enumerate a tiny paired randomization test\n\nA paired randomization test asks how surprising the observed mean difference would be if either model could exchange its outcome on each case. For a small independent paired sample, enumerate every sign assignment instead of relying on simulation.\n\nThe two-sided statistic uses the absolute mean, and ties count as at least as extreme. Exchangeability under the null is an assumption, not a property guaranteed by arithmetic. The exact enumerator is intentionally bounded to twelve cases because its cost doubles with each additional case. Large or dependent experiments need a different sampling and analysis design.\n\n```python\nimport itertools\nvalues=[1,2]\nnull=[sum(s*x for s,x in zip(signs,values)) for signs in itertools.product((-1,1),repeat=2)]\nprint(null)\n```\n\n## Review the design\n\nExact enumeration removes Monte Carlo error, not modeling assumptions. A small p-value does not measure effect size or the probability that a production release will improve user outcomes.\n",
+      "task": "Implement sign_flip_p(differences) for 1..12 finite values. Enumerate all sign combinations and return the fraction with absolute summed difference >= the observed absolute sum, with 1e-12 tie tolerance.",
+      "starter": "import itertools, math\n\ndef sign_flip_p(differences):\n    return None\n",
+      "solution": "import itertools,math\ndef sign_flip_p(differences):\n    if not 1<=len(differences)<=12 or any(not math.isfinite(d) for d in differences):raise ValueError('invalid paired sample')\n    observed=abs(sum(differences));extreme=0\n    for signs in itertools.product((-1,1),repeat=len(differences)):\n        extreme+=abs(sum(s*d for s,d in zip(signs,differences)))>=observed-1e-12\n    return extreme/(2**len(differences))\n",
+      "checks": [
+        {
+          "name": "exact two-sided probability",
+          "code": "assert sign_flip_p([1,1,1])==.25\n"
+        },
+        {
+          "name": "zero effect is not significant",
+          "code": "assert sign_flip_p([0,0])==1;assert sign_flip_p([1,-1])==1\n"
+        },
+        {
+          "name": "bounded computational contract",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:sign_flip_p([]));assert _bad(lambda:sign_flip_p([1]*13));assert _bad(lambda:sign_flip_p([float('inf')]))\n"
+        }
+      ],
+      "hints": [
+        "Enumerate (-1,1) to the number of pairs.",
+        "Compare absolute sums; dividing by n would cancel on both sides.",
+        "Exact enumeration removes Monte Carlo error, not modeling assumptions. A small p-value does not measure effect size or the probability that a production release will improve user outcomes."
+      ],
+      "explanation": "Exact enumeration removes Monte Carlo error, not modeling assumptions. A small p-value does not measure effect size or the probability that a production release will improve user outcomes."
+    },
+    {
+      "id": "stat-multiple-testing",
+      "title": "Adjust a family of discoveries without losing original order",
+      "body": "# Adjust a family of discoveries without losing original order\n\nTrying many hypotheses and reporting only the smallest unadjusted p-value creates false discoveries. Benjamini-Hochberg adjustment controls the expected false-discovery proportion under its assumptions by considering the whole declared family.\n\nSort p-values, multiply by family size divided by rank, and apply a reverse cumulative minimum. Without that last step adjusted values can violate rank monotonicity. Return results in the original hypothesis order so decisions remain attached to the correct experiment. Selecting the family after inspecting results defeats the point of the adjustment.\n\n```python\npvalues=[.01,.04,.03]\nranked=sorted(enumerate(pvalues),key=lambda x:x[1])\nprint(ranked)\n```\n\n## Review the design\n\nBH controls a false-discovery rate under conditions such as independent or suitable positively dependent tests. It does not establish a causal effect or replace a predeclared experiment and a meaningful effect-size threshold.\n",
+      "task": "Implement bh_adjust(pvalues) returning BH adjusted values in original order, capped at 1. Accept empty input. Reject nonfinite values or values outside [0,1].",
+      "starter": "import math\n\ndef bh_adjust(pvalues):\n    return None\n",
+      "solution": "import math\ndef bh_adjust(pvalues):\n    if any(not math.isfinite(p) or not 0<=p<=1 for p in pvalues):raise ValueError('invalid p value')\n    order=sorted(range(len(pvalues)),key=lambda i:pvalues[i]);result=[0.0]*len(order);best=1.0\n    for j in range(len(order)-1,-1,-1):\n        i=order[j];best=min(best,pvalues[i]*len(order)/(j+1));result[i]=best\n    return result\n",
+      "checks": [
+        {
+          "name": "reverse minimum preserves rank constraints",
+          "code": "r=bh_adjust([.01,.04,.03]);assert all(abs(a-b)<1e-12 for a,b in zip(r,[.03,.04,.04]))\n"
+        },
+        {
+          "name": "ties empty and cap",
+          "code": "assert bh_adjust([.5,.5])==[.5,.5];assert bh_adjust([])==[];assert bh_adjust([1])==[1]\n"
+        },
+        {
+          "name": "invalid probabilities are rejected",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:bh_adjust([-.1]));assert _bad(lambda:bh_adjust([float('nan')]))\n"
+        }
+      ],
+      "hints": [
+        "Keep original indices while sorting by p-value.",
+        "Walk ranks backwards and retain the smallest scaled value seen so far.",
+        "BH controls a false-discovery rate under conditions such as independent or suitable positively dependent tests. It does not establish a causal effect or replace a predeclared experiment and a meaningful effect-size threshold."
+      ],
+      "explanation": "BH controls a false-discovery rate under conditions such as independent or suitable positively dependent tests. It does not establish a causal effect or replace a predeclared experiment and a meaningful effect-size threshold."
+    },
+    {
+      "id": "stat-oof",
+      "title": "Reject overlapping or incomplete out-of-fold predictions",
+      "body": "# Reject overlapping or incomplete out-of-fold predictions\n\nA stacking model needs predictions made without fitting the first-stage estimator on the same row. Out-of-fold construction can silently leak if a row appears in two held-out sets or if training predictions fill missing positions.\n\nThis exercise validates coverage while assembling predictions supplied by fold. It cannot inspect how each estimator was trained, so the fold-training contract remains a separate responsibility. Preserve row identity explicitly and reject duplicates instead of averaging them away. A complete audit retains each fold's training and validation identities and the preprocessing state fitted on its training partition.\n\n```python\npredictions=[None]*3\nfor index,value in [(2,.8),(0,.1),(1,.4)]:\n    predictions[index]=value\nprint(predictions)\n```\n\n## Review the design\n\nComplete nonoverlapping assembly is necessary but not sufficient for honest out-of-fold prediction. The training procedure and feature transformations must also exclude each held-out row and its leakage group.\n",
+      "task": "Implement assemble_oof(n,folds) where folds contain (indices,predictions). Require each index in range(n) exactly once and equal lengths per fold; return predictions in row order. Reject missing or duplicate indices.",
+      "starter": "def assemble_oof(n, folds):\n    return None\n",
+      "solution": "def assemble_oof(n,folds):\n    if type(n) is not int or n<0:raise ValueError('invalid row count')\n    result=[None]*n;seen=set()\n    for indices,values in folds:\n        if len(indices)!=len(values):raise ValueError('length mismatch')\n        for i,value in zip(indices,values):\n            if type(i) is not int or not 0<=i<n or i in seen:raise ValueError('overlapping fold')\n            seen.add(i);result[i]=value\n    if len(seen)!=n:raise ValueError('incomplete coverage')\n    return result\n",
+      "checks": [
+        {
+          "name": "reconstructs row identity",
+          "code": "assert assemble_oof(3,[([2],[.8]),([0,1],[.1,.4])])==[.1,.4,.8]\n"
+        },
+        {
+          "name": "duplicates and missing rows fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:assemble_oof(2,[([0,0],[1,2])]));assert _bad(lambda:assemble_oof(2,[([0],[1])]))\n"
+        },
+        {
+          "name": "bounds lengths and empty data",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert assemble_oof(0,[])==[];assert _bad(lambda:assemble_oof(1,[([1],[0])]));assert _bad(lambda:assemble_oof(1,[([0],[])]))\n"
+        }
+      ],
+      "hints": [
+        "Track a seen set separately from prediction values, since None may itself be a value.",
+        "Check coverage after processing every fold.",
+        "Complete nonoverlapping assembly is necessary but not sufficient for honest out-of-fold prediction. The training procedure and feature transformations must also exclude each held-out row and its leakage group."
+      ],
+      "explanation": "Complete nonoverlapping assembly is necessary but not sufficient for honest out-of-fold prediction. The training procedure and feature transformations must also exclude each held-out row and its leakage group."
+    },
+    {
+      "id": "stat-nested-selection",
+      "title": "Select inside each outer evaluation fold",
+      "body": "# Select inside each outer evaluation fold\n\nThe score used to choose a hyperparameter is optimistically biased as a performance estimate. Nested evaluation separates inner selection from outer assessment. Each outer fold chooses its own candidate using only its inner validation scores, then evaluates that choice on the untouched outer partition.\n\nThis exercise receives precomputed scores so selection leakage can be tested without a costly training run. Candidate names break exact ties deterministically. The outer result is consulted only after selection; choosing a candidate by its outer score is explicitly the bug the checks expose.\n\n```python\ninner={\"small\":[.7,.8],\"large\":[.9,.5]}\nchosen=min(inner,key=lambda k:(-sum(inner[k])/len(inner[k]),k))\nprint(chosen)\n```\n\n## Review the design\n\nNested evaluation estimates the full selection procedure rather than one fixed configuration. Final deployment still needs a separately chosen configuration, a locked test set when appropriate, and an uncertainty analysis.\n",
+      "task": "Implement nested_report(folds). Each fold is a dict candidate -> {inner:[scores], outer:score}. Select highest mean inner score, lexical name on ties. Return (chosen_names,mean selected outer score). Validate nonempty folds/candidates/inner scores and finite numbers.",
+      "starter": "import math\n\ndef nested_report(folds):\n    return None\n",
+      "solution": "import math\ndef nested_report(folds):\n    if not folds:raise ValueError('no folds')\n    names=[];scores=[]\n    for candidates in folds:\n        if not candidates:raise ValueError('no candidates')\n        for record in candidates.values():\n            if not record['inner'] or any(not math.isfinite(x) for x in record['inner']+[record['outer']]):raise ValueError('invalid scores')\n        chosen=min(candidates,key=lambda k:(-sum(candidates[k]['inner'])/len(candidates[k]['inner']),k))\n        names.append(chosen);scores.append(candidates[chosen]['outer'])\n    return names,sum(scores)/len(scores)\n",
+      "checks": [
+        {
+          "name": "outer score cannot select the winner",
+          "code": "fold={'a':{'inner':[.9,.8],'outer':.2},'b':{'inner':[.6,.7],'outer':1.0}};assert nested_report([fold])==(['a'],.2)\n"
+        },
+        {
+          "name": "selection is per fold with stable ties",
+          "code": "a={'a':{'inner':[1],'outer':.4},'b':{'inner':[1],'outer':.9}};b={'a':{'inner':[0],'outer':.9},'b':{'inner':[1],'outer':.8}};names,mean=nested_report([a,b]);assert names==['a','b'];assert abs(mean-.6)<1e-12\n"
+        },
+        {
+          "name": "invalid experiments fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:nested_report([]));assert _bad(lambda:nested_report([{'a':{'inner':[],'outer':1}}]))\n"
+        }
+      ],
+      "hints": [
+        "Choose a candidate from inner scores before reading its outer result.",
+        "Use a separate selection for every outer fold, then aggregate held-out scores.",
+        "Nested evaluation estimates the full selection procedure rather than one fixed configuration. Final deployment still needs a separately chosen configuration, a locked test set when appropriate, and an uncertainty analysis."
+      ],
+      "explanation": "Nested evaluation estimates the full selection procedure rather than one fixed configuration. Final deployment still needs a separately chosen configuration, a locked test set when appropriate, and an uncertainty analysis."
+    }
+  ]
+}

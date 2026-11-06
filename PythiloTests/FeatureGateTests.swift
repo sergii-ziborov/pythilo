@@ -176,6 +176,51 @@ final class FeatureGateTests: XCTestCase {
         XCTAssertEqual(report?.results[3].message, "add(1, 1) returned 2, expected 3.")
     }
 
+    func testProjectExitCallbacksDoNotFinalizeLiveTorchLibraries() async throws {
+        let first = root.appending(path: "first.py")
+        let second = root.appending(path: "second.py")
+        let third = root.appending(path: "third.py")
+        try """
+        import atexit, pathlib, torch, weakref
+        import torch._prims
+        class Resource: pass
+        torch._pythilo_exit_resource = Resource()
+        weakref.finalize(torch._pythilo_exit_resource, pathlib.Path('process-finalized').write_text, 'done')
+        def record(value):
+            with open('exit-order', 'a') as handle: handle.write(value)
+        atexit.register(record, 'first')
+        atexit.register(record, 'removed')
+        atexit.unregister(record)
+        assert atexit.register(record, 'first') is record
+        atexit.register(record, 'second')
+        assert hasattr(torch.ops.prims, 'device_put')
+        """.write(to: first, atomically: true, encoding: .utf8)
+        try """
+        import pathlib, torch
+        from torch import nn
+        assert pathlib.Path('exit-order').read_text() == 'secondfirst'
+        assert not pathlib.Path('process-finalized').exists()
+        assert hasattr(torch.ops.prims, 'device_put')
+        model = nn.Linear(2, 1)
+        example = torch.ones(1, 2)
+        program = torch.export.export(model, (example,))
+        assert torch.allclose(program.module()(example), model(example))
+        """.write(to: second, atomically: true, encoding: .utf8)
+        try """
+        import gc, pathlib, torch
+        assert pathlib.Path('exit-order').read_text() == 'secondfirst'
+        assert not pathlib.Path('process-finalized').exists()
+        del torch._pythilo_exit_resource
+        gc.collect()
+        assert pathlib.Path('process-finalized').read_text() == 'done'
+        """.write(to: third, atomically: true, encoding: .utf8)
+        for path in [first, second, third] {
+            let id = session.submit(["kind": "script", "path": path.path, "root": root.path, "cwd": root.path], label: "Exit ownership")
+            try await waitUntil(timeout: 60) { self.session.lastOutcome?.id == id && self.session.phase == .idle }
+            XCTAssertEqual(session.lastOutcome?.code, 0, session.output.map(\.text).joined())
+        }
+    }
+
     func testEveryBundledLessonSolutionPassesOnTheDevice() async throws {
         let library = CourseLibrary()
         try XCTSkipIf(library.courses.isEmpty, "Courses are not in this build yet")
@@ -200,12 +245,47 @@ final class FeatureGateTests: XCTestCase {
                 )
                 try await waitUntil(timeout: 60) { report != nil && self.session.phase == .idle }
                 count += 1
+                if let error = report?.error { failures.append("\(lesson.id): \(error)") }
+                if report?.results.count != lesson.checks.count { failures.append("\(lesson.id): missing check results") }
                 for result in report?.results ?? [] where !result.ok {
                     failures.append("\(lesson.id) / \(result.name): \(result.message)")
                 }
             }
         }
-        XCTAssertEqual(count, 408)
+        XCTAssertEqual(count, 482)
+        XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
+    }
+
+    func testEveryAdvancedStarterIsRejectedOnTheDevice() async throws {
+        let library = CourseLibrary()
+        try XCTSkipIf(library.courses.isEmpty, "Courses are not in this build yet")
+        var failures: [String] = []
+        var count = 0
+        for course in library.courses where ["python-runtime", "python-systems", "ml-statistics", "ml-production", "ai-production", "deep-learning-practice", "senior-projects"].contains(course.id) {
+            for lesson in course.lessons {
+                let folder = root.appending(path: lesson.id)
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let path = folder.appending(path: "solution.py")
+                try lesson.starter.write(to: path, atomically: true, encoding: .utf8)
+                var report: LessonReport?
+                session.onCustom = { kind, data in
+                    if kind == "lesson_result" { report = try? JSONDecoder().decode(LessonReport.self, from: data) }
+                }
+                session.submit(
+                    [
+                        "kind": "lesson_check", "path": path.path, "root": folder.path, "cwd": folder.path,
+                        "checks": lesson.checks.map { ["name": $0.name, "code": $0.code] },
+                    ],
+                    label: lesson.id
+                )
+                try await waitUntil(timeout: 60) { report != nil && self.session.phase == .idle }
+                count += 1
+                if report?.error == nil && !(report?.results.contains(where: { !$0.ok }) ?? false) {
+                    failures.append("\(lesson.id): starter passed or produced no failure evidence")
+                }
+            }
+        }
+        XCTAssertEqual(count, 74)
         XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
     }
 
@@ -235,7 +315,7 @@ final class FeatureGateTests: XCTestCase {
         let audit = try JSONSerialization.data(withJSONObject: ["count": count, "failures": failures], options: [.prettyPrinted])
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         try audit.write(to: documents.appending(path: "reading-audit.json"))
-        XCTAssertEqual(count, 465)
+        XCTAssertEqual(count, 539)
         XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
     }
 

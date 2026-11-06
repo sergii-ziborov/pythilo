@@ -52,7 +52,7 @@ open source (see [License](#license)).
 
 ### Learn
 
-- **308 lessons in 23 courses**: Python foundations and Python deeper (30 each), clean
+- **382 lessons in 30 courses** (including 74 advanced lessons and six integration projects): Python foundations and Python deeper (30 each), clean
   code, testing, the tools around Python, architecture, concurrency and async, the web,
   data, the mathematics of neural networks, machine learning with PyTorch (30), language
   models from the inside, working with AI tools, and four practical courses on
@@ -70,12 +70,12 @@ open source (see [License](#license)).
 
 ### Labs
 
-52 labs that trace **your own code** while it runs, with scaling measurements where
+72 labs that trace **your own code** while it runs, with scaling measurements where
 available. Thirty also run in the browser at [pythilo.com/labs](https://pythilo.com/labs/),
 using the same tracer and correctness checks.
 Correctness first, then time. The catalogue now covers Basics, Data structures,
 Algorithms, Machine learning and Artificial intelligence. Search the catalog or use
-the ML (21 labs) and AI (8 labs) filters. For example:
+the ML (33 labs) and AI (16 labs) filters. For example:
 
 - **ML evaluation and optimization**: train-only standardization, confusion matrices,
   precision/recall/F1, threshold selection, folds, ridge regression, gradient checks,

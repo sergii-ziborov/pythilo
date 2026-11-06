@@ -1,0 +1,344 @@
+{
+  "id": "ml-production",
+  "title": "ML: data contracts and deployment decisions",
+  "summary": "Twelve practical contracts for point-in-time data, a boosted model, drift, conformal intervals, importance, threshold costs, cohort metrics, artifact identity and bounded serving. Small local experiments make operational assumptions explicit.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "ml-feature-contract",
+      "title": "Validate the serving feature contract",
+      "body": "# Validate the serving feature contract\n\nTraining and serving must agree on both feature meaning and feature order. A dictionary with the right values in the wrong matrix columns can produce plausible but incorrect predictions. Validate the schema at the boundary and construct columns from the declared order.\n\nThis contract rejects missing, extra, boolean and nonfinite values. The model should not silently replace invalid inputs with zeros. Real schemas also need units, availability timestamps and categorical vocabularies. A numeric shape check is only one layer of a reproducible preprocessing contract.\n\n```python\nschema=[\"age\",\"count\"]\nrow={\"count\":4,\"age\":20}\nprint([row[name] for name in schema])\n```\n\n## Review the design\n\nThe schema order is part of model identity. Version it with the preprocessing state and weights, and reject unsupported schema versions at serving rather than guessing a column mapping.\n",
+      "task": "Implement feature_matrix(rows,schema). Require unique schema names and exact row keys; each value is int or float, not bool, and finite. Return float rows in schema order, without mutating input.",
+      "starter": "import math\n\ndef feature_matrix(rows, schema):\n    return None\n",
+      "solution": "import math\ndef feature_matrix(rows,schema):\n    if len(set(schema))!=len(schema):raise ValueError('duplicate feature')\n    result=[]\n    for row in rows:\n        if set(row)!=set(schema):raise ValueError('schema mismatch')\n        values=[row[k] for k in schema]\n        if any(type(x) not in (int,float) or not math.isfinite(x) for x in values):raise ValueError('invalid numeric feature')\n        result.append([float(x) for x in values])\n    return result\n",
+      "checks": [
+        {
+          "name": "schema determines matrix order",
+          "code": "r={'b':2,'a':1};assert feature_matrix([r],['a','b'])==[[1.,2.]];assert r=={'b':2,'a':1}\n"
+        },
+        {
+          "name": "rejects missing extra and nonfinite data",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:feature_matrix([{'a':1,'b':2}],['a']));assert _bad(lambda:feature_matrix([{}],['a']));assert _bad(lambda:feature_matrix([{'a':float('nan')}],['a']))\n"
+        },
+        {
+          "name": "booleans and duplicate features fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:feature_matrix([{'a':True}],['a']));assert _bad(lambda:feature_matrix([],['a','a']));assert feature_matrix([],['a'])==[]\n"
+        }
+      ],
+      "hints": [
+        "Validate exact keys before constructing any column list.",
+        "Use the schema sequence for ordering and reject bool separately from int.",
+        "The schema order is part of model identity. Version it with the preprocessing state and weights, and reject unsupported schema versions at serving rather than guessing a column mapping."
+      ],
+      "explanation": "The schema order is part of model identity. Version it with the preprocessing state and weights, and reject unsupported schema versions at serving rather than guessing a column mapping."
+    },
+    {
+      "id": "ml-point-in-time",
+      "title": "Join only features available at prediction time",
+      "body": "# Join only features available at prediction time\n\nA historical event timestamp does not prove that its feature value was available to a prediction system then. Late ingestion and backfilled corrections can leak future knowledge into training. A point-in-time join must consider publication or availability time as well as event time.\n\nThis exercise chooses the latest eligible event per entity for each query. Both timestamps must be no later than the prediction timestamp. Ties are resolved by availability time. Missing history returns None instead of borrowing a future observation. Real pipelines must also document revisions and retention of historical feature versions.\n\n```python\nevents=[(1,2,\"known\"),(2,8,\"late\")]\nprediction_time=4\nprint([v for event,available,v in events if event<=prediction_time and available<=prediction_time])\n```\n\n## Review the design\n\nPoint-in-time correctness is a data-lineage property, not just a split choice. Backfills should preserve availability history so offline experiments can reconstruct what the online system actually knew.\n",
+      "task": "Implement asof_values(events,queries). Events are (entity,event_time,available_time,value); queries are (entity,time). Return latest eligible value ordered by (event_time,available_time), or None. No mutation; ties with identical timestamp pairs are outside this contract.",
+      "starter": "def asof_values(events, queries):\n    return None\n",
+      "solution": "def asof_values(events,queries):\n    result=[]\n    for entity,now in queries:\n        eligible=[e for e in events if e[0]==entity and e[1]<=now and e[2]<=now]\n        result.append(max(eligible,key=lambda e:(e[1],e[2]))[3] if eligible else None)\n    return result\n",
+      "checks": [
+        {
+          "name": "late-arriving history is excluded",
+          "code": "e=[('a',1,2,10),('a',2,8,99)];assert asof_values(e,[('a',4),('a',9)])==[10,99]\n"
+        },
+        {
+          "name": "entities and missing history stay isolated",
+          "code": "assert asof_values([('a',1,1,3)],[('b',9),('a',0)])==[None,None]\n"
+        },
+        {
+          "name": "event and publication order both matter",
+          "code": "e=[('a',3,3,30),('a',2,4,20),('a',5,2,50)];assert asof_values(e,[('a',4),('a',5)])==[30,50]\n"
+        }
+      ],
+      "hints": [
+        "Filter by entity, event time and availability time before selecting a maximum.",
+        "A later publication of an older event does not outrank a newer eligible event.",
+        "Point-in-time correctness is a data-lineage property, not just a split choice. Backfills should preserve availability history so offline experiments can reconstruct what the online system actually knew."
+      ],
+      "explanation": "Point-in-time correctness is a data-lineage property, not just a split choice. Backfills should preserve availability history so offline experiments can reconstruct what the online system actually knew."
+    },
+    {
+      "id": "ml-boosting",
+      "title": "Fit residual trees in a tiny gradient-boosted regressor",
+      "body": "# Fit residual trees in a tiny gradient-boosted regressor\n\nGradient boosting adds weak models that reduce the current residual error. For squared loss, fitting each new stump to target minus current prediction follows the negative gradient direction. Shrinkage scales each update and changes how many rounds are useful.\n\nThe exercise fits one-dimensional decision stumps by exhaustive split search. This is a real local training algorithm, with a constant baseline and reproducible tie handling, not a wrapper around supplied predictions. It intentionally omits large-scale histogram algorithms, missing-value routing and early stopping. Select rounds and learning rate on validation data, never by improving final test error.\n\n```python\ntarget=[0.,0.,2.,2.]\nbase=sum(target)/len(target)\nresidual=[y-base for y in target]\nprint(base,residual)\n```\n\n## Review the design\n\nA trainable baseline makes every later gain measurable. This tiny learner demonstrates gradient boosting correctly, while production libraries add numerical, categorical, performance and distributed engineering that must be evaluated separately.\n",
+      "task": "Implement fit_boost(x,y,rounds,rate) and predict_boost(model,x). Fit a mean baseline, then squared-error optimal residual stumps at midpoints of distinct x; ties choose smallest cut. Model is dict base, rate, stumps (cut,left,right). Constant x uses a constant residual stump with cut=inf. Validate nonempty equal finite data, rounds>=0 integer, 0<rate<=1.",
+      "starter": "import math\n\ndef fit_boost(x, y, rounds, rate):\n    return None\n\ndef predict_boost(model, x):\n    return None\n",
+      "solution": "import math\ndef fit_boost(x,y,rounds,rate):\n    if not x or len(x)!=len(y) or type(rounds) is not int or rounds<0 or not 0<rate<=1 or any(not math.isfinite(v) for v in list(x)+list(y)):raise ValueError('invalid training data')\n    base=sum(y)/len(y);prediction=[base]*len(y);stumps=[];values=sorted(set(x));cuts=[(a+b)/2 for a,b in zip(values,values[1:])] or [float('inf')]\n    for _ in range(rounds):\n        residual=[a-b for a,b in zip(y,prediction)];choices=[]\n        for cut in cuts:\n            left=[r for v,r in zip(x,residual) if v<=cut];right=[r for v,r in zip(x,residual) if v>cut]\n            a=sum(left)/len(left) if left else 0;b=sum(right)/len(right) if right else 0\n            loss=sum((r-(a if v<=cut else b))**2 for v,r in zip(x,residual));choices.append((loss,cut,a,b))\n        _,cut,a,b=min(choices);stumps.append((cut,a,b));prediction=[p+rate*(a if v<=cut else b) for v,p in zip(x,prediction)]\n    return {'base':base,'rate':rate,'stumps':stumps}\ndef predict_boost(model,x):\n    return [model['base']+model['rate']*sum(a if value<=cut else b for cut,a,b in model['stumps']) for value in x]\n",
+      "checks": [
+        {
+          "name": "one stump learns a step",
+          "code": "m=fit_boost([0,1,2,3],[0,0,2,2],1,1);assert predict_boost(m,[0,1,2,3])==[0,0,2,2]\n"
+        },
+        {
+          "name": "shrinkage and repeated residual fitting",
+          "code": "m=fit_boost([0,1],[0,2],2,.5);assert predict_boost(m,[0,1])==[.25,1.75]\n"
+        },
+        {
+          "name": "baseline constant feature and invalid input",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert predict_boost(fit_boost([1,1],[2,4],3,.2),[1])==[3];assert predict_boost(fit_boost([0,1],[0,2],0,1),[2])==[1];assert _bad(lambda:fit_boost([],[],1,.1))\n"
+        }
+      ],
+      "hints": [
+        "Fit each stump to the current residuals, not to the original targets.",
+        "Update every training prediction with rate times the chosen residual stump.",
+        "A trainable baseline makes every later gain measurable. This tiny learner demonstrates gradient boosting correctly, while production libraries add numerical, categorical, performance and distributed engineering that must be evaluated separately."
+      ],
+      "explanation": "A trainable baseline makes every later gain measurable. This tiny learner demonstrates gradient boosting correctly, while production libraries add numerical, categorical, performance and distributed engineering that must be evaluated separately."
+    },
+    {
+      "id": "ml-psi",
+      "title": "Measure binned drift with smoothing and fixed boundaries",
+      "body": "# Measure binned drift with smoothing and fixed boundaries\n\nPopulation stability index compares the proportions in fixed reference bins with those observed later. Zero occupancy makes logarithms undefined, so a declared smoothing convention is part of the calculation. Fit bin boundaries on reference data before observing the monitoring window.\n\nDrift is not the same as model performance degradation. A feature distribution may shift harmlessly, while labels or conditional relationships shift without a large PSI. Report sample sizes, bin definitions and relevant slices. This exercise receives bin counts directly so it tests the monitoring arithmetic without pretending to detect every kind of dataset change.\n\n```python\nimport math\nreference=[.5,.5];current=[.25,.75]\nprint(sum((b-a)*math.log(b/a) for a,b in zip(reference,current)))\n```\n\n## Review the design\n\nSmoothing reduces instability but changes the estimate, especially on tiny windows. PSI thresholds are not universal laws; calibrate alerts against reference variation and observed model outcomes.\n",
+      "task": "Implement psi(reference,current,epsilon=1e-6) for equal nonempty nonnegative finite bin counts with positive totals. Add epsilon to every bin count before normalizing each histogram; return sum((q-p)*log(q/p)). Require finite epsilon>0.",
+      "starter": "import math\n\ndef psi(reference, current, epsilon=1e-06):\n    return None\n",
+      "solution": "import math\ndef psi(reference,current,epsilon=1e-6):\n    if not reference or len(reference)!=len(current) or not math.isfinite(epsilon) or epsilon<=0 or any(not math.isfinite(x) or x<0 for x in list(reference)+list(current)) or sum(reference)<=0 or sum(current)<=0:raise ValueError('invalid histogram')\n    a=[x+epsilon for x in reference];b=[x+epsilon for x in current];sa=sum(a);sb=sum(b)\n    return sum((y/sb-x/sa)*math.log((y/sb)/(x/sa)) for x,y in zip(a,b))\n",
+      "checks": [
+        {
+          "name": "identical distributions have zero drift",
+          "code": "assert abs(psi([10,10],[10,10]))<1e-12\n"
+        },
+        {
+          "name": "zero bins remain finite and shifted bins positive",
+          "code": "import math\nassert math.isfinite(psi([10,0],[0,10]));assert psi([10,0],[0,10])>0\n"
+        },
+        {
+          "name": "invalid monitoring windows fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:psi([0,0],[1,2]));assert _bad(lambda:psi([1],[1,2]));assert _bad(lambda:psi([-1,2],[1,2]))\n"
+        }
+      ],
+      "hints": [
+        "Normalize smoothed counts separately for the two windows.",
+        "Never evaluate log of a zero probability.",
+        "Smoothing reduces instability but changes the estimate, especially on tiny windows. PSI thresholds are not universal laws; calibrate alerts against reference variation and observed model outcomes."
+      ],
+      "explanation": "Smoothing reduces instability but changes the estimate, especially on tiny windows. PSI thresholds are not universal laws; calibrate alerts against reference variation and observed model outcomes."
+    },
+    {
+      "id": "ml-js-drift",
+      "title": "Use a symmetric distribution divergence",
+      "body": "# Use a symmetric distribution divergence\n\nJensen-Shannon divergence compares two distributions through their midpoint. It is symmetric and remains finite for disjoint support, unlike a one-way KL divergence with a zero denominator. The logarithm base determines the scale; this exercise uses natural logs.\n\nA value near zero means similar marginal proportions, not identical joint behavior or stable model quality. Counts must share the same bin vocabulary. Empty or negative histograms are invalid observations, rather than another form of drift. Keep feature construction and bin definitions versioned with the monitoring configuration.\n\n```python\nimport math\np=[1.,0.];q=[0.,1.];m=[.5,.5]\nprint(sum(x*math.log(x/y) for x,y in zip(p,m) if x))\n```\n\n## Review the design\n\nNatural-log Jensen-Shannon divergence lies between zero and log(2). The metric compares the supplied bins, so missing a critical slice or dependency can still hide a production problem.\n",
+      "task": "Implement js_divergence(a,b), normalizing equal nonempty nonnegative finite count arrays with positive totals. Compute half KL(p||m)+half KL(q||m), skipping zero numerator terms.",
+      "starter": "import math\n\ndef js_divergence(a, b):\n    return None\n",
+      "solution": "import math\ndef js_divergence(a,b):\n    if not a or len(a)!=len(b) or any(not math.isfinite(x) or x<0 for x in list(a)+list(b)) or sum(a)<=0 or sum(b)<=0:raise ValueError('invalid histogram')\n    p=[x/sum(a) for x in a];q=[x/sum(b) for x in b];m=[(x+y)/2 for x,y in zip(p,q)]\n    return .5*sum(x*math.log(x/z) for x,z in zip(p,m) if x)+.5*sum(y*math.log(y/z) for y,z in zip(q,m) if y)\n",
+      "checks": [
+        {
+          "name": "normalization and identity",
+          "code": "assert abs(js_divergence([1,2],[2,4]))<1e-12\n"
+        },
+        {
+          "name": "disjoint support and symmetry",
+          "code": "import math\nassert abs(js_divergence([1,0],[0,1])-math.log(2))<1e-12;assert abs(js_divergence([1,3],[2,1])-js_divergence([2,1],[1,3]))<1e-12\n"
+        },
+        {
+          "name": "invalid data is not a drift score",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:js_divergence([0],[1]));assert _bad(lambda:js_divergence([1],[float('nan')]))\n"
+        }
+      ],
+      "hints": [
+        "Create normalized p, q and their midpoint m.",
+        "A zero numerator contributes zero; it does not require evaluating a logarithm.",
+        "Natural-log Jensen-Shannon divergence lies between zero and log(2). The metric compares the supplied bins, so missing a critical slice or dependency can still hide a production problem."
+      ],
+      "explanation": "Natural-log Jensen-Shannon divergence lies between zero and log(2). The metric compares the supplied bins, so missing a critical slice or dependency can still hide a production problem."
+    },
+    {
+      "id": "ml-conformal",
+      "title": "Use the finite-sample conformal rank",
+      "body": "# Use the finite-sample conformal rank\n\nSplit conformal regression calibrates an interval width using held-out absolute residuals. The finite-sample rank is ceil((n+1)(1-alpha)), not an ordinary interpolated percentile. If that rank exceeds the available calibration sample, the conservative interval is unbounded.\n\nCoverage is marginal under exchangeability between calibration and future observations. It does not guarantee conditional coverage for every subgroup or survive arbitrary time drift. The calibration residuals must come from a model that was not fitted on those calibration outcomes. Keep the final test set separate from choosing the score or calibration strategy.\n\n```python\nimport math\nn=9;alpha=.1\nprint(math.ceil((n+1)*(1-alpha)))\n```\n\n## Review the design\n\nThe guarantee depends on exchangeable calibration and future scores. An infinite interval honestly reports insufficient calibration information at the requested error level rather than silently overstating confidence.\n",
+      "task": "Implement conformal_radius(residuals,alpha) with finite nonnegative residuals, nonempty input and 0<alpha<1. Return sorted residual at one-based rank ceil((n+1)*(1-alpha)); return inf if rank>n.",
+      "starter": "import math\n\ndef conformal_radius(residuals, alpha):\n    return None\n",
+      "solution": "import math\ndef conformal_radius(residuals,alpha):\n    if not residuals or not 0<alpha<1 or any(not math.isfinite(x) or x<0 for x in residuals):raise ValueError('invalid calibration')\n    rank=math.ceil((len(residuals)+1)*(1-alpha))\n    return sorted(residuals)[rank-1] if rank<=len(residuals) else float('inf')\n",
+      "checks": [
+        {
+          "name": "uses finite sample rank",
+          "code": "assert conformal_radius([.1,.2,.3,.4],.4)==.3\n"
+        },
+        {
+          "name": "insufficient calibration is explicitly unbounded",
+          "code": "import math\nassert math.isinf(conformal_radius([.2],.05))\n"
+        },
+        {
+          "name": "invalid residuals or coverage fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:conformal_radius([],.1));assert _bad(lambda:conformal_radius([-1],.1));assert _bad(lambda:conformal_radius([1],1))\n"
+        }
+      ],
+      "hints": [
+        "Calculate the one-based rank with n+1, then convert it to a list index.",
+        "Do not clamp an unavailable rank to n and claim the same guarantee.",
+        "The guarantee depends on exchangeable calibration and future scores. An infinite interval honestly reports insufficient calibration information at the requested error level rather than silently overstating confidence."
+      ],
+      "explanation": "The guarantee depends on exchangeable calibration and future scores. An infinite interval honestly reports insufficient calibration information at the requested error level rather than silently overstating confidence."
+    },
+    {
+      "id": "ml-permutation-importance",
+      "title": "Measure reliance on a feature using held-out loss",
+      "body": "# Measure reliance on a feature using held-out loss\n\nA feature can be strongly associated with an outcome without a trained model relying on it. Permutation importance measures the change in held-out loss when one feature's alignment with the outcomes is disrupted. It evaluates the particular fitted model and test population.\n\nThis exercise uses a deterministic one-position rotation as an inspectable perturbation. It is one reference experiment, not a full estimate with repeated random permutations and uncertainty. Correlated features may substitute for each other, so low importance does not establish irrelevance or causality. Never refit the model on the perturbed evaluation data.\n\n```python\nrows=[[1,10],[2,20],[3,30]]\nrotated=[r[:] for r in rows]\ncolumn=[r[0] for r in rows]\nfor i,row in enumerate(rotated):row[0]=column[(i+1)%3]\nprint(rows,rotated)\n```\n\n## Review the design\n\nThe measured loss difference is predictive reliance under a specific perturbation, not a causal feature effect. Use repeated held-out permutations and uncertainty estimates for a serious interpretation.\n",
+      "task": "Implement rotated_importance(predict,rows,targets,column). Return perturbed MSE minus baseline MSE, rotating the chosen column by one row. Require nonempty matching row/target counts and a valid column in every row. Do not mutate rows.",
+      "starter": "def rotated_importance(predict, rows, targets, column):\n    return None\n",
+      "solution": "def rotated_importance(predict,rows,targets,column):\n    if not rows or len(rows)!=len(targets) or type(column) is not int or column<0 or any(column>=len(row) for row in rows):raise ValueError('invalid data')\n    changed=[list(row) for row in rows]\n    for i,row in enumerate(changed):row[column]=rows[(i+1)%len(rows)][column]\n    def loss(data):\n        values=list(predict(data))\n        if len(values)!=len(targets):raise ValueError('prediction length')\n        return sum((p-y)**2 for p,y in zip(values,targets))/len(targets)\n    return loss(changed)-loss(rows)\n",
+      "checks": [
+        {
+          "name": "reliance is visible in the selected feature",
+          "code": "rows=[[1,10],[2,20],[3,30]];assert rotated_importance(lambda rs:[r[0] for r in rs],rows,[1,2,3],0)==2\n"
+        },
+        {
+          "name": "unused feature and input ownership",
+          "code": "rows=[[1,10],[2,20]];assert rotated_importance(lambda rs:[r[0] for r in rs],rows,[1,2],1)==0;assert rows==[[1,10],[2,20]]\n"
+        },
+        {
+          "name": "invalid shapes fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:rotated_importance(lambda x:[],[[1]],[1],0));assert _bad(lambda:rotated_importance(lambda x:[],[],[],0))\n"
+        }
+      ],
+      "hints": [
+        "Copy every row before changing the selected feature.",
+        "Evaluate the same fixed predictor before and after perturbation.",
+        "The measured loss difference is predictive reliance under a specific perturbation, not a causal feature effect. Use repeated held-out permutations and uncertainty estimates for a serious interpretation."
+      ],
+      "explanation": "The measured loss difference is predictive reliance under a specific perturbation, not a causal feature effect. Use repeated held-out permutations and uncertainty estimates for a serious interpretation."
+    },
+    {
+      "id": "ml-cost-threshold",
+      "title": "Select an operating threshold using explicit error costs",
+      "body": "# Select an operating threshold using explicit error costs\n\nA classifier's best operating threshold depends on the costs of false positives and false negatives, not on a universal value of one half. Choose the threshold on validation data after probability or ranking training has finished, then lock it before final testing.\n\nThis exercise evaluates a supplied candidate set and returns total cost. It deliberately uses a deterministic higher-threshold tie break. Real deployments should include capacity constraints, subgroup behavior and changes in prevalence. A threshold that minimizes historical validation cost can still fail when the outcome distribution or downstream cost changes.\n\n```python\nlabels=[0,1]\nscores=[.6,.7]\nthreshold=.5\nfalse_positives=sum(y==0 and s>=threshold for y,s in zip(labels,scores))\nprint(false_positives)\n```\n\n## Review the design\n\nThreshold tuning is part of model selection. Its validation data must not be reused as a supposedly untouched test set, and cost assumptions should be documented and monitored.\n",
+      "task": "Implement cost_threshold(labels,scores,candidates,fp_cost,fn_cost). Predict 1 at score>=threshold. Return (threshold,total_cost), minimizing cost and choosing the higher threshold on ties. Validate nonempty equal data, binary labels, finite scores/candidates and finite nonnegative costs.",
+      "starter": "import math\n\ndef cost_threshold(labels, scores, candidates, fp_cost, fn_cost):\n    return None\n",
+      "solution": "import math\ndef cost_threshold(labels,scores,candidates,fp_cost,fn_cost):\n    if not labels or len(labels)!=len(scores) or not candidates or any(y not in (0,1) for y in labels) or any(not math.isfinite(v) for v in list(scores)+list(candidates)+[fp_cost,fn_cost]) or fp_cost<0 or fn_cost<0:raise ValueError('invalid costs')\n    options=[]\n    for t in candidates:\n        cost=sum(fp_cost if y==0 and s>=t else fn_cost if y==1 and s<t else 0 for y,s in zip(labels,scores));options.append((cost,-t))\n    cost,negative=min(options);return -negative,cost\n",
+      "checks": [
+        {
+          "name": "cost ratio changes threshold choice",
+          "code": "assert cost_threshold([0,1],[.6,.7],[.5,.65,.8],5,1)==(.65,0)\n"
+        },
+        {
+          "name": "deterministic ties and boundary",
+          "code": "assert cost_threshold([0,1],[.1,.9],[.2,.5],1,1)==(.5,0);assert cost_threshold([1],[.5],[.5],1,1)==(.5,0)\n"
+        },
+        {
+          "name": "invalid input is rejected",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:cost_threshold([],[],[.5],1,1));assert _bad(lambda:cost_threshold([1],[.5],[.5],-1,1))\n"
+        }
+      ],
+      "hints": [
+        "Count false positives and false negatives separately at each candidate threshold.",
+        "Minimize the pair (cost,-threshold) for the declared tie rule.",
+        "Threshold tuning is part of model selection. Its validation data must not be reused as a supposedly untouched test set, and cost assumptions should be documented and monitored."
+      ],
+      "explanation": "Threshold tuning is part of model selection. Its validation data must not be reused as a supposedly untouched test set, and cost assumptions should be documented and monitored."
+    },
+    {
+      "id": "ml-cohort-report",
+      "title": "Keep small cohorts visible without overclaiming their scores",
+      "body": "# Keep small cohorts visible without overclaiming their scores\n\nAn aggregate score can improve while a cohort becomes substantially worse. A deployment report should retain both cohort counts and error measurements so a reviewer can see how much evidence supports each number. Hiding small cohorts entirely can hide an important coverage problem.\n\nThis exercise reports mean absolute error for every named cohort and marks whether it reaches a required count. That count is a reporting threshold, not a statistical guarantee. Compare confidence and missingness before making a release decision, and define cohorts before inspecting results to reduce selective reporting.\n\n```python\ngroups=[\"new\",\"new\",\"returning\"]\nerrors=[1.,3.,10.]\nprint({g:sum(e for k,e in zip(groups,errors) if k==g) for g in set(groups)})\n```\n\n## Review the design\n\nA sample-count flag does not establish fairness, causality or sufficient power. The report is evidence for a review, and the choice of metric, cohort and acceptable harm needs a separate domain-specific decision.\n",
+      "task": "Implement cohort_mae(groups,truth,predicted,min_count). Return dict group->{n,mae,supported}. Require equal nonempty lengths, positive integer min_count and finite truth/predictions. supported means n>=min_count.",
+      "starter": "import math\n\ndef cohort_mae(groups, truth, predicted, min_count):\n    return None\n",
+      "solution": "import math\ndef cohort_mae(groups,truth,predicted,min_count):\n    if not groups or len(groups)!=len(truth) or len(truth)!=len(predicted) or type(min_count) is not int or min_count<1 or any(not math.isfinite(v) for v in list(truth)+list(predicted)):raise ValueError('invalid cohort data')\n    grouped={}\n    for g,y,p in zip(groups,truth,predicted):grouped.setdefault(g,[]).append(abs(y-p))\n    return {g:{'n':len(errors),'mae':sum(errors)/len(errors),'supported':len(errors)>=min_count} for g,errors in grouped.items()}\n",
+      "checks": [
+        {
+          "name": "reports both size and error",
+          "code": "r=cohort_mae(['a','a','b'],[0,0,0],[1,3,10],2);assert r['a']=={'n':2,'mae':2,'supported':True};assert r['b']=={'n':1,'mae':10,'supported':False}\n"
+        },
+        {
+          "name": "perfect cohort and no mutation",
+          "code": "g=['x'];assert cohort_mae(g,[2],[2],1)['x']['mae']==0;assert g==['x']\n"
+        },
+        {
+          "name": "invalid evidence is rejected",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:cohort_mae(['a'],[1],[],1));assert _bad(lambda:cohort_mae(['a'],[1],[float('nan')],1))\n"
+        }
+      ],
+      "hints": [
+        "Group absolute residuals while preserving their sample counts.",
+        "Keep unsupported cohorts in the report with an explicit supported flag.",
+        "A sample-count flag does not establish fairness, causality or sufficient power. The report is evidence for a review, and the choice of metric, cohort and acceptable harm needs a separate domain-specific decision."
+      ],
+      "explanation": "A sample-count flag does not establish fairness, causality or sufficient power. The report is evidence for a review, and the choice of metric, cohort and acceptable harm needs a separate domain-specific decision."
+    },
+    {
+      "id": "ml-artifact-identity",
+      "title": "Bind model bytes to ordered features and preprocessing",
+      "body": "# Bind model bytes to ordered features and preprocessing\n\nA weights file alone does not identify a reproducible predictor. Feature order, preprocessing version and schema determine how those weights are used. Compute an artifact identifier from a canonical metadata representation and a digest of the exact weight bytes.\n\nDictionary key ordering should not change identity, but changing feature order must change it. This is content identity, not proof of who produced an artifact. A trusted registry or authenticated signature supplies provenance. Do not load arbitrary serialized Python objects merely because their bytes have a matching locally supplied hash.\n\n```python\nimport hashlib,json\nmetadata={\"features\":[\"a\",\"b\"],\"pipeline\":\"v1\"}\nencoded=json.dumps(metadata,sort_keys=True,separators=(\",\",\":\")).encode()\nprint(hashlib.sha256(encoded).hexdigest()[:12])\n```\n\n## Review the design\n\nContent addressing detects changes only relative to a trusted expected identifier. It is not authentication, and it cannot make an unsafe deserialization format safe.\n",
+      "task": "Implement model_identity(weights,features,pipeline) returning SHA256 hex of canonical UTF-8 JSON {weights_sha256,features,pipeline}, sort_keys=True,separators=(\",\",\":\"),ensure_ascii=False. Feature order matters; require distinct feature names.",
+      "starter": "import hashlib, json\n\ndef model_identity(weights, features, pipeline):\n    return None\n",
+      "solution": "import hashlib,json\ndef model_identity(weights,features,pipeline):\n    if len(set(features))!=len(features):raise ValueError('duplicate feature')\n    metadata={'weights_sha256':hashlib.sha256(weights).hexdigest(),'features':list(features),'pipeline':pipeline}\n    return hashlib.sha256(json.dumps(metadata,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest()\n",
+      "checks": [
+        {
+          "name": "stable exact identity",
+          "code": "a=model_identity(b'weights',['a','b'],'v1');assert len(a)==64;assert a==model_identity(b'weights',['a','b'],'v1')\n"
+        },
+        {
+          "name": "all serving inputs affect identity",
+          "code": "a=model_identity(b'x',['a','b'],'v1');assert a!=model_identity(b'y',['a','b'],'v1');assert a!=model_identity(b'x',['b','a'],'v1');assert a!=model_identity(b'x',['a','b'],'v2')\n"
+        },
+        {
+          "name": "duplicate features are invalid",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:model_identity(b'x',['a','a'],'v1'))\n"
+        }
+      ],
+      "hints": [
+        "Hash the bytes first, then include that digest in canonical metadata.",
+        "Keep the feature list ordered even though metadata dictionary keys are sorted.",
+        "Content addressing detects changes only relative to a trusted expected identifier. It is not authentication, and it cannot make an unsafe deserialization format safe."
+      ],
+      "explanation": "Content addressing detects changes only relative to a trusted expected identifier. It is not authentication, and it cannot make an unsafe deserialization format safe."
+    },
+    {
+      "id": "ml-promotion-gate",
+      "title": "Require quality, latency and cost evidence together",
+      "body": "# Require quality, latency and cost evidence together\n\nA candidate model can improve an offline metric while exceeding the serving latency or cost budget. A release gate should evaluate all declared constraints and retain the reason for each rejection. Missing or nonfinite evidence should not be treated as a passing score.\n\nThis exercise is a deterministic policy over already collected evidence. It does not claim to perform a real deployment or statistical significance test. The quality margin and budgets are predeclared inputs. Production rollout additionally needs a shadow or canary phase, monitoring, rollback ownership and a plan for delayed outcome labels.\n\n```python\ncandidate={\"gain\":.02,\"p95_ms\":80,\"cost\":.01}\nprint(candidate[\"gain\"]>=.01 and candidate[\"p95_ms\"]<=100)\n```\n\n## Review the design\n\nThe gate evaluates declared measurements, not their trustworthiness or sampling uncertainty. A serious release review also needs data lineage, confidence, slice performance and a rollback plan.\n",
+      "task": "Implement promotion_reasons(candidate,min_gain,max_p95,max_cost). candidate has gain,p95_ms,cost. Return ordered reasons quality,latency,cost for failed bounds; missing/nonfinite evidence yields only [\"invalid evidence\"]. Require nonnegative latency and cost evidence.",
+      "starter": "import math\n\ndef promotion_reasons(candidate, min_gain, max_p95, max_cost):\n    return None\n",
+      "solution": "import math\ndef promotion_reasons(candidate,min_gain,max_p95,max_cost):\n    keys=['gain','p95_ms','cost']\n    if any(k not in candidate or not isinstance(candidate[k],(int,float)) or not math.isfinite(candidate[k]) for k in keys):return ['invalid evidence']\n    if candidate['p95_ms']<0 or candidate['cost']<0:return ['invalid evidence']\n    reasons=[]\n    if candidate['gain']<min_gain:reasons.append('quality')\n    if candidate['p95_ms']>max_p95:reasons.append('latency')\n    if candidate['cost']>max_cost:reasons.append('cost')\n    return reasons\n",
+      "checks": [
+        {
+          "name": "accepts exact budget boundaries",
+          "code": "assert promotion_reasons({'gain':.01,'p95_ms':100,'cost':2},.01,100,2)==[]\n"
+        },
+        {
+          "name": "reports every failed constraint",
+          "code": "assert promotion_reasons({'gain':0,'p95_ms':101,'cost':3},.01,100,2)==['quality','latency','cost']\n"
+        },
+        {
+          "name": "missing or invalid evidence never passes",
+          "code": "assert promotion_reasons({},0,1,1)==['invalid evidence'];assert promotion_reasons({'gain':float('nan'),'p95_ms':1,'cost':1},0,1,1)==['invalid evidence']\n"
+        }
+      ],
+      "hints": [
+        "Validate evidence before comparing thresholds.",
+        "Accumulate every failed policy constraint in the specified order.",
+        "The gate evaluates declared measurements, not their trustworthiness or sampling uncertainty. A serious release review also needs data lineage, confidence, slice performance and a rollback plan."
+      ],
+      "explanation": "The gate evaluates declared measurements, not their trustworthiness or sampling uncertainty. A serious release review also needs data lineage, confidence, slice performance and a rollback plan."
+    },
+    {
+      "id": "ml-batch-budget",
+      "title": "Pack inference requests within a declared memory budget",
+      "body": "# Pack inference requests within a declared memory budget\n\nInference throughput can improve with batching, but total batch size is constrained by memory and latency. A serving scheduler must define which request costs count against its budget and how oversized requests are handled. Silent overcommit can turn one large request into a service-wide failure.\n\nThis exercise uses declared byte costs and a first-fit-in-order sequential packing policy. It does not estimate GPU memory from token counts or claim to measure a real accelerator. Model weights, temporary activations and allocator overhead require separate budgets. Preserving request order makes the policy easy to replay and test.\n\n```python\nsizes=[4,3,5]\ncapacity=7\nprint(sum(sizes[:2])<=capacity)\nprint(sum(sizes)>capacity)\n```\n\n## Review the design\n\nAdmission by declared cost is an executable scheduling policy. Real serving needs measured memory headroom, deadline-aware admission and fairness across request classes; the arithmetic alone does not provide those guarantees.\n",
+      "task": "Implement budget_batches(sizes,capacity), preserving order and packing consecutive positive integer sizes until the next would exceed positive integer capacity. Reject any individual size>capacity. Return lists of original indices.",
+      "starter": "def budget_batches(sizes, capacity):\n    return None\n",
+      "solution": "def budget_batches(sizes,capacity):\n    if type(capacity) is not int or capacity<1 or any(type(x) is not int or x<1 or x>capacity for x in sizes):raise ValueError('invalid capacity')\n    result=[];batch=[];used=0\n    for i,size in enumerate(sizes):\n        if batch and used+size>capacity:result.append(batch);batch=[];used=0\n        batch.append(i);used+=size\n    if batch:result.append(batch)\n    return result\n",
+      "checks": [
+        {
+          "name": "packs without exceeding budget",
+          "code": "assert budget_batches([4,3,5,2],7)==[[0,1],[2,3]]\n"
+        },
+        {
+          "name": "empty and exact capacity cases",
+          "code": "assert budget_batches([],7)==[];assert budget_batches([7,7],7)==[[0],[1]]\n"
+        },
+        {
+          "name": "oversized and invalid requests fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:budget_batches([8],7));assert _bad(lambda:budget_batches([0],7));assert _bad(lambda:budget_batches([1],0))\n"
+        }
+      ],
+      "hints": [
+        "Flush the current batch before adding a request that would exceed capacity.",
+        "Keep original indices so outputs can be matched to callers.",
+        "Admission by declared cost is an executable scheduling policy. Real serving needs measured memory headroom, deadline-aware admission and fairness across request classes; the arithmetic alone does not provide those guarantees."
+      ],
+      "explanation": "Admission by declared cost is an executable scheduling policy. Real serving needs measured memory headroom, deadline-aware admission and fairness across request classes; the arithmetic alone does not provide those guarantees."
+    }
+  ]
+}

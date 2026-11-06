@@ -6,7 +6,7 @@ import { courses } from "@/lib/courses";
 import { labCount, labGroups } from "@/lib/labs";
 import { shots } from "@/lib/shots";
 
-export const metadata: Metadata = { title: "Courses, labs and interview practice", description: "How Pythilo's Python courses work on iPhone and iPad: lessons, checks that run your code, hints, Debug in a project, timed interview tasks and 52 interactive labs." };
+export const metadata: Metadata = { title: "Courses, labs and interview practice", description: "How Pythilo's Python courses work on iPhone and iPad: lessons, checks that run your code, hints, Debug in a project, timed interview tasks and interactive labs." };
 
 export default function Page() {
   const path = courses.filter(course => course.kind !== "interview");

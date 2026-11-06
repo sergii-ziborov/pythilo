@@ -35,8 +35,8 @@
 .lesson-task code { font-size: 14.5px; }
 .lesson-blocked { padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--body) !important; font-size: 14.5px !important; }
 .lesson-editor { flex: 1; min-height: 280px; position: relative; }
-.plain-editor { position: absolute; inset: 0; overflow: hidden; }
-.plain-editor .cm-editor { height: 100%; font-size: 14.5px; }
+.lesson-editor .plain-editor { position: absolute; inset: 0; overflow: hidden; }
+.lesson-editor .plain-editor .cm-editor { height: 100%; font-size: 14.5px; }
 .lesson-results { margin: 0 20px 14px; display: flex; flex-direction: column; gap: 10px; max-height: 45%; overflow-y: auto; flex: none; }
 .lesson-results:empty { display: none; }
 .lesson-hint { padding: 12px 14px; border-radius: 14px; background: var(--warn-bg); border: 1px solid var(--warn-border); font-size: 14.5px; line-height: 21px; }

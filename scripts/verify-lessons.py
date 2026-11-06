@@ -30,6 +30,13 @@ TORCH_IMPORT_SECONDS = 20
 
 # File stem -> (course id, kind, number of lessons)
 EXPECTED_COURSES = {
+    '25-python-runtime': ('python-runtime', "path", 12),
+    '26-python-systems': ('python-systems', "path", 12),
+    '27-ml-statistics': ('ml-statistics', "path", 12),
+    '28-ml-production': ('ml-production', "path", 12),
+    '29-ai-production': ('ai-production', "path", 12),
+    '30-deep-learning-practice': ('deep-learning-practice', "path", 8),
+    '31-senior-projects': ('senior-projects', "path", 6),
     "21-pydantic": ("pydantic", "path", 20),
     "22-fastapi-httpx": ("fastapi-httpx", "path", 14),
     "23-testing-practice": ("testing-practice", "path", 10),

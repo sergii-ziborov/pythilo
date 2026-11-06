@@ -1,0 +1,232 @@
+{
+  "id": "deep-learning-practice",
+  "title": "Deep learning: training correctness",
+  "summary": "Eight real PyTorch CPU exercises: uneven microbatches, padded losses, frozen normalization, inference state, checkpoint ownership, shifted targets, weighted gradient reduction and LoRA merging. Tensor code runs in the app; no GPU or cluster is claimed.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "dl-accumulation",
+      "title": "Weight uneven microbatches by sample count",
+      "body": "# Weight uneven microbatches by sample count\n\nAccumulating the mean loss of every microbatch and then averaging microbatches gives a short final batch too much influence. To reproduce one full-batch mean gradient, sum each batch loss and divide by the total number of samples before backpropagation.\n\nThis exercise uses actual PyTorch autograd with a scalar parameter and deliberately unequal microbatches. It compares the gradient with the analytical full-dataset result. Distributed training has the same weighting question when local batch sizes differ. The local calculation does not execute an all-reduce or measure a real cluster.\n\n```python\nimport torch\nw=torch.tensor(0.,requires_grad=True)\nx=torch.tensor([1.,2.])\ny=torch.tensor([2.,4.])\nloss=((w*x-y)**2).mean()\nloss.backward()\nprint(w.grad.item())\n```\n\n## Review the design\n\nThis reproduces full-batch gradients for a decomposable squared loss. Batch-dependent layers, stochastic operations and optimizer steps between microbatches can break equivalence even when the arithmetic weighting is correct.\n",
+      "task": "Implement accumulated_gradient(batches,w0), where each batch is (xs,ys) nonempty equal lists. Use one scalar torch parameter, squared loss summed per batch divided by total sample count, backward each batch and return the gradient as float. Reject no batches or invalid lengths.",
+      "starter": "import torch\n\ndef accumulated_gradient(batches, w0):\n    return None\n",
+      "solution": "import torch\ndef accumulated_gradient(batches,w0):\n    if not batches or any(not xs or len(xs)!=len(ys) for xs,ys in batches):raise ValueError('invalid microbatches')\n    total=sum(len(xs) for xs,ys in batches);w=torch.tensor(float(w0),requires_grad=True)\n    for xs,ys in batches:\n        x=torch.tensor(xs,dtype=torch.float32);y=torch.tensor(ys,dtype=torch.float32)\n        (((w*x-y)**2).sum()/total).backward()\n    return float(w.grad.item())\n",
+      "checks": [
+        {
+          "name": "uneven batches equal full batch weighting",
+          "code": "assert abs(accumulated_gradient([([1,2],[2,4]),([3],[6])],0)+56/3)<1e-5\n"
+        },
+        {
+          "name": "partition does not change the gradient",
+          "code": "a=accumulated_gradient([([1,2,3],[2,4,6])],1);b=accumulated_gradient([([1],[2]),([2,3],[4,6])],1);assert abs(a-b)<1e-5\n"
+        },
+        {
+          "name": "invalid microbatches fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:accumulated_gradient([],0));assert _bad(lambda:accumulated_gradient([([] ,[])],0))\n"
+        }
+      ],
+      "hints": [
+        "Create the parameter once so backward calls accumulate into the same gradient.",
+        "Use reduction by total samples, not by number of microbatches.",
+        "This reproduces full-batch gradients for a decomposable squared loss. Batch-dependent layers, stochastic operations and optimizer steps between microbatches can break equivalence even when the arithmetic weighting is correct."
+      ],
+      "explanation": "This reproduces full-batch gradients for a decomposable squared loss. Batch-dependent layers, stochastic operations and optimizer steps between microbatches can break equivalence even when the arithmetic weighting is correct."
+    },
+    {
+      "id": "dl-masked-loss",
+      "title": "Normalize sequence loss by valid tokens",
+      "body": "# Normalize sequence loss by valid tokens\n\nPadded sequence positions should not train the model, and their count should not dilute the reported loss. Mask them before normalization and divide by the number of valid targets. An all-padding batch needs an explicit finite result with a valid zero-gradient connection.\n\nThe exercise uses real log-softmax and gather operations over logits. It checks both forward values and backward gradients. Token masking is separate from attention masking: one controls which targets contribute to the objective, while the other controls which context positions can influence predictions. A correct loss mask cannot repair future-token leakage in attention.\n\n```python\nimport torch\nlogits=torch.tensor([[0.,0.],[0.,0.]])\nlogp=torch.nn.functional.log_softmax(logits,dim=-1)\nprint(-logp[0,1].item())\n```\n\n## Review the design\n\nMasking and normalization define the optimization objective. Counting padded tokens in the denominator silently changes the effective learning rate as sequence lengths change between batches.\n",
+      "task": "Implement masked_ce(logits,targets,pad=-1), logits shape [N,C], targets [N]. Mean negative log probability over non-pad targets only. Return logits.sum()*0 for all padding so backward works. Valid non-pad targets are class indices.",
+      "starter": "import torch\n\ndef masked_ce(logits, targets, pad=-1):\n    return None\n",
+      "solution": "import torch\ndef masked_ce(logits,targets,pad=-1):\n    mask=targets!=pad\n    if not bool(mask.any()):return logits.sum()*0\n    safe=targets.clone();safe[~mask]=0\n    logp=torch.nn.functional.log_softmax(logits,dim=-1)\n    losses=-logp.gather(1,safe.reshape(-1,1)).reshape(-1)\n    return losses[mask].mean()\n",
+      "checks": [
+        {
+          "name": "padding does not dilute valid loss",
+          "code": "import torch,math\nx=torch.zeros(3,2,requires_grad=True);y=torch.tensor([1,-1,-1]);loss=masked_ce(x,y);assert abs(loss.item()-math.log(2))<1e-6\n"
+        },
+        {
+          "name": "padding has zero gradient",
+          "code": "import torch\nx=torch.zeros(2,2,requires_grad=True);masked_ce(x,torch.tensor([1,-1])).backward();assert torch.allclose(x.grad[1],torch.zeros(2));assert x.grad[0].abs().sum().item()>0\n"
+        },
+        {
+          "name": "all padding remains differentiable",
+          "code": "import torch\nx=torch.ones(2,3,requires_grad=True);loss=masked_ce(x,torch.tensor([-1,-1]));assert loss.item()==0;loss.backward();assert torch.allclose(x.grad,torch.zeros_like(x))\n"
+        }
+      ],
+      "hints": [
+        "Use a boolean target mask and safe indices for padded rows.",
+        "Normalize selected losses only; an empty selection needs an explicit zero loss.",
+        "Masking and normalization define the optimization objective. Counting padded tokens in the denominator silently changes the effective learning rate as sequence lengths change between batches."
+      ],
+      "explanation": "Masking and normalization define the optimization objective. Counting padded tokens in the denominator silently changes the effective learning rate as sequence lengths change between batches."
+    },
+    {
+      "id": "dl-frozen-normalization",
+      "title": "Freeze parameters and running statistics separately",
+      "body": "# Freeze parameters and running statistics separately\n\nSetting requires_grad to false freezes parameter gradients, but a normalization layer can still update running statistics in training mode. Calling train on the enclosing model recursively changes its children, so the backbone must be placed back in evaluation mode after the global mode change.\n\nThis exercise uses a real BatchNorm layer and verifies that a forward pass leaves its running mean unchanged. The new head stays trainable. Fine-tuning policies should separately state which parameters receive gradients, which modules update state and which stochastic layers remain active. One flag does not express all three choices.\n\n```python\nimport torch\nfrom torch import nn\nbody=nn.BatchNorm1d(2)\nbody.eval()\nbefore=body.running_mean.clone()\nbody(torch.tensor([[1.,2.],[3.,4.]]))\nprint(torch.equal(before,body.running_mean))\n```\n\n## Review the design\n\nEvaluation mode and gradient recording are independent. A frozen backbone may still need gradients with respect to its inputs in some tasks, so disabling parameter gradients is different from wrapping the whole computation in no_grad.\n",
+      "task": "Implement prepare_finetune(model,backbone). Set model.train(), disable gradients for every backbone parameter, then backbone.eval(). Return the list of model parameters still requiring gradients.",
+      "starter": "def prepare_finetune(model, backbone):\n    return None\n",
+      "solution": "def prepare_finetune(model,backbone):\n    model.train()\n    for parameter in backbone.parameters():parameter.requires_grad_(False)\n    backbone.eval()\n    return [p for p in model.parameters() if p.requires_grad]\n",
+      "checks": [
+        {
+          "name": "head remains trainable and backbone is frozen",
+          "code": "import torch\nfrom torch import nn\nb=nn.Sequential(nn.Linear(2,2),nn.BatchNorm1d(2));h=nn.Linear(2,1);m=nn.Sequential(b,h);params=prepare_finetune(m,b);assert len(params)==2;assert all(not p.requires_grad for p in b.parameters());assert all(p.requires_grad for p in h.parameters())\n"
+        },
+        {
+          "name": "normalization statistics do not drift",
+          "code": "import torch\nfrom torch import nn\nb=nn.BatchNorm1d(2);m=nn.Sequential(b,nn.Linear(2,1));prepare_finetune(m,b);old=b.running_mean.clone();m(torch.tensor([[2.,3.],[4.,5.]]));assert torch.equal(old,b.running_mean)\n"
+        },
+        {
+          "name": "mode ordering is explicit",
+          "code": "from torch import nn\nb=nn.Sequential(nn.Linear(1,1));m=nn.Sequential(b,nn.Linear(1,1));m.eval();prepare_finetune(m,b);assert m.training and not b.training and m[1].training\n"
+        }
+      ],
+      "hints": [
+        "Call train on the parent before switching the backbone back to eval.",
+        "Filter the optimizer parameter list after setting requires_grad.",
+        "Evaluation mode and gradient recording are independent. A frozen backbone may still need gradients with respect to its inputs in some tasks, so disabling parameter gradients is different from wrapping the whole computation in no_grad."
+      ],
+      "explanation": "Evaluation mode and gradient recording are independent. A frozen backbone may still need gradients with respect to its inputs in some tasks, so disabling parameter gradients is different from wrapping the whole computation in no_grad."
+    },
+    {
+      "id": "dl-inference-state",
+      "title": "Restore module modes after a prediction helper",
+      "body": "# Restore module modes after a prediction helper\n\nA shared evaluation helper should not permanently alter a caller's training policy. Save each module's training flag before switching to evaluation mode, perform prediction without gradient recording and restore the original flags even on failure.\n\nSaving only the root flag is insufficient when a model intentionally mixes a training head with an evaluation backbone. This exercise preserves that mixed state and returns a detached clone so later mutations do not alias the prediction result. It does not make concurrent training and inference on the same mutable model safe; separate ownership is still required.\n\n```python\nimport torch\nfrom torch import nn\nmodel=nn.Linear(2,1)\nwith torch.no_grad():\n    result=model(torch.ones(1,2))\nprint(result.requires_grad)\n```\n\n## Review the design\n\nTemporary mode changes are shared mutable state. This helper is correct for exclusive ownership; concurrent requests should use a stable inference model or synchronization rather than racing mode toggles.\n",
+      "task": "Implement owned_prediction(model,x): save every module training flag, eval the model, return model(x).detach().clone() under torch.no_grad, then restore every saved flag in finally.",
+      "starter": "import torch\n\ndef owned_prediction(model, x):\n    return None\n",
+      "solution": "import torch\ndef owned_prediction(model,x):\n    states=[(module,module.training) for module in model.modules()]\n    try:\n        model.eval()\n        with torch.no_grad():return model(x).detach().clone()\n    finally:\n        for module,training in states:module.training=training\n",
+      "checks": [
+        {
+          "name": "inference disables dropout and gradients",
+          "code": "import torch\nfrom torch import nn\nm=nn.Dropout(.5);m.train();out=owned_prediction(m,torch.ones(4,requires_grad=True));assert torch.equal(out,torch.ones(4));assert not out.requires_grad;assert m.training\n"
+        },
+        {
+          "name": "mixed module modes are preserved",
+          "code": "import torch\nfrom torch import nn\nm=nn.Sequential(nn.Linear(1,1),nn.Dropout(.2));m.train();m[0].eval();owned_prediction(m,torch.ones(1,1));assert m.training and not m[0].training and m[1].training\n"
+        },
+        {
+          "name": "failures still restore caller state",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport torch\nfrom torch import nn\nm=nn.Linear(2,1);m.train();assert _bad(lambda:owned_prediction(m,torch.ones(1,3)),RuntimeError);assert m.training\n"
+        }
+      ],
+      "hints": [
+        "Snapshot each module mode instead of only model.training.",
+        "Restore modes in finally and detach the returned tensor.",
+        "Temporary mode changes are shared mutable state. This helper is correct for exclusive ownership; concurrent requests should use a stable inference model or synchronization rather than racing mode toggles."
+      ],
+      "explanation": "Temporary mode changes are shared mutable state. This helper is correct for exclusive ownership; concurrent requests should use a stable inference model or synchronization rather than racing mode toggles."
+    },
+    {
+      "id": "dl-checkpoint-copy",
+      "title": "Capture a checkpoint that cannot drift with live weights",
+      "body": "# Capture a checkpoint that cannot drift with live weights\n\nA state dictionary contains tensor references, not a frozen historical snapshot. Continuing training or mutating a parameter can therefore change an alleged best checkpoint in memory. Copy tensor state when capturing the checkpoint, and keep training progress metadata tied to that capture.\n\nThe exercise records actual model and optimizer state with a deep copy. It tests aliasing by modifying the live model after capture. Persisting and resuming a whole experiment additionally needs RNG, sampler, preprocessing and data-version state. A model-only snapshot is enough for inference recovery but not exact training continuation.\n\n```python\nimport copy,torch\nfrom torch import nn\nmodel=nn.Linear(1,1)\nsnapshot=copy.deepcopy(model.state_dict())\nwith torch.no_grad():model.weight.fill_(9)\nprint(torch.equal(snapshot[\"weight\"],model.weight))\n```\n\n## Review the design\n\nCheckpoint completeness depends on the recovery goal. Exact continuation also needs randomness, sampling position and input pipeline state; this exercise proves ownership of the captured model, optimizer and step fields only.\n",
+      "task": "Implement capture_training(model,optimizer,step) returning a deep-copied dict model=model.state_dict(), optimizer=optimizer.state_dict(), step=step. Later live tensor or optimizer-state mutation must not change the snapshot.",
+      "starter": "import copy\n\ndef capture_training(model, optimizer, step):\n    return None\n",
+      "solution": "import copy\ndef capture_training(model,optimizer,step):\n    return copy.deepcopy({'model':model.state_dict(),'optimizer':optimizer.state_dict(),'step':step})\n",
+      "checks": [
+        {
+          "name": "weights are owned by snapshot",
+          "code": "import torch\nfrom torch import nn\nm=nn.Linear(1,1);o=torch.optim.SGD(m.parameters(),lr=.1);s=capture_training(m,o,2);old=s['model']['weight'].clone();\nwith torch.no_grad():m.weight.add_(10)\nassert torch.equal(s['model']['weight'],old);assert s['step']==2\n"
+        },
+        {
+          "name": "optimizer configuration is copied",
+          "code": "from torch import nn\nimport torch\nm=nn.Linear(1,1);o=torch.optim.SGD(m.parameters(),lr=.1);s=capture_training(m,o,3);o.param_groups[0]['lr']=.9;assert s['optimizer']['param_groups'][0]['lr']==.1\n"
+        },
+        {
+          "name": "snapshot restores the prior model",
+          "code": "import torch\nfrom torch import nn\nm=nn.Linear(1,1);o=torch.optim.SGD(m.parameters(),lr=.1);x=torch.ones(1,1);expected=m(x).detach().clone();s=capture_training(m,o,0)\nwith torch.no_grad():m.weight.add_(2)\nm.load_state_dict(s['model']);assert torch.allclose(m(x),expected)\n"
+        }
+      ],
+      "hints": [
+        "Copy the combined checkpoint structure, not just its outer dictionary.",
+        "state_dict tensor values still refer to live state until copied.",
+        "Checkpoint completeness depends on the recovery goal. Exact continuation also needs randomness, sampling position and input pipeline state; this exercise proves ownership of the captured model, optimizer and step fields only."
+      ],
+      "explanation": "Checkpoint completeness depends on the recovery goal. Exact continuation also needs randomness, sampling position and input pipeline state; this exercise proves ownership of the captured model, optimizer and step fields only."
+    },
+    {
+      "id": "dl-next-token",
+      "title": "Shift language-model targets instead of predicting the present",
+      "body": "# Shift language-model targets instead of predicting the present\n\nA next-token objective pairs the logits at position t with the token at position t+1. Scoring a position against its own input can produce a deceptively easy task and a misleading loss. The final input position has no next token in the provided sequence and must be excluded.\n\nThis exercise computes actual cross-entropy on shifted tensors. It leaves attention construction outside the contract: a correct target shift is still invalid if the model's attention can see future tokens. Sequence packing also needs boundary masks so an unrelated document is not silently treated as the continuation of another.\n\n```python\nimport torch\nids=torch.tensor([[2,4,1]])\nprint(ids[:,:-1])\nprint(ids[:,1:])\n```\n\n## Review the design\n\nTarget alignment, causal attention and document-boundary masking are separate correctness conditions. Passing this loss check establishes alignment, not that a complete language-model training pipeline is leak-free.\n",
+      "task": "Implement next_token_loss(logits,tokens), logits [B,T,C], tokens [B,T], T>=2. Score logits[:,:-1] against tokens[:,1:] with mean cross entropy. Reject T<2.",
+      "starter": "import torch\n\ndef next_token_loss(logits, tokens):\n    return None\n",
+      "solution": "import torch\ndef next_token_loss(logits,tokens):\n    if tokens.shape[1]<2:raise ValueError('need a next token')\n    return torch.nn.functional.cross_entropy(logits[:,:-1,:].reshape(-1,logits.shape[-1]),tokens[:,1:].reshape(-1))\n",
+      "checks": [
+        {
+          "name": "last position logits do not affect the objective",
+          "code": "import torch\nx=torch.zeros(1,3,2);t=torch.tensor([[0,1,0]]);a=next_token_loss(x,t);x[:,2,:]=torch.tensor([99.,-99.]);assert abs(next_token_loss(x,t).item()-a.item())<1e-6\n"
+        },
+        {
+          "name": "next rather than current token is the target",
+          "code": "import torch\nx=torch.tensor([[[0.,10.],[10.,0.],[0.,0.]]]);t=torch.tensor([[0,1,0]]);assert next_token_loss(x,t).item()<.001\n"
+        },
+        {
+          "name": "uniform loss and too-short input",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport torch,math\nassert abs(next_token_loss(torch.zeros(1,2,3),torch.tensor([[0,1]])).item()-math.log(3))<1e-6;assert _bad(lambda:next_token_loss(torch.zeros(1,1,2),torch.tensor([[0]])))\n"
+        }
+      ],
+      "hints": [
+        "Slice logits on the left and targets on the right.",
+        "Flatten batch and sequence positions only after shifting.",
+        "Target alignment, causal attention and document-boundary masking are separate correctness conditions. Passing this loss check establishes alignment, not that a complete language-model training pipeline is leak-free."
+      ],
+      "explanation": "Target alignment, causal attention and document-boundary masking are separate correctness conditions. Passing this loss check establishes alignment, not that a complete language-model training pipeline is leak-free."
+    },
+    {
+      "id": "dl-weighted-reduction",
+      "title": "Combine local mean gradients by their sample counts",
+      "body": "# Combine local mean gradients by their sample counts\n\nAveraging worker mean gradients gives equal weight to workers, not examples. If workers processed different numbers of examples, the global mean gradient is a count-weighted reduction. This matters for short final batches and uneven work assignment.\n\nThe exercise performs the reduction on real local tensors and compares it with known weighted results. It is an algebraic prerequisite for distributed training, not an execution of DDP, an all-reduce backend or a multi-GPU benchmark. Real clusters additionally need consistent collective ordering, failure handling, synchronization and checkpoint recovery.\n\n```python\nimport torch\ngradients=[torch.tensor([2.]),torch.tensor([8.])]\ncounts=[3,1]\nprint(sum(g*n for g,n in zip(gradients,counts))/sum(counts))\n```\n\n## Review the design\n\nA reduction formula does not establish a distributed execution guarantee. The declared local objective, token/sample denominators and collective scaling must agree before this weighting matches the intended global gradient.\n",
+      "task": "Implement weighted_gradient(gradients,counts) returning sum(g*n)/sum(n), same-shaped tensors with positive integer counts. Reject empty/mismatched inputs, invalid counts and unequal tensor shapes. Do not modify the inputs.",
+      "starter": "import torch\n\ndef weighted_gradient(gradients, counts):\n    return None\n",
+      "solution": "import torch\ndef weighted_gradient(gradients,counts):\n    if not gradients or len(gradients)!=len(counts) or any(type(n) is not int or n<1 for n in counts) or any(g.shape!=gradients[0].shape for g in gradients):raise ValueError('invalid reduction')\n    result=torch.zeros_like(gradients[0])\n    for gradient,count in zip(gradients,counts):result=result+gradient*count\n    return result/sum(counts)\n",
+      "checks": [
+        {
+          "name": "unequal counts change the mean",
+          "code": "import torch\na=torch.tensor([2.,4.]);b=torch.tensor([8.,0.]);assert torch.allclose(weighted_gradient([a,b],[3,1]),torch.tensor([3.5,3.]))\n"
+        },
+        {
+          "name": "does not mutate local gradients",
+          "code": "import torch\na=torch.tensor([2.]);b=torch.tensor([8.]);weighted_gradient([a,b],[1,1]);assert a.item()==2 and b.item()==8\n"
+        },
+        {
+          "name": "shape and count mismatches fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport torch\nassert _bad(lambda:weighted_gradient([],[]));assert _bad(lambda:weighted_gradient([torch.ones(1)],[0]));assert _bad(lambda:weighted_gradient([torch.ones(1),torch.ones(2)],[1,1]))\n"
+        }
+      ],
+      "hints": [
+        "Weight each local mean by the number of examples that produced it.",
+        "Allocate a new result rather than accumulating in place into an input gradient.",
+        "A reduction formula does not establish a distributed execution guarantee. The declared local objective, token/sample denominators and collective scaling must agree before this weighting matches the intended global gradient."
+      ],
+      "explanation": "A reduction formula does not establish a distributed execution guarantee. The declared local objective, token/sample denominators and collective scaling must agree before this weighting matches the intended global gradient."
+    },
+    {
+      "id": "dl-lora-merge",
+      "title": "Merge a low-rank adapter without changing its function",
+      "body": "# Merge a low-rank adapter without changing its function\n\nA LoRA adapter represents a low-rank update as B times A, scaled by alpha divided by rank. Merging that update into a base weight should produce the same linear output as applying the base and adapter branches separately. Matrix orientation and scaling errors can silently spoil a fine-tuned model.\n\nThis exercise uses actual PyTorch matrix multiplication and checks functional equivalence. It does not perform quantization or optimize memory on a GPU. Merging a quantized base, changing dtype or repeatedly applying the same adapter introduces additional numerical and lifecycle decisions that require separate verification.\n\n```python\nimport torch\nbase=torch.zeros(2,3)\na=torch.ones(1,3)\nb=torch.tensor([[1.],[2.]])\nprint((base+b@a).shape)\n```\n\n## Review the design\n\nFunctional equivalence is the core merge contract. Artifact versioning must record whether an adapter has already been merged, because merging the same update twice changes the model again.\n",
+      "task": "Implement merge_lora(base,a,b,alpha) for base [out,in], a [rank,in], b [out,rank]. Return a new tensor base+(alpha/rank)*(b@a); reject nonmatrix inputs, incompatible shapes or rank<1; do not modify any input.",
+      "starter": "def merge_lora(base, a, b, alpha):\n    return None\n",
+      "solution": "def merge_lora(base,a,b,alpha):\n    if base.ndim!=2 or a.ndim!=2 or b.ndim!=2 or a.shape[0]<1 or a.shape[1]!=base.shape[1] or b.shape!=(base.shape[0],a.shape[0]):raise ValueError('invalid adapter shape')\n    return base+(alpha/a.shape[0])*(b@a)\n",
+      "checks": [
+        {
+          "name": "merged and branched functions agree",
+          "code": "import torch\nw=torch.tensor([[1.,2.],[3.,4.]]);a=torch.tensor([[2.,1.]]);b=torch.tensor([[1.],[2.]]);x=torch.tensor([[3.,4.]]);m=merge_lora(w,a,b,2);assert torch.allclose(x@m.T,x@w.T+2*(x@a.T)@b.T)\n"
+        },
+        {
+          "name": "rank scaling and input ownership",
+          "code": "import torch\nw=torch.zeros(2,2);a=torch.eye(2);b=torch.eye(2);m=merge_lora(w,a,b,2);assert torch.equal(m,torch.eye(2));assert torch.equal(w,torch.zeros(2,2))\n"
+        },
+        {
+          "name": "invalid rank and shape fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport torch\nassert _bad(lambda:merge_lora(torch.zeros(2,2),torch.zeros(0,2),torch.zeros(2,0),1));assert _bad(lambda:merge_lora(torch.zeros(2,2),torch.ones(1,3),torch.ones(2,1),1))\n"
+        }
+      ],
+      "hints": [
+        "Compute B@A in the orientation matching the base weight.",
+        "Scale by alpha/rank exactly once and return an out-of-place sum.",
+        "Functional equivalence is the core merge contract. Artifact versioning must record whether an adapter has already been merged, because merging the same update twice changes the model again."
+      ],
+      "explanation": "Functional equivalence is the core merge contract. Artifact versioning must record whether an adapter has already been merged, because merging the same update twice changes the model again."
+    }
+  ]
+}

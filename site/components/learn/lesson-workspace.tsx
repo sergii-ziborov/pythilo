@@ -18,6 +18,7 @@ type Props = {
   course: string; lesson: string; breadcrumb: { courseTitle: string; lessonTitle: string }; position: string;
   sections: LessonSection[]; task: ReactNode; starter: string; checks: { name: string; code: string }[]; hints: ReactNode[]; explanation: ReactNode;
   next: { href: string; title: string } | null; missing: string[]; packages: string[];
+  practice?: ReactNode;
 };
 
 /** "Run example" under a code block in the reading. Its output appears under the block. */
@@ -36,7 +37,7 @@ export function ExampleBlock({ code, index, children }: { code: string; index: n
   </figure>;
 }
 
-export function LessonWorkspace({ course, lesson, breadcrumb, position, sections, task, starter, checks, hints, explanation, next, missing, packages }: Props) {
+export function LessonWorkspace({ course, lesson, breadcrumb, position, sections, task, starter, checks, hints, explanation, next, missing, packages, practice }: Props) {
   const python = usePythonRuntime();
   const [section, setSection] = useState(0), [owner, setOwner] = useState<Owner | null>(null);
   const [code, setCode] = useState(starter), [version, setVersion] = useState(0), [restored, setRestored] = useState(false);
@@ -79,6 +80,7 @@ export function LessonWorkspace({ course, lesson, breadcrumb, position, sections
       </header>
       <div className="lesson">
         <article className="lesson-reading">
+          {practice}
           <nav aria-label="Lesson parts" className="lesson-chips">
             {sections.map((item, index) => <button key={index} type="button" aria-current={section === index ? "step" : undefined} onClick={() => setSection(index)}><span>{index + 1}</span>{item.chip}</button>)}
             <button type="button" aria-current={section === taskIndex ? "step" : undefined} onClick={() => setSection(taskIndex)}>Your task</button>

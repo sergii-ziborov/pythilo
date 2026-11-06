@@ -352,3 +352,39 @@ remains `PREPARE_FOR_SUBMISSION`, manual release. The archive contains the exact
 24 course files and checker verified above. Receipt:
 `build/release-receipts/testflight-22-ready.json`. Build 21 was superseded before
 its upload completed; build 22 includes the verified report-title fix.
+
+## Advanced curriculum and linked Labs (6 November 2026)
+
+Added 74 advanced lessons in seven courses, including six integration projects:
+Python runtime ownership/concurrency, resilient transactional services, statistical
+ML evaluation, ML production contracts, permission-aware AI systems, PyTorch
+training correctness and composed projects. Current totals are 382 path lessons
+in 30 courses plus 100 interview tasks. The public `/learn/senior/` paths explain
+review evidence and the additional real production/data/model/GPU experience
+required for senior work; passing local exercises does not certify a job level.
+
+Added 20 Labs (12 ML, eight AI): 72 native Labs total, including 33 ML and 16 AI;
+50 Labs also run in the browser. Forty lesson/Lab pairs link in both directions.
+Both native navigation stacks use value-based paths, including Lab links opened
+from a lesson. UI checks exercise links near their leading edge, beyond the text.
+Scoped website lesson-editor CSS prevents retained styles from overlaying a Lab
+and intercepting its links after client navigation.
+
+An order-dependent `torch.export` failure exposed global `atexit` cleanup that
+prematurely ran `weakref.finalize` process hooks and removed live PyTorch operator
+registrations. The runner now executes only project-owned exit callbacks between
+jobs, preserving bundled-library process callbacks. The native regression checks
+LIFO/unregister behavior, process-finalizer lifetime and actual PyTorch export
+across three jobs.
+
+Validation: all 482 solutions, all 539 independent reading blocks, 74 rejected
+advanced starters, every Lab variant answer/starter and both reciprocal native
+navigation routes pass in iOS Simulator. Result bundle:
+`build/verification/senior-runtime-fixed-native.xcresult`. All 85 site tests and
+the 608-page production build pass. Public route/link audits and smoke checks
+pass. Browser proof: `build/verification/pythilo-senior-lab-live.png`; native proof:
+`build/verification/pythilo-senior-linked-native.png`.
+
+The Release archive for build 23 matches 31 course JSON files and the current
+Lab catalog/code/runtime byte for byte (191 checked files). Source proof:
+`build/release-receipts/testflight-23-archive-source.json`.

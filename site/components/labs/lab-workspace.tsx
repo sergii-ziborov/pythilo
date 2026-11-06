@@ -24,7 +24,7 @@ function Panel({panel}: {panel: LabPanel}) {
     {panel.type==='array' ? <div className="lab-array">{panel.cells?.map((cell,i)=><div key={i}><small>{i}</small><code>{cell || '∅'}</code></div>)}</div> : panel.type==='vars' ? <dl className="lab-vars">{panel.pairs?.map(([name,value],i)=><div key={i}><dt>{name}</dt><dd><code>{value}</code></dd></div>)}</dl> : panel.type==='grid' ? null : <Chart panel={panel} />}
   </section>;
 }
-export function LabWorkspace({lab}: {lab: BrowserLab}) {
+export function LabWorkspace({lab,lessons=[]}: {lab: BrowserLab; lessons?: {href:string;title:string}[]}) {
   const python=usePythonRuntime();
   const [code,setCode]=useState(lab.starter),[version,setVersion]=useState(0),[result,setResult]=useState<LabResult|null>(null);
   const [frame,setFrame]=useState(0),[playing,setPlaying]=useState(false),[delay,setDelay]=useState(600),[error,setError]=useState('');
@@ -58,6 +58,7 @@ export function LabWorkspace({lab}: {lab: BrowserLab}) {
   return <main className="lab-workspace">
     <nav className="lab-breadcrumb" aria-label="Breadcrumb"><Link href="/labs/">← All labs</Link><span>{lab.section}</span></nav>
     <header className="lab-title"><p className="eyebrow">WRITE · TRACE · UNDERSTAND</p><h1>{lab.title}</h1><p>{lab.summary}</p></header>
+    {lessons.map(lesson=><p key={lesson.href}><Link className="pill-button" href={lesson.href}>Read lesson: {lesson.title} →</Link></p>)}
     <div className="lab-columns">
       <section className="lab-code" aria-label="Your Python code"><h2>Your experiment</h2><p>{lab.variants[0].prompt}</p>
         <PlainEditor value={code} onChange={change} label="Lab Python code" version={version} />

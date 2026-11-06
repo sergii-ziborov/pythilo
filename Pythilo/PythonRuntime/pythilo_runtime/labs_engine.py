@@ -247,6 +247,7 @@ def register(lab_id, variants):
 
 
 MODULES = {
+    **dict.fromkeys(('groupfolds', 'temporal', 'rocauc', 'averageprecision', 'brierscore', 'calibration', 'wilson', 'bhadjust', 'asofjoin', 'boostedstumps', 'populationdrift', 'conformal', 'rankfusion', 'tokenwindows', 'contextbudget', 'retrievalquality', 'citationcheck', 'tenantretrieval', 'toolpolicy', 'agentbudget'), "labs_senior"),
     **dict.fromkeys(('standardize', 'confusion', 'precisionrecall', 'threshold', 'crossvalidation', 'ridge', 'gradientcheck', 'adam', 'minibatch', 'naivebayes', 'pca', 'silhouette', 'softmax', 'attention', 'causalmask', 'nucleus', 'beamsearch', 'bpe', 'retrieval', 'layernorm'), "labs_intelligence"),
     **dict.fromkeys(("prefix", "monostack", "topological", "knapsack", "bellmanford", "editrows", "linearfit", "logistic", "neighbors", "stump"), "labs_extended"),
     "binsearch": "labs_basics", "window": "labs_basics", "stackqueue": "labs_basics", "recursion": "labs_basics",

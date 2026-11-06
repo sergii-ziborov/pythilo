@@ -47,6 +47,9 @@ struct LearnView: View {
             .background(AppTheme.background)
             .navigationTitle("Learn")
             .navigationDestination(for: Course.self) { CourseView(course: $0) }
+            .navigationDestination(for: String.self) { id in
+                if let lab = LabCatalog.lab(id) { TraceLabView(lab: lab) }
+            }
             .navigationDestination(for: LessonRoute.self) { route in
                 LessonView(course: route.course, lesson: route.lesson, onOpenProject: onOpenProject) { next in
                     path.removeLast()
@@ -620,6 +623,16 @@ struct LessonView: View {
                         .font(.system(size: 30, weight: .bold))
                         .padding(.top, 6)
                         .padding(.bottom, 8)
+                    ForEach(LabCatalog.all.filter { ($0.lessons ?? []).contains(lesson.id) }) { lab in
+                        NavigationLink(value: lab.id) {
+                            Label("Practice in Lab: \(lab.title)", systemImage: "flask")
+                                .font(.system(size: 14, weight: .semibold))
+                                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.app)
+                        .accessibilityIdentifier("lesson-lab-\(lab.id)")
+                    }
                     ForEach(sections) { section in
                         VStack(alignment: .leading, spacing: 10) {
                             if section.id > 0 || sections.count > 1 {

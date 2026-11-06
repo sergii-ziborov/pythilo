@@ -14,7 +14,8 @@ struct LabTrace: Decodable, Sendable {
 }
 
 struct LabsView: View {
-    @State private var path: [String] = []
+    let onOpenProject: (Project) -> Void
+    @State private var path = NavigationPath()
     @State private var selected: LabInfo.Section?
     @State private var query = ""
 
@@ -91,10 +92,13 @@ struct LabsView: View {
                     if let lab = LabCatalog.lab(id), !lab.isClassic { TraceLabView(lab: lab) } else { SortingBenchView() }
                 }
             }
+            .navigationDestination(for: LessonRoute.self) { route in
+                LessonView(course: route.course, lesson: route.lesson, onOpenProject: onOpenProject)
+            }
             #if DEBUG
             // For screenshots: -openLab <id> [-labVariant <id>] [-labRun YES] [-labAnswer YES] [-labStep 0.6] [-labScale YES].
             .onAppear {
-                if path.isEmpty, let lab = UserDefaults.standard.string(forKey: "openLab") { path = [lab] }
+                if path.isEmpty, let lab = UserDefaults.standard.string(forKey: "openLab") { path.append(lab) }
             }
             #endif
         }

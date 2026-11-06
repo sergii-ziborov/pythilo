@@ -26,6 +26,7 @@ struct LabInfo: Codable, Identifiable, Hashable, Sendable {
     let tint: Tint
     let section: Section
     var variants: [LabVariant] = []
+    var lessons: [String]?
 
     /// The labs written before the shared engine have screens of their own.
     var isClassic: Bool { variants.isEmpty }

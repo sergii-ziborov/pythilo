@@ -7,13 +7,13 @@ final class LabsNavigationTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-tab", "labs"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["52 interactive labs"].waitForExistence(timeout: 30))
-        XCTAssertTrue(app.buttons["ML · 21"].exists)
-        app.buttons["AI · 8"].tap()
-        XCTAssertTrue(app.staticTexts["ARTIFICIAL INTELLIGENCE · 8"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["72 interactive labs"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["ML · 33"].exists)
+        app.buttons["AI · 16"].tap()
+        XCTAssertTrue(app.staticTexts["ARTIFICIAL INTELLIGENCE · 16"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["lab-descent"].exists)
         let catalog = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        catalog.name = "52-labs-ai-catalog"
+        catalog.name = "72-labs-ai-catalog"
         catalog.lifetime = .keepAlways
         add(catalog)
         let attention = app.buttons["lab-attention"]

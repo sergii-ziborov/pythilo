@@ -156,7 +156,7 @@ writeFileSync(join(content, 'labs.json'), JSON.stringify({
     starter: readFileSync(join(labRoot, 'labcode', `${lab.id}.practice.starter.py`), 'utf8'),
     answer: readFileSync(join(labRoot, 'labcode', `${lab.id}.practice.answer.py`), 'utf8'),
   })),
-  sources: Object.fromEntries(['labs_engine.py', 'labs_extended.py', 'labs_intelligence.py'].map(file => [file, readFileSync(join(labRoot, file), 'utf8')])),
+  sources: Object.fromEntries(['labs_engine.py', 'labs_extended.py', 'labs_intelligence.py', 'labs_senior.py'].map(file => [file, readFileSync(join(labRoot, file), 'utf8')])),
 }) + '\n');
 
 // Pyodide runs only in a module worker, and the app's bundler starts workers as

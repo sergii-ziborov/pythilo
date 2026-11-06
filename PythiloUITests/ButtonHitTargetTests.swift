@@ -28,7 +28,7 @@ final class ButtonHitTargetTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-tab", "labs"]
         app.launch()
-        let filter = app.buttons["AI · 8"]
+        let filter = app.buttons["AI · 16"]
         XCTAssertTrue(filter.waitForExistence(timeout: 20))
         XCTAssertGreaterThanOrEqual(filter.frame.height, 44)
         filter.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.8)).tap()

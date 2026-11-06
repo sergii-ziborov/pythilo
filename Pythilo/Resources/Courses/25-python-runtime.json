@@ -1,0 +1,344 @@
+{
+  "id": "python-runtime",
+  "title": "Python: ownership and concurrency",
+  "summary": "Twelve deeper exercises in resource ownership, reference lifetimes, context propagation, cancellation, bounded work and asynchronous shutdown. Use real Python objects and tasks.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "sr-exit-stack",
+      "title": "Unwind partially acquired resources",
+      "body": "# Unwind partially acquired resources\n\nAcquiring several resources is a transaction of its own. If the third acquisition fails, the first two still need cleanup, in reverse order. An ExitStack records ownership as each acquisition succeeds. Registering cleanup only after every acquisition works leaves a leak on the failure path.\n\nThis exercise accepts context-manager factories so the tests can fail a specific acquisition without files or network access. The same ownership pattern applies to files, temporary directories and database sessions. A context manager should return a resource only after it owns the cleanup obligation.\n\n```python\nfrom contextlib import ExitStack\nlog = []\nwith ExitStack() as stack:\n    stack.callback(log.append, \"first\")\n    stack.callback(log.append, \"last\")\nprint(log)\n```\n\n## Review the design\n\nExitStack unwinds successful entries in reverse order on every exit. It cannot clean up an acquisition that leaked before its own context manager registered ownership; that manager must implement its own partial-failure handling.\n",
+      "task": "Implement acquire_all(factories, use). Enter each context manager in order, call use(resources) once, return its result and close everything in reverse order even if acquisition or use raises.",
+      "starter": "from contextlib import ExitStack\n\ndef acquire_all(factories, use):\n    return None\n",
+      "solution": "from contextlib import ExitStack\ndef acquire_all(factories, use):\n    with ExitStack() as stack:\n        resources = [stack.enter_context(make()) for make in factories]\n        return use(resources)\n",
+      "checks": [
+        {
+          "name": "successful reverse cleanup",
+          "code": "from contextlib import contextmanager\nlog=[]\n@contextmanager\ndef item(n):\n log.append(n); yield n; log.append(-n)\nassert acquire_all([lambda:item(1),lambda:item(2)],sum)==3\nassert log==[1,2,-2,-1]\n"
+        },
+        {
+          "name": "failed acquisition closes earlier resources",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nfrom contextlib import contextmanager\nlog=[]\n@contextmanager\ndef first():\n try: yield 1\n finally: log.append('closed')\n@contextmanager\ndef fail():\n raise RuntimeError('open failed'); yield\nassert _bad(lambda:acquire_all([first,fail],sum),RuntimeError)\nassert log==['closed']\n"
+        },
+        {
+          "name": "use failure propagates",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:acquire_all([],lambda xs:1/0),ZeroDivisionError)\n"
+        }
+      ],
+      "hints": [
+        "Register each resource through enter_context as soon as it opens.",
+        "Keep the use call inside the ExitStack scope.",
+        "ExitStack unwinds successful entries in reverse order on every exit. It cannot clean up an acquisition that leaked before its own context manager registered ownership; that manager must implement its own partial-failure handling."
+      ],
+      "explanation": "ExitStack unwinds successful entries in reverse order on every exit. It cannot clean up an acquisition that leaked before its own context manager registered ownership; that manager must implement its own partial-failure handling."
+    },
+    {
+      "id": "sr-weak-cache",
+      "title": "Cache without owning object lifetimes",
+      "body": "# Cache without owning object lifetimes\n\nA cache normally holds strong references, extending the lifetime of every value it stores. That can accidentally turn a memory optimization into unbounded retention. A WeakValueDictionary permits reuse while a caller still owns the object, but does not keep an otherwise unused object alive.\n\nWeak references are not a replacement for resource cleanup or a bounded LRU cache. Not every Python value supports them, and an entry can disappear between accesses. Keep a strong local reference while returning a value. This exercise uses user-defined objects and explicit collection instead of relying on CPython reference-count timing.\n\n```python\nimport weakref, gc\nclass Item: pass\nvalue = Item()\ncache = weakref.WeakValueDictionary()\ncache[\"x\"] = value\ndel value\ngc.collect()\nprint(list(cache))\n```\n\n## Review the design\n\nA weak cache delegates lifetime to callers. Losing an entry is normal behavior, so factory calls must be safe to repeat. Resource release still belongs in explicit context management, not in a finalizer.\n",
+      "task": "Implement weak_cache(factory) returning get(key). Reuse a live value for that key without retaining it after all callers drop it. Values support weak references.",
+      "starter": "import weakref\n\ndef weak_cache(factory):\n    return None\n",
+      "solution": "import weakref\ndef weak_cache(factory):\n    cache = weakref.WeakValueDictionary()\n    def get(key):\n        value = cache.get(key)\n        if value is None:\n            value = factory(key)\n            cache[key] = value\n        return value\n    return get\n",
+      "checks": [
+        {
+          "name": "live values are reused",
+          "code": "class Item: pass\nget=weak_cache(lambda k:Item()); a=get('x'); assert get('x') is a\n"
+        },
+        {
+          "name": "collection permits reconstruction",
+          "code": "import weakref,gc\nclass Item: pass\nmade=[]\ndef create(k):\n made.append(k);return Item()\nget=weak_cache(create);a=get('x');ref=weakref.ref(a);del a;gc.collect()\nassert ref() is None\nb=get('x');assert made==['x','x']\n"
+        },
+        {
+          "name": "keys stay independent",
+          "code": "class Item: pass\nget=weak_cache(lambda k:Item());a=get('a');b=get('b');assert a is not b\n"
+        }
+      ],
+      "hints": [
+        "Use WeakValueDictionary for values, while the returned closure owns the dictionary.",
+        "Bind the result of cache.get to a local before testing or returning it.",
+        "A weak cache delegates lifetime to callers. Losing an entry is normal behavior, so factory calls must be safe to repeat. Resource release still belongs in explicit context management, not in a finalizer."
+      ],
+      "explanation": "A weak cache delegates lifetime to callers. Losing an entry is normal behavior, so factory calls must be safe to repeat. Resource release still belongs in explicit context management, not in a finalizer."
+    },
+    {
+      "id": "sr-generator-close",
+      "title": "Release resources when iteration stops early",
+      "body": "# Release resources when iteration stops early\n\nA generator can suspend while a resource is open. Exhausting the iterator normally runs its finally block, but a consumer that takes one value and retains the generator can keep the resource alive. The consumer must close an owned iterator when it stops early.\n\nThis is observable behavior, not just a garbage-collection detail. Tests supply a generator with a finally log and verify cleanup before the consuming function returns. The boundary must also behave when the requested count is zero or the iterator raises during iteration. Cleanup belongs in finally rather than after a successful loop.\n\n```python\ndef values(log):\n    try: yield 1\n    finally: log.append(\"closed\")\nlog=[]\nit=values(log)\nprint(next(it))\nit.close()\nprint(log)\n```\n\n## Review the design\n\nClosing a generator executes its finally block once it has started. An unstarted generator has not entered its resource-owning body, so closing it cannot run cleanup that was never acquired.\n",
+      "task": "Implement take_owned(iterator,n) returning up to n values and always calling its close method if present. Reject negative n, including before iteration, while still closing the owned iterator.",
+      "starter": "def take_owned(iterator, n):\n    return None\n",
+      "solution": "def take_owned(iterator,n):\n    try:\n        if n<0: raise ValueError('negative count')\n        result=[]\n        for _ in range(n):\n            try: result.append(next(iterator))\n            except StopIteration: break\n        return result\n    finally:\n        close=getattr(iterator,'close',None)\n        if close is not None: close()\n",
+      "checks": [
+        {
+          "name": "closes a partially consumed generator",
+          "code": "log=[]\ndef gen():\n try:yield 1;yield 2\n finally:log.append('closed')\nassert take_owned(gen(),1)==[1];assert log==['closed']\n"
+        },
+        {
+          "name": "exhaustion and plain iterators",
+          "code": "assert take_owned(iter([1,2]),5)==[1,2]\nassert take_owned(iter([1]),0)==[]\n"
+        },
+        {
+          "name": "negative counts still release ownership",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nclass Owned:\n closed=False\n def close(self):self.closed=True\nx=Owned();assert _bad(lambda:take_owned(x,-1));assert x.closed\n"
+        }
+      ],
+      "hints": [
+        "Drive next explicitly so no extra item is consumed.",
+        "Put validation and iteration inside a try with close in finally.",
+        "Closing a generator executes its finally block once it has started. An unstarted generator has not entered its resource-owning body, so closing it cannot run cleanup that was never acquired."
+      ],
+      "explanation": "Closing a generator executes its finally block once it has started. An unstarted generator has not entered its resource-owning body, so closing it cannot run cleanup that was never acquired."
+    },
+    {
+      "id": "sr-context-token",
+      "title": "Restore request context after failures",
+      "body": "# Restore request context after failures\n\nRequest-local state must not become process-global state. ContextVar values follow an asynchronous context, while a module global is shared by unrelated requests. Setting a ContextVar returns a token that can restore the previous binding, including the absence of a previous value.\n\nNested scopes make this distinction visible: an inner request identifier must disappear when the inner call returns or raises. Resetting to a guessed default would erase an outer binding. The exercise accepts the variable explicitly, so its ownership and restoration can be tested without depending on logging infrastructure.\n\n```python\nfrom contextvars import ContextVar\nrequest=ContextVar(\"request\",default=\"none\")\ntoken=request.set(\"outer\")\nprint(request.get())\nrequest.reset(token)\nprint(request.get())\n```\n\n## Review the design\n\nContext tokens preserve nesting and the original binding. They are scoped to their context; passing a token to a different context is an error rather than a portable way to transfer request state.\n",
+      "task": "Implement within_context(variable,value,call) returning call() with the temporary binding. Restore the exact previous context even if call raises.",
+      "starter": "def within_context(variable, value, call):\n    return None\n",
+      "solution": "def within_context(variable,value,call):\n    token=variable.set(value)\n    try: return call()\n    finally: variable.reset(token)\n",
+      "checks": [
+        {
+          "name": "temporary binding returns a value",
+          "code": "from contextvars import ContextVar\nv=ContextVar('x',default='none');assert within_context(v,'a',v.get)=='a';assert v.get()=='none'\n"
+        },
+        {
+          "name": "nested context survives inner exit",
+          "code": "from contextvars import ContextVar\nv=ContextVar('y',default=0)\nassert within_context(v,1,lambda:(within_context(v,2,v.get),v.get()))==(2,1)\nassert v.get()==0\n"
+        },
+        {
+          "name": "failure restores context",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nfrom contextvars import ContextVar\nv=ContextVar('z',default=0);assert _bad(lambda:within_context(v,5,lambda:1/0),ZeroDivisionError);assert v.get()==0\n"
+        }
+      ],
+      "hints": [
+        "Save the token returned by set.",
+        "Reset that token in finally instead of setting a default value.",
+        "Context tokens preserve nesting and the original binding. They are scoped to their context; passing a token to a different context is an error rather than a portable way to transfer request state."
+      ],
+      "explanation": "Context tokens preserve nesting and the original binding. They are scoped to their context; passing a token to a different context is an error rather than a portable way to transfer request state."
+    },
+    {
+      "id": "sr-task-cancellation",
+      "title": "Cancel and await the task you own",
+      "body": "# Cancel and await the task you own\n\nCancellation is a request delivered at an await point. Calling cancel without awaiting the task leaves cleanup and exceptions unresolved. A parent that owns a task should request cancellation, await completion and suppress only the expected CancelledError.\n\nThe coroutine may already have finished successfully or failed before cancellation. Those outcomes must retain their meaning. Catching every exception would hide a broken worker. The tests synchronize through an Event so they verify the actual cleanup path without sleeps that depend on device speed.\n\n```python\nimport asyncio\nasync def main():\n    task=asyncio.create_task(asyncio.sleep(1))\n    task.cancel()\n    try: await task\n    except asyncio.CancelledError:\n        print(\"cancelled\")\nasyncio.run(main())\n```\n\n## Review the design\n\nAwaiting establishes the cleanup boundary. A task can refuse cancellation, so production owners also need a shutdown policy for uncooperative work; this contract assumes cooperative coroutines.\n",
+      "task": "Implement async stop_owned(task). Cancel and await it; return None for cancellation or its successful result. Propagate other failures.",
+      "starter": "import asyncio\n\nasync def stop_owned(task):\n    return None\n",
+      "solution": "import asyncio\nasync def stop_owned(task):\n    task.cancel()\n    try: return await task\n    except asyncio.CancelledError: return None\n",
+      "checks": [
+        {
+          "name": "awaits cleanup",
+          "code": "import asyncio\nasync def case():\n ready=asyncio.Event();log=[]\n async def work():\n  try:ready.set();await asyncio.Event().wait()\n  finally:log.append('closed')\n t=asyncio.create_task(work());await ready.wait();assert await stop_owned(t) is None;assert log==['closed']\nasyncio.run(case())\n"
+        },
+        {
+          "name": "keeps completed result",
+          "code": "import asyncio\nasync def case():\n async def work():return 7\n t=asyncio.create_task(work());await t;assert await stop_owned(t)==7\nasyncio.run(case())\n"
+        },
+        {
+          "name": "does not hide worker failures",
+          "code": "import asyncio\nasync def case():\n async def work():raise ValueError('broken')\n t=asyncio.create_task(work())\n try:await t\n except ValueError:pass\n try:await stop_owned(t)\n except ValueError:return\n assert False,'failure was swallowed'\nasyncio.run(case())\n"
+        }
+      ],
+      "hints": [
+        "Cancellation must be followed by awaiting the task.",
+        "Catch asyncio.CancelledError, not Exception or BaseException.",
+        "Awaiting establishes the cleanup boundary. A task can refuse cancellation, so production owners also need a shutdown policy for uncooperative work; this contract assumes cooperative coroutines."
+      ],
+      "explanation": "Awaiting establishes the cleanup boundary. A task can refuse cancellation, so production owners also need a shutdown policy for uncooperative work; this contract assumes cooperative coroutines."
+    },
+    {
+      "id": "sr-bounded-map",
+      "title": "Bound task creation as well as active calls",
+      "body": "# Bound task creation as well as active calls\n\nA semaphore limits active work, but creating one task per input can still exhaust memory before any result finishes. A fixed set of workers with a shared iterator bounds both task count and active calls. Preserve input indices so concurrent completion does not reorder the public result.\n\nTaskGroup gives the workers one failure boundary. If one fails, siblings are cancelled and awaited before control leaves the group. This exercise deliberately accepts a finite iterable and an asynchronous operation; unbounded streams need a separate result-consumption and backpressure contract.\n\n```python\nimport asyncio\nasync def main():\n    queue=asyncio.Queue(maxsize=1)\n    await queue.put(\"one\")\n    print(queue.full())\n    print(await queue.get())\n    queue.task_done()\nasyncio.run(main())\n```\n\n## Review the design\n\nThere is no await between taking an iterator item and assigning it to a worker, so the event loop cannot assign the same item twice. Result storage is still linear in input size; bounded concurrency is not bounded total result memory.\n",
+      "task": "Implement async bounded_map(values,call,limit). Create at most limit worker tasks, preserve result order, reject limit<1, and propagate worker failures through TaskGroup.",
+      "starter": "import asyncio\n\nasync def bounded_map(values, call, limit):\n    return None\n",
+      "solution": "import asyncio\nasync def bounded_map(values,call,limit):\n    if limit<1: raise ValueError('positive limit required')\n    values=list(values);result=[None]*len(values)\n    jobs=iter(enumerate(values))\n    async def worker():\n        for index,value in jobs:\n            result[index]=await call(value)\n    async with asyncio.TaskGroup() as group:\n        for _ in range(min(limit,len(values))): group.create_task(worker())\n    return result\n",
+      "checks": [
+        {
+          "name": "preserves results with bounded activity",
+          "code": "import asyncio\nasync def case():\n active=peak=0\n async def twice(x):\n  nonlocal active,peak\n  active+=1;peak=max(peak,active);await asyncio.sleep(0);active-=1;return x*2\n assert await bounded_map(range(9),twice,2)==list(range(0,18,2));assert peak==2\nasyncio.run(case())\n"
+        },
+        {
+          "name": "empty work and invalid capacity",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport asyncio\nasync def f(x):return x\nassert asyncio.run(bounded_map([],f,3))==[]\nassert _bad(lambda:asyncio.run(bounded_map([],f,0)))\n"
+        },
+        {
+          "name": "failed worker is not a partial success",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport asyncio\nasync def bad(x):raise ValueError('bad')\nassert _bad(lambda:asyncio.run(bounded_map([1,2],bad,2)),ExceptionGroup)\n"
+        }
+      ],
+      "hints": [
+        "Use a shared enumerate iterator and write each result to its original index.",
+        "Create only min(limit,len(values)) workers inside TaskGroup.",
+        "There is no await between taking an iterator item and assigning it to a worker, so the event loop cannot assign the same item twice. Result storage is still linear in input size; bounded concurrency is not bounded total result memory."
+      ],
+      "explanation": "There is no await between taking an iterator item and assigning it to a worker, so the event loop cannot assign the same item twice. Result storage is still linear in input size; bounded concurrency is not bounded total result memory."
+    },
+    {
+      "id": "sr-single-flight",
+      "title": "Share one in-flight computation per key",
+      "body": "# Share one in-flight computation per key\n\nA cache miss under concurrent traffic can trigger many identical requests. Single-flight coordination shares the in-flight Task for a key. Completed or failed tasks are removed so a later call can retry. This is different from storing a permanent result cache.\n\nOne caller cancelling its wait should not automatically cancel work still needed by another caller. Shield protects that shared task from this propagation. The owner still needs a lifetime policy for work that outlives all callers. Tests use Events and checkpoints to measure actual call counts rather than timing guesses.\n\n```python\nimport asyncio\nasync def main():\n    task=asyncio.create_task(asyncio.sleep(0,7))\n    values=await asyncio.gather(task,task)\n    print(values)\nasyncio.run(main())\n```\n\n## Review the design\n\nThe identity check prevents an old callback from deleting newer work for the same key. Retrieving a finished task exception prevents an abandoned shared task from producing an unobserved-exception warning.\n",
+      "task": "Implement SingleFlight with async get(key,factory), sharing one running factory(key) task per key. Remove finished tasks, and shield shared work from individual waiter cancellation.",
+      "starter": "import asyncio\n\nclass SingleFlight:\n\n    def __init__(self):\n        return None\n\n    async def get(self, key, factory):\n        return None\n",
+      "solution": "import asyncio\nclass SingleFlight:\n    def __init__(self): self.tasks={}\n    async def get(self,key,factory):\n        task=self.tasks.get(key)\n        if task is None or task.done():\n            task=asyncio.create_task(factory(key));self.tasks[key]=task\n            def clear(done):\n                if self.tasks.get(key) is done:self.tasks.pop(key,None)\n                if not done.cancelled():done.exception()\n            task.add_done_callback(clear)\n        return await asyncio.shield(task)\n",
+      "checks": [
+        {
+          "name": "coalesces concurrent callers",
+          "code": "import asyncio\nasync def case():\n calls=[];gate=asyncio.Event();s=SingleFlight()\n async def load(k):calls.append(k);await gate.wait();return 8\n a=asyncio.create_task(s.get('x',load));b=asyncio.create_task(s.get('x',load));await asyncio.sleep(0);gate.set()\n assert await asyncio.gather(a,b)==[8,8];assert calls==['x']\nasyncio.run(case())\n"
+        },
+        {
+          "name": "cancelled waiter does not cancel the shared task",
+          "code": "import asyncio\nasync def case():\n gate=asyncio.Event();s=SingleFlight()\n async def load(k):await gate.wait();return 3\n a=asyncio.create_task(s.get('x',load));b=asyncio.create_task(s.get('x',load));await asyncio.sleep(0);a.cancel()\n try:await a\n except asyncio.CancelledError:pass\n gate.set();assert await b==3\nasyncio.run(case())\n"
+        },
+        {
+          "name": "failure permits a retry",
+          "code": "import asyncio\nasync def case():\n s=SingleFlight()\n async def bad(k):raise ValueError('x')\n async def good(k):return 4\n try:await s.get('x',bad)\n except ValueError:pass\n assert await s.get('x',good)==4\nasyncio.run(case())\n"
+        }
+      ],
+      "hints": [
+        "Store Tasks rather than coroutine objects.",
+        "Use shield for each waiter and remove only the exact completed task.",
+        "The identity check prevents an old callback from deleting newer work for the same key. Retrieving a finished task exception prevents an abandoned shared task from producing an unobserved-exception warning."
+      ],
+      "explanation": "The identity check prevents an old callback from deleting newer work for the same key. Retrieving a finished task exception prevents an abandoned shared task from producing an unobserved-exception warning."
+    },
+    {
+      "id": "sr-queue-drain",
+      "title": "Drain a bounded queue before shutdown",
+      "body": "# Drain a bounded queue before shutdown\n\nA queue is not only a container: join tracks unfinished work, and each successful get requires one task_done call. Graceful shutdown stops new production while consumers drain accepted items. Immediate shutdown has a different contract and can abandon queued work.\n\nPython 3.14 provides Queue.shutdown. The local exercise uses its non-immediate mode and verifies that every accepted item finishes before returning. Returning from a producer without joining consumers can report success while writes are still pending. No worker thread or external service is needed to observe this lifecycle.\n\n```python\nimport asyncio\nasync def main():\n    q=asyncio.Queue()\n    await q.put(4)\n    q.shutdown()\n    print(await q.get())\n    q.task_done()\n    await q.join()\nasyncio.run(main())\n```\n\n## Review the design\n\nGraceful shutdown preserves already accepted work. TaskGroup owns the consumer lifetime, and task_done balances each retrieval even if processing later grows an exception path.\n",
+      "task": "Implement async drain(values) with a bounded asyncio.Queue(maxsize=2), one consumer and graceful shutdown. Return processed values doubled in order; call task_done in finally for every received item.",
+      "starter": "import asyncio\n\nasync def drain(values):\n    return None\n",
+      "solution": "import asyncio\nasync def drain(values):\n    queue=asyncio.Queue(maxsize=2);result=[]\n    async def consume():\n        while True:\n            try:value=await queue.get()\n            except asyncio.QueueShutDown:return\n            try:result.append(value*2)\n            finally:queue.task_done()\n    async with asyncio.TaskGroup() as group:\n        group.create_task(consume())\n        for value in values:await queue.put(value)\n        queue.shutdown();await queue.join()\n    return result\n",
+      "checks": [
+        {
+          "name": "drains beyond queue capacity",
+          "code": "import asyncio\nassert asyncio.run(drain([1,2,3,4,5]))==[2,4,6,8,10]\n"
+        },
+        {
+          "name": "empty shutdown completes",
+          "code": "import asyncio\nassert asyncio.run(drain([]))==[]\n"
+        },
+        {
+          "name": "supports one-pass producers",
+          "code": "import asyncio\nassert asyncio.run(drain(iter([0,-2,7])))==[0,-4,14]\n"
+        }
+      ],
+      "hints": [
+        "Run the consumer before filling a bounded queue.",
+        "Call shutdown after production, then join inside the TaskGroup.",
+        "Graceful shutdown preserves already accepted work. TaskGroup owns the consumer lifetime, and task_done balances each retrieval even if processing later grows an exception path."
+      ],
+      "explanation": "Graceful shutdown preserves already accepted work. TaskGroup owns the consumer lifetime, and task_done balances each retrieval even if processing later grows an exception path."
+    },
+    {
+      "id": "sr-exception-groups",
+      "title": "Separate failures without flattening away structure",
+      "body": "# Separate failures without flattening away structure\n\nConcurrent operations can fail independently. ExceptionGroup preserves that structure instead of losing all but the first failure. Catching the group as one generic error prevents a caller from distinguishing retryable failures from programming bugs.\n\nA split operation can select one exception type while retaining nested groups and the original leaves. This exercise returns leaf messages for reporting only; it does not pretend that flattening is sufficient for recovery. A recovery policy should continue using subgroup structure and avoid retrying work whose side effects may already have committed.\n\n```python\ngroup=ExceptionGroup(\"batch\",[\n    ValueError(\"bad input\"),\n    OSError(\"offline\")])\nselected,rest=group.split(OSError)\nprint(type(selected.exceptions[0]).__name__)\nprint(type(rest.exceptions[0]).__name__)\n```\n\n## Review the design\n\nLeaf traversal is useful for diagnostics but should not replace except-star or split when handling failures. Cancellation and interrupts also require separate ownership and propagation policies.\n",
+      "task": "Implement error_leaves(error) returning leaf exception class names in depth-first order. Handle nested BaseExceptionGroup and ordinary exceptions without including group names.",
+      "starter": "def error_leaves(error):\n    return None\n",
+      "solution": "def error_leaves(error):\n    if isinstance(error,BaseExceptionGroup):\n        return [name for child in error.exceptions for name in error_leaves(child)]\n    return [type(error).__name__]\n",
+      "checks": [
+        {
+          "name": "ordinary exception is one leaf",
+          "code": "assert error_leaves(ValueError('x'))==['ValueError']\n"
+        },
+        {
+          "name": "nested order is preserved",
+          "code": "g=ExceptionGroup('a',[ValueError('x'),ExceptionGroup('b',[OSError('y'),TypeError('z')])]);assert error_leaves(g)==['ValueError','OSError','TypeError']\n"
+        },
+        {
+          "name": "base exceptions stay visible",
+          "code": "g=BaseExceptionGroup('a',[KeyboardInterrupt(),ValueError()]);assert error_leaves(g)==['KeyboardInterrupt','ValueError']\n"
+        }
+      ],
+      "hints": [
+        "Recurse through exceptions only when the value is a BaseExceptionGroup.",
+        "An ordinary exception contributes its class name as one leaf.",
+        "Leaf traversal is useful for diagnostics but should not replace except-star or split when handling failures. Cancellation and interrupts also require separate ownership and propagation policies."
+      ],
+      "explanation": "Leaf traversal is useful for diagnostics but should not replace except-star or split when handling failures. Cancellation and interrupts also require separate ownership and propagation policies."
+    },
+    {
+      "id": "sr-data-descriptor",
+      "title": "Enforce an invariant through a data descriptor",
+      "body": "# Enforce an invariant through a data descriptor\n\nAttribute lookup has an order. A data descriptor defines setting as well as getting, so it can enforce a rule before an instance dictionary value is considered. A read-only non-data descriptor has different precedence and can be shadowed.\n\nUse a per-instance storage name established by __set_name__. Storing the value on the descriptor would share it among every instance of the owning class. The exercise checks independent owners, class access and validation of booleans, because bool is an int subclass and often slips through a domain-level integer check.\n\n```python\nclass Owner:\n    def __init__(self):\n        self._value=2\n    @property\n    def value(self):return self._value\n    @value.setter\n    def value(self,v):self._value=max(0,v)\nx=Owner();x.value=-1\nprint(x.value)\n```\n\n## Review the design\n\nDefining __set__ makes this a data descriptor. Its precedence protects ordinary assignment paths, but direct modification of backing storage remains possible; Python attribute conventions are not a security boundary.\n",
+      "task": "Implement NonNegative descriptor. On assignment accept only type(value) is int and value>=0, otherwise raise ValueError. Unset instance values read as 0. Class access returns the descriptor.",
+      "starter": "class NonNegative:\n\n    def __set_name__(self, owner, name):\n        return None\n\n    def __get__(self, instance, owner=None):\n        return None\n\n    def __set__(self, instance, value):\n        return None\n",
+      "solution": "class NonNegative:\n    def __set_name__(self,owner,name):self.storage='_'+name\n    def __get__(self,instance,owner=None):\n        if instance is None:return self\n        return instance.__dict__.get(self.storage,0)\n    def __set__(self,instance,value):\n        if type(value) is not int or value<0:raise ValueError('nonnegative integer required')\n        instance.__dict__[self.storage]=value\n",
+      "checks": [
+        {
+          "name": "isolated instance state",
+          "code": "class Box: count=NonNegative()\na,b=Box(),Box();a.count=3;assert a.count==3 and b.count==0\n"
+        },
+        {
+          "name": "rejects wrong domain values",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nclass Box: count=NonNegative()\na=Box()\nfor value in [-1,True,1.0,'2']:\n assert _bad(lambda:setattr(a,'count',value))\n"
+        },
+        {
+          "name": "class access and descriptor precedence",
+          "code": "class Box: count=NonNegative()\na=Box();a.__dict__['count']=99;assert a.count==0;assert isinstance(Box.count,NonNegative)\n"
+        }
+      ],
+      "hints": [
+        "Build a distinct backing name in __set_name__.",
+        "Return self for class access; use the instance dictionary for owned data.",
+        "Defining __set__ makes this a data descriptor. Its precedence protects ordinary assignment paths, but direct modification of backing storage remains possible; Python attribute conventions are not a security boundary."
+      ],
+      "explanation": "Defining __set__ makes this a data descriptor. Its precedence protects ordinary assignment paths, but direct modification of backing storage remains possible; Python attribute conventions are not a security boundary."
+    },
+    {
+      "id": "sr-signature-wrapper",
+      "title": "Preserve a callable contract in instrumentation",
+      "body": "# Preserve a callable contract in instrumentation\n\nInstrumentation can damage an API when it hides metadata or changes return and exception behavior. functools.wraps preserves the wrapped function relationship so introspection can recover the original signature. Timing or logging should remain an effect around the call, not a transformation of its result.\n\nThis exercise counts completed attempts through a callback and includes failed calls. The wrapper must accept arbitrary positional and keyword arguments and should not swallow errors from the wrapped function. Static ParamSpec annotations can improve type checking in a real codebase; runtime behavior still needs its own tests.\n\n```python\nimport functools,inspect\ndef trace(f):\n    @functools.wraps(f)\n    def wrapped(*args,**kwargs):\n        return f(*args,**kwargs)\n    return wrapped\n@trace\ndef add(a,b=1):return a+b\nprint(inspect.signature(add))\n```\n\n## Review the design\n\nThe wrapper preserves dynamic behavior and inspect.signature follows __wrapped__. An async function needs a separate async wrapper that awaits completion; wrapping only coroutine construction would record the wrong boundary.\n",
+      "task": "Implement instrument(function,record) preserving metadata with wraps. Call record(function.__name__) once in finally for each attempt; return the original result and propagate its exception. record itself is assumed not to fail.",
+      "starter": "from functools import wraps\n\ndef instrument(function, record):\n    return None\n",
+      "solution": "from functools import wraps\ndef instrument(function,record):\n    @wraps(function)\n    def wrapped(*args,**kwargs):\n        try:return function(*args,**kwargs)\n        finally:record(function.__name__)\n    return wrapped\n",
+      "checks": [
+        {
+          "name": "keeps the public call signature",
+          "code": "import inspect\ndef add(a,b=2):return a+b\nlog=[];f=instrument(add,log.append);assert str(inspect.signature(f))=='(a, b=2)';assert f.__name__=='add'\n"
+        },
+        {
+          "name": "records successful return",
+          "code": "log=[]\ndef add(a,b=2):return a+b\nassert instrument(add,log.append)(3,b=4)==7;assert log==['add']\n"
+        },
+        {
+          "name": "records failure and keeps exception",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nlog=[]\ndef bad():raise KeyError('x')\nassert _bad(instrument(bad,log.append),KeyError);assert log==['bad']\n"
+        }
+      ],
+      "hints": [
+        "Apply wraps to the inner function, not to the instrumentation callback.",
+        "Use finally so failed attempts are observable too.",
+        "The wrapper preserves dynamic behavior and inspect.signature follows __wrapped__. An async function needs a separate async wrapper that awaits completion; wrapping only coroutine construction would record the wrong boundary."
+      ],
+      "explanation": "The wrapper preserves dynamic behavior and inspect.signature follows __wrapped__. An async function needs a separate async wrapper that awaits completion; wrapping only coroutine construction would record the wrong boundary."
+    },
+    {
+      "id": "sr-merge-streams",
+      "title": "Merge sorted feeds with bounded lookahead",
+      "body": "# Merge sorted feeds with bounded lookahead\n\nA global sort requires every record to be materialized. If each input stream is already sorted, a heap can emit the next smallest record with one lookahead per stream. The memory bound depends on the number of streams instead of the total record count.\n\nProduction stream contracts must define ordering and tie behavior. This exercise works with comparable numbers and preserves duplicates. A one-pass test rejects implementations that rewind an input. A prefix test uses an infinite sorted stream, making eager consumption a correctness failure rather than merely a performance concern.\n\n```python\nimport heapq,itertools\nleft=iter([1,4,7])\nright=iter([2,2,9])\nmerged=heapq.merge(left,right)\nprint(list(itertools.islice(merged,4)))\n```\n\n## Review the design\n\nThe sorted-input precondition is essential. A heap merge cannot repair an internally unsorted source without buffering or reordering it. Output storage is proportional to the requested prefix.\n",
+      "task": "Implement merge_prefix(streams,n), returning at most n sorted values from already sorted iterables. Do not materialize entire streams. Reject negative n.",
+      "starter": "import heapq, itertools\n\ndef merge_prefix(streams, n):\n    return None\n",
+      "solution": "import heapq,itertools\ndef merge_prefix(streams,n):\n    if n<0:raise ValueError('negative count')\n    return list(itertools.islice(heapq.merge(*streams),n))\n",
+      "checks": [
+        {
+          "name": "retains duplicates across streams",
+          "code": "assert merge_prefix([iter([1,3]),iter([1,2])],4)==[1,1,2,3]\n"
+        },
+        {
+          "name": "takes a finite prefix of an infinite feed",
+          "code": "import itertools\nassert merge_prefix([itertools.count(0,2),iter([1,3])],5)==[0,1,2,3,4]\n"
+        },
+        {
+          "name": "empty and invalid count",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert merge_prefix([],5)==[];assert merge_prefix([iter([1])],0)==[];assert _bad(lambda:merge_prefix([],-1))\n"
+        }
+      ],
+      "hints": [
+        "heapq.merge produces a lazy sorted iterator.",
+        "Limit it with islice before constructing a list.",
+        "The sorted-input precondition is essential. A heap merge cannot repair an internally unsorted source without buffering or reordering it. Output storage is proportional to the requested prefix."
+      ],
+      "explanation": "The sorted-input precondition is essential. A heap merge cannot repair an internally unsorted source without buffering or reordering it. Output storage is proportional to the requested prefix."
+    }
+  ]
+}

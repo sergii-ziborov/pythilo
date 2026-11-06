@@ -214,3 +214,29 @@ three checks for each lesson. Home shows 308/23. Proof:
 `build/logs/library-new-live-audit.json`, `library-final-public-smoke.log`,
 `expanded-site-tests-cold-start.log`. Native verification additionally executed
 all 408 solutions and all 465 reading blocks without skips.
+
+The advanced expansion was published on 6 November 2026: 74 lessons in seven
+courses, including six integrated projects, and 20 companion Labs. Totals are
+382 path lessons in 30 courses plus 100 interview tasks; 72 native Labs (33 ML,
+16 AI), of which 50 run in the browser. Forty lesson/Lab pairs have reciprocal
+links. `/learn/senior/` publishes three paths, review criteria and the real
+production/model/hardware work still required beyond local exercises.
+
+Content deployment `pythilo-senior-final-deploy-20261106-v4` was followed by a
+navigation-style repair at 11:50:33 UTC, receipt
+`pythilo-senior-css-deploy-20261106-v2`. Serving image:
+`sha256:3aaecff08c3816996be03240ddd2738ce357c8567071b7ceb36e4c49ed339beb`;
+source revision:
+`sha256:f56b9c34886153300a4e3a9670c4f456be785284b914abfc9584108aa0dfb640`.
+Build and registry receipts use the same `pythilo-senior-css-…-20261106-v2`
+prefix; archived receipts are in `build/release-receipts/senior-css-release.json`.
+Lesson editor positioning is scoped to `.lesson-editor`, so retained Next.js CSS
+cannot overlay a Lab or intercept its lesson link after client navigation.
+
+All 85 site tests pass, including 428 browser solutions, 483 reading blocks and
+every browser Lab answer/starter. The 608-page production build includes type
+checking. Production audits cover all 94 new lesson/Lab routes, three paths and
+40 reciprocal links, followed by the public smoke suite. A real browser ran a
+reading example, passed the ROC AUC lesson's three checks, replayed its Lab to
+step 11/11 with three passing checks and returned through the lesson link after
+client navigation. Proof: `build/verification/pythilo-senior-lab-live.png`.

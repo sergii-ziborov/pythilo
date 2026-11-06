@@ -4,6 +4,7 @@ export type BrowserLab = {
   id: string; title: string; summary: string; section: string; idea: string;
   variants: { id: string; title: string; prompt: string; file: string; scales: boolean }[];
   starter: string; answer: string;
+  lessons?: string[];
 };
 export const browserLabs = snapshot.labs as BrowserLab[];
 export const labSources: Record<string,string> = snapshot.sources;

@@ -2,6 +2,39 @@ import XCTest
 
 @MainActor
 final class CourseNavigationTests: XCTestCase {
+    func testLabTabCanOpenItsRelatedLessonAndReturnToPractice() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-tab", "labs", "-openLab", "rocauc"]
+        app.launch()
+        let lesson = app.buttons["lab-lesson-stat-roc-auc"]
+        XCTAssertTrue(lesson.waitForExistence(timeout: 30))
+        lesson.tap()
+        let lab = app.buttons["lesson-lab-rocauc"]
+        XCTAssertTrue(lab.waitForExistence(timeout: 10))
+        lab.tap()
+        XCTAssertTrue(app.buttons["lab-answer"].waitForExistence(timeout: 10))
+    }
+
+    func testRelatedLessonAndLabNavigateInBothDirections() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-tab", "learn", "-openLesson", "stat-roc-auc"]
+        app.launch()
+        let link = app.buttons["lesson-lab-rocauc"]
+        XCTAssertTrue(link.waitForExistence(timeout: 30))
+        link.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5)).tap()
+        XCTAssertTrue(app.buttons["lab-answer"].waitForExistence(timeout: 10))
+        let lesson = app.buttons["lab-lesson-stat-roc-auc"]
+        XCTAssertTrue(lesson.exists)
+        lesson.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5)).tap()
+        XCTAssertTrue(app.buttons["lesson-lab-rocauc"].waitForExistence(timeout: 10))
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "senior-lesson-lab-linked"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testPydanticRootModelWorkedSolutionPassesThroughTheLessonUI() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

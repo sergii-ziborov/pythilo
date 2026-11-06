@@ -1,0 +1,344 @@
+{
+  "id": "python-systems",
+  "title": "Python: transactions and resilient services",
+  "summary": "Twelve production-oriented contracts: transactional outbox, deduplication, optimistic concurrency, savepoints, pagination, migrations, overload controls and service objectives. SQLite and injected clocks make failure paths reproducible.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "sys-outbox",
+      "title": "Commit a business row and an outbox atomically",
+      "body": "# Commit a business row and an outbox atomically\n\nA database transaction cannot atomically commit a remote message broker too. A transactional outbox stores the business change and a message intent in the same database commit. A separate dispatcher may publish that intent more than once, so consumers still need deduplication.\n\nThe local exercise uses two real SQLite tables and an injected failure between their writes. It checks durable database state after the failure rather than trusting a returned success flag. Do not describe this pattern as exactly-once delivery: the uncertain window moves to dispatch and acknowledgement.\n\n```python\nimport sqlite3\nwith sqlite3.connect(\":memory:\") as db:\n    db.execute(\"create table events(id text)\")\n    try:\n        with db:\n            db.execute(\"insert into events values ('a')\")\n            raise ValueError(\"abort\")\n    except ValueError:pass\n    print(db.execute(\"select count(*) from events\").fetchone())\n```\n\n## Review the design\n\nThe connection context commits on successful exit and rolls back on an exception. It does not close the connection. An outbox dispatcher must separately handle retries, acknowledgements and duplicate delivery.\n",
+      "task": "Implement commit_order(db,key,amount,fail=False). In one transaction insert orders(id,amount), then outbox(id,payload) with payload=str(amount). If fail, raise RuntimeError between writes. The tables exist; propagate uniqueness errors and roll back both writes.",
+      "starter": "def commit_order(db, key, amount, fail=False):\n    return None\n",
+      "solution": "def commit_order(db,key,amount,fail=False):\n    with db:\n        db.execute('insert into orders values (?,?)',(key,amount))\n        if fail:raise RuntimeError('between writes')\n        db.execute('insert into outbox values (?,?)',(key,str(amount)))\n",
+      "checks": [
+        {
+          "name": "commits both sides",
+          "code": "import sqlite3\ndb=sqlite3.connect(':memory:');db.executescript('create table orders(id text primary key,amount int);create table outbox(id text primary key,payload text);');commit_order(db,'a',7);assert db.execute('select * from outbox').fetchall()==[('a','7')];assert db.execute('select * from orders').fetchall()==[('a',7)];db.close()\n"
+        },
+        {
+          "name": "rolls back an interrupted transaction",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport sqlite3\ndb=sqlite3.connect(':memory:');db.executescript('create table orders(id text primary key,amount int);create table outbox(id text primary key,payload text);');assert _bad(lambda:commit_order(db,'a',7,True),RuntimeError);assert db.execute('select count(*) from orders').fetchone()==(0,);assert db.execute('select count(*) from outbox').fetchone()==(0,);db.close()\n"
+        },
+        {
+          "name": "second insert failure rolls back the first",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport sqlite3\ndb=sqlite3.connect(':memory:');db.executescript(\"create table orders(id text primary key,amount int);create table outbox(id text primary key,payload text);insert into outbox values('a','old');\");assert _bad(lambda:commit_order(db,'a',7),sqlite3.IntegrityError);assert db.execute('select * from orders').fetchall()==[];db.close()\n"
+        }
+      ],
+      "hints": [
+        "Place both parameterized INSERT statements inside the same transaction.",
+        "Raise the injected error before the outbox insert, while the context is still active.",
+        "The connection context commits on successful exit and rolls back on an exception. It does not close the connection. An outbox dispatcher must separately handle retries, acknowledgements and duplicate delivery."
+      ],
+      "explanation": "The connection context commits on successful exit and rolls back on an exception. It does not close the connection. An outbox dispatcher must separately handle retries, acknowledgements and duplicate delivery."
+    },
+    {
+      "id": "sys-inbox",
+      "title": "Deduplicate an event in the same transaction as its effect",
+      "body": "# Deduplicate an event in the same transaction as its effect\n\nAt-least-once delivery means a consumer must expect duplicate events. Recording a processed identifier separately from the business effect introduces two failure windows: a lost effect or a repeated effect. A uniqueness constraint and one transaction close those local windows.\n\nAn identifier alone is not permission to ignore a changed payload. This contract rejects a replay whose amount differs from the original event. In production, scope identifiers to a tenant and producer, define retention, and decide how poison messages are handled. The exercise demonstrates durable local deduplication, not an end-to-end exactly-once guarantee.\n\n```python\nimport sqlite3\nwith sqlite3.connect(\":memory:\") as db:\n    db.execute(\"create table inbox(id text primary key)\")\n    db.execute(\"insert into inbox values (?)\",(\"a\",))\n    print(db.execute(\"select id from inbox\").fetchall())\n```\n\n## Review the design\n\nThis serial SQLite exercise proves the local invariant. A concurrent database deployment additionally needs an isolation and uniqueness-conflict policy; a read-then-write sequence by itself is not a cross-process lock.\n",
+      "task": "Implement apply_event(db,key,amount). Tables inbox(id primary key,amount) and totals(value) with one row exist. First delivery inserts the inbox row and increments total atomically, returning True. Identical replay returns False; changed amount raises ValueError.",
+      "starter": "def apply_event(db, key, amount):\n    return None\n",
+      "solution": "def apply_event(db,key,amount):\n    with db:\n        row=db.execute('select amount from inbox where id=?',(key,)).fetchone()\n        if row is not None:\n            if row[0]!=amount:raise ValueError('conflicting replay')\n            return False\n        db.execute('insert into inbox values (?,?)',(key,amount))\n        db.execute('update totals set value=value+?',(amount,))\n    return True\n",
+      "checks": [
+        {
+          "name": "duplicate has one effect",
+          "code": "import sqlite3\ndb=sqlite3.connect(':memory:');db.executescript('create table inbox(id text primary key,amount int);create table totals(value int);insert into totals values(0);');assert apply_event(db,'a',5) is True;assert apply_event(db,'a',5) is False;assert db.execute('select value from totals').fetchone()==(5,);db.close()\n"
+        },
+        {
+          "name": "conflicting replay is rejected",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport sqlite3\ndb=sqlite3.connect(':memory:');db.executescript('create table inbox(id text primary key,amount int);create table totals(value int);insert into totals values(0);');apply_event(db,'a',5);assert _bad(lambda:apply_event(db,'a',6));assert db.execute('select value from totals').fetchone()==(5,);db.close()\n"
+        },
+        {
+          "name": "distinct keys apply independently",
+          "code": "import sqlite3\ndb=sqlite3.connect(':memory:');db.executescript('create table inbox(id text primary key,amount int);create table totals(value int);insert into totals values(0);');apply_event(db,'a',5);apply_event(db,'b',-2);assert db.execute('select value from totals').fetchone()==(3,);db.close()\n"
+        }
+      ],
+      "hints": [
+        "Read and compare an existing payload before declaring a replay harmless.",
+        "The inbox INSERT and total UPDATE need one commit boundary.",
+        "This serial SQLite exercise proves the local invariant. A concurrent database deployment additionally needs an isolation and uniqueness-conflict policy; a read-then-write sequence by itself is not a cross-process lock."
+      ],
+      "explanation": "This serial SQLite exercise proves the local invariant. A concurrent database deployment additionally needs an isolation and uniqueness-conflict policy; a read-then-write sequence by itself is not a cross-process lock."
+    },
+    {
+      "id": "sys-optimistic-lock",
+      "title": "Reject stale writes with a compare-and-swap",
+      "body": "# Reject stale writes with a compare-and-swap\n\nTwo clients can both read version four and compute different replacements. A last-writer-wins UPDATE silently loses one change. Optimistic concurrency makes the version part of the write predicate and checks the affected row count.\n\nThe database performs the comparison and update together. Checking the version in Python and then issuing an unconditional UPDATE recreates the race. This exercise uses sequential conflicting writes to demonstrate the same lost-update contract deterministically. A stale writer should re-read and reconsider the operation, not blindly overwrite the newer value.\n\n```python\nimport sqlite3\nwith sqlite3.connect(\":memory:\") as db:\n    db.execute(\"create table docs(id int,version int)\")\n    db.execute(\"insert into docs values(1,2)\")\n    result=db.execute(\"update docs set version=3 where id=1 and version=1\")\n    print(result.rowcount)\n```\n\n## Review the design\n\nThe version predicate belongs in the database statement. Retrying an operation that encodes business intent may be appropriate; retrying a stale replacement without recomputing its intent is data loss.\n",
+      "task": "Implement replace_version(db,key,expected,text) for docs(id primary key,version,body). Atomically update body and increment version only if expected matches. Return True for one changed row, otherwise False.",
+      "starter": "def replace_version(db, key, expected, text):\n    return None\n",
+      "solution": "def replace_version(db,key,expected,text):\n    with db:\n        result=db.execute('update docs set body=?,version=version+1 where id=? and version=?',(text,key,expected))\n    return result.rowcount==1\n",
+      "checks": [
+        {
+          "name": "increments a matching version",
+          "code": "import sqlite3\ndb=sqlite3.connect(':memory:');db.executescript(\"create table docs(id text primary key,version int,body text);insert into docs values('a',1,'old');\");assert replace_version(db,'a',1,'new');assert db.execute('select version,body from docs').fetchone()==(2,'new');db.close()\n"
+        },
+        {
+          "name": "stale writer cannot overwrite",
+          "code": "import sqlite3\ndb=sqlite3.connect(':memory:');db.executescript(\"create table docs(id text primary key,version int,body text);insert into docs values('a',2,'winner');\");assert replace_version(db,'a',1,'loser') is False;assert db.execute('select body from docs').fetchone()==('winner',);db.close()\n"
+        },
+        {
+          "name": "missing record stays missing",
+          "code": "import sqlite3\ndb=sqlite3.connect(':memory:');db.execute('create table docs(id text primary key,version int,body text)');assert replace_version(db,'none',0,'x') is False;db.close()\n"
+        }
+      ],
+      "hints": [
+        "Include both id and expected version in WHERE.",
+        "Use cursor.rowcount to distinguish success from a stale or missing row.",
+        "The version predicate belongs in the database statement. Retrying an operation that encodes business intent may be appropriate; retrying a stale replacement without recomputing its intent is data loss."
+      ],
+      "explanation": "The version predicate belongs in the database statement. Retrying an operation that encodes business intent may be appropriate; retrying a stale replacement without recomputing its intent is data loss."
+    },
+    {
+      "id": "sys-savepoint",
+      "title": "Roll back one item without losing the batch",
+      "body": "# Roll back one item without losing the batch\n\nA batch may contain one invalid record while earlier records should still commit. A savepoint provides a nested rollback boundary inside the outer transaction. Releasing it does not mean the entire transaction is durable; the outer commit still owns that decision.\n\nThis exercise accepts positive amounts and skips invalid or duplicate identifiers. Rollback must target only the current item, so a blanket connection rollback is incorrect. The check deliberately places an invalid record between valid ones. Production systems also need an explicit result for each rejected item so silent partial success does not surprise callers.\n\n```python\nimport sqlite3\nwith sqlite3.connect(\":memory:\") as db:\n    db.execute(\"create table x(value int)\")\n    db.execute(\"savepoint item\")\n    db.execute(\"insert into x values(1)\")\n    db.execute(\"rollback to item\")\n    db.execute(\"release item\")\n    print(db.execute(\"select * from x\").fetchall())\n```\n\n## Review the design\n\nThe explicit BEGIN prevents the first released savepoint from becoming the outermost commit. This function owns its transaction and expects an idle connection; callers already inside a transaction need a different nesting contract.\n",
+      "task": "Implement insert_valid(db,rows) for ledger(id primary key,amount check(amount>0)). Within one outer transaction use one savepoint per row, skip sqlite3.IntegrityError items, and return the number inserted.",
+      "starter": "import sqlite3\n\ndef insert_valid(db, rows):\n    return None\n",
+      "solution": "import sqlite3\ndef insert_valid(db,rows):\n    count=0\n    with db:\n        db.execute('begin')\n        for key,amount in rows:\n            db.execute('savepoint item')\n            try:\n                db.execute('insert into ledger values (?,?)',(key,amount));count+=1\n            except sqlite3.IntegrityError:db.execute('rollback to item')\n            finally:db.execute('release item')\n    return count\n",
+      "checks": [
+        {
+          "name": "valid neighbors survive rejection",
+          "code": "import sqlite3\ndb=sqlite3.connect(':memory:');db.execute('create table ledger(id text primary key,amount int check(amount>0))');assert insert_valid(db,[('a',1),('b',-1),('c',2)])==2;assert db.execute('select id from ledger order by id').fetchall()==[('a',),('c',)];db.close()\n"
+        },
+        {
+          "name": "duplicate does not discard earlier write",
+          "code": "import sqlite3\ndb=sqlite3.connect(':memory:');db.execute('create table ledger(id text primary key,amount int check(amount>0))');assert insert_valid(db,[('a',1),('a',2),('b',3)])==2;assert db.execute('select amount from ledger where id=?',('a',)).fetchone()==(1,);db.close()\n"
+        },
+        {
+          "name": "empty batch is valid",
+          "code": "import sqlite3\ndb=sqlite3.connect(':memory:');db.execute('create table ledger(id text primary key,amount int check(amount>0))');assert insert_valid(db,[])==0;db.close()\n"
+        }
+      ],
+      "hints": [
+        "Begin the outer transaction before creating savepoints.",
+        "On an integrity error roll back to the savepoint, then release it.",
+        "The explicit BEGIN prevents the first released savepoint from becoming the outermost commit. This function owns its transaction and expects an idle connection; callers already inside a transaction need a different nesting contract."
+      ],
+      "explanation": "The explicit BEGIN prevents the first released savepoint from becoming the outermost commit. This function owns its transaction and expects an idle connection; callers already inside a transaction need a different nesting contract."
+    },
+    {
+      "id": "sys-keyset",
+      "title": "Paginate through a stable composite order",
+      "body": "# Paginate through a stable composite order\n\nOffset pagination can skip or repeat rows when preceding data changes. A keyset cursor identifies the last ordering key instead. When timestamps tie, a unique identifier must break ties or a page boundary can permanently lose rows.\n\nThe cursor contains both timestamp and identifier, and the next page uses a strict lexicographic comparison. This handles tied timestamps and insertions before the cursor. It is not a historical snapshot: a newly inserted row after the cursor may appear in a later page. Clients that need snapshot semantics must carry a snapshot boundary too.\n\n```python\nrows=[(1,\"a\"),(1,\"b\"),(2,\"c\")]\ncursor=(1,\"a\")\nprint([row for row in rows if row>cursor])\n```\n\n## Review the design\n\nA real database should apply the composite predicate, ORDER BY and LIMIT against a supporting index. Sorting a supplied in-memory fixture demonstrates ordering semantics, not the scalability of a database query plan.\n",
+      "task": "Implement page_after(rows,cursor,limit). rows are (timestamp,id) pairs in any order. Return sorted rows strictly greater than cursor, or from the beginning for None, at most limit. Require positive limit.",
+      "starter": "def page_after(rows, cursor, limit):\n    return None\n",
+      "solution": "def page_after(rows,cursor,limit):\n    if limit<1:raise ValueError('positive page size required')\n    return sorted(row for row in rows if cursor is None or row>cursor)[:limit]\n",
+      "checks": [
+        {
+          "name": "ties use the identifier",
+          "code": "assert page_after([(2,'c'),(1,'b'),(1,'a')],(1,'a'),2)==[(1,'b'),(2,'c')]\n"
+        },
+        {
+          "name": "new rows before cursor do not shift a page",
+          "code": "assert page_after([(0,'new'),(1,'a'),(2,'b')],(1,'a'),5)==[(2,'b')]\n"
+        },
+        {
+          "name": "initial empty and invalid pages",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert page_after([(2,'b'),(1,'a')],None,1)==[(1,'a')];assert page_after([],None,2)==[];assert _bad(lambda:page_after([],None,0))\n"
+        }
+      ],
+      "hints": [
+        "Use the full tuple for both sorting and cursor comparison.",
+        "The comparison must be strict, otherwise the previous final row repeats.",
+        "A real database should apply the composite predicate, ORDER BY and LIMIT against a supporting index. Sorting a supplied in-memory fixture demonstrates ordering semantics, not the scalability of a database query plan."
+      ],
+      "explanation": "A real database should apply the composite predicate, ORDER BY and LIMIT against a supporting index. Sorting a supplied in-memory fixture demonstrates ordering semantics, not the scalability of a database query plan."
+    },
+    {
+      "id": "sys-migration",
+      "title": "Apply a schema migration once and atomically",
+      "body": "# Apply a schema migration once and atomically\n\nSchema evolution needs a durable record of which migration has committed. Recording a version before the schema change succeeds can leave an unrecoverable mismatch. Recording it in the same transaction makes a retry safe after a crash or validation failure.\n\nThis SQLite migration adds a nullable column and records version one. SQL executes one statement at a time: executescript can alter transaction boundaries, so it is deliberately excluded. Real rolling deployments should also use expand-and-contract compatibility, because an atomic migration does not guarantee that an old application version understands the new schema.\n\n```python\nimport sqlite3\nwith sqlite3.connect(\":memory:\") as db:\n    db.execute(\"create table data(id int)\")\n    db.execute(\"alter table data add column note text\")\n    print([r[1] for r in db.execute(\"pragma table_info(data)\")])\n```\n\n## Review the design\n\nThe version and schema share one commit. Database engines differ in transactional DDL support, so this guarantee is SQLite-specific and must be rechecked when migrating the pattern to another engine.\n",
+      "task": "Implement migrate_note(db,fail=False). Existing tables data(id) and migrations(version primary key). If version 1 exists return False. Otherwise begin a transaction, add note TEXT, optionally raise RuntimeError, insert migration 1 and return True. Expect an idle connection.",
+      "starter": "def migrate_note(db, fail=False):\n    return None\n",
+      "solution": "def migrate_note(db,fail=False):\n    if db.execute('select 1 from migrations where version=1').fetchone():return False\n    with db:\n        db.execute('begin')\n        db.execute('alter table data add column note text')\n        if fail:raise RuntimeError('migration interrupted')\n        db.execute('insert into migrations values(1)')\n    return True\n",
+      "checks": [
+        {
+          "name": "applies and records once",
+          "code": "import sqlite3\ndb=sqlite3.connect(':memory:');db.executescript('create table data(id int);create table migrations(version int primary key);');assert migrate_note(db);assert migrate_note(db) is False;assert [r[1] for r in db.execute('pragma table_info(data)')]==['id','note'];db.close()\n"
+        },
+        {
+          "name": "failure rolls back schema and version",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport sqlite3\ndb=sqlite3.connect(':memory:');db.executescript('create table data(id int);create table migrations(version int primary key);');assert _bad(lambda:migrate_note(db,True),RuntimeError);assert [r[1] for r in db.execute('pragma table_info(data)')]==['id'];assert db.execute('select * from migrations').fetchall()==[];db.close()\n"
+        },
+        {
+          "name": "retry succeeds after rollback",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport sqlite3\ndb=sqlite3.connect(':memory:');db.executescript('create table data(id int);create table migrations(version int primary key);');assert _bad(lambda:migrate_note(db,True),RuntimeError);assert migrate_note(db);db.close()\n"
+        }
+      ],
+      "hints": [
+        "Use an explicit transaction before transactional DDL.",
+        "Record the migration version only after the schema statement succeeds.",
+        "The version and schema share one commit. Database engines differ in transactional DDL support, so this guarantee is SQLite-specific and must be rechecked when migrating the pattern to another engine."
+      ],
+      "explanation": "The version and schema share one commit. Database engines differ in transactional DDL support, so this guarantee is SQLite-specific and must be rechecked when migrating the pattern to another engine."
+    },
+    {
+      "id": "sys-token-bucket",
+      "title": "Refill a rate limit with an injected monotonic clock",
+      "body": "# Refill a rate limit with an injected monotonic clock\n\nA token bucket permits a burst while enforcing a longer-term rate. Refill depends on elapsed monotonic time, not wall-clock dates that can jump. The bucket stores its last observation and clamps the number of available tokens to capacity.\n\nThis exercise makes the clock an argument, so boundary cases run immediately and repeatably. A backwards timestamp is rejected instead of manufacturing or removing tokens. A single in-memory bucket limits one owner only; several application processes need shared coordination or deliberately partitioned budgets. It should not be advertised as a global rate limit.\n\n```python\ncapacity=3\navailable=0.5\nelapsed=2\nrate=1\nprint(min(capacity,available+elapsed*rate))\n```\n\n## Review the design\n\nInjected monotonic time makes refill deterministic. Authentication, tenant-specific quotas and shared state remain separate service responsibilities; a local counter cannot enforce a fleet-wide policy.\n",
+      "task": "Implement Bucket(capacity,rate,start=0) and allow(now). Start full, refill by elapsed*rate, consume one token if available, return bool. Require capacity>=1, rate>=0 and nondecreasing now.",
+      "starter": "class Bucket:\n\n    def __init__(self, capacity, rate, start=0):\n        return None\n\n    def allow(self, now):\n        return None\n",
+      "solution": "class Bucket:\n    def __init__(self,capacity,rate,start=0):\n        if capacity<1 or rate<0:raise ValueError('invalid bucket')\n        self.capacity=capacity;self.rate=rate;self.tokens=float(capacity);self.last=start\n    def allow(self,now):\n        if now<self.last:raise ValueError('backwards clock')\n        self.tokens=min(self.capacity,self.tokens+(now-self.last)*self.rate);self.last=now\n        if self.tokens<1:return False\n        self.tokens-=1;return True\n",
+      "checks": [
+        {
+          "name": "burst is bounded",
+          "code": "b=Bucket(2,1);assert [b.allow(0) for _ in range(3)]==[True,True,False]\n"
+        },
+        {
+          "name": "fractional refill and cap",
+          "code": "b=Bucket(1,2);assert b.allow(0);assert not b.allow(.25);assert b.allow(.5);assert b.allow(100);assert not b.allow(100)\n"
+        },
+        {
+          "name": "rejects invalid state transitions",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:Bucket(0,1));assert _bad(lambda:Bucket(1,-1));b=Bucket(1,0);b.allow(2);assert _bad(lambda:b.allow(1))\n"
+        }
+      ],
+      "hints": [
+        "Track fractional tokens and the last injected timestamp.",
+        "Cap refill before consuming a token; update the timestamp on rejections too.",
+        "Injected monotonic time makes refill deterministic. Authentication, tenant-specific quotas and shared state remain separate service responsibilities; a local counter cannot enforce a fleet-wide policy."
+      ],
+      "explanation": "Injected monotonic time makes refill deterministic. Authentication, tenant-specific quotas and shared state remain separate service responsibilities; a local counter cannot enforce a fleet-wide policy."
+    },
+    {
+      "id": "sys-circuit-breaker",
+      "title": "Separate breaker state from retry policy",
+      "body": "# Separate breaker state from retry policy\n\nA circuit breaker stops repeated work against a dependency after enough consecutive failures. Its states express permission to attempt a call: closed, open and a single half-open probe after a cooldown. A retry policy instead decides whether and when to repeat one logical operation.\n\nThe exercise models sequential attempts and injects time. Its half-open state permits only one probe; concurrent production use would require synchronization around admission. Outcomes are reported explicitly after each admitted attempt. A timeout must be treated as an uncertain side effect, not automatic evidence that repeating a write is safe.\n\n```python\nfailures=3\nthreshold=3\nopened_at=10\ncooldown=5\nprint(failures>=threshold)\nprint(14-opened_at>=cooldown)\n```\n\n## Review the design\n\nThe sequential state machine is executable and testable, but a multi-caller service needs an atomic admission lock. Probe ownership and cleanup must be defined if a caller disappears before reporting an outcome.\n",
+      "task": "Implement Breaker(threshold,cooldown): permit(now), success(), failure(now). Start closed; threshold consecutive failures opens. After cooldown allow one probe and deny others until outcome. Success closes and resets; failed probe reopens. Positive threshold and nonnegative cooldown required.",
+      "starter": "class Breaker:\n\n    def __init__(self, threshold, cooldown):\n        return None\n\n    def permit(self, now):\n        return None\n\n    def success(self):\n        return None\n\n    def failure(self, now):\n        return None\n",
+      "solution": "class Breaker:\n    def __init__(self,threshold,cooldown):\n        if threshold<1 or cooldown<0:raise ValueError('invalid policy')\n        self.threshold=threshold;self.cooldown=cooldown;self.failures=0;self.state='closed';self.opened=0\n    def permit(self,now):\n        if self.state=='closed':return True\n        if self.state=='open' and now-self.opened>=self.cooldown:\n            self.state='half';return True\n        return False\n    def success(self):self.state='closed';self.failures=0\n    def failure(self,now):\n        self.failures+=1\n        if self.state=='half' or self.failures>=self.threshold:self.state='open';self.opened=now\n",
+      "checks": [
+        {
+          "name": "opens only at threshold",
+          "code": "b=Breaker(2,5);assert b.permit(0);b.failure(0);assert b.permit(1);b.failure(1);assert not b.permit(2)\n"
+        },
+        {
+          "name": "one probe and successful recovery",
+          "code": "b=Breaker(1,5);b.failure(0);assert not b.permit(4);assert b.permit(5);assert not b.permit(5);b.success();assert b.permit(5);assert b.failures==0\n"
+        },
+        {
+          "name": "failed probe restarts cooldown",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nb=Breaker(1,3);b.failure(0);assert b.permit(3);b.failure(3);assert not b.permit(5);assert b.permit(6);assert _bad(lambda:Breaker(0,1))\n"
+        }
+      ],
+      "hints": [
+        "Keep half-open distinct from both open and closed.",
+        "Move to half-open at admission, before the probe starts.",
+        "The sequential state machine is executable and testable, but a multi-caller service needs an atomic admission lock. Probe ownership and cleanup must be defined if a caller disappears before reporting an outcome."
+      ],
+      "explanation": "The sequential state machine is executable and testable, but a multi-caller service needs an atomic admission lock. Probe ownership and cleanup must be defined if a caller disappears before reporting an outcome."
+    },
+    {
+      "id": "sys-deadline-budget",
+      "title": "Spend one end-to-end deadline across retries",
+      "body": "# Spend one end-to-end deadline across retries\n\nIndependent timeout values can accidentally multiply the latency of one request. An end-to-end deadline limits the whole operation, including attempts and backoff. Before admitting another attempt, reserve enough time for that attempt instead of checking only whether the sleep fits.\n\nThis planner accepts elapsed time and deterministic candidate delays. It schedules full attempts only and never sleeps. Equality at the budget boundary is accepted by contract. Production jitter, retryable error classification and idempotency are independent decisions. Retrying every error until a timer expires is not a resilience strategy.\n\n```python\nbudget=1.0\nelapsed=0.4\ndelay=0.2\nattempt=0.3\nprint(elapsed+delay+attempt<=budget)\n```\n\n## Review the design\n\nA real request uses an absolute monotonic deadline and measures actual elapsed time. The pure planner isolates the arithmetic contract; it is not a claim that real operations always consume their estimated duration.\n",
+      "task": "Implement retry_plan(budget,attempt,delays). The initial attempt consumes attempt seconds; each listed retry consumes delay+attempt. Return admitted delays in order, stopping at the first that would exceed budget. Reject negative values.",
+      "starter": "def retry_plan(budget, attempt, delays):\n    return None\n",
+      "solution": "def retry_plan(budget,attempt,delays):\n    delays=list(delays)\n    if budget<0 or attempt<0 or any(d<0 for d in delays):raise ValueError('negative budget')\n    elapsed=attempt;result=[]\n    if elapsed>budget:return result\n    for delay in delays:\n        if elapsed+delay+attempt>budget:break\n        result.append(delay);elapsed+=delay+attempt\n    return result\n",
+      "checks": [
+        {
+          "name": "accounts for every full attempt",
+          "code": "assert retry_plan(10,2,[1,2,4])==[1,2]\n"
+        },
+        {
+          "name": "insufficient initial or retry budget",
+          "code": "assert retry_plan(1,2,[0])==[];assert retry_plan(4,2,[0,0])==[0]\n"
+        },
+        {
+          "name": "empty and invalid schedules",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert retry_plan(4,1,[])==[];assert _bad(lambda:retry_plan(4,1,[-1]));assert _bad(lambda:retry_plan(-1,1,[]))\n"
+        }
+      ],
+      "hints": [
+        "Initialize elapsed with the original attempt cost.",
+        "A retry requires both its delay and its full attempt cost to fit.",
+        "A real request uses an absolute monotonic deadline and measures actual elapsed time. The pure planner isolates the arithmetic contract; it is not a claim that real operations always consume their estimated duration."
+      ],
+      "explanation": "A real request uses an absolute monotonic deadline and measures actual elapsed time. The pure planner isolates the arithmetic contract; it is not a claim that real operations always consume their estimated duration."
+    },
+    {
+      "id": "sys-error-budget",
+      "title": "Calculate burn against a defined service objective",
+      "body": "# Calculate burn against a defined service objective\n\nAn SLO defines which user events count as good and the acceptable fraction over a window. Error budget is the permitted bad fraction, while burn rate compares the observed bad fraction to that allowance. A raw failure count has no meaning without its denominator and window.\n\nThis exercise calculates a window summary, including a defined result for no traffic. A complete alerting policy would combine short and long windows and avoid treating a single tiny sample as decisive. The same computation can drive a release gate, but selecting the objective is a product and operational decision rather than an automatic metric choice.\n\n```python\ngood,total=990,1000\nobjective=.999\nbad_rate=1-good/total\nprint(round(bad_rate/(1-objective),3))\n```\n\n## Review the design\n\nBurn is normalized to the objective, so one means consuming budget at the planned rate. The event definition and time window must accompany the number before it is used in an incident or release decision.\n",
+      "task": "Implement slo_window(good,total,objective). Require integers 0<=good<=total, total>=0 and 0<objective<1. Return dict availability and burn; for zero traffic return None for both.",
+      "starter": "def slo_window(good, total, objective):\n    return None\n",
+      "solution": "def slo_window(good,total,objective):\n    if type(good) is not int or type(total) is not int or not 0<=good<=total or not 0<objective<1:raise ValueError('invalid window')\n    if total==0:return {'availability':None,'burn':None}\n    return {'availability':good/total,'burn':((total-good)/total)/(1-objective)}\n",
+      "checks": [
+        {
+          "name": "reports a burned budget",
+          "code": "r=slo_window(990,1000,.999);assert abs(r['availability']-.99)<1e-12;assert abs(r['burn']-10)<1e-8\n"
+        },
+        {
+          "name": "no traffic differs from perfect service",
+          "code": "assert slo_window(0,0,.99)=={'availability':None,'burn':None};assert slo_window(10,10,.99)['burn']==0\n"
+        },
+        {
+          "name": "invalid denominators and targets",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:slo_window(3,2,.99));assert _bad(lambda:slo_window(0,-1,.99));assert _bad(lambda:slo_window(1,1,1))\n"
+        }
+      ],
+      "hints": [
+        "Compute a fraction of bad events before comparing it to the allowance.",
+        "Represent an empty window as unknown, not as a fabricated 100 percent availability.",
+        "Burn is normalized to the objective, so one means consuming budget at the planned rate. The event definition and time window must accompany the number before it is used in an incident or release decision."
+      ],
+      "explanation": "Burn is normalized to the objective, so one means consuming budget at the planned rate. The event definition and time window must accompany the number before it is used in an incident or release decision."
+    },
+    {
+      "id": "sys-body-limit",
+      "title": "Reject oversized streams before buffering them",
+      "body": "# Reject oversized streams before buffering them\n\nAn input size limit is ineffective if the server reads the entire body before checking it. Enforce the byte budget incrementally while consuming chunks, and stop as soon as the accepted prefix plus the next chunk exceeds the bound.\n\nText characters and encoded bytes are different units. This exercise accepts byte chunks and returns exact bytes without decoding. It also tests that the producer is not consumed after rejection. A service must apply corresponding limits at ingress and decompression boundaries, because a small compressed request can expand far beyond its wire size.\n\n```python\ntext=\"я\"\nprint(len(text))\nprint(len(text.encode(\"utf-8\")))\n```\n\n## Review the design\n\nThe bound limits accepted bytes and buffering, but the producer may already have allocated a large individual chunk. A complete transport should also bound chunk allocation and decoded or decompressed output.\n",
+      "task": "Implement bounded_body(chunks,limit) joining byte chunks only while the cumulative length is <=limit. Reject negative limit or oversized input with ValueError; stop consuming immediately on overflow.",
+      "starter": "def bounded_body(chunks, limit):\n    return None\n",
+      "solution": "def bounded_body(chunks,limit):\n    if limit<0:raise ValueError('negative limit')\n    parts=[];size=0\n    for chunk in chunks:\n        size+=len(chunk)\n        if size>limit:raise ValueError('body too large')\n        parts.append(chunk)\n    return b''.join(parts)\n",
+      "checks": [
+        {
+          "name": "exact byte boundary is accepted",
+          "code": "assert bounded_body([b'a',b'bc'],3)==b'abc';assert bounded_body([],0)==b''\n"
+        },
+        {
+          "name": "does not consume after overflow",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nseen=[]\ndef chunks():\n for x in [b'ab',b'cd',b'never']:\n  seen.append(x);yield x\nassert _bad(lambda:bounded_body(chunks(),3));assert seen==[b'ab',b'cd']\n"
+        },
+        {
+          "name": "unicode uses encoded byte count",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:bounded_body(['я'.encode()],1));assert _bad(lambda:bounded_body([],-1))\n"
+        }
+      ],
+      "hints": [
+        "Count len(chunk) before appending the chunk.",
+        "Raise in the loop so no subsequent chunk is pulled.",
+        "The bound limits accepted bytes and buffering, but the producer may already have allocated a large individual chunk. A complete transport should also bound chunk allocation and decoded or decompressed output."
+      ],
+      "explanation": "The bound limits accepted bytes and buffering, but the producer may already have allocated a large individual chunk. A complete transport should also bound chunk allocation and decoded or decompressed output."
+    },
+    {
+      "id": "sys-path-boundary",
+      "title": "Resolve a path before checking its containment",
+      "body": "# Resolve a path before checking its containment\n\nA string prefix is not a filesystem containment check: a sibling named root-backup can share the same prefix as root. Resolve the root and candidate with pathlib, then compare their path ancestry. Absolute names and explicit traversal components should be rejected at the input boundary.\n\nThis exercise returns a validated path without opening it. Resolution can follow existing symbolic links, but a later filesystem mutation can create a time-of-check/time-of-use race. Production file serving needs descriptor-based opening or equivalent platform controls; a correct path check by itself is not a race-free sandbox.\n\n```python\nfrom pathlib import Path\nroot=Path(\"/tmp/root\")\nsibling=Path(\"/tmp/root-backup/file\")\nprint(root in sibling.parents)\n```\n\n## Review the design\n\nPath containment validation catches structural traversal and existing symlink escapes at resolution time. It does not protect an open performed later from filesystem races; the operating system must enforce the final resource boundary.\n",
+      "task": "Resolve safe_path(root,name) to an absolute Path inside resolved root. Reject absolute names, any .. path component, backslashes, NUL and resolved paths outside root. Relative ordinary names may identify a missing file. This function validates only; it does not open the path.",
+      "starter": "from pathlib import Path\n\ndef safe_path(root, name):\n    return None\n",
+      "solution": "from pathlib import Path\ndef safe_path(root,name):\n    relative=Path(name)\n    if relative.is_absolute() or \"..\" in relative.parts or \"\\\\\" in name or \"\\x00\" in name:raise ValueError(\"invalid relative path\")\n    base=Path(root).resolve();candidate=(base/relative).resolve()\n    if candidate!=base and base not in candidate.parents:raise ValueError(\"outside root\")\n    return candidate\n",
+      "checks": [
+        {
+          "name": "relative paths remain under the root",
+          "code": "from pathlib import Path\nassert safe_path('/tmp/root','folder/file')==Path('/tmp/root/folder/file').resolve()\n"
+        },
+        {
+          "name": "traversal and absolute paths fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:safe_path('/tmp/root','../outside'));assert _bad(lambda:safe_path('/tmp/root','/tmp/root-backup/file'))\n"
+        },
+        {
+          "name": "ambiguous separators and NUL fail",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:safe_path('/tmp/root','folder'+chr(92)+'file'));assert _bad(lambda:safe_path('/tmp/root','a'+chr(0)+'b'))\n"
+        }
+      ],
+      "hints": [
+        "Reject explicit traversal before resolving the filesystem path.",
+        "Compare resolved ancestry with Path objects, never string startswith.",
+        "Path containment validation catches structural traversal and existing symlink escapes at resolution time. It does not protect an open performed later from filesystem races; the operating system must enforce the final resource boundary."
+      ],
+      "explanation": "Path containment validation catches structural traversal and existing symlink escapes at resolution time. It does not protect an open performed later from filesystem races; the operating system must enforce the final resource boundary."
+    }
+  ]
+}

@@ -1,0 +1,184 @@
+{
+  "id": "senior-projects",
+  "title": "Projects: integrate and review a complete contract",
+  "summary": "Six larger local projects combining persistence, concurrency, honest model selection, monitoring, authorized retrieval and tool execution. Each has executable failure checks and a review rubric; completing them is evidence to discuss, not a seniority certificate.",
+  "kind": "path",
+  "lessons": [
+    {
+      "id": "project-ledger",
+      "title": "Project: a tenant-scoped transactional event importer",
+      "body": "# Project: a tenant-scoped transactional event importer\n\nCombine tenant isolation, durable deduplication and all-or-nothing batch processing. A batch can contain a retry of an old event, a new event and a conflicting replay. The conflict must abort every new write in this batch while leaving earlier committed batches intact.\n\nUse real SQLite tables with a composite tenant-and-key primary key. The review should explain transaction ownership, the concurrent-writer policy, retention of deduplication records and recovery after an uncertain acknowledgement. The tests exercise local persistence and rollback; they do not turn a single-process fixture into a distributed exactly-once system.\n\n```python\nimport sqlite3\nwith sqlite3.connect(\":memory:\") as db:\n    db.execute(\"create table events(tenant text,id text,primary key(tenant,id))\")\n    db.execute(\"insert into events values(?,?)\",(\"a\",\"same\"))\n    db.execute(\"insert into events values(?,?)\",(\"b\",\"same\"))\n    print(db.execute(\"select count(*) from events\").fetchone())\n```\n\n## Review the design\n\nReview the invariant in database state after failure, not only the returned count. A production design must also specify serialization or conflict handling for concurrent writers and a bounded policy for retained event identities.\n",
+      "task": "Implement import_events(db,tenant,events), events=(key,positive integer amount). Tables events(tenant,id,amount, primary key(tenant,id)) and balances(tenant primary key,value) exist. In one transaction initialize balance if absent, apply each new event once and increment its tenant balance. Identical replay has no effect; changed amount or invalid amount raises ValueError and rolls back the whole batch. Return number of new events. Review concurrency, id retention and recovery policy after passing checks.",
+      "starter": "def import_events(db, tenant, events):\n    return None\n",
+      "solution": "def import_events(db,tenant,events):\n    inserted=0\n    with db:\n        db.execute('insert into balances values(?,0) on conflict(tenant) do nothing',(tenant,))\n        for key,amount in events:\n            if type(amount) is not int or amount<=0:raise ValueError('invalid amount')\n            row=db.execute('select amount from events where tenant=? and id=?',(tenant,key)).fetchone()\n            if row is not None:\n                if row[0]!=amount:raise ValueError('conflicting replay')\n                continue\n            db.execute('insert into events values(?,?,?)',(tenant,key,amount))\n            db.execute('update balances set value=value+? where tenant=?',(amount,tenant));inserted+=1\n    return inserted\n",
+      "checks": [
+        {
+          "name": "retries are durable and tenant scoped",
+          "code": "import sqlite3\ndb=sqlite3.connect(':memory:');db.executescript('create table events(tenant text,id text,amount int,primary key(tenant,id));create table balances(tenant text primary key,value int);');assert import_events(db,'a',[('x',3),('x',3)])==1;assert import_events(db,'b',[('x',7)])==1;assert import_events(db,'a',[('x',3)])==0;assert db.execute('select * from balances order by tenant').fetchall()==[('a',3),('b',7)];db.close()\n"
+        },
+        {
+          "name": "conflict rolls back earlier new items",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport sqlite3\ndb=sqlite3.connect(':memory:');db.executescript('create table events(tenant text,id text,amount int,primary key(tenant,id));create table balances(tenant text primary key,value int);');import_events(db,'a',[('old',2)]);assert _bad(lambda:import_events(db,'a',[('new',4),('old',9)]));assert db.execute('select id from events').fetchall()==[('old',)];assert db.execute('select value from balances').fetchone()==(2,);db.close()\n"
+        },
+        {
+          "name": "invalid items abort a new tenant batch",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport sqlite3\ndb=sqlite3.connect(':memory:');db.executescript('create table events(tenant text,id text,amount int,primary key(tenant,id));create table balances(tenant text primary key,value int);');assert _bad(lambda:import_events(db,'new',[('ok',2),('bad',True)]));assert db.execute('select * from balances').fetchall()==[];assert db.execute('select * from events').fetchall()==[];db.close()\n"
+        }
+      ],
+      "hints": [
+        "Bind both tenant and event id in every replay lookup.",
+        "The balance creation, event inserts and balance updates share one transaction.",
+        "Review the invariant in database state after failure, not only the returned count. A production design must also specify serialization or conflict handling for concurrent writers and a bounded policy for retained event identities."
+      ],
+      "explanation": "Review the invariant in database state after failure, not only the returned count. A production design must also specify serialization or conflict handling for concurrent writers and a bounded policy for retained event identities."
+    },
+    {
+      "id": "project-async-worker",
+      "title": "Project: bounded jobs with replay validation and selective retries",
+      "body": "# Project: bounded jobs with replay validation and selective retries\n\nA reliable job runner needs more than gather and a retry loop. It must bound task creation, reject conflicting duplicate jobs before causing effects, retry only the declared transient error class and clean up siblings when one job fails permanently.\n\nThis project uses a real asynchronous worker pool over a finite batch. Identical keys share one logical execution within that batch, while cross-process durability remains outside the contract. The review should explain cancellation, whether retried calls are idempotent and how accepted work is recovered after a process crash. Returning a partial dictionary must not be mistaken for a fully successful batch.\n\n```python\nimport asyncio\nasync def attempt():\n    await asyncio.sleep(0)\n    return 7\nasync def main():\n    async with asyncio.TaskGroup() as g:\n        task=g.create_task(attempt())\n    print(task.result())\nasyncio.run(main())\n```\n\n## Review the design\n\nThe project proves finite-batch coordination and failure propagation. Durability, jittered backoff, deadlines and externally idempotent effects are required design extensions, not guarantees supplied by an in-memory dictionary.\n",
+      "task": "Implement async run_jobs(jobs,call,workers,retries). jobs=(key,payload), duplicate identical keys execute once; conflicting payloads raise ValueError before any call. Use at most workers worker tasks and preserve first-key result order. Retry OSError up to retries additional attempts, propagating other errors via TaskGroup. No sleeping backoff in this local project. Require workers>=1 and retries>=0.",
+      "starter": "import asyncio\n\nasync def run_jobs(jobs, call, workers, retries):\n    return None\n",
+      "solution": "import asyncio\nasync def run_jobs(jobs,call,workers,retries):\n    if workers<1 or retries<0:raise ValueError('invalid policy')\n    unique={}\n    for key,payload in jobs:\n        if key in unique and unique[key]!=payload:raise ValueError('conflicting job')\n        unique[key]=payload\n    results={};pending=iter(unique.items())\n    async def worker():\n        for key,payload in pending:\n            for attempt in range(retries+1):\n                try:results[key]=await call(payload);break\n                except OSError:\n                    if attempt==retries:raise\n    async with asyncio.TaskGroup() as group:\n        for _ in range(min(workers,len(unique))):group.create_task(worker())\n    return {key:results[key] for key in unique}\n",
+      "checks": [
+        {
+          "name": "deduplication and active work bounds",
+          "code": "import asyncio\nasync def case():\n active=peak=0;calls=[]\n async def work(x):\n  nonlocal active,peak\n  active+=1;peak=max(peak,active);calls.append(x);await asyncio.sleep(0);active-=1;return x*2\n r=await run_jobs([('a',1),('b',2),('a',1),('c',3)],work,2,0);assert list(r)==['a','b','c'];assert r=={'a':2,'b':4,'c':6};assert sorted(calls)==[1,2,3];assert peak<=2\nasyncio.run(case())\n"
+        },
+        {
+          "name": "only transient failures are retried",
+          "code": "import asyncio\nasync def case():\n count=0\n async def work(x):\n  nonlocal count\n  count+=1\n  if count<3:raise OSError('temporary')\n  return x\n assert await run_jobs([('a',8)],work,1,2)=={'a':8};assert count==3\nasyncio.run(case())\n"
+        },
+        {
+          "name": "conflicts are rejected before effects",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport asyncio\nlog=[]\nasync def work(x):log.append(x);return x\nassert _bad(lambda:asyncio.run(run_jobs([('a',1),('a',2)],work,2,1)));assert log==[]\n"
+        },
+        {
+          "name": "permanent failures are not retried",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport asyncio\ncalls=[]\nasync def bad(x):calls.append(x);raise ValueError('permanent')\nassert _bad(lambda:asyncio.run(run_jobs([('a',1)],bad,1,5)),ExceptionGroup);assert calls==[1]\n"
+        }
+      ],
+      "hints": [
+        "Validate and deduplicate the entire batch before creating workers.",
+        "Keep retry handling narrow: only OSError consumes an additional attempt.",
+        "The project proves finite-batch coordination and failure propagation. Durability, jittered backoff, deadlines and externally idempotent effects are required design extensions, not guarantees supplied by an in-memory dictionary."
+      ],
+      "explanation": "The project proves finite-batch coordination and failure propagation. Durability, jittered backoff, deadlines and externally idempotent effects are required design extensions, not guarantees supplied by an in-memory dictionary."
+    },
+    {
+      "id": "project-ml-pipeline",
+      "title": "Project: fit, select and evaluate without leaking the test set",
+      "body": "# Project: fit, select and evaluate without leaking the test set\n\nBuild one complete numeric regression experiment: fit preprocessing on training data, train candidate ridge models, choose a penalty using validation error and evaluate the chosen model once on the test partition. Store the preprocessing state with the selected model.\n\nThe tests change test targets and ensure selection does not move. The review should explain the split unit, baseline, metric uncertainty and how an artifact would be reproduced from data and code versions. A tiny one-feature experiment makes leakage inspectable; it is not a claim that one validation split establishes generalization for every deployment population.\n\n```python\ntrain=[0.,2.]\nmean=sum(train)/len(train)\nscale=(sum((x-mean)**2 for x in train)/len(train))**.5 or 1\nprint([(x-mean)/scale for x in [1.,100.]])\n```\n\n## Review the design\n\nA reproducible experiment retains preprocessing, model state and the selection decision. A senior review should add baselines, confidence, slice analysis, dataset lineage and a release/rollback plan rather than treating zero error on a tiny fixture as deployment proof.\n",
+      "task": "Implement regression_experiment(train,validation,test,penalties), each dataset=(xs,ys) nonempty equal lengths finite. Fit train mean/population scale (constant ->1), unpenalized intercept and ridge slope minimizing SSE+penalty*w² in standardized space. Select lowest validation MSE, smaller penalty on ties. Return dict mean,scale,w,b,penalty,validation_mse,test_mse,test_predictions. Require nonempty finite nonnegative penalties. Never fit on validation/test.",
+      "starter": "import math\n\ndef regression_experiment(train, validation, test, penalties):\n    return None\n",
+      "solution": "import math\ndef regression_experiment(train,validation,test,penalties):\n    for xs,ys in [train,validation,test]:\n        if not xs or len(xs)!=len(ys) or any(not math.isfinite(v) for v in list(xs)+list(ys)):raise ValueError('invalid dataset')\n    if not penalties or any(not math.isfinite(v) or v<0 for v in penalties):raise ValueError('invalid penalty')\n    xs,ys=train;mean=sum(xs)/len(xs);scale=(sum((x-mean)**2 for x in xs)/len(xs))**.5 or 1.0\n    z=[(x-mean)/scale for x in xs];b=sum(ys)/len(ys);numerator=sum(x*(y-b) for x,y in zip(z,ys));den=sum(x*x for x in z);models=[]\n    for penalty in penalties:\n        w=numerator/(den+penalty) if den+penalty else 0.0\n        vx,vy=validation;error=sum((b+w*(x-mean)/scale-y)**2 for x,y in zip(vx,vy))/len(vx);models.append((error,penalty,w))\n    error,penalty,w=min(models);tx,ty=test;pred=[b+w*(x-mean)/scale for x in tx]\n    return dict(mean=mean,scale=scale,w=w,b=b,penalty=penalty,validation_mse=error,test_mse=sum((p-y)**2 for p,y in zip(pred,ty))/len(ty),test_predictions=pred)\n",
+      "checks": [
+        {
+          "name": "trains a real regression model and retains preprocessing",
+          "code": "r=regression_experiment(([0,2],[1,5]),([1,3],[3,7]),([4],[9]),[0,2]);assert r['mean']==1 and r['scale']==1;assert r['penalty']==0;assert r['test_predictions']==[9];assert r['test_mse']==0\n"
+        },
+        {
+          "name": "test outcomes cannot influence selection",
+          "code": "args=(([0,2],[1,5]),([1,3],[3,7]));a=regression_experiment(*args,([100],[0]),[0,10]);b=regression_experiment(*args,([100],[999]),[0,10]);assert a['penalty']==b['penalty'];assert a['mean']==1;assert a['test_predictions']==b['test_predictions']\n"
+        },
+        {
+          "name": "constant feature and invalid data",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nr=regression_experiment(([2,2],[1,3]),([2],[2]),([3],[2]),[0]);assert r['scale']==1 and r['w']==0;assert _bad(lambda:regression_experiment(([],[]),([1],[1]),([1],[1]),[0]))\n"
+        }
+      ],
+      "hints": [
+        "Fit mean and scale from train only and preserve them across candidate models.",
+        "Use validation MSE for selection, then compute test predictions after the selected tuple is fixed.",
+        "A reproducible experiment retains preprocessing, model state and the selection decision. A senior review should add baselines, confidence, slice analysis, dataset lineage and a release/rollback plan rather than treating zero error on a tiny fixture as deployment proof."
+      ],
+      "explanation": "A reproducible experiment retains preprocessing, model state and the selection decision. A senior review should add baselines, confidence, slice analysis, dataset lineage and a release/rollback plan rather than treating zero error on a tiny fixture as deployment proof."
+    },
+    {
+      "id": "project-delayed-monitor",
+      "title": "Project: join delayed outcomes before measuring model error",
+      "body": "# Project: join delayed outcomes before measuring model error\n\nServing produces predictions before outcomes may be available. Joining by row position can silently compare the wrong prediction and label when events arrive out of order. Join by stable identity and retain the model version with every measurement.\n\nThis project builds a versioned monitoring report from prediction events and delayed outcomes. Missing outcomes remain unmatched instead of being interpreted as successes. Duplicate identifiers are rejected so repeated events cannot inflate the denominator. The review should explain late labels, corrections, monitoring-window selection and how sampled missing outcomes could bias reported quality.\n\n```python\npredictions={\"a\":.2,\"b\":.8}\nlabels={\"b\":1}\nprint([(key,p,labels[key]) for key,p in predictions.items() if key in labels])\n```\n\n## Review the design\n\nA matched metric can be biased when outcomes are missing non-randomly. Monitoring should retain label coverage, model identity and delays, and it needs an incident policy for stale or partial evidence.\n",
+      "task": "Implement delayed_report(predictions,outcomes), predictions=(id,version,probability), outcomes=(id,binary_label). Reject duplicate ids in either input, invalid probabilities/labels. Return dict version->{predictions,matched,brier}; brier None when no labels match. Unknown outcome ids are ignored.",
+      "starter": "import math\n\ndef delayed_report(predictions, outcomes):\n    return None\n",
+      "solution": "import math\ndef delayed_report(predictions,outcomes):\n    labels={}\n    for key,label in outcomes:\n        if key in labels or type(label) is not int or label not in (0,1):raise ValueError('invalid outcome')\n        labels[key]=label\n    seen=set();groups={}\n    for key,version,p in predictions:\n        if key in seen or not math.isfinite(p) or not 0<=p<=1:raise ValueError('invalid prediction')\n        seen.add(key);g=groups.setdefault(version,{'predictions':0,'matched':0,'total':0.0});g['predictions']+=1\n        if key in labels:g['matched']+=1;g['total']+=(p-labels[key])**2\n    return {v:{'predictions':g['predictions'],'matched':g['matched'],'brier':g['total']/g['matched'] if g['matched'] else None} for v,g in groups.items()}\n",
+      "checks": [
+        {
+          "name": "out-of-order labels join by id and model version",
+          "code": "r=delayed_report([('a','v1',.2),('b','v2',.8)],[('b',1),('a',0)]);assert abs(r['v1']['brier']-.04)<1e-12;assert abs(r['v2']['brier']-.04)<1e-12\n"
+        },
+        {
+          "name": "missing outcomes are reported explicitly",
+          "code": "r=delayed_report([('a','v1',.2),('b','v2',.8)],[('a',0),('other',1)]);assert r['v2']=={'predictions':1,'matched':0,'brier':None}\n"
+        },
+        {
+          "name": "duplicate ids cannot inflate evidence",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert _bad(lambda:delayed_report([('a','v',.1),('a','v',.1)],[]));assert _bad(lambda:delayed_report([], [('a',0),('a',1)]));assert _bad(lambda:delayed_report([('a','v',float('nan'))],[]))\n"
+        }
+      ],
+      "hints": [
+        "Build and validate the outcome identity map before scanning predictions.",
+        "Keep prediction count separate from matched outcome count.",
+        "A matched metric can be biased when outcomes are missing non-randomly. Monitoring should retain label coverage, model identity and delays, and it needs an incident policy for stale or partial evidence."
+      ],
+      "explanation": "A matched metric can be biased when outcomes are missing non-randomly. Monitoring should retain label coverage, model identity and delays, and it needs an incident policy for stale or partial evidence."
+    },
+    {
+      "id": "project-authorized-rag",
+      "title": "Project: assemble permission-scoped lexical retrieval context",
+      "body": "# Project: assemble permission-scoped lexical retrieval context\n\nBuild a complete local retrieval pipeline that keeps authorization before ranking, computes a lexical relevance baseline and packs evidence within a token-ID budget. Every returned chunk retains its document identifier so citations can be checked against the exact supplied context.\n\nThe local retriever uses token overlap rather than an external embedding or generation service. It is a working deterministic baseline, not an assertion that a language model produced a grounded answer. The review should explain relevance judgments, corpus versioning, access revocation, prompt injection and a separate real-model evaluation plan.\n\n```python\nquery={\"python\",\"queue\"}\ndocument={\"python\",\"async\",\"queue\"}\nprint(len(query&document)/len(query|document))\n```\n\n## Review the design\n\nThis is an executable lexical RAG retrieval baseline with traceable context. It deliberately does not fabricate generation, embedding quality or semantic faithfulness; those require a real model, judged queries and adversarial evaluation outside this local fixture.\n",
+      "task": "Implement build_context(docs,tenant,query,budget). Docs have id,tenant,tokens(list of strings). Filter tenant first; score by Jaccard of unique query/document tokens (zero for empty union), keep only positive scores, sort descending then id. Pack whole documents by len(tokens), skipping nonfitting docs; return {ids,tokens_used,evidence:[{id,tokens}]}. Require budget>=0; doc ids unique within tenant.",
+      "starter": "def build_context(docs, tenant, query, budget):\n    return None\n",
+      "solution": "def build_context(docs,tenant,query,budget):\n    if budget<0:raise ValueError('negative budget')\n    allowed=[d for d in docs if d['tenant']==tenant];ids=[d['id'] for d in allowed]\n    if len(set(ids))!=len(ids):raise ValueError('duplicate document')\n    q=set(query);ranked=[]\n    for d in allowed:\n        tokens=set(d['tokens']);union=q|tokens;score=len(q&tokens)/len(union) if union else 0\n        if score>0:ranked.append((-score,d['id'],d))\n    evidence=[];used=0\n    for _,key,d in sorted(ranked,key=lambda r:(r[0],r[1])):\n        size=len(d['tokens'])\n        if used+size<=budget:evidence.append({'id':key,'tokens':list(d['tokens'])});used+=size\n    return {'ids':[d['id'] for d in evidence],'tokens_used':used,'evidence':evidence}\n",
+      "checks": [
+        {
+          "name": "unauthorized high relevance never enters evidence",
+          "code": "docs=[{'id':'secret','tenant':'b','tokens':['x']},{'id':'ok','tenant':'a','tokens':['x','y']}];r=build_context(docs,'a',['x'],2);assert r['ids']==['ok'];assert r['tokens_used']==2\n"
+        },
+        {
+          "name": "budget packing skips large documents and retains source ids",
+          "code": "docs=[{'id':'a','tenant':'t','tokens':['x','x','x']},{'id':'b','tenant':'t','tokens':['x','y']}];r=build_context(docs,'t',['x'],2);assert r=={'ids':['b'],'tokens_used':2,'evidence':[{'id':'b','tokens':['x','y']}]}\n"
+        },
+        {
+          "name": "empty relevance and invalid corpus contracts",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nassert build_context([{'id':'a','tenant':'t','tokens':['y']}],'t',['x'],5)['ids']==[];assert _bad(lambda:build_context([],'t',[], -1));assert _bad(lambda:build_context([{'id':'a','tenant':'t','tokens':[]},{'id':'a','tenant':'t','tokens':[]}],'t',[],2))\n"
+        }
+      ],
+      "hints": [
+        "Perform tenant filtering before computing ranks or selecting top context.",
+        "Keep score ordering separate from whole-document admission under the measured budget.",
+        "This is an executable lexical RAG retrieval baseline with traceable context. It deliberately does not fabricate generation, embedding quality or semantic faithfulness; those require a real model, judged queries and adversarial evaluation outside this local fixture."
+      ],
+      "explanation": "This is an executable lexical RAG retrieval baseline with traceable context. It deliberately does not fabricate generation, embedding quality or semantic faithfulness; those require a real model, judged queries and adversarial evaluation outside this local fixture."
+    },
+    {
+      "id": "project-tool-executor",
+      "title": "Project: authorize and deduplicate approved tool execution",
+      "body": "# Project: authorize and deduplicate approved tool execution\n\nCombine trusted tool policy, tenant boundaries, exact proposal approval and replay protection. A model can propose a call, but the executor must decide whether it may run. A reused request identifier with changed arguments must fail rather than borrowing an earlier approval or result.\n\nThis local project executes a supplied callable only after those checks and records successful results. A failed operation is not cached. The review should explain durable idempotency, concurrent duplicate calls, approval expiry and the uncertain window when an external effect succeeds but recording its result fails. A local dictionary cannot erase that distributed failure window.\n\n```python\nimport hashlib,json\nproposal={\"tool\":\"save\",\"args\":{\"value\":2}}\nidentity=hashlib.sha256(json.dumps(proposal,sort_keys=True,separators=(\",\",\":\")).encode()).hexdigest()\nprint(len(identity))\n```\n\n## Review the design\n\nThe in-memory executor proves policy composition under sequential ownership. Production effects require durable receipts, concurrency control, trusted approval records and a recovery protocol for uncertain external outcomes.\n",
+      "task": "Implement execute_approved(call,tenant,scopes,policy,approved_digest,receipts,perform). call={id,tenant,tool,args}; policy maps tool to required scope. Validate authority first. Identity is SHA256 of compact sorted ensure_ascii=False allow_nan=False JSON {tool,args}. Require matching approved_digest with compare_digest. receipts maps id to (identity,result). Identical replay returns cached result; changed replay raises ValueError. Cache only successful perform(tool,args) results.",
+      "starter": "import hashlib, hmac, json\n\ndef execute_approved(call, tenant, scopes, policy, approved_digest, receipts, perform):\n    return None\n",
+      "solution": "import hashlib,hmac,json\ndef execute_approved(call,tenant,scopes,policy,approved_digest,receipts,perform):\n    tool=call.get('tool')\n    if tool not in policy or call.get('tenant')!=tenant or policy[tool] not in scopes:raise PermissionError('not authorized')\n    raw=json.dumps({'tool':tool,'args':call['args']},sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode();identity=hashlib.sha256(raw).hexdigest()\n    if not hmac.compare_digest(identity,approved_digest):raise PermissionError('approval mismatch')\n    key=(tenant,call['id'])\n    if key in receipts:\n        previous,result=receipts[key]\n        if previous!=identity:raise ValueError('conflicting replay')\n        return result\n    result=perform(tool,call['args']);receipts[key]=(identity,result);return result\n",
+      "checks": [
+        {
+          "name": "approved replay executes only once",
+          "code": "import hashlib,json\nc={'id':'1','tenant':'a','tool':'save','args':{'x':2}};d=hashlib.sha256(json.dumps({'tool':'save','args':{'x':2}},sort_keys=True,separators=(',',':')).encode()).hexdigest();log=[];receipts={}\ndef run(tool,args):log.append((tool,args));return 7\nassert execute_approved(c,'a',{'write'},{'save':'write'},d,receipts,run)==7;assert execute_approved(c,'a',{'write'},{'save':'write'},d,receipts,run)==7;assert len(log)==1\n"
+        },
+        {
+          "name": "tenant and approval failures cause no effects",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nc={'id':'1','tenant':'b','tool':'save','args':{}};log=[]\nassert _bad(lambda:execute_approved(c,'a',{'write'},{'save':'write'},'x',{},lambda *a:log.append(a)),PermissionError);c['tenant']='a';assert _bad(lambda:execute_approved(c,'a',{'write'},{'save':'write'},'x',{},lambda *a:log.append(a)),PermissionError);assert log==[]\n"
+        },
+        {
+          "name": "failed operations are not cached",
+          "code": "def _bad(call, error=ValueError):\n    try: call()\n    except error: return True\n    return False\nimport hashlib,json\nc={'id':'1','tenant':'a','tool':'save','args':{}};d=hashlib.sha256(json.dumps({'tool':'save','args':{}},sort_keys=True,separators=(',',':')).encode()).hexdigest();receipts={}\ndef fail(*args):raise RuntimeError('failed')\nassert _bad(lambda:execute_approved(c,'a',{'w'},{'save':'w'},d,receipts,fail),RuntimeError);assert receipts=={}\n"
+        },
+        {
+          "name": "changed replay cannot borrow an earlier receipt",
+          "code": "import hashlib,json\ncall={'id':'same','tenant':'a','tool':'save','args':{'value':1}}\ndef digest(args):\n    return hashlib.sha256(json.dumps({'tool':'save','args':args},sort_keys=True,separators=(',',':')).encode()).hexdigest()\nlog=[];receipts={}\ndef perform(tool,args):\n    log.append(dict(args));return 1\nexecute_approved(call,'a',{'w'},{'save':'w'},digest(call['args']),receipts,perform)\ncall['args']={'value':2}\ntry:\n    execute_approved(call,'a',{'w'},{'save':'w'},digest(call['args']),receipts,perform)\nexcept ValueError:\n    pass\nelse:\n    assert False,'conflicting replay was accepted'\nassert log==[{'value':1}]\n"
+        }
+      ],
+      "hints": [
+        "Bind receipts to both tenant and request id, and compare the complete proposal identity.",
+        "Perform authority and approval checks before reading a cached result or executing a tool.",
+        "The in-memory executor proves policy composition under sequential ownership. Production effects require durable receipts, concurrency control, trusted approval records and a recovery protocol for uncertain external outcomes."
+      ],
+      "explanation": "The in-memory executor proves policy composition under sequential ownership. Production effects require durable receipts, concurrency control, trusted approval records and a recovery protocol for uncertain external outcomes."
+    }
+  ]
+}

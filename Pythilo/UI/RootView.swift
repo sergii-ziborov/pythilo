@@ -92,7 +92,7 @@ struct RootView: View {
         case .learn:
             LearnView(onOpenProject: open)
         case .labs:
-            LabsView()
+            LabsView(onOpenProject: open)
         case .playground:
             PlaygroundView(store: store, onOpen: open, incomingLink: $incomingRoomLink)
         }

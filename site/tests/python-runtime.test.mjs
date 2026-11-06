@@ -95,7 +95,7 @@ test("every lesson's solution passes the app's own checker in Pyodide", { skip: 
     if (result.error || result.results.length !== lesson.checks.length || result.results.some(item => !item.ok)) failures.push(`${course.id}/${lesson.id}: ${result.error ?? result.results.filter(item => !item.ok).map(item => `${item.name}: ${item.message}`).join("; ")}`);
   }
   assert.deepEqual(failures, []);
-  assert.ok(checked > 350);
+  assert.ok(checked > 400);
   console.log(`Browser lesson solutions verified: ${checked}`);
 });
 
@@ -125,7 +125,7 @@ test("lesson checks register their module and restore module/path state on succe
 });
 
 test("course content is built from the app's files, and lessons needing missing packages say so", () => {
-  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview", "algorithm-patterns", "data-practice", "reliable-python", "ml-practice", "ml-evaluation", "ai-building-blocks", "pydantic", "fastapi-httpx", "testing-practice", "data-formats"]);
+  assert.deepEqual(courses.map(course => course.id), ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "web", "data", "math", "ml", "llm", "ai", "interview", "algorithm-patterns", "data-practice", "reliable-python", "ml-practice", "ml-evaluation", "ai-building-blocks", "pydantic", "fastapi-httpx", "testing-practice", "data-formats", "python-runtime", "python-systems", "ml-statistics", "ml-production", "ai-production", "deep-learning-practice", "senior-projects"]);
   const all = courses.flatMap(course => course.lessons);
   assert.ok(all.every(lesson => lesson.sections[0].chip === "Idea" && lesson.checks.length && lesson.starter));
   const lessonsOf = id => courses.find(course => course.id === id).lessons;
@@ -156,7 +156,7 @@ test("all browser labs trace actual edited code, accept worked answers and rejec
       const report=readLabResult(output.out);
       assert.equal(report.correct,correct,`${lab.id}: ${report.message}`);
       assert.ok(report.checks.length>=3,lab.id);
-      if(correct){assert.equal(report.truncated,false,`${lab.id}: worked example must replay to completion`);assert.ok(report.frames.length>1,lab.id);assert.ok(report.frames.every(frame=>frame.panels.length));}
+      if(correct){assert.equal(report.truncated,false,`${lab.id}: worked example must replay to completion`);assert.ok(report.frames.length>=3,lab.id);assert.ok(report.frames.every(frame=>frame.panels.length));}
       else assert.ok(report.checks.some(check=>!check.ok),lab.id);
     }
   }
@@ -193,13 +193,13 @@ test("every browser-compatible reading example in all courses runs independently
     checked++;
   }
   assert.deepEqual(failures, []);
-  assert.equal(checked + unavailable, 465);
-  assert.ok(checked > 350);
+  assert.equal(checked + unavailable, 539);
+  assert.ok(checked > 400);
   console.log(`Reading examples verified in browser: ${checked}; app-only: ${unavailable}`);
 });
 
 test("all 52 new lessons and their examples are browser compatible", () => {
-  const added = courses.filter(course => course.order >= 21);
+  const added = courses.filter(course => course.order >= 21 && course.order <= 24);
   assert.equal(added.flatMap(course => course.lessons).length, 52);
   for (const course of added) for (const lesson of course.lessons) {
     assert.deepEqual(lesson.missing, [], lesson.id);

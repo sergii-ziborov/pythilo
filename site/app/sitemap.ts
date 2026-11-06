@@ -7,7 +7,7 @@ import { absolute, allPosts } from "./blog/_lib/posts";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const paths = new Set([
-    "/", "/learn/", "/labs/",
+    "/", "/learn/", "/learn/senior/", "/labs/",
     ...browserLabs.map(lab => `/labs/${lab.id}/`), "/playground/", "/ai/", "/guide/", "/pricing/", "/blog/",
     ...LEGAL_PAGES.map(([href]) => href),
     ...guidePages.map(page => `/guide/${page.slug}/`),
