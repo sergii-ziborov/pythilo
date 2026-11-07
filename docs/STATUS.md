@@ -757,5 +757,9 @@ and 21 signed native backend links. Full lesson bodies, Lab source, optional API
 datasets and weights remain downloadable. Catalog hash remains
 `b29787e5e05d7aa54a965695c7c59fb5b920b121174c5bce53321d12ef0bc191`.
 Archive/source proof: `build/release-receipts/testflight-29-archive-source.json`.
-Apple accepted the TestFlight upload. Processing and final internal readiness
-verification are pending.
+Apple processing completed. At 2026-11-07 09:14:42 UTC, build 29 is `VALID`
+and `IN_BETA_TESTING`, available to the existing internal group (one tester,
+all-build access). Both en-US and ru release notes exactly match
+`docs/app-store/testflight-29.json`. No Beta App Review submission exists;
+App Store 1.0 remains `PREPARE_FOR_SUBMISSION` with manual release. Final proof:
+`build/release-receipts/testflight-29-ready.json`.
