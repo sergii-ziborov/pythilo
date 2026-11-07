@@ -810,5 +810,9 @@ hashes still match the build's inputs. Its 83,556,070-byte IPA retains the same
 Full courses, Lab Python source, optional APIs, datasets and model weights remain
 downloadable. Runtime/curriculum and website content are unchanged. Archive
 proof: `build/release-receipts/testflight-30-archive-source.json`.
-Internal TestFlight upload is in progress; Apple processing and final readiness
-verification remain pending. No review submission is requested.
+Apple processing completed: build 30 became `VALID` at 2026-11-07 10:25:05 UTC.
+Final verification at 10:41:56 UTC confirms `IN_BETA_TESTING`, the existing
+internal group with one tester and all-build access, and exact en-US/ru notes.
+No Beta App Review submission exists. App Store 1.0 remains
+`PREPARE_FOR_SUBMISSION` with manual release; neither review was requested.
+Readiness proof: `build/release-receipts/testflight-30-ready.json`.
