@@ -683,4 +683,19 @@ IPA contains 38 course previews, 43 matching runtime files, six local project
 recipes and 21 signed backend links; complete lessons, Lab Python files, optional
 API trees, datasets and weights remain downloadable. Archive proof:
 `build/release-receipts/testflight-28-archive-source.json`.
-Apple processing and final internal TestFlight readiness verification are pending.
+Apple completed processing with no errors. TestFlight 0.1.0 (28) is VALID and
+IN_BETA_TESTING for the existing internal group, verified at
+2026-11-07T01:30:51.686Z. The group has one tester and access to all builds. English
+and Russian notes exactly match `docs/app-store/testflight-28.json`.
+No Beta App Review submission exists. App Store 1.0 remains PREPARE_FOR_SUBMISSION
+with MANUAL release; neither App Review nor Beta App Review was requested.
+Readiness proof: `build/release-receipts/testflight-28-ready.json`.
+
+All eight screenshot assets are COMPLETE in the correct order. Updated captures
+show the 136-Lab catalog with an explicit whole-category Download control and a
+real DPO/LoRA training curve, held-out metrics, artifact size and exact reload.
+The final two UI capture/navigation tests also pass in
+`build/research28-ui-screens.xcresult`. Draft/beta descriptions, review notes and
+marketing/support links match the authored metadata. Final receipts:
+`build/release-receipts/research28-screenshots.json` and
+`build/release-receipts/research28-metadata.json`.
