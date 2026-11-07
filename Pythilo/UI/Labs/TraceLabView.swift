@@ -114,8 +114,9 @@ struct TraceLabView: View {
             }
         }
         .sheet(isPresented: $showingAnswer) { answerSheet }
-        .confirmationDialog("Put the starter code back?", isPresented: $confirmingReset, titleVisibility: .visible) {
+        .alert("Put the starter code back?", isPresented: $confirmingReset) {
             Button("Start over", role: .destructive) { source = LabCatalog.code(lab.id, variant.id, .starter) }
+            Button("Cancel", role: .cancel) {}
         } message: {
             Text("Your code for this lab is replaced by the starter.")
         }

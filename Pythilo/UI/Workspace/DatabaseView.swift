@@ -710,10 +710,11 @@ private struct RowEditor: View {
                     .accessibilityIdentifier("database-save-row")
                 }
             }
-            .confirmationDialog("Delete this row?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+            .alert("Delete this row?", isPresented: $confirmingDelete) {
                 Button("Delete", role: .destructive) {
                     if let message = onDelete(edit) { failure = message } else { dismiss() }
                 }
+                Button("Cancel", role: .cancel) {}
             }
         }
     }

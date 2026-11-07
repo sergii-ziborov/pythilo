@@ -61,6 +61,7 @@ struct PlaygroundView: View {
             }
             .background(AppTheme.background)
             .navigationTitle("Playground")
+            .toolbar { DownloadsLink() }
             .onAppear(perform: store.refresh)
             .navigationDestination(for: PlaygroundRoute.self) { route in
                 switch route {

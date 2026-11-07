@@ -90,15 +90,16 @@ struct FileTreeView: View {
         } message: {
             Text("Enter the new path inside this project. Missing folders are created.")
         }
-        .confirmationDialog(
-            deleting.map { "Delete \($0.name)?" } ?? "",
+        .alert(
+            deleting.map { "Delete \($0.name)?" } ?? "Delete item?",
             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
-            titleVisibility: .visible
-        ) {
+            presenting: deleting
+        ) { node in
             Button("Delete", role: .destructive) {
-                if let node = deleting { attempt { try model.delete(node.path) } }
+                attempt { try model.delete(node.path) }
             }
-        } message: {
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
             Text("This removes it from the device. Commit first if you may want it back.")
         }
         .alert("Could not do that", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {

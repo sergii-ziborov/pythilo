@@ -136,12 +136,13 @@ struct ProjectColumn: View {
 
 /// Slides over the workspace from the chosen edge. Opens by button or by a swipe
 /// from that edge, and closes by a swipe back or a tap outside.
-struct FileDrawerOverlay<Content: View>: View {
+struct FileDrawerOverlay<DrawerContent: View>: ViewModifier {
     @Binding var isOpen: Bool
     let side: DrawerSide
     let swipeEnabled: Bool
+    let enabled: Bool
     var width: CGFloat = 328
-    @ViewBuilder let content: () -> Content
+    @ViewBuilder let content: () -> DrawerContent
     @State private var drag: CGFloat = 0
 
     private var direction: CGFloat { side == .left ? 1 : -1 }
@@ -152,38 +153,42 @@ struct FileDrawerOverlay<Content: View>: View {
         return min(width, max(0, base + drag * direction))
     }
 
-    var body: some View {
-        ZStack(alignment: side == .left ? .leading : .trailing) {
-            Color.black.opacity(0.45 * Double(reveal / width))
-                .ignoresSafeArea()
-                .allowsHitTesting(isOpen)
-                .onTapGesture { close() }
-                .accessibilityHidden(!isOpen)
+    func body(content workspace: Content) -> some View {
+        GeometryReader { geometry in
+            ZStack(alignment: side == .left ? .leading : .trailing) {
+                workspace
+                if enabled {
+                    Color.black.opacity(0.45 * Double(reveal / width))
+                        .ignoresSafeArea()
+                        .allowsHitTesting(isOpen)
+                        .onTapGesture { close() }
+                        .accessibilityHidden(!isOpen)
 
-            if swipeEnabled, !isOpen {
-                Color.clear
-                    .frame(width: 22)
-                    .frame(maxHeight: .infinity)
-                    .contentShape(Rectangle())
-                    .gesture(openGesture)
-                    .accessibilityHidden(true)
-            }
-
-            if reveal > 0 {
-                content()
-                    .frame(width: width)
-                    .frame(maxHeight: .infinity)
-                    .background(AppTheme.panel, ignoresSafeAreaEdges: [])
-                    .overlay(alignment: side == .left ? .trailing : .leading) {
-                        Rectangle().fill(AppTheme.border).frame(width: 1)
+                    if reveal > 0 {
+                        self.content()
+                            .frame(width: width)
+                            .frame(maxHeight: .infinity)
+                            .background(AppTheme.panel, ignoresSafeAreaEdges: [])
+                            .overlay(alignment: side == .left ? .trailing : .leading) {
+                                Rectangle().fill(AppTheme.border).frame(width: 1)
+                            }
+                            .shadow(color: .black.opacity(0.4), radius: 18, x: 12 * direction)
+                            .offset(x: (reveal - width) * direction)
+                            .simultaneousGesture(closeGesture)
+                            .transition(.identity)
                     }
-                    .shadow(color: .black.opacity(0.4), radius: 18, x: 12 * direction)
-                    .offset(x: (reveal - width) * direction)
-                    .gesture(closeGesture)
-                    .transition(.identity)
+                }
             }
+            // Observe edge drags without putting a hit-testing view over buttons or code.
+            .simultaneousGesture(openGesture(containerWidth: geometry.size.width))
+            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.88), value: isOpen)
         }
-        .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.88), value: isOpen)
+    }
+
+    private func canOpen(_ value: DragGesture.Value, containerWidth: CGFloat) -> Bool {
+        enabled && swipeEnabled && !isOpen && (side == .left
+            ? value.startLocation.x <= 22
+            : value.startLocation.x >= containerWidth - 22)
     }
 
     private func close() {
@@ -191,13 +196,20 @@ struct FileDrawerOverlay<Content: View>: View {
         drag = 0
     }
 
-    private var openGesture: some Gesture {
+    private func openGesture(containerWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 8)
-            .onChanged { drag = $0.translation.width }
+            .onChanged { value in
+                guard canOpen(value, containerWidth: containerWidth),
+                      abs(value.translation.width) > abs(value.translation.height) else { return }
+                drag = value.translation.width
+            }
             .onEnded { value in
-                let travelled = value.predictedEndTranslation.width * direction
-                isOpen = travelled > width * 0.35
-                drag = 0
+                guard canOpen(value, containerWidth: containerWidth) else { return }
+                withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.88)) {
+                    let horizontal = abs(value.translation.width) > abs(value.translation.height)
+                    isOpen = horizontal && value.predictedEndTranslation.width * direction > width * 0.35
+                    drag = 0
+                }
             }
     }
 
@@ -207,8 +219,13 @@ struct FileDrawerOverlay<Content: View>: View {
                 if abs(value.translation.width) > abs(value.translation.height) { drag = value.translation.width }
             }
             .onEnded { value in
-                if value.predictedEndTranslation.width * direction < -width * 0.35 { isOpen = false }
-                drag = 0
+                withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.88)) {
+                    if abs(value.translation.width) > abs(value.translation.height),
+                       value.predictedEndTranslation.width * direction < -width * 0.35 {
+                        isOpen = false
+                    }
+                    drag = 0
+                }
             }
     }
 }

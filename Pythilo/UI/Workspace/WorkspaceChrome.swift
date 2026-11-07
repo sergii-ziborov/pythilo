@@ -168,36 +168,67 @@ struct FileTabsBar: View {
     }
 }
 
-/// Presents the system share sheet, or an alert, over whatever is on screen.
-@MainActor
-func presentOverTopScreen(_ controller: UIViewController) {
-    let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first { $0.activationState == .foregroundActive }
-    var top = scene?.windows.first { $0.isKeyWindow }?.rootViewController
-    while let presented = top?.presentedViewController { top = presented }
-    if let popover = controller.popoverPresentationController, let view = top?.view {
-        popover.sourceView = view
-        popover.sourceRect = CGRect(x: view.bounds.midX, y: 60, width: 1, height: 1)
+struct ProjectShareLink: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
+}
+
+private struct ProjectLinkActivity: UIViewControllerRepresentable {
+    let url: URL
+    let onComplete: @MainActor () -> Void
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        controller.completionWithItemsHandler = { [onComplete] _, _, _, _ in
+            Task { @MainActor in onComplete() }
+        }
+        return controller
     }
-    top?.present(controller, animated: true)
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+struct ProjectLinkShareSheet: View {
+    let url: URL
+    let onClose: @MainActor () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ProjectLinkActivity(url: url, onComplete: onClose)
+                .navigationTitle("Share project link")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done", action: onClose).accessibilityIdentifier("project-share-close")
+                    }
+                }
+        }
+        .presentationSizing(.form)
+        .presentationDragIndicator(.visible)
+    }
 }
 
 struct WorkspaceProjectMenu: View {
     @Bindable var model: WorkspaceModel
     let onGit: () -> Void
     let onPackages: () -> Void
+    let onDownloads: () -> Void
+    let onShareLink: () -> Void
     let onShareRoom: () -> Void
     /// A round header button rather than the plain one at the end of the tabs.
     var round = false
 
     var body: some View {
         Menu {
+            Button("Downloads", systemImage: "arrow.down.circle", action: onDownloads)
+                .accessibilityIdentifier("project-downloads-menu")
             Button("Packages", systemImage: "shippingbox", action: onPackages)
             if model.previewURL != nil {
                 Button("Web preview", systemImage: "globe") { model.previewOpen = true }
             }
             Button("Git", systemImage: "arrow.triangle.branch", action: onGit)
             Button("Share with an AI client or person", systemImage: "person.2", action: onShareRoom)
-            Button("Share as a link", systemImage: "link") { shareSnapshotLink() }
+            Button("Share as a link", systemImage: "link", action: onShareLink)
                 .accessibilityIdentifier("share-snapshot-link")
             Divider()
             Button("Debug", systemImage: "ladybug") {
@@ -229,24 +260,8 @@ struct WorkspaceProjectMenu: View {
         .accessibilityLabel("Project actions")
         .accessibilityIdentifier("project-menu")
     }
-
-    /// The project's text files, packed into a link that opens them in the
-    /// website's Playground or in Pythilo. No server keeps a copy.
-    private func shareSnapshotLink() {
-        model.saveAll()
-        do {
-            let snapshot = try ShareSnapshot.of(project: model.project.url, main: model.selectedPath)
-            let link = try snapshot.webLink()
-            let note = "\(snapshot.files.count) file\(snapshot.files.count == 1 ? "" : "s") from \(snapshot.name), in a Pythilo link"
-            _ = note
-            presentOverTopScreen(UIActivityViewController(activityItems: [link], applicationActivities: nil))
-        } catch {
-            let alert = UIAlertController(title: "Cannot make a link", message: error.localizedDescription, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .cancel))
-            presentOverTopScreen(alert)
-        }
-    }
 }
+
 
 /// The editor for whatever the selected tab holds.
 struct EditorPane: View {

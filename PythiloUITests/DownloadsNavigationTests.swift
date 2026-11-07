@@ -38,6 +38,14 @@ import XCTest
             XCTAssertTrue(app.buttons["download-resume-runtime-torch"].waitForExistence(timeout: 10))
             app.buttons["download-resume-runtime-torch"].tap()
         }
+        app.buttons["downloads-close"].tap()
+        XCTAssertTrue(app.navigationBars["Project downloads"].waitForNonExistence(timeout: 10))
+        let menu = app.buttons["project-menu"].firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 10))
+        menu.tap()
+        XCTAssertTrue(app.buttons["project-downloads-menu"].waitForExistence(timeout: 5))
+        app.buttons["project-downloads-menu"].tap()
+        XCTAssertTrue(app.navigationBars["Project downloads"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["offline-ready-download-project-packages"].waitForExistence(timeout: 180))
         let proof = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         proof.name = "explicit-offline-project-download"; proof.lifetime = .keepAlways; add(proof)

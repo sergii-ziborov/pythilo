@@ -70,15 +70,16 @@ struct ProjectsView: View {
                     failure = error.localizedDescription
                 }
             }
-            .confirmationDialog(
-                deleting.map { "Delete \($0.name)?" } ?? "",
+            .alert(
+                deleting.map { "Delete \($0.name)?" } ?? "Delete project?",
                 isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
-                titleVisibility: .visible
-            ) {
+                presenting: deleting
+            ) { project in
                 Button("Delete", role: .destructive) {
-                    if let deleting { attempt { try store.delete(deleting) } }
+                    attempt { try store.delete(project) }
                 }
-            } message: {
+                Button("Cancel", role: .cancel) {}
+            } message: { _ in
                 Text("This removes the folder from this device.")
             }
             .alert("Rename project", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {

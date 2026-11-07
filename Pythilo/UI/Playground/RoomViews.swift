@@ -91,8 +91,9 @@ struct RoomView: View {
                 .accessibilityIdentifier("room-end")
             }
         }
-        .confirmationDialog(room.isOwner ? "End this room for everyone?" : "Leave this room?", isPresented: $confirmingEnd, titleVisibility: .visible) {
+        .alert(room.isOwner ? "End this room for everyone?" : "Leave this room?", isPresented: $confirmingEnd) {
             Button(room.isOwner ? "End room" : "Leave room", role: .destructive, action: end)
+            Button("Cancel", role: .cancel) {}
         } message: {
             Text("Your copy of the files stays on this \(device).")
         }

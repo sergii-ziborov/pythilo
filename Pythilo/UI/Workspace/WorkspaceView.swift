@@ -12,6 +12,8 @@ struct WorkspaceView: View {
     @State private var showingGit = false
     @State private var showingPackages = false
     @State private var showingDownloads = false
+    @State private var sharingLink: ProjectShareLink?
+    @State private var shareFailure: String?
     @State private var contentStore = ContentStore.shared
     @State private var showingRoom = false
     @State private var showingOpenFile = false
@@ -34,8 +36,8 @@ struct WorkspaceView: View {
                     .ignoresSafeArea(.container)
                 serverBanner(layout, safeArea: geometry.safeAreaInsets)
                     .animation(.snappy, value: model.previewURL)
-                if usesDrawer(layout) { drawer(layout, size: size) }
             }
+            .modifier(drawer(layout, size: size))
             .frame(width: size.width, height: size.height)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background { HingeReader { fold = $0 } }
@@ -46,10 +48,12 @@ struct WorkspaceView: View {
         .defersSystemGestures(on: .bottom)
         .sheet(isPresented: $showingGit) { GitView(model: model) }
         .sheet(isPresented: $showingPackages) { PackagesView(model: model) }
-        .sheet(isPresented: $showingDownloads) {
-            NavigationStack {
-                ProjectDownloadsView(project: model.project).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showingDownloads = false } } }
-            }
+        .sheet(isPresented: $showingDownloads) { DownloadsSheet(project: model.project, onClose: { showingDownloads = false }) }
+        .sheet(item: $sharingLink) { ProjectLinkShareSheet(url: $0.url, onClose: { sharingLink = nil }) }
+        .alert("Cannot make a link", isPresented: Binding(get: { shareFailure != nil }, set: { if !$0 { shareFailure = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(shareFailure ?? "")
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             if model.project.requiredPacks.contains(where: { !contentStore.ready($0) }) {
@@ -95,6 +99,16 @@ struct WorkspaceView: View {
     #if DEBUG
     private static var tappedMigrate = false
     #endif
+
+    private func shareSnapshotLink() {
+        model.saveAll()
+        do {
+            let snapshot = try ShareSnapshot.of(project: model.project.url, main: model.selectedPath)
+            sharingLink = ProjectShareLink(url: try snapshot.webLink())
+        } catch {
+            shareFailure = error.localizedDescription
+        }
+    }
 
     private func noticeOutput(_ chunks: [OutputChunk], terminal: Bool) {
         let tail = chunks.suffix(12).map(\.text).joined()
@@ -154,7 +168,12 @@ struct WorkspaceView: View {
         default: break
         }
         #endif
-        return WorkspaceLayout.resolve(size: geometry.size, container: geometry.frame(in: .global), fold: fold)
+        // Keyboard avoidance changes the visible height, not the window's orientation.
+        // Resolving from that reduced height can replace the sidebar and its active sheet.
+        let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows).first { $0.isKeyWindow }
+        let stableSize = keyboard.isVisible ? (window?.bounds.size ?? geometry.size) : geometry.size
+        return WorkspaceLayout.resolve(size: stableSize, container: CGRect(origin: geometry.frame(in: .global).origin, size: stableSize), fold: fold)
     }
 
     private func usesDrawer(_ layout: WorkspaceLayout) -> Bool {
@@ -175,11 +194,12 @@ struct WorkspaceView: View {
         .accessibilityHidden(true)
     }
 
-    private func drawer(_ layout: WorkspaceLayout, size: CGSize) -> some View {
+    private func drawer(_ layout: WorkspaceLayout, size: CGSize) -> some ViewModifier {
         FileDrawerOverlay(
             isOpen: $model.drawerOpen,
             side: drawerSide,
             swipeEnabled: drawerSwipe && !keyboard.isVisible,
+            enabled: usesDrawer(layout),
             width: min(328, size.width - 56)
         ) {
             VStack(spacing: 0) {
@@ -226,8 +246,9 @@ struct WorkspaceView: View {
         case let .duoBook(left, hinge): duoBook(left: left, hinge: hinge)
         case .duoFlat: duoFlat
         case .cover: cover
-        case .padLandscape: pad(bottomHeight: 230, showsPreviewColumn: true)
-        case .padPortrait: pad(bottomHeight: 310, showsPreviewColumn: false)
+        case .padLandscape, .padPortrait:
+            // Keep the sidebar's identity (and presented forms) through rotation.
+            pad(bottomHeight: layout == .padLandscape ? 230 : 310, showsPreviewColumn: layout == .padLandscape)
         }
     }
 
@@ -254,6 +275,8 @@ struct WorkspaceView: View {
             model: model,
             onGit: { showingGit = true },
             onPackages: { showingPackages = true },
+            onDownloads: { showingDownloads = true },
+            onShareLink: shareSnapshotLink,
             onShareRoom: { showingRoom = true },
             round: true
         )
@@ -274,6 +297,8 @@ struct WorkspaceView: View {
             model: model,
             onGit: { showingGit = true },
             onPackages: { showingPackages = true },
+            onDownloads: { showingDownloads = true },
+            onShareLink: shareSnapshotLink,
             onShareRoom: { showingRoom = true }
         )
     }
@@ -404,11 +429,11 @@ struct WorkspaceView: View {
                 // The camera sits in the middle of this edge.
                 Spacer(minLength: 0)
                 VStack(spacing: 2) {
-                    HStack(spacing: 0) {
+                    HStack(spacing: 4) {
                         railPanel(.code)
                         railPanel(.problems)
                     }
-                    HStack(spacing: 0) {
+                    HStack(spacing: 4) {
                         railPanel(.output)
                         railPanel(.terminal)
                     }
@@ -417,7 +442,7 @@ struct WorkspaceView: View {
             }
         }
         .padding(.vertical, 8)
-        .frame(width: 62)
+        .frame(width: 100)
         .frame(maxHeight: .infinity)
         .background(AppTheme.rail, ignoresSafeAreaEdges: [])
         .overlay(alignment: cameraIsOnLeading() ? .trailing : .leading) {
@@ -432,11 +457,13 @@ struct WorkspaceView: View {
             Image(systemName: panel.systemImage)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(model.panel == panel ? AppTheme.blue : AppTheme.muted)
-                .frame(width: 30, height: 40)
+                .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.app)
         .accessibilityLabel(panel.title)
+        .accessibilityIdentifier("panel-\(panel.rawValue)")
+        .accessibilityAddTraits(model.panel == panel ? .isSelected : [])
     }
 
     // MARK: iPhone Duo
@@ -725,6 +752,7 @@ struct WorkspaceView: View {
                 }
                 .buttonStyle(.app)
                 .accessibilityIdentifier("panel-\(panel.rawValue)")
+                .accessibilityAddTraits(active ? .isSelected : [])
             }
             }
             }

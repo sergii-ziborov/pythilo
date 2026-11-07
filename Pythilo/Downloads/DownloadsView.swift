@@ -79,14 +79,19 @@ struct ContentSelectionCard: View {
 
 struct ProjectDownloadsView: View {
     let project: Project
+    var onClose: (() -> Void)? = nil
     var body: some View {
         ScrollView {
             ContentSelectionCard(title: project.name, packIDs: project.requiredPacks,
                 summary: "Download the packages and assets this project needs before going offline. Creating, opening and running a project never starts a download.",
                 downloadTitle: "Download project packages", downloadID: "download-project-packages")
                 .padding().frame(maxWidth: 760)
-            NavigationLink("All downloads") { DownloadsView() }.padding()
-        }.navigationTitle("Project downloads")
+            NavigationLink("All downloads") { DownloadsView(onClose: onClose) }
+                .accessibilityIdentifier("downloads-all").padding()
+        }.accessibilityIdentifier("project-downloads-content")
+            .navigationTitle("Project downloads")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { DownloadsCloseButton(onClose: onClose) }
     }
 }
 
@@ -106,7 +111,8 @@ private struct DownloadRow: View {
                 Spacer(minLength: 8)
                 switch store.phase(pack.id) {
                 case .installed:
-                    Button("Remove", systemImage: "trash") { confirmRemoval = true }.labelStyle(.iconOnly)
+                    Button("Remove", systemImage: "trash") { confirmRemoval = true }
+                        .labelStyle(.iconOnly).accessibilityIdentifier("download-remove-\(pack.id)")
                 case .downloading, .queued:
                     Button("Pause", systemImage: "pause.fill") { store.pause(pack.id) }.labelStyle(.iconOnly).accessibilityIdentifier("download-pause-\(pack.id)")
                 case .installing: ProgressView()
@@ -114,7 +120,8 @@ private struct DownloadRow: View {
                     Button("Resume", systemImage: "play.fill") { store.download(pack.id) }.labelStyle(.iconOnly).accessibilityIdentifier("download-resume-\(pack.id)")
                     Button("Cancel download", systemImage: "xmark") { store.cancel(pack.id) }.labelStyle(.iconOnly)
                 case .absent:
-                    Button("Download", systemImage: "arrow.down") { store.download(pack.id) }.labelStyle(.iconOnly)
+                    Button("Download", systemImage: "arrow.down") { store.download(pack.id) }
+                        .labelStyle(.iconOnly).accessibilityIdentifier("download-start-\(pack.id)")
                 }
             }
             .buttonStyle(.bordered)
@@ -124,8 +131,11 @@ private struct DownloadRow: View {
             }
             if let failure { Text(failure).font(.caption).foregroundStyle(AppTheme.coralInk) }
         }
-        .confirmationDialog("Remove \(pack.title)? Your code and progress will stay on this device.", isPresented: $confirmRemoval, titleVisibility: .visible) {
+        .alert("Remove download?", isPresented: $confirmRemoval) {
             Button("Remove download", role: .destructive) { do { try store.remove(pack.id) } catch { failure = error.localizedDescription } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Remove \(pack.title) from this device? Your code, lesson drafts and progress will stay.")
         }
     }
     private var status: String {
@@ -145,6 +155,7 @@ private struct DownloadRow: View {
 }
 
 struct DownloadsView: View {
+    var onClose: (() -> Void)? = nil
     @State private var store = ContentStore.shared
     var body: some View {
         List {
@@ -154,23 +165,62 @@ struct DownloadsView: View {
                     .font(.footnote).foregroundStyle(AppTheme.secondary)
             }
             Section("Offline library") {
-                ContentSelectionButton(packIDs: store.catalog.packs.filter { $0.kind == "course" }.map(\.id), title: "Download all courses", downloadID: "download-all-courses")
-                ContentSelectionButton(packIDs: store.catalog.packs.filter { $0.kind == "labs" }.map(\.id), title: "Download all Labs", downloadID: "download-all-labs")
-                ContentSelectionButton(packIDs: store.catalog.packs.map(\.id), title: "Download everything", downloadID: "download-everything")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("All courses").font(.headline)
+                    ContentSelectionButton(packIDs: store.catalog.packs.filter { $0.kind == "course" }.map(\.id), title: "Download all courses", downloadID: "download-all-courses")
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("All Labs").font(.headline)
+                    ContentSelectionButton(packIDs: store.catalog.packs.filter { $0.kind == "labs" }.map(\.id), title: "Download all Labs", downloadID: "download-all-labs")
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Entire library").font(.headline)
+                    ContentSelectionButton(packIDs: store.catalog.packs.map(\.id), title: "Download everything", downloadID: "download-everything")
+                }
             }
             ForEach([("runtime", "Python packages"), ("asset", "Datasets & models"), ("course", "Courses"), ("labs", "Lab topics")], id: \.0) { kind, title in
                 Section(title) {
                     ForEach(store.catalog.packs.filter { $0.kind == kind }) { pack in DownloadRow(pack: pack) }
                 }
             }
-        }.navigationTitle("Downloads")
+        }.accessibilityIdentifier("downloads-list")
+            .navigationTitle("Downloads")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { DownloadsCloseButton(onClose: onClose) }
+    }
+}
+
+private struct DownloadsCloseButton: ToolbarContent {
+    var onClose: (() -> Void)?
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .confirmationAction) {
+            if let onClose {
+                Button("Done", action: onClose).accessibilityIdentifier("downloads-close")
+            }
+        }
+    }
+}
+
+struct DownloadsSheet: View {
+    var project: Project? = nil
+    let onClose: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            if let project { ProjectDownloadsView(project: project, onClose: onClose) }
+            else { DownloadsView(onClose: onClose) }
+        }
+        .presentationSizing(.form)
+        .presentationDragIndicator(.visible)
     }
 }
 
 struct DownloadsLink: View {
+    @State private var showingDownloads = false
     var body: some View {
-        NavigationLink { DownloadsView() } label: { Label("Downloads", systemImage: "arrow.down.circle") }
+        Button { showingDownloads = true } label: { Label("Downloads", systemImage: "arrow.down.circle") }
             .accessibilityIdentifier("downloads-open")
+            .sheet(isPresented: $showingDownloads) { DownloadsSheet(onClose: { showingDownloads = false }) }
     }
 }
 

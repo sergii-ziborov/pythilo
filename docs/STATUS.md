@@ -699,3 +699,63 @@ The final two UI capture/navigation tests also pass in
 marketing/support links match the authored metadata. Final receipts:
 `build/release-receipts/research28-screenshots.json` and
 `build/release-receipts/research28-metadata.json`.
+
+## Gestures and modal windows — 7 November 2026
+
+The file drawer's invisible 22-point edge view intercepted taps on controls near
+the edge, including Back and the landscape Output button. Edge drags now run on
+the workspace container without a hit-testing overlay. Both directions, outside
+taps, the swipe preference and mostly vertical drags are checked. File-list
+scrolling can coexist with the close gesture. Landscape controls have full
+44-point targets in a wider rail and report their selected state.
+
+Downloads opens as a modal form from all four tabs and the project menu. Done
+stays available through Project downloads → All downloads, and the form also
+dismisses by swiping down. Its close action updates the owning presentation state
+directly: an initial active-transfer regression found that Done could leave the
+window open after Pause/Resume. The corrected single-tap close, ongoing download,
+reopening and final offline readiness all pass. Offline-library headings remain
+visible when all three selections show Available offline.
+
+Download removal, project/file deletion, Lab reset, database row deletion and
+ending/leaving a room now use centered confirmations with Cancel. Destructive
+project/file actions capture their target before presentation state clears.
+Project-link sharing uses a modal with Done, replacing the arbitrary UIKit
+popover anchor; tests open and dismiss the system sharing UI without sending.
+
+The iPad sidebar keeps its identity across portrait/landscape changes, and layout
+classification uses the window size when the keyboard reduces the visible area.
+This fixes the focused New file form disappearing. Creating a file, rotating
+with its input focused, returning to portrait, canceling deletion and then deleting
+only that test file pass on both devices.
+
+Native simulator verification passes all 16 interaction scenarios on iPhone and
+11 on iPad, including edge-back navigation, left/right Lab filters, answers,
+editor panels, project creation/cancellation and destructive confirmations.
+Final modal changes also pass four targeted cases on each device and the active
+transfer case. Three native content tests, seven button-padding tests and both
+course/category download tests pass. The initial regression bundle retains the
+superseded transfer-close failure; its targeted rerun is green. Earlier iPad Lab
+tests required installing their offline fixtures; the catalog preparation gate
+downloaded and verified all 63 packs before those reruns. No physical-device run
+is claimed. Summary: `build/release-receipts/interaction29-qa.json`.
+
+Proof bundles: `build/interaction29-final-phone.xcresult`,
+`build/interaction29-final-pad.xcresult`,
+`build/interaction29-owner-phone.xcresult`,
+`build/interaction29-owner-pad.xcresult` and
+`build/interaction29-owner-transfer.xcresult`. Native captures under
+`build/verification/` show the centered Downloads form/removal alert, system
+sharing modal and landscape controls. The Python runtime and curriculum are
+unchanged; the same 63-pack catalog pins all downloaded content. Guarded tests
+confirm that Create/Open/Run starts no download and package removal preserves
+project code and lesson drafts.
+
+Release 0.1.0 (29) archives and exports successfully. Its 83,527,184-byte IPA
+contains 38 course previews, 43 matching runtime files, six local project recipes
+and 21 signed native backend links. Full lesson bodies, Lab source, optional APIs,
+datasets and weights remain downloadable. Catalog hash remains
+`b29787e5e05d7aa54a965695c7c59fb5b920b121174c5bce53321d12ef0bc191`.
+Archive/source proof: `build/release-receipts/testflight-29-archive-source.json`.
+Apple accepted the TestFlight upload. Processing and final internal readiness
+verification are pending.
