@@ -78,6 +78,42 @@ final class ContentDownloadTests: XCTestCase {
         XCTAssertEqual(course.id, "foundations"); XCTAssertFalse(course.lessons[0].solution.isEmpty)
     }
 
+    @MainActor func testSeniorResearchSelectionsFetchEveryPublishedCourseTopicAndDependency() async throws {
+        let catalog = DownloadCatalog.bundled
+        let selected = ["course-robust-ml-engineering", "course-alignment-engineering", "labs-robust-training", "labs-robustness-projects", "labs-alignment-mechanisms", "labs-alignment-projects"]
+        let store = ContentStore(root: try temporary())
+        XCTAssertTrue(store.phases.isEmpty)
+        XCTAssertFalse(store.ready(selected))
+        XCTAssertEqual(catalog.closure(selected).count, 9, "Six complete content packs share three runtime packs")
+        store.download(selected)
+        let deadline = Date().addingTimeInterval(240)
+        while !store.ready(selected) {
+            for pack in catalog.closure(selected) {
+                if case .failed(let message) = store.phase(pack.id) { throw ContentFailure.invalid("\(pack.id): \(message)") }
+            }
+            guard Date() < deadline else { throw ContentFailure.invalid("Complete research selection did not finish downloading") }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        var lessons: [Lesson] = []
+        for id in selected.prefix(2) {
+            let folder = try XCTUnwrap(store.location(id))
+            let course = try JSONDecoder().decode(Course.self, from: Data(contentsOf: folder.appending(path: "course.json")))
+            XCTAssertEqual(course.lessons.count, 8)
+            lessons += course.lessons
+        }
+        XCTAssertEqual(lessons.count, 16)
+        for lesson in lessons {
+            XCTAssertFalse(LessonOutline.sections(of: lesson).first?.markdown.isEmpty ?? true, lesson.id)
+            let lab = try XCTUnwrap(LabCatalog.all.first { $0.lessons?.contains(lesson.id) == true })
+            let topic = try XCTUnwrap(LabCatalog.topic(for: lab))
+            let folder = try XCTUnwrap(store.location("labs-\(topic.id)"))
+            let answer = try String(contentsOf: folder.appending(path: "labcode/\(lab.id).practice.answer.py"), encoding: .utf8)
+            XCTAssertEqual(answer, lesson.solution, lab.id)
+            XCTAssertEqual(lesson.checks.count, 5)
+        }
+        XCTAssertEqual(store.phases.filter { $0.value == .installed }.count, 9)
+    }
+
     @MainActor func testProjectCreationOpeningAndRunNeverStartDownloads() async throws {
         let session = RunSession.shared
         let deadline = Date().addingTimeInterval(30)
@@ -114,8 +150,8 @@ final class ContentDownloadTests: XCTestCase {
     @MainActor func testSelectionsIncludeEveryLessonLabAndSharedDependency() throws {
         let catalog = DownloadCatalog.bundled
         let courses = catalog.packs.filter { $0.kind == "course" }.map(\.id)
-        XCTAssertEqual(courses.count, 36)
-        XCTAssertEqual(catalog.courses.flatMap(\.lessons).count, 530)
+        XCTAssertEqual(courses.count, 38)
+        XCTAssertEqual(catalog.courses.flatMap(\.lessons).count, 546)
         let ml = LabCatalog.topics.filter { $0.section == .learning }.map { "labs-\($0.id)" }
         let selection = catalog.closure(ml)
         XCTAssertTrue(Set(ml).isSubset(of: Set(selection.map(\.id))))

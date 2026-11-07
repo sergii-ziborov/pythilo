@@ -2050,5 +2050,357 @@
     ],
     "runtime": "pytorch",
     "idea": "An adapter artifact is small because it omits the frozen base. A merged classifier contains the complete encoder again. Merge W plus alpha/r times B@A in evaluation mode, remove the LoRA modules, and compare actual inference logits. Export the resulting state and load it into a fresh ordinary classifier. This demonstrates a real deployment transformation; it does not imply quantization, acceleration or a smaller full-model file."
+  },
+  {
+    "id": "torchfocal",
+    "title": "Differentiate masked focal loss under class imbalance",
+    "summary": "Implement multiclass focal loss: mean of -alpha[y]*(1-p[y])**gamma*log(p[y]) over valid rows, normalized by the number of valid targets, not the sum of class weights. Use log-softmax, preserve autograd and return graph-connected zero when every target is ignored. Reject nonfinite logits, invalid shapes/dtypes/labels, negative or nonfinite gamma, and nonpositive/nonfinite class weights. Do not detach the focal factor.",
+    "symbol": "brain",
+    "tint": "blue",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Mechanism",
+        "prompt": "Implement multiclass focal loss: mean of -alpha[y]*(1-p[y])**gamma*log(p[y]) over valid rows, normalized by the number of valid targets, not the sum of class weights. Use log-softmax, preserve autograd and return graph-connected zero when every target is ignored. Reject nonfinite logits, invalid shapes/dtypes/labels, negative or nonfinite gamma, and nonpositive/nonfinite class weights. Do not detach the focal factor.",
+        "file": "torchfocal.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "research-torchfocal"
+    ],
+    "runtime": "pytorch",
+    "idea": "Focal weighting changes which examples dominate the gradient. The factor depends on the current model probability and must participate in autograd; multiplying cross entropy by a detached difficulty score defines a different update. A declared reduction also matters when class weights and ignored examples interact. This Lab uses multiclass logits, one integer target per row and a fixed valid-row denominator. It exercises extreme scores and an entirely ignored batch without introducing undefined gradients."
+  },
+  {
+    "id": "torchsam",
+    "title": "Own both passes of a sharpness-aware optimizer step",
+    "summary": "Execute one SAM update with the supplied optimizer. closure returns a differentiable scalar loss and does not call backward. Compute the global first-pass norm, perturb trainable parameters in that direction by rho, recompute gradients, restore exact original parameter values and apply exactly one optimizer step using second-pass gradients. Always restore parameters and clear gradients if the second pass fails. Reject invalid rho, nonfinite losses/gradients, duplicate or incomplete optimizer ownership. This fixture uses deterministic layers without BatchNorm or dropout; stateful stochastic layers need a separate replay/buffer policy.",
+    "symbol": "brain",
+    "tint": "blue",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Mechanism",
+        "prompt": "Execute one SAM update with the supplied optimizer. closure returns a differentiable scalar loss and does not call backward. Compute the global first-pass norm, perturb trainable parameters in that direction by rho, recompute gradients, restore exact original parameter values and apply exactly one optimizer step using second-pass gradients. Always restore parameters and clear gradients if the second pass fails. Reject invalid rho, nonfinite losses/gradients, duplicate or incomplete optimizer ownership. This fixture uses deterministic layers without BatchNorm or dropout; stateful stochastic layers need a separate replay/buffer policy.",
+        "file": "torchsam.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "research-torchsam"
+    ],
+    "runtime": "pytorch",
+    "idea": "Sharpness-aware training evaluates a nearby parameter vector before making the real update. Two forward passes are not two optimizer steps. The second gradient belongs to the perturbed model, while momentum and weight decay must update the original model exactly once. Reversing a floating-point perturbation by subtraction can leave rounding residue, so this exercise owns exact snapshots. Exception handling is part of the algorithm: a failed closure must never leave the live model perturbed."
+  },
+  {
+    "id": "torchpcgrad",
+    "title": "Project conflicting task gradients without mutating their owners",
+    "summary": "Return a detached [tasks, parameters] matrix of PCGrad gradients. For each task, visit the other ORIGINAL task gradients in a seed-local shuffled order. If the current projected gradient has a negative dot product with an original peer, remove that component. Skip zero-norm peers. Do not mutate the input or global RNG. The caller chooses how to combine the projected rows; this Lab does not assert that a mean improves every task.",
+    "symbol": "brain",
+    "tint": "blue",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Mechanism",
+        "prompt": "Return a detached [tasks, parameters] matrix of PCGrad gradients. For each task, visit the other ORIGINAL task gradients in a seed-local shuffled order. If the current projected gradient has a negative dot product with an original peer, remove that component. Skip zero-norm peers. Do not mutate the input or global RNG. The caller chooses how to combine the projected rows; this Lab does not assert that a mean improves every task.",
+        "file": "torchpcgrad.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "research-torchpcgrad"
+    ],
+    "runtime": "pytorch",
+    "idea": "Multi-task objectives can produce gradients that oppose one another even when the shared model is differentiable. PCGrad edits a task gradient by removing conflicting components relative to original peer gradients. Projection order matters with three or more tasks, so order and randomness are part of the reproducibility contract. Returning separate rows preserves the distinction between surgery and the later task-weighting decision. This is a local vector algorithm; it does not claim a Pareto optimum or execute distributed reduction."
+  },
+  {
+    "id": "torchgroupdro",
+    "title": "Update a detached Group DRO adversary from group means",
+    "summary": "Return (robust_loss, next_log_weights). All G declared groups must occur in this batch. Average losses within each group, update adversary log weights by eta times DETACHED group means, normalize in log space, then weight differentiable group means by detached updated probabilities. Do not backpropagate into old adversary state. Reject empty/missing/out-of-range groups, nonfinite losses/state and nonpositive eta. This deliberately balanced-batch contract avoids silently inventing loss for unobserved groups.",
+    "symbol": "brain",
+    "tint": "blue",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Mechanism",
+        "prompt": "Return (robust_loss, next_log_weights). All G declared groups must occur in this batch. Average losses within each group, update adversary log weights by eta times DETACHED group means, normalize in log space, then weight differentiable group means by detached updated probabilities. Do not backpropagate into old adversary state. Reject empty/missing/out-of-range groups, nonfinite losses/state and nonpositive eta. This deliberately balanced-batch contract avoids silently inventing loss for unobserved groups.",
+        "file": "torchgroupdro.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "research-torchgroupdro"
+    ],
+    "runtime": "pytorch",
+    "idea": "Average risk can hide a poorly served subgroup when that group is rare. Group DRO maintains an adversary over declared groups, increasing mass on groups with larger observed mean loss. The adversary state is an optimization state, not a differentiable shortcut through every previous batch. Normalizing by each group count prevents duplicated rows from becoming an unintended group weight. Observing only a subset of groups requires an explicit estimator; this exercise instead declares complete group coverage per batch."
+  },
+  {
+    "id": "torchhetero",
+    "title": "Fit a positive heteroscedastic Gaussian likelihood",
+    "summary": "Use variance=softplus(raw_variance)+floor and return mean(0.5*(log(2*pi)+log(variance)+(target-mean)**2/variance)). Preserve gradients through both mean and raw variance. Require aligned nonempty finite floating tensors and finite floor>0. The floor is part of the declared model; do not clamp a negative variance after taking its logarithm.",
+    "symbol": "brain",
+    "tint": "blue",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Mechanism",
+        "prompt": "Use variance=softplus(raw_variance)+floor and return mean(0.5*(log(2*pi)+log(variance)+(target-mean)**2/variance)). Preserve gradients through both mean and raw variance. Require aligned nonempty finite floating tensors and finite floor>0. The floor is part of the declared model; do not clamp a negative variance after taking its logarithm.",
+        "file": "torchhetero.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "research-torchhetero"
+    ],
+    "runtime": "pytorch",
+    "idea": "A regression model can learn both a conditional mean and input-dependent noise. Gaussian likelihood rewards a good mean but also penalizes excessive variance, unlike simply enlarging every interval. An unconstrained raw output is transformed into a positive variance before any logarithm or division. Very negative raw values test the numerical behavior at the floor. The learned quantity is aleatoric uncertainty under this likelihood assumption; it does not include model uncertainty or automatically provide calibrated prediction intervals."
+  },
+  {
+    "id": "torchqat",
+    "title": "Train through per-channel fake quantization and saturation",
+    "summary": "Implement symmetric signed per-output-channel fake quantization of floating [out,in] weights with qmax=2**(bits-1)-1 and qmin=-qmax, bits in 2..8. Infer detached scales=max(abs(channel))/qmax with floor 1e-8, or accept explicit finite positive detached [out] scales. Round ties to even, simulate quantize/dequantize in floating point and use straight-through rounding with zero gradient outside the clipping interval. Return a floating tensor; this is QAT simulation, not a packed int8 kernel or a speed benchmark.",
+    "symbol": "brain",
+    "tint": "blue",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Mechanism",
+        "prompt": "Implement symmetric signed per-output-channel fake quantization of floating [out,in] weights with qmax=2**(bits-1)-1 and qmin=-qmax, bits in 2..8. Infer detached scales=max(abs(channel))/qmax with floor 1e-8, or accept explicit finite positive detached [out] scales. Round ties to even, simulate quantize/dequantize in floating point and use straight-through rounding with zero gradient outside the clipping interval. Return a floating tensor; this is QAT simulation, not a packed int8 kernel or a speed benchmark.",
+        "file": "torchqat.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "research-torchqat"
+    ],
+    "runtime": "pytorch",
+    "idea": "Quantization-aware training simulates rounding during training so the model can adapt to a finite grid. Rounding has almost-everywhere zero derivative; a declared straight-through rule supplies the training surrogate. Saturation still needs a policy: this exercise passes gradients inside the representable interval and stops them outside it. Per-channel scales prevent one large output row from determining every row’s resolution. The result remains floating point and is not evidence of compressed storage, integer execution or faster inference."
+  },
+  {
+    "id": "torchdpo",
+    "title": "Differentiate response-masked Direct Preference Optimization",
+    "summary": "Inputs are finite floating [batch,2,time,vocab] logits and int64 [batch,2,time] aligned response targets; pair index 0 is chosen, 1 rejected, and -100 masks non-response positions. Sum valid token log probabilities for each response, not their length average. Return mean(softplus(-beta*((policy_chosen-policy_rejected)-(reference_chosen-reference_rejected)))). Detach all reference logits. Every response needs a valid target. Reject bad labels, shape, empty batches and nonpositive/nonfinite beta. This is the DPO objective, not a claim of aligned behavior from passing a small fixture.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Mechanism",
+        "prompt": "Inputs are finite floating [batch,2,time,vocab] logits and int64 [batch,2,time] aligned response targets; pair index 0 is chosen, 1 rejected, and -100 masks non-response positions. Sum valid token log probabilities for each response, not their length average. Return mean(softplus(-beta*((policy_chosen-policy_rejected)-(reference_chosen-reference_rejected)))). Detach all reference logits. Every response needs a valid target. Reject bad labels, shape, empty batches and nonpositive/nonfinite beta. This is the DPO objective, not a claim of aligned behavior from passing a small fixture.",
+        "file": "torchdpo.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "research-torchdpo"
+    ],
+    "runtime": "pytorch",
+    "idea": "DPO compares the policy’s chosen-versus-rejected log-probability margin with a frozen reference margin. Summing only response targets keeps prompt and padding positions out of that comparison. Length normalization would change the objective, rather than merely improve numerical stability. Softplus evaluates the binary preference likelihood without explicitly taking a logarithm of a near-zero sigmoid. Reference ownership is observable in autograd: an accidental gradient into the reference changes the optimization problem even when the scalar loss initially looks correct."
+  },
+  {
+    "id": "torchgrpo",
+    "title": "Own grouped advantages and the clipped policy surrogate",
+    "summary": "Implement the GRPO-style clipped surrogate core for [prompts,completions,tokens] sampled log probabilities. Use detached within-prompt reward advantages normalized by population standard deviation plus 1e-8. Compute exp(logp-old_logp.detach()), take the minimum of unclipped and [1-clip,1+clip] clipped ratio times advantage, average over valid tokens within each response, then equally over prompts/completions. Detach rewards. Require each response to contain a token, at least two completions, 0<clip<1 and absolute log-ratio<=20. This exercise isolates the surrogate; rollout collection, a reference-KL penalty and reward design are separate components.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Mechanism",
+        "prompt": "Implement the GRPO-style clipped surrogate core for [prompts,completions,tokens] sampled log probabilities. Use detached within-prompt reward advantages normalized by population standard deviation plus 1e-8. Compute exp(logp-old_logp.detach()), take the minimum of unclipped and [1-clip,1+clip] clipped ratio times advantage, average over valid tokens within each response, then equally over prompts/completions. Detach rewards. Require each response to contain a token, at least two completions, 0<clip<1 and absolute log-ratio<=20. This exercise isolates the surrogate; rollout collection, a reference-KL penalty and reward design are separate components.",
+        "file": "torchgrpo.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "research-torchgrpo"
+    ],
+    "runtime": "pytorch",
+    "idea": "Grouped policy optimization compares completions of the same prompt rather than fitting a value baseline. Reward normalization must use that prompt’s group, and old policy scores are immutable evidence from rollout collection. Clipping limits the surrogate incentive after a ratio crosses a boundary, with different signs for good and bad advantages. Per-response token reduction prevents long completions from acquiring accidental extra weight. The Lab deliberately separates this mechanism from an end-to-end RL training system."
+  },
+  {
+    "id": "torchsupcon",
+    "title": "Handle multiple positives and singleton anchors in SupCon",
+    "summary": "Normalize finite nonzero [N,D] embeddings, exclude self pairs from every softmax denominator, and average log probability over all same-label non-self positives for each anchor. Average only anchors that have a positive; singleton embeddings still appear as negatives for other anchors. Require N>=2, aligned int64 labels, temperature>0, and at least one positive pair. Preserve gradients to every participating embedding. Avoid zero times negative infinity on masked diagonals.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Mechanism",
+        "prompt": "Normalize finite nonzero [N,D] embeddings, exclude self pairs from every softmax denominator, and average log probability over all same-label non-self positives for each anchor. Average only anchors that have a positive; singleton embeddings still appear as negatives for other anchors. Require N>=2, aligned int64 labels, temperature>0, and at least one positive pair. Preserve gradients to every participating embedding. Avoid zero times negative infinity on masked diagonals.",
+        "file": "torchsupcon.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "research-torchsupcon"
+    ],
+    "runtime": "pytorch",
+    "idea": "Pairwise contrastive learning assigns one positive per observation; supervised contrastive learning can assign several. Averaging individual positive log probabilities differs from taking the logarithm of their summed probability. A singleton label has no positive anchor loss but can still be a useful negative for another class. Removing its entire row and column would change the objective. Masked numerical operations also matter: multiplying an invalid diagonal by zero can still propagate NaNs."
+  },
+  {
+    "id": "torchmoe",
+    "title": "Route sparse top-two experts with an explicit capacity policy",
+    "summary": "For finite floating [tokens,dim] x, a Linear router with E>=2 outputs and E Linear experts of one common output width, choose the two largest router softmax probabilities per token (ties by expert index). Process tokens in input order; accept an assignment while that expert has capacity. Renormalize the retained gates per token. A token whose two assignments overflow returns graph-connected zeros. Return (output, auxiliary, accepted_loads, dropped_assignments). Auxiliary is E*sum(mean_full_router_probability*detached_pre_capacity_top2_fraction), fractions normalized by 2*tokens. Execute only accepted expert rows; do not evaluate every expert densely. Reject invalid shapes, nonfinite inputs/parameters and nonpositive integer capacity.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Mechanism",
+        "prompt": "For finite floating [tokens,dim] x, a Linear router with E>=2 outputs and E Linear experts of one common output width, choose the two largest router softmax probabilities per token (ties by expert index). Process tokens in input order; accept an assignment while that expert has capacity. Renormalize the retained gates per token. A token whose two assignments overflow returns graph-connected zeros. Return (output, auxiliary, accepted_loads, dropped_assignments). Auxiliary is E*sum(mean_full_router_probability*detached_pre_capacity_top2_fraction), fractions normalized by 2*tokens. Execute only accepted expert rows; do not evaluate every expert densely. Reject invalid shapes, nonfinite inputs/parameters and nonpositive integer capacity.",
+        "file": "torchmoe.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "research-torchmoe"
+    ],
+    "runtime": "pytorch",
+    "idea": "A sparse router introduces a discrete ownership decision between differentiable computations. The selected gate probabilities remain trainable, but selection indices and capacity decisions do not. Overflow policy changes which examples reach which expert; this exercise makes input-order admission and renormalization explicit. Load balancing uses pre-capacity assignments so dropping work cannot masquerade as balanced demand. CPU execution demonstrates correctness and gradients, not expert-parallel communication, a distributed all-to-all operation or an inference speedup."
+  },
+  {
+    "id": "torchspeculative",
+    "title": "Preserve target mass with speculative accept and residual resampling",
+    "summary": "Implement one exact categorical speculative step for normalized finite nonnegative [vocab] probabilities. The proposed token must have positive draft mass. Accept it when accept_uniform < min(1,target[proposal]/draft[proposal]). On rejection, inverse-CDF sample from normalized clamp(target-draft,min=0), using residual_uniform and right-open CDF bins. Return (token, accepted). Uniforms are explicit finite values in [0,1), so the function owns no RNG. Reject invalid probabilities, token indices and uniforms. This single-position probability mechanism makes no wall-clock speed claim.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Mechanism",
+        "prompt": "Implement one exact categorical speculative step for normalized finite nonnegative [vocab] probabilities. The proposed token must have positive draft mass. Accept it when accept_uniform < min(1,target[proposal]/draft[proposal]). On rejection, inverse-CDF sample from normalized clamp(target-draft,min=0), using residual_uniform and right-open CDF bins. Return (token, accepted). Uniforms are explicit finite values in [0,1), so the function owns no RNG. Reject invalid probabilities, token indices and uniforms. This single-position probability mechanism makes no wall-clock speed claim.",
+        "file": "torchspeculative.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "research-torchspeculative"
+    ],
+    "runtime": "pytorch",
+    "idea": "A draft model proposes cheaply, but naive verification would change the target distribution. Speculative sampling accepts some draft mass and compensates on rejection using the positive residual between target and draft probabilities. That residual is not simply the target distribution again. Making both uniform draws explicit separates the probability transform from RNG ownership and permits deterministic boundary tests. The Lab studies one categorical verification step, not a multi-token cached transformer execution pipeline."
+  },
+  {
+    "id": "torchgrammar",
+    "title": "Search a finite-state grammar with explicit EOS and sequence scores",
+    "summary": "Search finite floating [time,vocab] position-conditioned logits under transitions[state][token]=next_state. EOS is permitted only in accepting states and terminates the hypothesis without a transition. Use original full-vocabulary log-softmax scores before grammar filtering: do not renormalize each allowed subset. Keep finished hypotheses without scoring further tokens, sort by descending accumulated score then lexicographic token sequence, and retain width hypotheses after each step. Return {tokens,score} for the best finished hypothesis; reject if none finishes. Wide beams can match exhaustive search; a finite narrow beam is not guaranteed optimal.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Mechanism",
+        "prompt": "Search finite floating [time,vocab] position-conditioned logits under transitions[state][token]=next_state. EOS is permitted only in accepting states and terminates the hypothesis without a transition. Use original full-vocabulary log-softmax scores before grammar filtering: do not renormalize each allowed subset. Keep finished hypotheses without scoring further tokens, sort by descending accumulated score then lexicographic token sequence, and retain width hypotheses after each step. Return {tokens,score} for the best finished hypothesis; reject if none finishes. Wide beams can match exhaustive search; a finite narrow beam is not guaranteed optimal.",
+        "file": "torchgrammar.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "research-torchgrammar"
+    ],
+    "runtime": "pytorch",
+    "idea": "A grammar constrains valid sequences, while a language model supplies their scores. Filtering illegal transitions after normalizing the original vocabulary preserves the declared model likelihood; renormalizing only legal tokens instead creates a different conditional distribution. Finished EOS paths need their own lifetime, otherwise they can be accidentally extended or charged extra probability. This finite-position exercise makes search and grammar correctness inspectable without a remote model. A narrow beam can still prune the best complete sequence."
+  },
+  {
+    "id": "torchrobustproject",
+    "title": "Project: audit ERM and Group DRO under a spurious correlation",
+    "summary": "Implement the complete experiment using the supplied make_data/tensors/classification/train_model helpers. Generate the declared local synthetic four-group dataset, train ERM and Group DRO from identical initialization, choose each checkpoint only by validation worst-group accuracy then validation loss, and evaluate the untouched test set once. Return the reference schema with both models, disjoint row IDs, train/validation fit hash, source hash, measured history and a real serialized artifact. The artifact includes both model states and initialization for independent audit. Reload into a fresh model and verify predictions. Test-label overrides must affect only evaluation, never selection or weights. The reference CLI writes model/report files in the current project. Report empirical sample group masses for ERM and the adversary probabilities belonging to the selected DRO checkpoint; serialize those probabilities and selected step with each model.",
+    "symbol": "brain",
+    "tint": "blue",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Implement the complete experiment using the supplied make_data/tensors/classification/train_model helpers. Generate the declared local synthetic four-group dataset, train ERM and Group DRO from identical initialization, choose each checkpoint only by validation worst-group accuracy then validation loss, and evaluate the untouched test set once. Return the reference schema with both models, disjoint row IDs, train/validation fit hash, source hash, measured history and a real serialized artifact. The artifact includes both model states and initialization for independent audit. Reload into a fresh model and verify predictions. Test-label overrides must affect only evaluation, never selection or weights. The reference CLI writes model/report files in the current project. Report empirical sample group masses for ERM and the adversary probabilities belonging to the selected DRO checkpoint; serialize those probabilities and selected step with each model.",
+        "file": "torchrobustproject.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "project-torchrobustproject"
+    ],
+    "runtime": "pytorch",
+    "idea": "A majority-aligned shortcut can make average accuracy look reassuring while minority groups fail. This experiment creates that failure mode explicitly with generated causal and spurious features, then compares two actual optimizer objectives from the same initialization. Validation selects checkpoints before test labels are observed. Reports retain per-group results, row identities and a reloadable artifact rather than declaring that a robust objective must win every seed. The data are a controlled synthetic stress test, not real-world robustness evidence."
+  },
+  {
+    "id": "torchuncertaintyproject",
+    "title": "Project: train uncertainty and calibrate independent prediction intervals",
+    "summary": "Build the complete local synthetic heteroscedastic regression experiment with four disjoint partitions: training, validation selection, conformal calibration and final test. Train both mean and positive variance using Gaussian NLL, choose the checkpoint by validation NLL, then compute normalized absolute calibration residuals and the finite-sample ceil((n+1)*(1-alpha)) order statistic without interpolation. Export the learned state plus quantile, reload in a fresh model, and report actual test coverage, width and left/right-region coverage. Calibration and test labels must never fit or select model weights. Keep the full reference report schema. Marginal conformal coverage requires exchangeability and does not imply subgroup coverage.",
+    "symbol": "brain",
+    "tint": "blue",
+    "section": "Machine learning",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Build the complete local synthetic heteroscedastic regression experiment with four disjoint partitions: training, validation selection, conformal calibration and final test. Train both mean and positive variance using Gaussian NLL, choose the checkpoint by validation NLL, then compute normalized absolute calibration residuals and the finite-sample ceil((n+1)*(1-alpha)) order statistic without interpolation. Export the learned state plus quantile, reload in a fresh model, and report actual test coverage, width and left/right-region coverage. Calibration and test labels must never fit or select model weights. Keep the full reference report schema. Marginal conformal coverage requires exchangeability and does not imply subgroup coverage.",
+        "file": "torchuncertaintyproject.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "project-torchuncertaintyproject"
+    ],
+    "runtime": "pytorch",
+    "idea": "An uncertainty model and an interval calibration procedure answer different questions. This project trains a heteroscedastic likelihood, selects its checkpoint on validation data, and only then uses a separate calibration partition to choose interval width. The corrected order statistic is an integer rank, not an interpolated percentile. Final test rows measure observed coverage without feeding back into model or quantile selection. Synthetic regions make subgroup differences visible while keeping every row reproducible offline."
+  },
+  {
+    "id": "torchpreferenceproject",
+    "title": "Project: train and reload a local DPO policy with LoRA ownership",
+    "summary": "Implement the full synthetic preference experiment with the supplied local conditional token model and data helpers. First supervised-train the local base only on training chosen responses, freeze it as the reference, clone it and train only the two rank-two adapter matrices with response-token DPO at beta=.5. Select by validation preference loss, evaluate separate prompt identities, and export a real serialized model/reference/initialization artifact. Report actual loss, preference wins, reference-to-policy KL, parameter ownership, frozen-base hashes and reload equality. Preserve the reference report schema and prevent test preferences from fitting or selecting weights. The base is locally trained on generated pairs, not a downloaded pretrained LLM.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Implement the full synthetic preference experiment with the supplied local conditional token model and data helpers. First supervised-train the local base only on training chosen responses, freeze it as the reference, clone it and train only the two rank-two adapter matrices with response-token DPO at beta=.5. Select by validation preference loss, evaluate separate prompt identities, and export a real serialized model/reference/initialization artifact. Report actual loss, preference wins, reference-to-policy KL, parameter ownership, frozen-base hashes and reload equality. Preserve the reference report schema and prevent test preferences from fitting or selecting weights. The base is locally trained on generated pairs, not a downloaded pretrained LLM.",
+        "file": "torchpreferenceproject.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "project-torchpreferenceproject"
+    ],
+    "runtime": "pytorch",
+    "idea": "Preference optimization needs more evidence than a scalar loss formula. This project owns a local supervised base, a frozen reference, trainable low-rank adapters and separate prompt identities for selection and evaluation. Pair responses contain real token sequences, so the optimizer evaluates chosen and rejected prefixes rather than fabricated sequence scores. The exported artifact includes every component required for offline reload. Generated preferences make optimizer and ownership failures reproducible; they do not establish natural-language ability or human alignment."
+  },
+  {
+    "id": "torchmoeproject",
+    "title": "Project: train sparse experts and audit capacity under load",
+    "summary": "Complete the generated XOR-region experiment with a four-expert, top-two sparse classifier. Train router and expert parameters with cross entropy plus .03 times the declared load-balancing auxiliary; choose only by validation cross entropy. Export model/initialization states, reload into a fresh model and evaluate held-out row identities. Report measured accuracy, load distribution, dropped assignments and a separate bounded-capacity stress run. Preserve the reference schema and keep test targets out of training/selection. Actual selected expert rows execute on CPU; this is not a GPU/distributed throughput benchmark. The CLI saves a real model and JSON report.",
+    "symbol": "brain",
+    "tint": "violet",
+    "section": "Artificial intelligence",
+    "variants": [
+      {
+        "id": "practice",
+        "title": "Project",
+        "prompt": "Complete the generated XOR-region experiment with a four-expert, top-two sparse classifier. Train router and expert parameters with cross entropy plus .03 times the declared load-balancing auxiliary; choose only by validation cross entropy. Export model/initialization states, reload into a fresh model and evaluate held-out row identities. Report measured accuracy, load distribution, dropped assignments and a separate bounded-capacity stress run. Preserve the reference schema and keep test targets out of training/selection. Actual selected expert rows execute on CPU; this is not a GPU/distributed throughput benchmark. The CLI saves a real model and JSON report.",
+        "file": "torchmoeproject.py",
+        "scales": false
+      }
+    ],
+    "lessons": [
+      "project-torchmoeproject"
+    ],
+    "runtime": "pytorch",
+    "idea": "A functioning mixture-of-experts model needs routing, optimization, evaluation and overflow evidence together. This project trains a sparse classifier on generated nonlinear regions, then selects a checkpoint without seeing test targets. A separate capacity stress run reveals how admission order and dropped assignments affect the result. Export and fresh reload check that the router and every expert belong to the artifact. The experiment measures local correctness and utilization; it does not infer sparse hardware efficiency from the model’s name."
   }
 ]

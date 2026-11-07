@@ -30,6 +30,8 @@ TORCH_IMPORT_SECONDS = 20
 
 # File stem -> (course id, kind, number of lessons)
 EXPECTED_COURSES = {
+    "37-robust-ml-engineering": ("robust-ml-engineering", "path", 8),
+    "38-alignment-engineering": ("alignment-engineering", "path", 8),
     "36-finetuning-projects": ("finetuning-projects", "path", 6),
     "34-pytorch-training": ("pytorch-training", "path", 9),
     "35-transformer-engineering": ("transformer-engineering", "path", 9),
@@ -252,9 +254,12 @@ def static_problems(lesson, kind):
         if not isinstance(minutes, int) or isinstance(minutes, bool) or minutes <= 0:
             problems.append(f"bad minutes {minutes!r}")
     else:
-        for field in ("level", "minutes"):
-            if field in lesson:
-                problems.append(f"'{field}' is for interview lessons only")
+        if "level" in lesson and lesson["level"] != "Senior":
+            problems.append("optional path level must be 'Senior'")
+        if "minutes" in lesson:
+            minutes = lesson["minutes"]
+            if not isinstance(minutes, int) or isinstance(minutes, bool) or minutes <= 0:
+                problems.append(f"bad estimated minutes {minutes!r}")
 
     checks = lesson.get("checks")
     if not isinstance(checks, list) or not 3 <= len(checks) <= 6:

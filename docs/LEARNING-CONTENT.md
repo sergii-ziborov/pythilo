@@ -113,3 +113,35 @@ Update the App Store draft's counts, TestFlight notes and relevant screenshot
 artwork, but do not request App Review or Beta App Review. Verify screenshot
 processing reaches COMPLETE and a build reaches internal beta testing before
 reporting it as available.
+
+## Senior robustness and alignment Labs
+
+The robust-ml-engineering and alignment-engineering courses add sixteen linked
+CPU PyTorch lessons. Four new collapsible topics group training mechanisms,
+robustness/uncertainty projects, alignment/inference mechanisms and preference/
+expert projects. A complete course or category download includes every required
+shared runtime; project code never queues downloads when created, opened or run.
+
+Author `scripts/research-content/labs.json` and the corresponding canonical
+`labcode/<id>.practice.answer.py` files, then run
+`scripts/generate-research-content.py`. It regenerates both courses, starter
+scaffolds, topic assignments, reciprocal lesson links and native Lab contracts.
+Each of the sixteen Labs has five independent checks shared with its lesson.
+The renderer observes the learner's actual tensors and optimizer milestones.
+
+Four complete CLI experiments generate deterministic synthetic datasets locally,
+train real CPU models, select on validation data, evaluate separate held-out
+identities, serialize artifacts and reload them into fresh models. They cover
+ERM versus Group DRO, heteroscedastic regression with independent conformal
+calibration, local preference DPO with rank-two adapters, and sparse top-two MoE
+training with capacity stress. Their report and artifact filenames are declared
+in their source. Generated datasets are controlled correctness fixtures, not
+pretrained-model or production-quality evidence. The six real pretrained BERT
+projects and their separately pinned source data remain available.
+
+After generation, rerun the native solution/reading/contract gates with the
+external-network audit active. The full CLI gate records real exports at default
+training budgets; the public-download gate independently installs the two courses,
+four topics and three shared runtimes from published URLs and compares every
+lesson solution with its downloaded Lab answer. Publish immutable payloads before
+releasing the app catalog; preserve all earlier content-addressed URLs.

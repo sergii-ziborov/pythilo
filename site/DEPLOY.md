@@ -376,3 +376,34 @@ Catalog hash: `eeafdc1b5bf814b0674f3a8700fdf9c9c09c84861fa3bd2a631abc95c3218ab4`
 Only the fine-tuning course text pack changed; prior content-addressed URLs remain
 reachable for older builds. Public transport proof:
 `build/release-receipts/manual27-public-integrity.json`.
+
+## Senior research Labs release (7 November 2026)
+
+The published catalog contains 136 Labs in 19 topics, including 40 CPU PyTorch
+Labs, 446 path lessons and 100 interview tasks. Two new eight-lesson courses
+cover robust ML and alignment; 16 new Labs include four complete experiments
+with deterministic synthetic local data, validation selection, separate test
+evaluation and serialized model reloads. All 104 lesson/Lab pairs are reciprocal.
+The app explicitly downloads an entire course or category, including dependencies,
+before offline execution. Creating/opening a project or pressing Run starts no download.
+
+Final source revision:
+`sha256:41309c5c872caa455efb2a8a1f5867ced07e8622e38cacca2f238da3f41587b1`.
+Image: `sha256:b0c814a46f09702f2d65cf8eaa2ef37cc490290778f23395c3145e7f53b226e8`.
+Registry manifest:
+`sha256:ee7dc590fb0ded9616f5842751a09e65228c8e53a5d85b3fc1151862cec5fc7d`.
+Verified serving revision:
+`sha256:7e24b15cf7530b7ee046f547a0deae19170f01d92c6632486f7433f7e934e56d`.
+The source build, registry update and live deployment succeeded independently;
+the live image matches the final staged image. Operation keys use
+`pythilo-senior-research-{build,publish,deploy}-20261107-v2`.
+Receipt: `build/release-receipts/research28-site-release.json`.
+
+All 92 web tests, TypeScript and the final 743-page remote build pass. The public
+audit passes 226 routes, all 104 link pairs, native runtime notices and isolation
+headers. Room/runtime smoke checks pass. All 63 catalog-pinned public payloads
+(43,593,736 bytes) were downloaded completely and verified with SHA-256.
+Catalog hash: `b29787e5e05d7aa54a965695c7c59fb5b920b121174c5bce53321d12ef0bc191`.
+Prior immutable pack URLs remain available. Public receipts:
+`build/release-receipts/research28-public-integrity.json` and
+`build/logs/research28-public-audit.json`.

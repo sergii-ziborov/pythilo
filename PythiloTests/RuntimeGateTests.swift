@@ -7,7 +7,7 @@ import XCTest
 final class RuntimeGateTests: XCTestCase {
     private var session: RunSession { RunSession.shared }
     private var root: URL!
-    private var offlineAudit: Bool { name.contains("testAllSixPretrainedProject") || name.contains("testCompletePretrainedProject") }
+    private var offlineAudit: Bool { name.contains("testAllSixPretrainedProject") || name.contains("testCompletePretrainedProject") || name.contains("testSeniorResearchFullCLIProjects") }
 
     override func setUp() async throws {
         root = FileManager.default.temporaryDirectory.appending(path: "gate-\(UUID().uuidString)")
@@ -540,6 +540,37 @@ final class RuntimeGateTests: XCTestCase {
         let accuracy = Int(last.components(separatedBy: "accuracy ").last?.dropLast() ?? "") ?? 0
         XCTAssertGreaterThanOrEqual(accuracy, 95, outputText())
         XCTAssertTrue(outputText().contains("Saved the weights to spirals.pt"), outputText())
+    }
+
+    func testSeniorResearchFullCLIProjectsTrainExportAndReloadOffline() async throws {
+        let projects = [
+            ("torchrobustproject", "group-dro", 120),
+            ("torchuncertaintyproject", "uncertainty", 140),
+            ("torchpreferenceproject", "preference", 100),
+            ("torchmoeproject", "sparse-moe", 120),
+        ]
+        var evidence: [[String: Any]] = []
+        for (lab, prefix, steps) in projects {
+            let folder = root.appending(path: lab)
+            let source = LabCatalog.code(lab, "practice", .answer)
+            let path = try write("main.py", source, in: folder)
+            let started = Date()
+            let outcome = try await runJob(["kind": "script", "path": path, "root": folder.path, "cwd": folder.path], timeout: 180)
+            XCTAssertEqual(outcome.code, 0, "\(lab): \(outputText())")
+            let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: folder.appending(path: "\(prefix)-report.json"))) as? [String: Any])
+            XCTAssertEqual(report["steps"] as? Int, steps, lab)
+            if let error = report["reload_max_error"] as? Double { XCTAssertEqual(error, 0, lab) }
+            if let equal = report["reload_equal"] as? Bool { XCTAssertTrue(equal, lab) }
+            let artifactName = lab == "torchpreferenceproject" ? "preference-lora.pt" : "\(prefix)-model.pt"
+            let artifact = try Data(contentsOf: folder.appending(path: artifactName))
+            XCTAssertGreaterThan(artifact.count, 1000, lab)
+            evidence.append(["project": lab, "seconds": Date().timeIntervalSince(started), "artifactBytes": artifact.count,
+                             "artifactSHA256": ContentInstaller.digest(artifact), "report": report])
+        }
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        try JSONSerialization.data(withJSONObject: evidence, options: [.prettyPrinted, .sortedKeys])
+            .write(to: documents.appending(path: "senior-research-native-full-audit.json"))
+        XCTAssertEqual(evidence.count, 4)
     }
 
     func testAllSixPretrainedProjectTemplatesRunFromTheirLocalSource() async throws {

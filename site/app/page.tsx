@@ -40,7 +40,7 @@ export default function Home() {
       <section className="home-hero" aria-labelledby="hero-title">
         <span className="eyebrow"><span className="dot" aria-hidden="true" />In beta on TestFlight · iPhone and iPad</span>
         <h1 id="hero-title">Real Python, <span className="accent">on your iPhone and iPad</span></h1>
-        <p className="lead">Pythilo is a Python IDE, a course and a set of algorithm labs in one app. CPython 3.14 runs on the device itself: your code, your tests, your Django site and your debugger session never leave the phone, and none of it needs a network.</p>
+        <p className="lead">Pythilo is a Python IDE, a course and a set of algorithm labs in one app. CPython 3.14 runs on the device itself: your code, your tests, your Django site and your debugger session never leave the phone, and downloaded courses and Labs work entirely offline.</p>
         <div className="button-row center">
           <a href={APP_URL} className="big-button primary">Get the app<Arrow /></a>
           <Link href="/guide/" className="big-button">Read the guide</Link>
@@ -93,10 +93,10 @@ export default function Home() {
       <section className="feature" aria-labelledby="f-ml">
         <div className="feature-text">
           <span className="label">Packages and machine learning</span>
-          <h2 id="f-ml">NumPy and PyTorch, bundled. pip for the rest.</h2>
-          <p>PyTorch 2.15 is built for iOS from source and ships in the app, so the machine learning lessons train real networks offline. pip installs pure-Python packages from PyPI into each project&apos;s own folder.</p>
+          <h2 id="f-ml">Choose your packages. Work offline.</h2>
+          <p>PyTorch 2.15 has signed native backends in the app. Explicitly download a course or Lab category with its Python packages and assets, then train real networks offline. pip installs pure-Python packages from PyPI into each project&apos;s own folder.</p>
           <ul className="ticks">
-            <li>Bundled: NumPy, PyTorch, Django, Flask, FastAPI, Pydantic, Starlette, Uvicorn, Requests, httpx, pytest, SymPy, NetworkX and more.</li>
+            <li>Downloadable Python APIs: NumPy, PyTorch, Django, Flask, FastAPI, Pydantic, Starlette, Uvicorn, httpx, SymPy and NetworkX. pytest and the core interpreter ship in the app.</li>
             <li><code>pythilo.coreml</code> runs a Core ML model on the CPU, the GPU or the Neural Engine, times each one and checks they agree.</li>
             <li>Notebooks open and save ordinary <code>.ipynb</code> files, with cells that share one namespace.</li>
           </ul>

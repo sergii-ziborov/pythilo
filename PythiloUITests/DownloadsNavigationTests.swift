@@ -48,8 +48,8 @@ import XCTest
         let app = XCUIApplication()
         app.launchArguments = ["-tab", "labs", "-removeDownload", "labs-pytorch-training"]
         app.launch()
-        XCTAssertTrue(app.buttons["ML · 57"].waitForExistence(timeout: 30))
-        app.buttons["ML · 57"].tap()
+        XCTAssertTrue(app.buttons["ML · 65"].waitForExistence(timeout: 30))
+        app.buttons["ML · 65"].tap()
         let download = app.buttons["download-category-Machine learning"]
         XCTAssertTrue(download.waitForExistence(timeout: 10))
         XCTAssertTrue(download.isEnabled)

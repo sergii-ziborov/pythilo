@@ -28,15 +28,15 @@ final class ButtonHitTargetTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-tab", "labs"]
         app.launch()
-        let filter = app.buttons["AI · 40"]
+        let filter = app.buttons["AI · 48"]
         XCTAssertTrue(filter.waitForExistence(timeout: 20))
         XCTAssertGreaterThanOrEqual(filter.frame.height, 44)
         filter.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.8)).tap()
-        XCTAssertTrue(app.staticTexts["ARTIFICIAL INTELLIGENCE · 40"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["ARTIFICIAL INTELLIGENCE · 48"].waitForExistence(timeout: 5))
         app.buttons["labs-topic-transformer-internals"].tap()
         let attention = app.buttons["lab-attention"]
         XCTAssertTrue(attention.exists)
-        attention.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.92)).tap()
+        tapVisiblePadding(attention, in: app, offset: CGVector(dx: 0.6, dy: 0.92))
         XCTAssertTrue(app.buttons["lab-trace"].waitForExistence(timeout: 5))
     }
 
@@ -104,5 +104,31 @@ final class ButtonHitTargetTests: XCTestCase {
         let ran = NSPredicate(format: "value CONTAINS %@", "Hello from Python on this device")
         expectation(for: ran, evaluatedWith: output)
         waitForExpectations(timeout: 15)
+    }
+}
+
+// XCUITest considers partially covered/offscreen controls hittable on this SDK.
+// Keep the exact padding point clear of the navigation and floating tab bars.
+@MainActor
+extension XCTestCase {
+    func tapVisiblePadding(_ element: XCUIElement, in app: XCUIApplication,
+                           offset: CGVector = CGVector(dx: 0.5, dy: 0.5),
+                           file: StaticString = #filePath, line: UInt = #line) {
+        for _ in 0..<24 {
+            let point = element.coordinate(withNormalizedOffset: offset).screenPoint
+            let window = app.windows.firstMatch.frame
+            let visible = CGRect(x: window.minX + 8, y: window.minY + 120,
+                                 width: window.width - 16, height: window.height - 230)
+            if visible.contains(point) {
+                element.coordinate(withNormalizedOffset: offset).tap()
+                return
+            }
+            let up = point.y > visible.maxY
+            // Swipe along the outer margin, outside the nested code editor.
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: up ? 0.7 : 0.3))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.98, dy: up ? 0.3 : 0.7)))
+        }
+        XCTFail("Control padding did not enter the unobscured viewport: \(element.identifier)", file: file, line: line)
     }
 }

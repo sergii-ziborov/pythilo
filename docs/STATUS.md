@@ -632,3 +632,55 @@ Review or Beta App Review was requested. Final proofs:
 `build/release-receipts/testflight-27-ready.json`,
 `build/release-receipts/manual27-screenshots.json` and
 `build/release-receipts/manual27-metadata.json`.
+
+## Senior ML and AI research Labs — 7 November 2026
+
+Added 16 CPU PyTorch Labs and two eight-lesson courses: robust ML engineering
+and alignment engineering. Four new topic groups cover focal gradients, SAM,
+PCGrad, Group DRO, uncertainty, QAT, DPO/GRPO, contrastive learning, sparse MoE,
+speculative sampling and grammar search. Four complete experiments train models,
+select on validation data, evaluate separate test data and export/reload real
+artifacts. Their deterministic local datasets are explicitly synthetic. Existing
+six pretrained BERT projects and downloaded UCI data remain available.
+
+The catalog now contains 136 Labs (65 ML, 48 AI), 19 topics and 40 PyTorch Labs;
+446 path lessons plus 100 interview tasks; 138 advanced lessons and 34 integration
+projects. All 104 lesson/Lab links are reciprocal. Explicit entire-course and
+entire-category downloads include every dependency. Create/Open/Run starts no
+download. New authoring metadata and generation instructions live in
+`scripts/research-content/README.md`.
+
+Native guarded execution passes all 546 solutions, 138 advanced starters,
+603 independent reading programs, every Lab answer/starter, all 183 PyTorch
+contracts, six complete pretrained projects and the four new full CLI projects
+(120/140/100/120 optimizer steps). External DNS and connections are blocked and
+the guard checks for attempted access. Full new projects produce real model bytes
+and reload into fresh models. Receipts: `research28-native-readings.json`,
+`research28-full-training-offline.json` and `research28-pretrained-full-offline.json`
+under `build/release-receipts/`. The initial broad bundle contains one obsolete
+587-versus-603 count assertion; the corrected 603-program native rerun passes.
+
+Actual public native installation passes: the app downloads all six new content
+packs and three shared runtime packs into a fresh store, verifies the complete
+selection and checks all 16 lessons against Lab source bytes. Test:
+`ContentDownloadTests.testSeniorResearchSelectionsFetchEveryPublishedCourseTopicAndDependency`
+in `build/research28-public-native.xcresult`. That bundle also retains two
+superseded UI test geometry failures. Final padding-tap, senior DPO/LoRA execution,
+lesson navigation and topic/search reruns all pass in
+`build/research28-ui-final.xcresult`; whole-course/category/project download UI
+tests pass in `build/research28-final-native.xcresult`. Tests now reveal exact
+padding coordinates above the floating tab bar before tapping.
+
+The site is live; 92 web tests, TypeScript, 743 generated pages, 226 public routes,
+104 link pairs and public smoke checks pass. Desktop/mobile browser search and
+navigation pass without overflow or browser errors. All 63 published payloads
+(43,593,736 bytes) match the signed catalog SHA-256 inventory. Release and integrity
+receipts are `research28-site-release.json`, `research28-public-integrity.json`
+and `research28-browser.json` under `build/release-receipts/`.
+
+Release 0.1.0 (28) archives, exports and uploads successfully. Its 83,492,655-byte
+IPA contains 38 course previews, 43 matching runtime files, six local project
+recipes and 21 signed backend links; complete lessons, Lab Python files, optional
+API trees, datasets and weights remain downloadable. Archive proof:
+`build/release-receipts/testflight-28-archive-source.json`.
+Apple processing and final internal TestFlight readiness verification are pending.

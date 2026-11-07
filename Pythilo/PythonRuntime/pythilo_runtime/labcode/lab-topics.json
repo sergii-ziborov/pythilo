@@ -74,6 +74,26 @@
       "id": "finetuning-adapters",
       "title": "LoRA & model deployment",
       "section": "Artificial intelligence"
+    },
+    {
+      "id": "robust-training",
+      "title": "Robust training mechanisms",
+      "section": "Machine learning"
+    },
+    {
+      "id": "robustness-projects",
+      "title": "Robustness & uncertainty projects",
+      "section": "Machine learning"
+    },
+    {
+      "id": "alignment-mechanisms",
+      "title": "Alignment & sparse inference",
+      "section": "Artificial intelligence"
+    },
+    {
+      "id": "alignment-projects",
+      "title": "Preference & expert projects",
+      "section": "Artificial intelligence"
     }
   ],
   "assignments": {
@@ -196,6 +216,22 @@
     "torchbertdomain": "finetuning-training",
     "torchbertcompare": "finetuning-training",
     "torchbertresume": "finetuning-adapters",
-    "torchbertmerge": "finetuning-adapters"
+    "torchbertmerge": "finetuning-adapters",
+    "torchfocal": "robust-training",
+    "torchsam": "robust-training",
+    "torchpcgrad": "robust-training",
+    "torchgroupdro": "robust-training",
+    "torchhetero": "robust-training",
+    "torchqat": "robust-training",
+    "torchdpo": "alignment-mechanisms",
+    "torchgrpo": "alignment-mechanisms",
+    "torchsupcon": "alignment-mechanisms",
+    "torchmoe": "alignment-mechanisms",
+    "torchspeculative": "alignment-mechanisms",
+    "torchgrammar": "alignment-mechanisms",
+    "torchrobustproject": "robustness-projects",
+    "torchuncertaintyproject": "robustness-projects",
+    "torchpreferenceproject": "alignment-projects",
+    "torchmoeproject": "alignment-projects"
   }
 }

@@ -1,6 +1,6 @@
 # Pythilo
 
-**Real Python on your iPhone and iPad.** Pythilo is an IDE, a course and 120 interactive
+**Real Python on your iPhone and iPad.** Pythilo is an IDE, a course and 136 interactive
 algorithm and machine learning labs in one app. CPython 3.14 runs on the device itself: your code, your
 tests, your Django site and your debugger session never leave the phone. Execution
 works offline after the required packages and data have been downloaded.
@@ -63,7 +63,7 @@ Python extensions remain signed inside the app; their Python APIs download separ
 
 ### Learn
 
-- **430 lessons in 35 courses**, including 122 advanced lessons (30 integration projects): Python foundations and Python deeper (30 each), clean
+- **446 lessons in 37 courses**, including 138 advanced lessons (34 integration projects): Python foundations and Python deeper (30 each), clean
   code, testing, the tools around Python, architecture, concurrency and async, the web,
   data, the mathematics of neural networks, machine learning with PyTorch (30), language
   models from the inside, working with AI tools, and four practical courses on
@@ -81,14 +81,14 @@ Python extensions remain signed inside the app; their Python APIs download separ
 
 ### Labs
 
-120 labs in 15 topics that trace **your own code** while it runs, with scaling measurements where
+136 labs in 19 topics that trace **your own code** while it runs, with scaling measurements where
 available. Seventy-four also run in the browser at [pythilo.com/labs](https://pythilo.com/labs/),
-using the same tracer and correctness checks. Twenty-four PyTorch Labs run in the app,
-including twelve composed projects. Six train real pretrained BERT models with the UCI
+using the same tracer and correctness checks. Forty PyTorch Labs run in the app,
+including sixteen composed projects. Six train real pretrained BERT models with the UCI
 sentiment dataset, LoRA, domain transfer, exact resume and merged-artifact evaluation. Expand a topic or search by concept to find them.
 Correctness first, then time. The catalogue now covers Basics, Data structures,
 Algorithms, Machine learning and Artificial intelligence. Search the catalog or use
-the ML (57 labs) and AI (40 labs) filters. For example:
+the ML (65 labs) and AI (48 labs) filters. For example:
 
 - **ML evaluation and optimization**: train-only standardization, confusion matrices,
   precision/recall/F1, threshold selection, folds, ridge regression, gradient checks,
@@ -98,6 +98,12 @@ the ML (57 labs) and AI (40 labs) filters. For example:
   packed-document masks, grouped-query attention and RMS normalization. Projects train
   MLPs, resume AdamW/dropout exactly, learn low-rank adapters, audit decoder blocks,
   train a tiny causal language model and classify padded sequences.
+- **Senior training and alignment**: masked focal loss, SAM with rollback, PCGrad,
+  Group DRO, heteroscedastic likelihood, per-channel QAT, response-masked DPO,
+  grouped policy surrogates, supervised contrastive learning, sparse expert capacity,
+  speculative residual sampling and finite-state constrained decoding. Four complete
+  synthetic-data projects train, select, export and reload robust, uncertainty,
+  preference-LoRA and sparse-expert models.
 - **AI building blocks**: stable softmax and temperature, scaled dot-product attention,
   causal masks, nucleus candidates, beam search, BPE merging, cosine retrieval and
   layer normalization.

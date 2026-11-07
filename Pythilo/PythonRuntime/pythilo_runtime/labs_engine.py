@@ -247,6 +247,7 @@ def register(lab_id, variants):
 
 
 MODULES = {
+    **dict.fromkeys(('torchfocal', 'torchsam', 'torchpcgrad', 'torchgroupdro', 'torchhetero', 'torchqat', 'torchdpo', 'torchgrpo', 'torchsupcon', 'torchmoe', 'torchspeculative', 'torchgrammar', 'torchrobustproject', 'torchuncertaintyproject', 'torchpreferenceproject', 'torchmoeproject'), "labs_research"),
     **dict.fromkeys(('torchclip', 'torchgroups', 'torchdistill', 'torchcontrast', 'torchema', 'torchtokens', 'torchmlp', 'torchresume', 'torchlora', 'torchsdpa', 'torchrope', 'torchkv', 'torchpacked', 'torchgqa', 'torchrms', 'torchblock', 'torchtinylm', 'torchseqcls'), "labs_torch"),
     **dict.fromkeys(('torchbertfull', 'torchbertlora', 'torchbertdomain', 'torchbertcompare', 'torchbertresume', 'torchbertmerge'), "labs_finetune"),
     **dict.fromkeys(('multiclassloss', 'ndcg', 'clusterbootstrap', 'offpolicy', 'temperature', 'isotonic', 'ridgeworkflow', 'nestedridge', 'walkforward', 'stackingproject', 'logisticproject', 'rolloutmonitor', 'mmr', 'stopdecoder', 'kvplanner', 'strictschema', 'evalmatrix', 'provenance', 'bm25project', 'indexproject', 'ragproject', 'planproject', 'batchproject', 'releaseproject'), "labs_projects"),
