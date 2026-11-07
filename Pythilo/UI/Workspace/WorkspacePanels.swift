@@ -187,10 +187,7 @@ struct OutputPanel: View {
 struct TerminalPanel: View {
     @Bindable var model: WorkspaceModel
     var fontSize: CGFloat = 13
-    @State private var line = ""
-    @State private var history: [String] = []
-    @State private var historyIndex: Int?
-    @FocusState private var focused: Bool
+    private var keyboard: TerminalKeyboardController { model.terminalKeyboard }
 
     private var session: RunSession { model.session }
     private var inProgram: Bool { session.isBusy && session.activeChannel == .terminal }
@@ -232,17 +229,12 @@ struct TerminalPanel: View {
                 Text(session.phase == .waitingForInput ? ">" : "$")
                     .font(.system(size: 14, design: .monospaced))
                     .foregroundStyle(AppTheme.blue)
-                TextField(placeholder, text: $line)
-                    .font(.system(size: 14, design: .monospaced))
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .focused($focused)
+                TerminalPrompt(text: $model.terminalInput, placeholder: placeholder, keyboard: keyboard,
+                    onSubmit: submit, onPrevious: recall, onNext: recallNext, onStop: { session.stop() })
                     .padding(.horizontal, 12)
                     .frame(height: 44)
                     .background(AppTheme.background, in: RoundedRectangle(cornerRadius: 10))
                     .overlay { RoundedRectangle(cornerRadius: 10).stroke(AppTheme.border, lineWidth: 1) }
-                    .accessibilityIdentifier("terminal-field")
-                    .onSubmit(submit)
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 6)
@@ -250,9 +242,9 @@ struct TerminalPanel: View {
         }
         .onChange(of: model.terminalDraft, initial: true) { _, draft in
             guard let draft else { return }
-            line = draft
+            model.terminalInput = draft
             model.terminalDraft = nil
-            focused = true
+            keyboard.focus()
         }
     }
 
@@ -268,16 +260,23 @@ struct TerminalPanel: View {
     }
 
     private func insert(_ text: String) {
-        line += text
-        focused = true
+        keyboard.insert(text)
     }
 
     private func recall() {
-        guard !history.isEmpty else { return }
-        let next = max(0, (historyIndex ?? history.count) - 1)
-        historyIndex = next
-        line = history[next]
-        focused = true
+        guard !model.terminalHistory.isEmpty else { return }
+        let next = max(0, (model.terminalHistoryIndex ?? model.terminalHistory.count) - 1)
+        model.terminalHistoryIndex = next
+        model.terminalInput = model.terminalHistory[next]
+        keyboard.focus()
+    }
+
+    private func recallNext() {
+        guard let historyIndex = model.terminalHistoryIndex else { return }
+        let next = historyIndex + 1
+        model.terminalHistoryIndex = next < model.terminalHistory.count ? next : nil
+        model.terminalInput = next < model.terminalHistory.count ? model.terminalHistory[next] : ""
+        keyboard.focus()
     }
 
     private func submit() {
@@ -285,19 +284,19 @@ struct TerminalPanel: View {
         // the keyboard and bring it back each time a server restarts. A line
         // typed meanwhile waits in the field until Enter can run it.
         guard acceptsInput else {
-            focused = true
+            keyboard.focus()
             return
         }
-        let text = line
-        line = ""
-        historyIndex = nil
-        focused = true
+        let text = model.terminalInput
+        model.terminalInput = ""
+        model.terminalHistoryIndex = nil
+        keyboard.focus()
         if session.phase == .waitingForInput, session.activeChannel == .terminal {
             session.noteTerminal(text + "\n", kind: .input)
             session.sendInput(text)
             return
         }
-        if !text.trimmingCharacters(in: .whitespaces).isEmpty { history.append(text) }
+        if !text.trimmingCharacters(in: .whitespaces).isEmpty { model.terminalHistory.append(text) }
         model.runTerminal(text)
     }
 }

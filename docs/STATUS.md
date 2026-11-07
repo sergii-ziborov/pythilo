@@ -763,3 +763,52 @@ all-build access). Both en-US and ru release notes exactly match
 `docs/app-store/testflight-29.json`. No Beta App Review submission exists;
 App Store 1.0 remains `PREPARE_FOR_SUBMISSION` with manual release. Final proof:
 `build/release-receipts/testflight-29-ready.json`.
+
+## Editor and terminal keyboards — 7 November 2026
+
+The reported editor strip is reproduced with the software keyboard open: the
+Tab key grew to 1,254.7 points, placing the colon beyond the screen. The keyboard
+strip now uses bounded key widths, 44-point targets and explicit scroll layout,
+with a fixed Hide keyboard button. Tab, punctuation and scrolled symbols insert
+into the actual editor. English and Ukrainian layouts, hiding/reopening and
+portrait/landscape are verified. The initial three regression cases all fail on
+the previous implementation; screenshots and the accessibility hierarchy are in
+`build/verification/keyboard30-baseline/`.
+
+The terminal now owns a separate native accessory with shell punctuation,
+cursor left/right, previous/next command, Ctrl-C and a fixed Hide terminal
+keyboard button. Its prompt inserts at the cursor and disables smart quotes and
+dashes. Executing a Python command, recalling history and stopping a running
+command pass through the real runtime. Its command chips remain available.
+Prompt text/history/controller belong to the workspace, so layout replacement
+cannot discard an unfinished command. The focused editor selection or terminal
+responder is restored after a layout change; intentional dismissal and panel
+changes do not reopen the keyboard.
+
+The file drawer no longer disables edge swipes while a keyboard is visible.
+Opening it dismisses the active responder, including the terminal. Both chosen
+edges, outside taps, vertical scrolling, landscape controls and the Back
+button's padding pass. Landscape and laptop Hide actions dismiss the active
+workspace keyboard rather than only the editor.
+
+Final simulator suites pass 10/10 cases on iPhone and 4/4 on iPad, with no skips
+or failures. They include three editor/terminal round trips, portrait/landscape
+with focused input, actual symbol insertion and command execution. Earlier
+partial runs exposed the rotation issue and incorrect keyboard-test selection;
+they are superseded by the complete final bundles. Low disk space interrupted
+installation/result writing during another run; generated local artifacts and
+dedicated simulator caches were cleared before the final successful run.
+No physical-device test is claimed. Proof:
+`build/release-receipts/keyboard30-qa.json`,
+`build/keyboard30-final-phone.xcresult` and
+`build/keyboard30-final-pad.xcresult`. Current native captures are under
+`build/verification/keyboard30-final-{phone,pad}/`.
+
+Release 0.1.0 (30) archives and exports successfully. All 460 recorded source
+hashes still match the build's inputs. Its 83,556,070-byte IPA retains the same
+63-pack catalog, 38 previews, 43 runtime files, 21 signed backend links and six local recipes.
+Full courses, Lab Python source, optional APIs, datasets and model weights remain
+downloadable. Runtime/curriculum and website content are unchanged. Archive
+proof: `build/release-receipts/testflight-30-archive-source.json`.
+Internal TestFlight upload is in progress; Apple processing and final readiness
+verification remain pending. No review submission is requested.

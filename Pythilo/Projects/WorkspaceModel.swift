@@ -74,6 +74,11 @@ final class WorkspaceModel {
     private(set) var commands = ProjectCommands.none
     /// Text a chip puts into the terminal's input for the user to finish.
     var terminalDraft: String?
+    /// Kept with the workspace so a new layout cannot discard the prompt.
+    var terminalInput = ""
+    var terminalHistory: [String] = []
+    var terminalHistoryIndex: Int?
+    let terminalKeyboard = TerminalKeyboardController()
     private var djangoNames: [(group: String, name: String)] = []
     /// Django said "You have N unapplied migration(s)" while starting the server.
     private(set) var unappliedMigrations = 0

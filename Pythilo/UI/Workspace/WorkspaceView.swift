@@ -30,6 +30,9 @@ struct WorkspaceView: View {
         GeometryReader { geometry in
             let layout = resolvedLayout(geometry)
             let size = layoutSize(layout, geometry)
+            let editorSelection = bridge.focusedSelection?()
+            let terminalFocused = model.terminalKeyboard.hasFirstResponder
+            let focusedPanel = model.panel
             ZStack {
                 AppTheme.background.ignoresSafeArea()
                 content(layout, size: size, safeArea: geometry.safeAreaInsets)
@@ -41,6 +44,16 @@ struct WorkspaceView: View {
             .frame(width: size.width, height: size.height)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background { HingeReader { fold = $0 } }
+            .onChange(of: layout) {
+                // Capture the old responder before a different arrangement
+                // replaces its UIKit view, then focus the newly attached one.
+                guard editorSelection != nil || terminalFocused else { return }
+                DispatchQueue.main.async {
+                    guard !model.drawerOpen, model.panel == focusedPanel else { return }
+                    if let editorSelection { bridge.restoreFocus?(editorSelection) }
+                    else if terminalFocused { model.terminalKeyboard.focus() }
+                }
+            }
         }
         .ignoresSafeArea(.container)
         .statusBarHidden(hideStatusBar)
@@ -93,6 +106,9 @@ struct WorkspaceView: View {
             if phase == .paused { model.panel = .debug }
         }
         .onChange(of: model.selectedPath) { model.clearCompletions() }
+        .onChange(of: model.drawerOpen) { _, open in
+            if open { dismissWorkspaceKeyboard() }
+        }
         .background { shortcuts }
     }
 
@@ -198,7 +214,7 @@ struct WorkspaceView: View {
         FileDrawerOverlay(
             isOpen: $model.drawerOpen,
             side: drawerSide,
-            swipeEnabled: drawerSwipe && !keyboard.isVisible,
+            swipeEnabled: drawerSwipe,
             enabled: usesDrawer(layout),
             width: min(328, size.width - 56)
         ) {
@@ -305,8 +321,12 @@ struct WorkspaceView: View {
 
     private var hideKeyboardButton: some View {
         RoundIconButton(systemImage: "keyboard.chevron.compact.down", label: "Hide keyboard") {
-            bridge.dismissKeyboard()
+            dismissWorkspaceKeyboard()
         }
+    }
+
+    private func dismissWorkspaceKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private var hairline: some View { Rectangle().fill(AppTheme.border).frame(height: 1) }
@@ -498,7 +518,7 @@ struct WorkspaceView: View {
                 PanelDockBar(model: model, panels: [.problems, .output, .terminal, .debug])
                 if keyboard.isVisible {
                     Button {
-                        bridge.dismissKeyboard()
+                        dismissWorkspaceKeyboard()
                     } label: {
                         Label("Hide", systemImage: "keyboard.chevron.compact.down")
                             .font(.system(size: 13, weight: .semibold))

@@ -27,6 +27,172 @@ final class InteractionNavigationTests: XCTestCase {
         add(attachment)
     }
 
+    func testEditorSymbolKeysStayVisibleAndInsertWithTheSoftwareKeyboard() throws {
+        let app = launch(["-openTemplate", "blank"])
+        let editor = app.textViews["Source code editor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 30))
+        editor.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(app.keyboards.firstMatch.frame.height, 120)
+        capture("editor-symbols-focused-portrait")
+        let colon = app.buttons[":"].firstMatch
+        XCTAssertTrue(colon.waitForExistence(timeout: 3))
+        XCTAssertTrue(colon.isHittable, "A blank accessory strip is not usable")
+        let before = editor.value as? String ?? ""
+        colon.tap()
+        XCTAssertEqual((editor.value as? String ?? "").count, before.count + 1)
+        XCTAssertTrue((editor.value as? String ?? "").contains(":"))
+        let tab = app.buttons["editor-key-tab"]
+        XCTAssertEqual(tab.frame.width, 44, accuracy: 1, "Tab must not stretch and push the punctuation offscreen")
+        let beforeTab = editor.value as? String ?? ""
+        tab.tap()
+        XCTAssertEqual((editor.value as? String ?? "").count, beforeTab.count + 4)
+        let symbols = app.scrollViews["editor-keyboard-accessory-symbols"]
+        let power = app.buttons["editor-key-**"]
+        for _ in 0..<10 { if power.isHittable { break }; symbols.swipeLeft() }
+        XCTAssertTrue(power.isHittable)
+        let beforePower = editor.value as? String ?? ""
+        power.tap()
+        XCTAssertEqual((editor.value as? String ?? "").count, beforePower.count + 2)
+        for _ in 0..<10 { if tab.isHittable { break }; symbols.swipeRight() }
+        let beforeRotation = editor.value as? String
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(colon.waitForExistence(timeout: 5))
+        XCTAssertTrue(colon.isHittable)
+        XCTAssertEqual(editor.value as? String, beforeRotation)
+        colon.tap()
+        XCTAssertEqual((editor.value as? String ?? "").count, (beforeRotation ?? "").count + 1)
+        capture("editor-symbols-focused-landscape")
+        app.buttons["Hide keyboard"].firstMatch.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        XCUIDevice.shared.orientation = .portrait
+        editor.tap()
+        XCTAssertTrue(colon.waitForExistence(timeout: 5))
+        XCTAssertTrue(colon.isHittable)
+    }
+
+    func testFileDrawerOpensWhileTheEditorKeyboardIsVisible() throws {
+        for side in ["left", "right"] {
+            let app = launch(["-openTemplate", "blank", "-pythilo.drawerSide", side, "-pythilo.drawerSwipe", "YES"])
+            let editor = app.textViews["Source code editor"]
+            XCTAssertTrue(editor.waitForExistence(timeout: 30))
+            editor.tap()
+            XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+            let y = min(0.35, editor.frame.midY / app.frame.height)
+            capture("drawer-keyboard-before-\(side)")
+            drag(app, from: CGVector(dx: side == "left" ? 0.01 : 0.99, dy: y),
+                 to: CGVector(dx: side == "left" ? 0.85 : 0.15, dy: y))
+            XCTAssertTrue(app.buttons["Close files"].waitForExistence(timeout: 5), "Keyboard must not disable the \(side) drawer")
+            XCTAssertTrue(app.textFields["Find a file"].isHittable)
+            capture("drawer-keyboard-open-\(side)")
+            app.terminate()
+        }
+    }
+
+    func testTerminalHasItsOwnSymbolsAndHideKeyboardAction() throws {
+        let app = launch(["-openTemplate", "blank"])
+        XCTAssertTrue(app.buttons["panel-terminal"].waitForExistence(timeout: 30))
+        app.buttons["panel-terminal"].tap()
+        let field = app.textFields["terminal-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        capture("terminal-keyboard-accessory")
+        XCTAssertFalse(app.buttons["editor-keyboard-hide"].exists, "The terminal must own its accessory")
+        field.typeText("ab")
+        app.buttons["terminal-key-left"].tap()
+        app.buttons["terminal-key-/"].tap()
+        XCTAssertEqual(field.value as? String, "a/b", "Symbols insert at the cursor")
+        let hide = app.buttons["Hide terminal keyboard"]
+        XCTAssertTrue(hide.waitForExistence(timeout: 3), "Terminal needs its own keyboard dismissal")
+        XCTAssertTrue(hide.isHittable)
+        hide.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        field.tap()
+        XCTAssertTrue(hide.waitForExistence(timeout: 5))
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(hide.isHittable)
+        XCTAssertEqual(field.value as? String, "a/b", "Rotation must preserve an unfinished command")
+        capture("terminal-keyboard-landscape")
+        hide.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        XCUIDevice.shared.orientation = .portrait
+    }
+
+    func testTerminalCommandsHistoryAndControlCWithTheSoftwareKeyboard() throws {
+        let app = launch(["-openTemplate", "blank"])
+        XCTAssertTrue(app.buttons["panel-terminal"].waitForExistence(timeout: 30))
+        app.buttons["panel-terminal"].tap()
+        let field = app.textFields["terminal-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        let command = "python -c \"print('keyboard30-ok')\""
+        field.typeText(command + "\n")
+        let output = app.textViews["output-text"]
+        expectation(for: NSPredicate(format: "value CONTAINS %@", "keyboard30-ok\n"), evaluatedWith: output)
+        waitForExpectations(timeout: 30)
+        XCTAssertTrue(app.buttons["terminal-keyboard-hide"].isHittable)
+        app.buttons["terminal-key-previous"].tap()
+        XCTAssertEqual(field.value as? String, command)
+        app.buttons["terminal-key-next"].tap()
+        XCTAssertEqual(field.value as? String, "")
+        field.typeText("python -c \"while True: pass\"\n")
+        XCTAssertTrue(app.buttons["stop-button"].waitForExistence(timeout: 10))
+        app.buttons["terminal-key-stop"].tap()
+        XCTAssertTrue(app.buttons["run-button"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["terminal-keyboard-hide"].isHittable)
+        capture("terminal-command-history-control-c")
+        app.buttons["terminal-keyboard-hide"].tap()
+    }
+
+    func testEditorAndTerminalKeepTheirOwnBarsAcrossRepeatedSwitches() throws {
+        let app = launch(["-openTemplate", "blank"])
+        let editor = app.textViews["Source code editor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 30))
+        for _ in 0..<3 {
+            editor.tap()
+            XCTAssertTrue(app.buttons["editor-key-:"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["editor-key-:"].isHittable)
+            XCTAssertFalse(app.buttons["terminal-keyboard-hide"].exists)
+            app.buttons["editor-keyboard-hide"].tap()
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+            app.buttons["panel-terminal"].tap()
+            app.textFields["terminal-field"].tap()
+            XCTAssertTrue(app.buttons["terminal-keyboard-hide"].waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["editor-keyboard-hide"].exists)
+            app.buttons["terminal-keyboard-hide"].tap()
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+            if app.buttons["panel-code"].exists { app.buttons["panel-code"].tap() }
+        }
+    }
+
+    func testUkrainianSoftwareKeyboardKeepsTheEditorSymbolsVisible() throws {
+        let app = launch(["-openTemplate", "django"])
+        let editor = app.textViews["Source code editor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 30))
+        editor.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        let next = app.buttons["Next keyboard"].firstMatch
+        XCTAssertTrue(next.exists)
+        next.press(forDuration: 1)
+        let ukrainian = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label CONTAINS[c] 'Ukrain' OR label CONTAINS[c] 'Україн'")).firstMatch
+        XCTAssertTrue(ukrainian.waitForExistence(timeout: 5))
+        ukrainian.tap()
+        XCTAssertTrue(app.keys["є"].waitForExistence(timeout: 5), "Exercise the Ukrainian layout shown in the bug report")
+        XCTAssertTrue(app.buttons["editor-key-:"].isHittable)
+        let before = editor.value as? String ?? ""
+        app.buttons["editor-key-:"].tap()
+        XCTAssertEqual((editor.value as? String ?? "").count, before.count + 1)
+        capture("ukrainian-editor-keyboard-symbols")
+        next.press(forDuration: 1)
+        let english = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label BEGINSWITH[c] 'English'")).firstMatch
+        XCTAssertTrue(english.waitForExistence(timeout: 5))
+        english.tap()
+        app.buttons["editor-keyboard-hide"].tap()
+    }
+
     func testMostlyVerticalDragsDoNotOpenOrCloseTheFileDrawer() throws {
         let app = launch(["-openTemplate", "blank", "-pythilo.drawerSide", "left", "-pythilo.drawerSwipe", "YES"])
         XCTAssertTrue(app.buttons["run-button"].waitForExistence(timeout: 30))

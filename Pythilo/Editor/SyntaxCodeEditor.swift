@@ -18,6 +18,8 @@ final class EditorKeyboardBridge: ObservableObject {
     var focus: (() -> Void)?
     var replaceDocument: ((UUID, String, String, String) -> Bool)?
     var readCursor: ((UUID, String) -> Int?)?
+    var focusedSelection: (() -> NSRange?)?
+    var restoreFocus: ((NSRange) -> Void)?
 
     func insertSymbol(_ symbol: String) { insert?(symbol) }
     func dismissKeyboard() { dismiss?() }
@@ -174,6 +176,7 @@ struct SyntaxCodeEditor: UIViewRepresentable {
         textView.text = text
         context.coordinator.textView = textView
         context.coordinator.canvas = canvas
+        connectFocusBridge(to: canvas)
         let keyboardBar = EditorKeyboardAccessoryView(
             usesAppleIntelligence: assistantUsesAppleIntelligence,
             onInsert: { [weak coordinator = context.coordinator] symbol in
@@ -218,6 +221,7 @@ struct SyntaxCodeEditor: UIViewRepresentable {
         defer { context.coordinator.isUpdatingView = false }
         context.coordinator.parent = self
         context.coordinator.canvas = canvas
+        connectFocusBridge(to: canvas)
         canvas.keyboardBar?.setUsesAppleIntelligence(assistantUsesAppleIntelligence)
         canvas.setTabletopCodeTabActive(tabletopCodeTabActive)
         keyboardBridge?.insert = { [weak coordinator = context.coordinator] symbol in
@@ -269,6 +273,22 @@ struct SyntaxCodeEditor: UIViewRepresentable {
             context.coordinator.applyHighlighting(to: textView, filePath: filePath)
             context.coordinator.reveal(navigationTarget, in: textView)
             canvas.setNeedsSizeUpdate()
+        }
+    }
+
+    private func connectFocusBridge(to canvas: CodeEditorCanvas) {
+        let textView = canvas.textView
+        keyboardBridge?.focusedSelection = { [weak textView] in
+            guard let textView, textView.isFirstResponder else { return nil }
+            return textView.selectedRange
+        }
+        keyboardBridge?.restoreFocus = { [weak textView, weak canvas] selection in
+            guard let textView, textView.isEditable else { return }
+            let length = (textView.text as NSString).length
+            let start = min(selection.location, length)
+            textView.selectedRange = NSRange(location: start, length: min(selection.length, length - start))
+            textView.becomeFirstResponder()
+            canvas?.scrollCaretToVisible()
         }
     }
 
@@ -1278,8 +1298,7 @@ private final class BreakpointAccessibilityElement: UIAccessibilityElement {
     override func accessibilityActivate() -> Bool { action?(); return true }
 }
 
-fileprivate final class EditorKeyboardAccessoryView: UIView {
-    private let symbols = EditorKeyboardSymbols.shortcuts
+fileprivate final class EditorKeyboardAccessoryView: KeyboardShortcutAccessoryView {
     private let completeButton: UIButton
 
     init(
@@ -1289,86 +1308,22 @@ fileprivate final class EditorKeyboardAccessoryView: UIView {
         onDismiss: @escaping () -> Void
     ) {
         completeButton = Self.assistantButton(usesAppleIntelligence: usesAppleIntelligence)
-        super.init(frame: .zero)
-        backgroundColor = .secondarySystemBackground
-        autoresizingMask = .flexibleHeight
-
-        let scrollView = UIScrollView()
-        scrollView.showsHorizontalScrollIndicator = false
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-
-        let stack = UIStackView()
-        stack.axis = .horizontal
-        stack.spacing = 5
-        stack.alignment = .center
-        stack.translatesAutoresizingMaskIntoConstraints = false
-
+        completeButton.accessibilityIdentifier = "editor-complete"
         completeButton.addAction(UIAction { _ in onComplete() }, for: .touchUpInside)
-        completeButton.translatesAutoresizingMaskIntoConstraints = false
-        completeButton.setContentHuggingPriority(.required, for: .horizontal)
-        completeButton.setContentCompressionResistancePriority(.required, for: .horizontal)
-
-        for symbol in symbols {
-            // The indent key inserts four spaces, which would draw as a blank key.
-            let button = symbol.allSatisfy({ $0 == " " })
-                ? accessoryButton(title: nil, systemImage: "arrow.right.to.line", tint: .label, accessibilityLabel: "Tab")
-                : accessoryButton(title: symbol, systemImage: nil, tint: .label)
-            button.addAction(UIAction { _ in onInsert(symbol) }, for: .touchUpInside)
-            stack.addArrangedSubview(button)
+        let keys = EditorKeyboardSymbols.shortcuts.map { symbol in
+            let isTab = symbol.allSatisfy { $0 == " " }
+            return KeyboardShortcutAccessoryView.key(
+                title: isTab ? nil : symbol,
+                image: isTab ? "arrow.right.to.line" : nil,
+                label: isTab ? "Tab" : symbol,
+                identifier: "editor-key-" + (isTab ? "tab" : symbol)
+            ) { onInsert(symbol) }
         }
-
-        let doneButton = accessoryButton(
-            title: nil,
-            systemImage: "keyboard.chevron.compact.down",
-            tint: .systemBlue,
-            accessibilityLabel: "Hide keyboard"
+        let hide = KeyboardShortcutAccessoryView.key(
+            image: "keyboard.chevron.compact.down", label: "Hide keyboard",
+            identifier: "editor-keyboard-hide", tint: .systemBlue, action: onDismiss
         )
-        doneButton.addAction(UIAction { _ in onDismiss() }, for: .touchUpInside)
-        doneButton.translatesAutoresizingMaskIntoConstraints = false
-
-        let leadingSeparator = UIView()
-        leadingSeparator.backgroundColor = .separator
-        leadingSeparator.translatesAutoresizingMaskIntoConstraints = false
-
-        let trailingSeparator = UIView()
-        trailingSeparator.backgroundColor = .separator
-        trailingSeparator.translatesAutoresizingMaskIntoConstraints = false
-
-        addSubview(completeButton)
-        addSubview(leadingSeparator)
-        addSubview(scrollView)
-        addSubview(trailingSeparator)
-        addSubview(doneButton)
-        scrollView.addSubview(stack)
-
-        NSLayoutConstraint.activate([
-            heightAnchor.constraint(equalToConstant: 46),
-            completeButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
-            completeButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-            completeButton.heightAnchor.constraint(equalToConstant: 36),
-            completeButton.widthAnchor.constraint(equalToConstant: 42),
-            leadingSeparator.leadingAnchor.constraint(equalTo: completeButton.trailingAnchor, constant: 5),
-            leadingSeparator.topAnchor.constraint(equalTo: topAnchor, constant: 7),
-            leadingSeparator.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -7),
-            leadingSeparator.widthAnchor.constraint(equalToConstant: 1),
-            doneButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
-            doneButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-            doneButton.heightAnchor.constraint(equalToConstant: 36),
-            doneButton.widthAnchor.constraint(equalToConstant: 42),
-            trailingSeparator.trailingAnchor.constraint(equalTo: doneButton.leadingAnchor, constant: -5),
-            trailingSeparator.topAnchor.constraint(equalTo: topAnchor, constant: 7),
-            trailingSeparator.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -7),
-            trailingSeparator.widthAnchor.constraint(equalToConstant: 1),
-            scrollView.leadingAnchor.constraint(equalTo: leadingSeparator.trailingAnchor, constant: 5),
-            scrollView.trailingAnchor.constraint(equalTo: trailingSeparator.leadingAnchor, constant: -5),
-            scrollView.topAnchor.constraint(equalTo: topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            stack.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
-        ])
+        super.init(leading: [completeButton], shortcuts: keys, hide: hide, identifier: "editor-keyboard-accessory")
     }
 
     @available(*, unavailable)
@@ -1415,22 +1370,4 @@ fileprivate final class EditorKeyboardAccessoryView: UIView {
             : "Complete Python code offline"
     }
 
-    private func accessoryButton(
-        title: String?,
-        systemImage: String?,
-        tint: UIColor,
-        accessibilityLabel: String? = nil
-    ) -> UIButton {
-        var configuration = UIButton.Configuration.gray()
-        configuration.title = title
-        configuration.image = systemImage.flatMap { UIImage(systemName: $0) }
-        configuration.imagePadding = 4
-        configuration.baseForegroundColor = tint
-        configuration.cornerStyle = .small
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 9, bottom: 5, trailing: 9)
-        let button = UIButton(configuration: configuration)
-        button.titleLabel?.font = .monospacedSystemFont(ofSize: 12, weight: .semibold)
-        button.accessibilityLabel = accessibilityLabel ?? title
-        return button
-    }
 }
