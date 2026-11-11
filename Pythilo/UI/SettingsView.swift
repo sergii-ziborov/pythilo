@@ -10,6 +10,7 @@ struct SettingsView: View {
     @AppStorage("pythilo.gitName") private var gitName = ""
     @AppStorage("pythilo.gitEmail") private var gitEmail = ""
     @AppStorage("pythilo.roomName") private var roomName = ""
+    @AppStorage("pythilo.githubLogin") private var githubLogin = ""
 
     var body: some View {
         NavigationStack {
@@ -27,6 +28,14 @@ struct SettingsView: View {
                     }
                 }
                 Section("Git") {
+                    NavigationLink { GitHubAccountView() } label: {
+                        LabeledContent {
+                            Text(githubLogin.isEmpty ? "Not signed in" : "@\(githubLogin)")
+                        } label: {
+                            Label("GitHub account", systemImage: "person.crop.circle")
+                        }
+                    }
+                    .accessibilityIdentifier("settings-github")
                     TextField("Name", text: $gitName).textContentType(.name)
                     TextField("Email", text: $gitEmail).textInputAutocapitalization(.never).keyboardType(.emailAddress)
                     LabeledContent("HTTPS tokens", value: "\(GitCredentialVault.count()) in Keychain")

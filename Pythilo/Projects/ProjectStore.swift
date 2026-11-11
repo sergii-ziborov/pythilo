@@ -16,11 +16,21 @@ final class ProjectStore {
     static let shared = ProjectStore()
 
     private(set) var projects: [Project] = []
+    /// Folder name -> category the person chose. Kept on this device, outside the
+    /// project folders, so it never shows up in a repository or an exported project.
+    private(set) var categories: [String: String] = [:]
     let root: URL
+    private let defaults: UserDefaults
+    private static let categoriesKey = "pythilo.projectCategories"
 
-    init(root: URL? = nil) {
+    init(root: URL? = nil, defaults: UserDefaults = .standard) {
         self.root = root
             ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appending(path: "Projects")
+        self.defaults = defaults
+        if let data = defaults.data(forKey: Self.categoriesKey),
+           let saved = try? JSONDecoder().decode([String: String].self, from: data) {
+            categories = saved
+        }
         try? FileManager.default.createDirectory(at: self.root, withIntermediateDirectories: true)
         refresh()
     }
@@ -94,13 +104,55 @@ final class ProjectStore {
 
     func delete(_ project: Project) throws {
         try FileManager.default.removeItem(at: project.url)
+        setCategory(nil, for: project)
         refresh()
     }
 
     func rename(_ project: Project, to name: String) throws {
         let target = root.appending(path: uniqueName(name))
         try FileManager.default.moveItem(at: project.url, to: target)
+        if let category = categories.removeValue(forKey: project.name) {
+            categories[target.lastPathComponent] = category
+            saveCategories()
+        }
         refresh()
+    }
+
+    // MARK: Categories
+
+    func category(of project: Project) -> String? { categories[project.name] }
+
+    /// Every category in use, sorted by name.
+    var categoryNames: [String] {
+        let present = Set(projects.map(\.name))
+        return Set(categories.filter { present.contains($0.key) }.values)
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    func setCategory(_ category: String?, for project: Project) {
+        let clean = category?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let clean, !clean.isEmpty {
+            categories[project.name] = String(clean.prefix(40))
+        } else {
+            categories.removeValue(forKey: project.name)
+        }
+        saveCategories()
+    }
+
+    func renameCategory(_ old: String, to new: String) {
+        let clean = new.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        for (name, value) in categories where value == old { categories[name] = String(clean.prefix(40)) }
+        saveCategories()
+    }
+
+    func removeCategory(_ category: String) {
+        categories = categories.filter { $0.value != category }
+        saveCategories()
+    }
+
+    private func saveCategories() {
+        if let data = try? JSONEncoder().encode(categories) { defaults.set(data, forKey: Self.categoriesKey) }
     }
 
     /// A project's name is enough to describe it on the list.

@@ -107,6 +107,16 @@ struct RootView: View {
     private func openFromLaunchArguments() {
         let defaults = UserDefaults.standard
         if let id = defaults.string(forKey: "removeDownload") { try? ContentStore.shared.remove(id) }
+        // -seedProjects a,b,c makes blank projects with those names when they are missing,
+        // and -resetProjectCategories YES clears every category, for UI tests.
+        if defaults.bool(forKey: "resetProjectCategories") {
+            for project in store.projects { store.setCategory(nil, for: project) }
+            UserDefaults.standard.removeObject(forKey: "pythilo.projectFilter")
+        }
+        for name in (defaults.string(forKey: "seedProjects") ?? "").split(separator: ",").map(String.init)
+        where !store.projects.contains(where: { $0.name == name }) {
+            _ = try? store.create(name: name, template: .blank)
+        }
         if let tab = defaults.string(forKey: "tab").flatMap(AppSection.init(rawValue:)) { section = tab }
         if let link = defaults.string(forKey: "roomLink") {
             incomingRoomLink = link

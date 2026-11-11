@@ -28,7 +28,14 @@ enum GitCredentialVault {
     }
 
     static func credential(for address: String?) -> GitCredential? {
-        guard let address else { return nil }
+        guard let address, let saved = read(address) else { return nil }
+        return GitCredential(username: saved.username, token: saved.token)
+    }
+
+    /// The saved token itself, for the GitHub API (api.github.com) only.
+    static func token(for address: String) -> String? { read(address)?.token }
+
+    private static func read(_ address: String) -> (username: String, token: String)? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -40,7 +47,7 @@ enum GitCredentialVault {
               let data = result as? Data,
               let parts = String(data: data, encoding: .utf8)?.split(separator: "\n", maxSplits: 1),
               parts.count == 2 else { return nil }
-        return GitCredential(username: String(parts[0]), token: String(parts[1]))
+        return (String(parts[0]), String(parts[1]))
     }
 
     static func remove(address: String) {
