@@ -85,7 +85,34 @@ enum LabCatalog {
         return (try? JSONDecoder().decode([LabInfo].self, from: data)) ?? []
     }()
 
-    static let all: [LabInfo] = [
+    /// Lessons in the Algorithms and data structures course that teach each classic Lab's idea.
+    private static let classicLessons: [String: [String]] = [
+        "binsearch": ["binary-search"],
+        "window": ["pair-sum-pointers", "longest-unique-window"],
+        "stackqueue": ["balanced-brackets", "queue-elimination"],
+        "recursion": ["recursive-permutations", "power-set", "merge-sort"],
+        "sorting": ["insertion-sort", "merge-sort", "quicksort-partition"],
+        "linkedlist": ["reverse-linked-list", "linked-list-middle"],
+        "hash": ["hash-two-sum"],
+        "bst": ["bst-insert", "bst-delete"],
+        "heap": ["heap-push-pop", "k-smallest"],
+        "trie": ["trie-prefix"],
+        "unionfind": ["union-find"],
+        "lru": ["lru-cache"],
+        "graph": ["bfs-shortest-path", "dfs-components", "dijkstra"],
+        "flood": ["dfs-components", "flood-fill-islands"],
+        "dp": ["memoized-stairs", "coin-change", "longest-common-subsequence"],
+        "queens": ["n-queens"],
+        "matching": ["kmp-search"],
+    ]
+
+    static let all: [LabInfo] = classic.map { lab in
+        var lab = lab
+        if let lessons = classicLessons[lab.id] { lab.lessons = (lab.lessons ?? []) + lessons }
+        return lab
+    } + expanded
+
+    private static let classic: [LabInfo] = [
         // Basics
         LabInfo(id: "binsearch", title: "Binary Search", summary: "Watch lo, hi and mid close in on the target", symbol: "arrow.left.and.right.square", tint: .blue, section: .basics, variants: [
             LabVariant(id: "search", title: "Search", prompt: "binary_search(items, target) gives the index of target in the sorted list items, or -1. Each step should halve the part that is left.", file: "search.py"),
@@ -158,5 +185,5 @@ enum LabCatalog {
         LabInfo(id: "qlearning", title: "Q-learning", summary: "An agent learns a maze from rewards alone", symbol: "figure.walk", tint: .amber, section: .learning, variants: [
             LabVariant(id: "grid", title: "Grid world", prompt: "update(Q, state, action, reward, next_state, alpha, gamma) nudges Q[state][action] toward reward + gamma × the best value of the next state.", file: "qlearning.py", scales: false),
         ]),
-    ] + expanded
+    ]
 }

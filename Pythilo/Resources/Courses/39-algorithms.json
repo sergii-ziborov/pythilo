@@ -1,0 +1,1008 @@
+{
+ "id": "algorithms",
+ "title": "Algorithms and data structures",
+ "summary": "Searching, sorting, stacks, trees, heaps, graphs, dynamic programming and backtracking, one idea per lesson, each with a Lab that traces it step by step.",
+ "kind": "path",
+ "lessons": [
+  {
+   "id": "binary-search",
+   "title": "Halve a sorted list with binary search",
+   "body": "# Halve a sorted list with binary search\n\nA sorted list lets you discard half of the remaining items with one comparison. Keep two bounds, lo and hi, around the part that can still contain the target. Look at the middle, then move one bound past it.\n\n```python\nitems = [2, 5, 8, 13, 21]\nlo, hi = 0, len(items) - 1\nmid = (lo + hi) // 2   # 2 -> items[2] is 8\n```\n\n## Think before coding\n\nEach step removes at least the middle item, so the loop ends after about log2(n) steps. Use lo <= hi with inclusive bounds and move to mid + 1 or mid - 1, never to mid itself, or a two-item range can loop forever. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write binary_search(items, target) for a sorted list. Return an index where items holds target, or -1 when it is absent.",
+   "starter": "def binary_search(items, target):\n    pass\n",
+   "solution": "def binary_search(items, target):\n    lo, hi = 0, len(items) - 1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if items[mid] == target:\n            return mid\n        if items[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1\n",
+   "checks": [
+    {
+     "name": "found",
+     "code": "assert binary_search([2,5,8,13,21], 13) == 3\n"
+    },
+    {
+     "name": "first and last",
+     "code": "assert binary_search([2,5,8], 2) == 0 and binary_search([2,5,8], 8) == 2\n"
+    },
+    {
+     "name": "missing",
+     "code": "assert binary_search([2,5,8], 6) == -1 and binary_search([], 1) == -1\n"
+    },
+    {
+     "name": "large list",
+     "code": "big = list(range(0, 2_000_000, 2)); assert binary_search(big, 1_999_998) == 999_999 and binary_search(big, 7) == -1\n"
+    }
+   ],
+   "hints": [
+    "Start with lo = 0 and hi = len(items) - 1.",
+    "Compare items[mid] with target to decide which half survives.",
+    "Move lo to mid + 1 or hi to mid - 1 so the range always shrinks."
+   ],
+   "explanation": "Each step removes at least the middle item, so the loop ends after about log2(n) steps. Use lo <= hi with inclusive bounds and move to mid + 1 or mid - 1, never to mid itself, or a two-item range can loop forever."
+  },
+  {
+   "id": "pair-sum-pointers",
+   "title": "Meet in the middle with two pointers",
+   "body": "# Meet in the middle with two pointers\n\nIn a sorted list, a pair that sums too low needs a larger left value and a pair that sums too high needs a smaller right value. Two indices moving toward each other test every useful pair once.\n\n```python\nitems = [1, 3, 4, 6, 9]\nleft, right = 0, len(items) - 1\nprint(items[left] + items[right])   # 10\n```\n\n## Think before coding\n\nWhen the sum is too small, no pair using the current left value can work with any smaller right value, so the left value is finished. The symmetric argument retires the right value. The scan is linear instead of quadratic. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write pair_with_sum(items, target) for a sorted list. Return a tuple of two indices (i, j) with i < j whose values add up to target, or None.",
+   "starter": "def pair_with_sum(items, target):\n    return (0, 1)\n",
+   "solution": "def pair_with_sum(items, target):\n    left, right = 0, len(items) - 1\n    while left < right:\n        total = items[left] + items[right]\n        if total == target:\n            return (left, right)\n        if total < target:\n            left += 1\n        else:\n            right -= 1\n    return None\n",
+   "checks": [
+    {
+     "name": "finds a pair",
+     "code": "i, j = pair_with_sum([1,3,4,6,9], 10); assert i < j and [1,3,4,6,9][i] + [1,3,4,6,9][j] == 10\n"
+    },
+    {
+     "name": "no pair",
+     "code": "assert pair_with_sum([1,2,3], 100) is None\n"
+    },
+    {
+     "name": "one value cannot pair with itself",
+     "code": "assert pair_with_sum([5], 10) is None and pair_with_sum([], 0) is None\n"
+    },
+    {
+     "name": "duplicates",
+     "code": "assert pair_with_sum([2,2,7], 4) == (0, 1)\n"
+    }
+   ],
+   "hints": [
+    "Start with one index at each end.",
+    "Compare the sum with target.",
+    "Move left up when the sum is small, right down when it is large."
+   ],
+   "explanation": "When the sum is too small, no pair using the current left value can work with any smaller right value, so the left value is finished. The symmetric argument retires the right value. The scan is linear instead of quadratic."
+  },
+  {
+   "id": "longest-unique-window",
+   "title": "Slide a window over the longest unique run",
+   "body": "# Slide a window over the longest unique run\n\nA window is a slice described by two indices. Grow it on the right one character at a time. When the new character is already inside, move the left edge just past its previous position instead of starting over.\n\n```python\nlast = {}\ntext = \"abcab\"\n# at index 3, 'a' was seen at 0\n# so left moves to 1\n```\n\n## Think before coding\n\nRemember where each character was last seen. The left edge only moves forward, so each index enters and leaves the window once and the whole scan is linear. Take the maximum width after each step. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write longest_unique(text) returning the length of the longest substring with no repeated character.",
+   "starter": "def longest_unique(text):\n    return len(set(text))\n",
+   "solution": "def longest_unique(text):\n    last = {}\n    left = best = 0\n    for right, char in enumerate(text):\n        if char in last and last[char] >= left:\n            left = last[char] + 1\n        last[char] = right\n        best = max(best, right - left + 1)\n    return best\n",
+   "checks": [
+    {
+     "name": "classic",
+     "code": "assert longest_unique('abcabcbb') == 3\n"
+    },
+    {
+     "name": "all same",
+     "code": "assert longest_unique('bbbb') == 1\n"
+    },
+    {
+     "name": "empty",
+     "code": "assert longest_unique('') == 0\n"
+    },
+    {
+     "name": "repeat outside window",
+     "code": "assert longest_unique('abba') == 2 and longest_unique('pwwkew') == 3\n"
+    }
+   ],
+   "hints": [
+    "Keep a dictionary from character to its last index.",
+    "Move left only when the repeat is inside the window.",
+    "Update the best width after storing the new index."
+   ],
+   "explanation": "Remember where each character was last seen. The left edge only moves forward, so each index enters and leaves the window once and the whole scan is linear. Take the maximum width after each step."
+  },
+  {
+   "id": "merge-intervals",
+   "title": "Merge overlapping intervals after sorting",
+   "body": "# Merge overlapping intervals after sorting\n\nOverlapping meetings, ranges of free memory and booked dates all reduce to intervals. Sorting by start puts every overlap next to each other, so one pass can merge them.\n\n```python\nspans = sorted([(5, 8), (1, 3), (2, 4)])\nprint(spans)   # [(1, 3), (2, 4), (5, 8)]\n```\n\n## Think before coding\n\nAfter sorting, an interval either starts inside the last merged one, which extends its end, or starts after it, which closes it and opens a new one. Use max for the end, because a short interval can sit entirely inside a longer one. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write merge(intervals) taking (start, end) tuples. Return the merged, sorted list; touching intervals such as (1, 2) and (2, 3) merge too. Leave the input list unchanged.",
+   "starter": "def merge(intervals):\n    return intervals\n",
+   "solution": "def merge(intervals):\n    merged = []\n    for start, end in sorted(intervals):\n        if merged and start <= merged[-1][1]:\n            merged[-1] = (merged[-1][0], max(merged[-1][1], end))\n        else:\n            merged.append((start, end))\n    return merged\n",
+   "checks": [
+    {
+     "name": "overlap",
+     "code": "assert merge([(5,8),(1,3),(2,4)]) == [(1,4),(5,8)]\n"
+    },
+    {
+     "name": "contained",
+     "code": "assert merge([(1,10),(2,3)]) == [(1,10)]\n"
+    },
+    {
+     "name": "touching",
+     "code": "assert merge([(1,2),(2,3)]) == [(1,3)]\n"
+    },
+    {
+     "name": "empty and input intact",
+     "code": "a=[(3,4),(1,2)]; assert merge(a) == [(1,2),(3,4)] and a == [(3,4),(1,2)] and merge([]) == []\n"
+    }
+   ],
+   "hints": [
+    "Sort a copy by start.",
+    "Compare each start with the end of the last merged interval.",
+    "Extend with max(end) or append a new interval."
+   ],
+   "explanation": "After sorting, an interval either starts inside the last merged one, which extends its end, or starts after it, which closes it and opens a new one. Use max for the end, because a short interval can sit entirely inside a longer one."
+  },
+  {
+   "id": "balanced-brackets",
+   "title": "Match brackets with a stack",
+   "body": "# Match brackets with a stack\n\nThe most recently opened bracket must close first. That last-in, first-out order is exactly what a stack gives you: push every opener, and every closer must match the top.\n\n```python\nstack = []\nfor char in \"([])\":\n    print(char, stack)\n```\n\n## Think before coding\n\nA closer is wrong when the stack is empty or its top is a different kind. At the end, anything still on the stack was never closed. Other characters are ignored, so the same check works on code or formulas. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write balanced(text) returning True when every (, [ and { is closed by its own kind in the right order. Ignore all other characters.",
+   "starter": "def balanced(text):\n    return text.count('(') == text.count(')')\n",
+   "solution": "def balanced(text):\n    pairs = {')': '(', ']': '[', '}': '{'}\n    stack = []\n    for char in text:\n        if char in '([{':\n            stack.append(char)\n        elif char in pairs:\n            if not stack or stack.pop() != pairs[char]:\n                return False\n    return not stack\n",
+   "checks": [
+    {
+     "name": "nested",
+     "code": "assert balanced('{[()()]}') and balanced('f(a[1]) + {x}')\n"
+    },
+    {
+     "name": "wrong order",
+     "code": "assert not balanced('([)]')\n"
+    },
+    {
+     "name": "unclosed and extra closer",
+     "code": "assert not balanced('((') and not balanced('())')\n"
+    },
+    {
+     "name": "empty",
+     "code": "assert balanced('')\n"
+    }
+   ],
+   "hints": [
+    "Push each opening bracket.",
+    "On a closer, pop and compare with its partner.",
+    "The text is balanced only if the stack ends empty."
+   ],
+   "explanation": "A closer is wrong when the stack is empty or its top is a different kind. At the end, anything still on the stack was never closed. Other characters are ignored, so the same check works on code or formulas."
+  },
+  {
+   "id": "queue-elimination",
+   "title": "Rotate a queue to eliminate players",
+   "body": "# Rotate a queue to eliminate players\n\nA queue serves items in arrival order. collections.deque removes from the front in constant time, unlike list.pop(0), which shifts every remaining item.\n\n```python\nfrom collections import deque\nline = deque([\"Ann\", \"Bob\", \"Cy\"])\nline.rotate(-1)\nprint(line)   # deque(['Bob', 'Cy', 'Ann'])\n```\n\n## Think before coding\n\nPassing the item k times is the same as moving k people from the front to the back. The person now at the front is out. Repeat until the queue is empty, recording the order people leave. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write elimination_order(names, k): pass k times around the queue, remove whoever is at the front, and repeat. Return the names in the order they leave. Do not modify names.",
+   "starter": "def elimination_order(names, k):\n    return list(names)\n",
+   "solution": "from collections import deque\n\ndef elimination_order(names, k):\n    line = deque(names)\n    order = []\n    while line:\n        line.rotate(-k)\n        order.append(line.popleft())\n    return order\n",
+   "checks": [
+    {
+     "name": "three players",
+     "code": "assert elimination_order(['A','B','C'], 1) == ['B','A','C']\n"
+    },
+    {
+     "name": "k zero keeps order",
+     "code": "assert elimination_order(['A','B','C'], 0) == ['A','B','C']\n"
+    },
+    {
+     "name": "large k",
+     "code": "assert elimination_order(['A','B'], 5) == ['B','A']\n"
+    },
+    {
+     "name": "input intact",
+     "code": "n=['x','y']; elimination_order(n, 1); assert n == ['x','y'] and elimination_order([], 3) == []\n"
+    }
+   ],
+   "hints": [
+    "Copy names into a deque.",
+    "rotate(-k) moves k people from front to back.",
+    "popleft() removes the player who is out."
+   ],
+   "explanation": "Passing the item k times is the same as moving k people from the front to the back. The person now at the front is out. Repeat until the queue is empty, recording the order people leave."
+  },
+  {
+   "id": "recursive-permutations",
+   "title": "Build permutations by fixing one item",
+   "body": "# Build permutations by fixing one item\n\nA recursive function solves a problem by trusting a smaller copy of itself. To order n items, choose which item goes first, then ask for every ordering of the remaining items.\n\n```python\ndef count(n):\n    return 1 if n <= 1 else n * count(n - 1)\nprint(count(4))   # 24 orderings\n```\n\n## Think before coding\n\nThe base case is an empty list, which has exactly one ordering: the empty one. Each level loops over the items, removes one and prefixes it to every smaller ordering. Removing by position keeps repeated values correct. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write permutations(items) returning every ordering of items as a list of lists, in the order produced by choosing positions left to right.",
+   "starter": "def permutations(items):\n    return [list(items)]\n",
+   "solution": "def permutations(items):\n    if not items:\n        return [[]]\n    result = []\n    for i, first in enumerate(items):\n        rest = items[:i] + items[i + 1:]\n        for tail in permutations(rest):\n            result.append([first] + tail)\n    return result\n",
+   "checks": [
+    {
+     "name": "three items",
+     "code": "assert permutations([1,2,3]) == [[1,2,3],[1,3,2],[2,1,3],[2,3,1],[3,1,2],[3,2,1]]\n"
+    },
+    {
+     "name": "empty",
+     "code": "assert permutations([]) == [[]]\n"
+    },
+    {
+     "name": "count",
+     "code": "assert len(permutations(list(range(5)))) == 120\n"
+    },
+    {
+     "name": "repeated values kept",
+     "code": "assert permutations([7,7]) == [[7,7],[7,7]]\n"
+    }
+   ],
+   "hints": [
+    "Return [[]] for an empty list.",
+    "Loop over positions and remove that item.",
+    "Prefix it to each permutation of the rest."
+   ],
+   "explanation": "The base case is an empty list, which has exactly one ordering: the empty one. Each level loops over the items, removes one and prefixes it to every smaller ordering. Removing by position keeps repeated values correct."
+  },
+  {
+   "id": "power-set",
+   "title": "List every subset with include or skip",
+   "body": "# List every subset with include or skip\n\nEvery item faces one decision: in the subset or out. Two choices for each of n items give `2 ** n` subsets. Recursion makes the decision for the first item and lets a smaller call handle the rest.\n\n```python\nitems = [\"a\", \"b\"]\n# skip a: [], [b]   take a: [a], [a, b]\n```\n\n## Think before coding\n\nThe subsets of the rest appear twice: once unchanged and once with the first item added in front. Keeping the skip branch first gives a predictable order, which helps when you compare results. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write subsets(items) returning all `2 ** n` subsets as lists, skip branch first, preserving item order inside each subset.",
+   "starter": "def subsets(items):\n    return [list(items)]\n",
+   "solution": "def subsets(items):\n    if not items:\n        return [[]]\n    rest = subsets(items[1:])\n    return rest + [[items[0]] + subset for subset in rest]\n",
+   "checks": [
+    {
+     "name": "two items",
+     "code": "assert subsets(['a','b']) == [[], ['b'], ['a'], ['a','b']]\n"
+    },
+    {
+     "name": "empty",
+     "code": "assert subsets([]) == [[]]\n"
+    },
+    {
+     "name": "count",
+     "code": "assert len(subsets(list(range(10)))) == 1024\n"
+    },
+    {
+     "name": "order inside subsets",
+     "code": "assert all(s == sorted(s) for s in subsets([1,2,3]))\n"
+    }
+   ],
+   "hints": [
+    "The empty list has one subset.",
+    "Compute the subsets of items[1:] once.",
+    "Return those, then the same with items[0] in front."
+   ],
+   "explanation": "The subsets of the rest appear twice: once unchanged and once with the first item added in front. Keeping the skip branch first gives a predictable order, which helps when you compare results."
+  },
+  {
+   "id": "insertion-sort",
+   "title": "Insert each item into a sorted prefix",
+   "body": "# Insert each item into a sorted prefix\n\nInsertion sort keeps the left part of the list sorted. Each new item slides left past larger neighbours until it reaches its place, like sorting a hand of cards.\n\n```python\nhand = [3, 7, 9, 4]\n# 4 moves past 9 and 7, then stops after 3\n```\n\n## Think before coding\n\nIt takes about n squared steps in the worst case, yet it is fast on nearly sorted data and stable: equal items keep their order because an item stops at the first neighbour that is not larger. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write insertion_sort(items) returning a new sorted list, without calling sorted or list.sort, and without changing items.",
+   "starter": "def insertion_sort(items):\n    return list(items)\n",
+   "solution": "def insertion_sort(items):\n    result = list(items)\n    for i in range(1, len(result)):\n        value = result[i]\n        j = i - 1\n        while j >= 0 and result[j] > value:\n            result[j + 1] = result[j]\n            j -= 1\n        result[j + 1] = value\n    return result\n",
+   "checks": [
+    {
+     "name": "mixed",
+     "code": "assert insertion_sort([3,7,9,4,1]) == [1,3,4,7,9]\n"
+    },
+    {
+     "name": "empty and single",
+     "code": "assert insertion_sort([]) == [] and insertion_sort([5]) == [5]\n"
+    },
+    {
+     "name": "stable",
+     "code": "pairs=[(1,'b'),(0,'x'),(1,'a')]; import functools\nclass K:\n    def __init__(s,p): s.p=p\n    def __gt__(s,o): return s.p[0] > o.p[0]\nassert [k.p for k in insertion_sort([K(p) for p in pairs])] == [(0,'x'),(1,'b'),(1,'a')]\n"
+    },
+    {
+     "name": "input intact",
+     "code": "a=[2,1]; insertion_sort(a); assert a == [2,1]\n"
+    }
+   ],
+   "hints": [
+    "Copy the list first.",
+    "Hold result[i] aside and shift larger items right.",
+    "Drop the held value into the gap."
+   ],
+   "explanation": "It takes about n squared steps in the worst case, yet it is fast on nearly sorted data and stable: equal items keep their order because an item stops at the first neighbour that is not larger."
+  },
+  {
+   "id": "merge-sort",
+   "title": "Sort by splitting and merging",
+   "body": "# Sort by splitting and merging\n\nMerge sort splits the list in half, sorts each half recursively and merges the two sorted halves. Merging needs only one pass because the smallest remaining item is always at the front of one half.\n\n```python\nleft, right = [1, 4], [2, 3]\n# take 1, then 2, then 3, then 4\n```\n\n## Think before coding\n\nThere are about log2(n) levels of splitting and each level merges n items, so the total is n log n. Taking from the left half when values are equal keeps the sort stable. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write merge_sort(items) returning a new sorted list using merge sort, without sorted or list.sort.",
+   "starter": "def merge_sort(items):\n    return list(items)\n",
+   "solution": "def merge_sort(items):\n    if len(items) <= 1:\n        return list(items)\n    middle = len(items) // 2\n    left, right = merge_sort(items[:middle]), merge_sort(items[middle:])\n    merged, i, j = [], 0, 0\n    while i < len(left) and j < len(right):\n        if left[i] <= right[j]:\n            merged.append(left[i]); i += 1\n        else:\n            merged.append(right[j]); j += 1\n    return merged + left[i:] + right[j:]\n",
+   "checks": [
+    {
+     "name": "mixed",
+     "code": "assert merge_sort([5,2,9,1,5,6]) == [1,2,5,5,6,9]\n"
+    },
+    {
+     "name": "empty and single",
+     "code": "assert merge_sort([]) == [] and merge_sort([3]) == [3]\n"
+    },
+    {
+     "name": "negative and sorted",
+     "code": "assert merge_sort([-1,-3,2]) == [-3,-1,2] and merge_sort([1,2,3]) == [1,2,3]\n"
+    },
+    {
+     "name": "larger",
+     "code": "import random; r=random.Random(4); a=[r.randint(-50,50) for _ in range(500)]; assert merge_sort(a) == sorted(a)\n"
+    }
+   ],
+   "hints": [
+    "Lists of length 0 or 1 are already sorted.",
+    "Sort both halves recursively.",
+    "Merge by repeatedly taking the smaller front item."
+   ],
+   "explanation": "There are about log2(n) levels of splitting and each level merges n items, so the total is n log n. Taking from the left half when values are equal keeps the sort stable."
+  },
+  {
+   "id": "quicksort-partition",
+   "title": "Partition around a pivot for quicksort",
+   "body": "# Partition around a pivot for quicksort\n\nQuicksort picks a pivot, moves smaller items before it and larger items after it, then sorts the two sides. The pivot is already in its final place after partitioning.\n\n```python\nitems = [7, 2, 9, 4]\npivot = items[-1]                     # 4\nless = [x for x in items if x < pivot]\nprint(less)   # [2]\n```\n\n## Think before coding\n\nWith a fair pivot, each level halves the work and the total is n log n. Grouping values equal to the pivot separately prevents the slowdown on lists full of duplicates. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write quicksort(items) returning a new sorted list. Partition into less, equal and greater lists around a pivot and recurse on less and greater.",
+   "starter": "def quicksort(items):\n    return list(items)\n",
+   "solution": "def quicksort(items):\n    if len(items) <= 1:\n        return list(items)\n    pivot = items[len(items) // 2]\n    less = [x for x in items if x < pivot]\n    equal = [x for x in items if x == pivot]\n    greater = [x for x in items if x > pivot]\n    return quicksort(less) + equal + quicksort(greater)\n",
+   "checks": [
+    {
+     "name": "mixed",
+     "code": "assert quicksort([7,2,9,4,4,1]) == [1,2,4,4,7,9]\n"
+    },
+    {
+     "name": "all equal",
+     "code": "assert quicksort([3]*1000) == [3]*1000\n"
+    },
+    {
+     "name": "empty",
+     "code": "assert quicksort([]) == []\n"
+    },
+    {
+     "name": "random",
+     "code": "import random; r=random.Random(9); a=[r.random() for _ in range(300)]; assert quicksort(a) == sorted(a)\n"
+    }
+   ],
+   "hints": [
+    "Pick a pivot from the middle.",
+    "Build less, equal and greater lists.",
+    "Concatenate the sorted sides around equal."
+   ],
+   "explanation": "With a fair pivot, each level halves the work and the total is n log n. Grouping values equal to the pivot separately prevents the slowdown on lists full of duplicates."
+  },
+  {
+   "id": "reverse-linked-list",
+   "title": "Reverse a linked list in place",
+   "body": "# Reverse a linked list in place\n\nA singly linked list stores each value with a pointer to the next node. Reversing it means turning every arrow around. Three names track the work: the previous node, the current one and the next one you are about to lose.\n\n```python\nclass Node:\n    def __init__(self, value, next=None):\n        self.value, self.next = value, next\nhead = Node(1, Node(2, Node(3)))\n```\n\n## Think before coding\n\nSave current.next before overwriting it, point current back at prev, then step both forward. When current becomes None, prev is the new head. No new nodes are created, so memory stays constant. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Node(value, next) is provided. Write reverse(head) that reverses the list in place and returns the new head (None for an empty list).",
+   "starter": "class Node:\n    def __init__(self, value, next=None):\n        self.value = value\n        self.next = next\n\ndef reverse(head):\n    return head\n",
+   "solution": "class Node:\n    def __init__(self, value, next=None):\n        self.value = value\n        self.next = next\n\n\ndef reverse(head):\n    prev = None\n    current = head\n    while current:\n        following = current.next\n        current.next = prev\n        prev, current = current, following\n    return prev\n",
+   "checks": [
+    {
+     "name": "three nodes",
+     "code": "def values(node):\n    out = []\n    while node:\n        out.append(node.value); node = node.next\n    return out\ndef build(xs):\n    head = None\n    for x in reversed(xs):\n        head = Node(x, head)\n    return head\nassert values(reverse(build([1,2,3]))) == [3,2,1]\n"
+    },
+    {
+     "name": "empty and single",
+     "code": "def values(node):\n    out = []\n    while node:\n        out.append(node.value); node = node.next\n    return out\ndef build(xs):\n    head = None\n    for x in reversed(xs):\n        head = Node(x, head)\n    return head\nassert reverse(None) is None and values(reverse(build([7]))) == [7]\n"
+    },
+    {
+     "name": "same nodes reused",
+     "code": "def values(node):\n    out = []\n    while node:\n        out.append(node.value); node = node.next\n    return out\ndef build(xs):\n    head = None\n    for x in reversed(xs):\n        head = Node(x, head)\n    return head\nh=build([1,2]); second=h.next; r=reverse(h); assert r is second and r.next is h and h.next is None\n"
+    }
+   ],
+   "hints": [
+    "Start with prev = None and current = head.",
+    "Save current.next before changing it.",
+    "Return prev when current runs out."
+   ],
+   "explanation": "Save current.next before overwriting it, point current back at prev, then step both forward. When current becomes None, prev is the new head. No new nodes are created, so memory stays constant."
+  },
+  {
+   "id": "linked-list-middle",
+   "title": "Find the middle with slow and fast pointers",
+   "body": "# Find the middle with slow and fast pointers\n\nYou do not need the length of a linked list to find its middle. Move one pointer one step and another two steps at a time. When the fast one reaches the end, the slow one is halfway.\n\n```python\n# 1 -> 2 -> 3 -> 4 -> 5\n# slow: 1, 2, 3   fast: 1, 3, 5\n```\n\n## Think before coding\n\nThe same two-speed idea detects cycles, because a fast pointer inside a loop eventually laps the slow one. For an even number of nodes, this version returns the second of the two middle nodes. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Node(value, next) is provided. Write middle(head) returning the middle node in one pass; for an even length return the second middle. Return None for an empty list.",
+   "starter": "class Node:\n    def __init__(self, value, next=None):\n        self.value = value\n        self.next = next\n\ndef middle(head):\n    return head\n",
+   "solution": "class Node:\n    def __init__(self, value, next=None):\n        self.value = value\n        self.next = next\n\n\ndef middle(head):\n    slow = fast = head\n    while fast and fast.next:\n        slow = slow.next\n        fast = fast.next.next\n    return slow\n",
+   "checks": [
+    {
+     "name": "odd",
+     "code": "def values(node):\n    out = []\n    while node:\n        out.append(node.value); node = node.next\n    return out\ndef build(xs):\n    head = None\n    for x in reversed(xs):\n        head = Node(x, head)\n    return head\nassert middle(build([1,2,3,4,5])).value == 3\n"
+    },
+    {
+     "name": "even",
+     "code": "def values(node):\n    out = []\n    while node:\n        out.append(node.value); node = node.next\n    return out\ndef build(xs):\n    head = None\n    for x in reversed(xs):\n        head = Node(x, head)\n    return head\nassert middle(build([1,2,3,4])).value == 3\n"
+    },
+    {
+     "name": "short",
+     "code": "def values(node):\n    out = []\n    while node:\n        out.append(node.value); node = node.next\n    return out\ndef build(xs):\n    head = None\n    for x in reversed(xs):\n        head = Node(x, head)\n    return head\nassert middle(None) is None and middle(build([9])).value == 9\n"
+    }
+   ],
+   "hints": [
+    "Start both pointers at head.",
+    "Loop while fast and fast.next exist.",
+    "Move slow once and fast twice per step."
+   ],
+   "explanation": "The same two-speed idea detects cycles, because a fast pointer inside a loop eventually laps the slow one. For an even number of nodes, this version returns the second of the two middle nodes."
+  },
+  {
+   "id": "hash-two-sum",
+   "title": "Trade memory for speed with a dictionary",
+   "body": "# Trade memory for speed with a dictionary\n\nChecking every pair of numbers is quadratic. A dictionary remembers values you have already seen and answers \"have I seen x?\" in constant time on average, so one pass is enough.\n\n```python\nseen = {}\nfor index, value in enumerate([2, 7, 11]):\n    seen[value] = index\nprint(9 - 7 in seen)   # True\n```\n\n## Think before coding\n\nFor each value, the partner you need is target minus value. Look it up before storing the current value, so an item is never paired with itself, and duplicates still find each other. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write two_sum(items, target) returning indices (i, j) with i < j and items[i] + items[j] == target, choosing the pair whose j is smallest. Return None when no pair exists. The list is not sorted.",
+   "starter": "def two_sum(items, target):\n    for i in range(len(items)):\n        for j in range(len(items)):\n            if items[i] + items[j] == target:\n                return (i, j)\n",
+   "solution": "def two_sum(items, target):\n    seen = {}\n    for j, value in enumerate(items):\n        if target - value in seen:\n            return (seen[target - value], j)\n        seen.setdefault(value, j)\n    return None\n",
+   "checks": [
+    {
+     "name": "basic",
+     "code": "assert two_sum([2,7,11,15], 9) == (0,1)\n"
+    },
+    {
+     "name": "not with itself",
+     "code": "assert two_sum([3,4], 6) is None\n"
+    },
+    {
+     "name": "duplicates",
+     "code": "assert two_sum([3,3], 6) == (0,1)\n"
+    },
+    {
+     "name": "unsorted and missing",
+     "code": "assert two_sum([8,1,5,3], 4) == (1,3) and two_sum([], 1) is None\n"
+    }
+   ],
+   "hints": [
+    "Map each seen value to its index.",
+    "Before storing, look up target - value.",
+    "Return the stored index and the current one."
+   ],
+   "explanation": "For each value, the partner you need is target minus value. Look it up before storing the current value, so an item is never paired with itself, and duplicates still find each other."
+  },
+  {
+   "id": "bst-insert",
+   "title": "Insert into a binary search tree",
+   "body": "# Insert into a binary search tree\n\nIn a binary search tree every value in a node's left subtree is smaller and every value in its right subtree is larger. Inserting walks down as a search would and attaches a new node where the search falls off the tree.\n\n```python\n# 8 has 3 on the left and 10 on the right\n# inserting 6: 6 < 8 go left, 6 > 3 go right\n```\n\n## Think before coding\n\nReturning the root from the recursive call lets an empty subtree become a new node without special cases. Ignoring duplicates keeps every value unique. An in-order walk of the result lists the values in sorted order. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "TreeNode(value) is provided. Write insert(root, value) returning the root after inserting value; insert into None to start a tree. Ignore a value that is already present.",
+   "starter": "class TreeNode:\n    def __init__(self, value):\n        self.value = value\n        self.left = None\n        self.right = None\n\ndef insert(root, value):\n    return root\n",
+   "solution": "class TreeNode:\n    def __init__(self, value):\n        self.value = value\n        self.left = None\n        self.right = None\n\n\ndef insert(root, value):\n    if root is None:\n        return TreeNode(value)\n    if value < root.value:\n        root.left = insert(root.left, value)\n    elif value > root.value:\n        root.right = insert(root.right, value)\n    return root\n",
+   "checks": [
+    {
+     "name": "sorted in order",
+     "code": "def inorder(n):\n    return inorder(n.left) + [n.value] + inorder(n.right) if n else []\nr=None\nfor v in [8,3,10,1,6,14]: r=insert(r,v)\nassert inorder(r) == [1,3,6,8,10,14]\n"
+    },
+    {
+     "name": "shape",
+     "code": "r=None\nfor v in [8,3,10]: r=insert(r,v)\nassert r.value == 8 and r.left.value == 3 and r.right.value == 10\n"
+    },
+    {
+     "name": "duplicates ignored",
+     "code": "def inorder(n):\n    return inorder(n.left) + [n.value] + inorder(n.right) if n else []\nr=None\nfor v in [5,5,5]: r=insert(r,v)\nassert inorder(r) == [5]\n"
+    }
+   ],
+   "hints": [
+    "An empty tree becomes TreeNode(value).",
+    "Go left for smaller values and right for larger ones.",
+    "Assign the recursive result back to root.left or root.right."
+   ],
+   "explanation": "Returning the root from the recursive call lets an empty subtree become a new node without special cases. Ignoring duplicates keeps every value unique. An in-order walk of the result lists the values in sorted order."
+  },
+  {
+   "id": "bst-delete",
+   "title": "Delete from a binary search tree",
+   "body": "# Delete from a binary search tree\n\nDeleting a leaf or a node with one child is easy: replace it with that child. A node with two children needs a stand-in that keeps the ordering, and the smallest value in its right subtree fits exactly.\n\n```python\n# delete 3 from: 3 has children 1 and 6\n# successor: smallest in right subtree -> 6\n```\n\n## Think before coding\n\nCopy the successor's value into the node, then delete that successor from the right subtree. The successor has no left child, so the second deletion is always one of the easy cases. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "TreeNode(value) is provided. Write delete(root, value) returning the root after removing value. Leave the tree unchanged if value is absent.",
+   "starter": "class TreeNode:\n    def __init__(self, value):\n        self.value = value\n        self.left = None\n        self.right = None\n\ndef inorder(n):\n    return inorder(n.left) + [n.value] + inorder(n.right) if n else []\ndef insert(root, value):\n    if root is None:\n        return TreeNode(value)\n    if value < root.value:\n        root.left = insert(root.left, value)\n    elif value > root.value:\n        root.right = insert(root.right, value)\n    return root\n\ndef delete(root, value):\n    return root\n",
+   "solution": "class TreeNode:\n    def __init__(self, value):\n        self.value = value\n        self.left = None\n        self.right = None\n\ndef inorder(n):\n    return inorder(n.left) + [n.value] + inorder(n.right) if n else []\n\ndef insert(root, value):\n    if root is None:\n        return TreeNode(value)\n    if value < root.value:\n        root.left = insert(root.left, value)\n    elif value > root.value:\n        root.right = insert(root.right, value)\n    return root\n\ndef delete(root, value):\n    if root is None:\n        return None\n    if value < root.value:\n        root.left = delete(root.left, value)\n    elif value > root.value:\n        root.right = delete(root.right, value)\n    else:\n        if root.left is None:\n            return root.right\n        if root.right is None:\n            return root.left\n        successor = root.right\n        while successor.left:\n            successor = successor.left\n        root.value = successor.value\n        root.right = delete(root.right, successor.value)\n    return root\n",
+   "checks": [
+    {
+     "name": "two children",
+     "code": "r=None\nfor v in [8,3,10,1,6,14,4,7]: r=insert(r,v)\nr=delete(r,3)\nassert inorder(r) == [1,4,6,7,8,10,14]\n"
+    },
+    {
+     "name": "root and leaf",
+     "code": "r=None\nfor v in [5,2,9]: r=insert(r,v)\nr=delete(r,5); r=delete(r,2)\nassert inorder(r) == [9]\n"
+    },
+    {
+     "name": "missing and empty",
+     "code": "r=insert(None,1)\nassert inorder(delete(r,42)) == [1] and delete(None, 3) is None\n"
+    }
+   ],
+   "hints": [
+    "Search for the node, assigning recursive results back.",
+    "With at most one child, return that child.",
+    "With two, copy the right subtree's minimum and delete it there."
+   ],
+   "explanation": "Copy the successor's value into the node, then delete that successor from the right subtree. The successor has no left child, so the second deletion is always one of the easy cases."
+  },
+  {
+   "id": "heap-push-pop",
+   "title": "Keep a min-heap in a plain list",
+   "body": "# Keep a min-heap in a plain list\n\nA heap is a tree stored in a list: the children of index i sit at 2i+1 and 2i+2, and every parent is no larger than its children. The smallest item is always at index 0.\n\n```python\nheap = [1, 4, 2, 9]\ni = 3\nprint((i - 1) // 2)   # parent index 1\n```\n\n## Think before coding\n\nPush appends and sifts the new item up while it is smaller than its parent. Pop moves the last item to the root and sifts it down, swapping with the smaller child. Both take about log2(n) swaps. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write push(heap, value) and pop(heap) for a min-heap kept in a list, without the heapq module. pop removes and returns the smallest item.",
+   "starter": "def push(heap, value):\n    heap.append(value)\n\ndef pop(heap):\n    return heap.pop()\n",
+   "solution": "def push(heap, value):\n    heap.append(value)\n    i = len(heap) - 1\n    while i > 0 and heap[(i - 1) // 2] > heap[i]:\n        parent = (i - 1) // 2\n        heap[i], heap[parent] = heap[parent], heap[i]\n        i = parent\n\ndef pop(heap):\n    last = heap.pop()\n    if not heap:\n        return last\n    smallest, heap[0] = heap[0], last\n    i = 0\n    while True:\n        child = 2 * i + 1\n        if child >= len(heap):\n            break\n        if child + 1 < len(heap) and heap[child + 1] < heap[child]:\n            child += 1\n        if heap[i] <= heap[child]:\n            break\n        heap[i], heap[child] = heap[child], heap[i]\n        i = child\n    return smallest\n",
+   "checks": [
+    {
+     "name": "sorted output",
+     "code": "h=[]\nfor v in [5,1,8,3,9,2]: push(h,v)\nassert [pop(h) for _ in range(6)] == [1,2,3,5,8,9]\n"
+    },
+    {
+     "name": "heap property",
+     "code": "h=[]\nfor v in [7,3,5,1]: push(h,v)\nassert all(h[(i-1)//2] <= h[i] for i in range(1,len(h)))\n"
+    },
+    {
+     "name": "duplicates and single",
+     "code": "h=[]\nfor v in [4,4,1]: push(h,v)\nassert [pop(h),pop(h),pop(h)] == [1,4,4] and h == []\n"
+    },
+    {
+     "name": "random",
+     "code": "import random; r=random.Random(2); h=[]; a=[r.randint(0,99) for _ in range(200)]\nfor v in a: push(h,v)\nassert [pop(h) for _ in a] == sorted(a)\n"
+    }
+   ],
+   "hints": [
+    "Parent of i is (i - 1) // 2.",
+    "Sift up after push while the parent is larger.",
+    "After moving the last item to the root, swap with the smaller child."
+   ],
+   "explanation": "Push appends and sifts the new item up while it is smaller than its parent. Pop moves the last item to the root and sifts it down, swapping with the smaller child. Both take about log2(n) swaps."
+  },
+  {
+   "id": "k-smallest",
+   "title": "Pick the k smallest with heapq",
+   "body": "# Pick the k smallest with heapq\n\nPython's heapq module implements the heap from the previous lesson on plain lists. heapify arranges a list in linear time, and heappop returns the smallest item in logarithmic time.\n\n```python\nimport heapq\nscores = [42, 7, 19, 3]\nheapq.heapify(scores)\nprint(heapq.heappop(scores))   # 3\n```\n\n## Think before coding\n\nSorting everything costs n log n even when you need three items. Popping k times from a heap costs n plus k log n. Copy the input first, because heapify rearranges the list it is given. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write k_smallest(items, k) returning the k smallest values in ascending order using heapq, without modifying items. If k exceeds the length, return all values sorted.",
+   "starter": "def k_smallest(items, k):\n    return items[:k]\n",
+   "solution": "import heapq\n\ndef k_smallest(items, k):\n    heap = list(items)\n    heapq.heapify(heap)\n    return [heapq.heappop(heap) for _ in range(min(k, len(heap)))]\n",
+   "checks": [
+    {
+     "name": "basic",
+     "code": "assert k_smallest([42,7,19,3,8], 3) == [3,7,8]\n"
+    },
+    {
+     "name": "k too large",
+     "code": "assert k_smallest([2,1], 5) == [1,2]\n"
+    },
+    {
+     "name": "zero and empty",
+     "code": "assert k_smallest([5], 0) == [] and k_smallest([], 2) == []\n"
+    },
+    {
+     "name": "input intact",
+     "code": "a=[3,1,2]; k_smallest(a,2); assert a == [3,1,2]\n"
+    }
+   ],
+   "hints": [
+    "Copy the list.",
+    "heapq.heapify the copy.",
+    "heappop min(k, len) times."
+   ],
+   "explanation": "Sorting everything costs n log n even when you need three items. Popping k times from a heap costs n plus k log n. Copy the input first, because heapify rearranges the list it is given."
+  },
+  {
+   "id": "trie-prefix",
+   "title": "Store words letter by letter in a trie",
+   "body": "# Store words letter by letter in a trie\n\nA trie is a tree of nested dictionaries, one letter per level. Words that share a prefix share the path for it, so finding every word that starts with \"ca\" means walking two steps and collecting what lies below.\n\n```python\nroot = {}\nnode = root\nfor letter in \"cat\":\n    node = node.setdefault(letter, {})\nnode[\"$\"] = True   # a word ends here\n```\n\n## Think before coding\n\nThe end marker distinguishes a stored word from a mere prefix: \"car\" can be a word while \"ca\" is not. Collect words with a depth-first walk that carries the letters so far, then sort the result for a stable order. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write a Trie class with add(word), contains(word) and complete(prefix). complete returns every stored word starting with prefix, sorted.",
+   "starter": "class Trie:\n    def __init__(self):\n        self.words = []\n    def add(self, word):\n        pass\n    def contains(self, word):\n        return False\n    def complete(self, prefix):\n        return []\n",
+   "solution": "class Trie:\n    def __init__(self):\n        self.root = {}\n\n    def add(self, word):\n        node = self.root\n        for letter in word:\n            node = node.setdefault(letter, {})\n        node[\"$\"] = True\n\n    def _find(self, prefix):\n        node = self.root\n        for letter in prefix:\n            if letter not in node:\n                return None\n            node = node[letter]\n        return node\n\n    def contains(self, word):\n        node = self._find(word)\n        return bool(node and node.get(\"$\"))\n\n    def complete(self, prefix):\n        found = []\n        def walk(node, letters):\n            for key, child in node.items():\n                if key == \"$\":\n                    found.append(letters)\n                else:\n                    walk(child, letters + key)\n        start = self._find(prefix)\n        if start is not None:\n            walk(start, prefix)\n        return sorted(found)\n",
+   "checks": [
+    {
+     "name": "complete",
+     "code": "t=Trie()\nfor w in ['car','cat','cart','dog']: t.add(w)\nassert t.complete('ca') == ['car','cart','cat']\n"
+    },
+    {
+     "name": "prefix is not a word",
+     "code": "t=Trie(); t.add('car')\nassert t.contains('car') and not t.contains('ca')\n"
+    },
+    {
+     "name": "no match",
+     "code": "t=Trie(); t.add('a')\nassert t.complete('b') == [] and t.complete('') == ['a']\n"
+    },
+    {
+     "name": "empty word",
+     "code": "t=Trie(); t.add('')\nassert t.contains('') and t.complete('') == ['']\n"
+    }
+   ],
+   "hints": [
+    "Walk or create one dict per letter.",
+    "Mark the end of a word with '$'.",
+    "Walk from the prefix node and collect letters until each '$'."
+   ],
+   "explanation": "The end marker distinguishes a stored word from a mere prefix: \"car\" can be a word while \"ca\" is not. Collect words with a depth-first walk that carries the letters so far, then sort the result for a stable order."
+  },
+  {
+   "id": "union-find",
+   "title": "Join sets quickly with union-find",
+   "body": "# Join sets quickly with union-find\n\nUnion-find tracks which items belong together, such as connected computers or merged accounts. Each item points to a parent; following parents reaches a root that names the whole set.\n\n```python\nparent = {x: x for x in \"abc\"}\nparent[\"b\"] = \"a\"      # b joins a's set\n```\n\n## Think before coding\n\nPath compression makes every node on a find path point straight at the root, so later finds are almost instant. Union just points one root at the other. Two items are connected when their roots are equal. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write a UnionFind class built from an iterable of items, with find(x), union(a, b) and connected(a, b). Use path compression in find.",
+   "starter": "class UnionFind:\n    def __init__(self, items):\n        self.parent = {x: x for x in items}\n    def find(self, x):\n        return x\n    def union(self, a, b):\n        pass\n    def connected(self, a, b):\n        return a == b\n",
+   "solution": "class UnionFind:\n    def __init__(self, items):\n        self.parent = {x: x for x in items}\n\n    def find(self, x):\n        root = x\n        while self.parent[root] != root:\n            root = self.parent[root]\n        while self.parent[x] != root:\n            self.parent[x], x = root, self.parent[x]\n        return root\n\n    def union(self, a, b):\n        ra, rb = self.find(a), self.find(b)\n        if ra != rb:\n            self.parent[rb] = ra\n\n    def connected(self, a, b):\n        return self.find(a) == self.find(b)\n",
+   "checks": [
+    {
+     "name": "joins",
+     "code": "u=UnionFind('abcd'); u.union('a','b'); u.union('c','d')\nassert u.connected('a','b') and not u.connected('a','c')\n"
+    },
+    {
+     "name": "transitive",
+     "code": "u=UnionFind(range(5)); u.union(0,1); u.union(1,2)\nassert u.connected(0,2)\n"
+    },
+    {
+     "name": "compression",
+     "code": "u=UnionFind(range(4)); u.parent={0:0,1:0,2:1,3:2}\nassert u.find(3) == 0 and u.parent[3] == 0 and u.parent[2] == 0\n"
+    },
+    {
+     "name": "self",
+     "code": "u=UnionFind([7]); u.union(7,7); assert u.connected(7,7)\n"
+    }
+   ],
+   "hints": [
+    "Follow parent links until a node is its own parent.",
+    "Point every node on the path at that root.",
+    "Union links one root under the other."
+   ],
+   "explanation": "Path compression makes every node on a find path point straight at the root, so later finds are almost instant. Union just points one root at the other. Two items are connected when their roots are equal."
+  },
+  {
+   "id": "lru-cache",
+   "title": "Evict the least recently used key",
+   "body": "# Evict the least recently used key\n\nA cache keeps a limited number of results. When it is full, a least recently used policy drops the key nobody has touched for the longest time. OrderedDict remembers order and can move a key to the end in constant time.\n\n```python\nfrom collections import OrderedDict\nrecent = OrderedDict(a=1, b=2)\nrecent.move_to_end(\"a\")\nprint(list(recent))   # ['b', 'a']\n```\n\n## Think before coding\n\nTreat the end of the dictionary as most recent. Both get and put on an existing key move it there. When an insert exceeds capacity, popitem(last=False) removes the oldest key from the front. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write LRUCache(capacity) with get(key), returning None when missing, and put(key, value). A full cache evicts the least recently used key.",
+   "starter": "class LRUCache:\n    def __init__(self, capacity):\n        self.data = {}\n    def get(self, key):\n        return self.data.get(key)\n    def put(self, key, value):\n        self.data[key] = value\n",
+   "solution": "from collections import OrderedDict\n\nclass LRUCache:\n    def __init__(self, capacity):\n        self.capacity = capacity\n        self.data = OrderedDict()\n\n    def get(self, key):\n        if key not in self.data:\n            return None\n        self.data.move_to_end(key)\n        return self.data[key]\n\n    def put(self, key, value):\n        self.data[key] = value\n        self.data.move_to_end(key)\n        if len(self.data) > self.capacity:\n            self.data.popitem(last=False)\n",
+   "checks": [
+    {
+     "name": "evicts oldest",
+     "code": "c=LRUCache(2); c.put('a',1); c.put('b',2); c.put('c',3)\nassert c.get('a') is None and c.get('c') == 3\n"
+    },
+    {
+     "name": "get refreshes",
+     "code": "c=LRUCache(2); c.put('a',1); c.put('b',2); c.get('a'); c.put('c',3)\nassert c.get('b') is None and c.get('a') == 1\n"
+    },
+    {
+     "name": "update refreshes",
+     "code": "c=LRUCache(2); c.put('a',1); c.put('b',2); c.put('a',9); c.put('c',3)\nassert c.get('a') == 9 and c.get('b') is None\n"
+    },
+    {
+     "name": "missing",
+     "code": "assert LRUCache(1).get('x') is None\n"
+    }
+   ],
+   "hints": [
+    "Keep the data in an OrderedDict.",
+    "move_to_end on every get hit and put.",
+    "popitem(last=False) when over capacity."
+   ],
+   "explanation": "Treat the end of the dictionary as most recent. Both get and put on an existing key move it there. When an insert exceeds capacity, popitem(last=False) removes the oldest key from the front."
+  },
+  {
+   "id": "bfs-shortest-path",
+   "title": "Find the fewest steps with breadth-first search",
+   "body": "# Find the fewest steps with breadth-first search\n\nBreadth-first search explores a graph in rings: every node one step away, then every node two steps away. The first time it reaches a node, it has used the fewest possible edges.\n\n```python\ngraph = {\"a\": [\"b\", \"c\"], \"b\": [\"d\"],\n         \"c\": [\"d\"], \"d\": []}\n# ring 0: a   ring 1: b, c   ring 2: d\n```\n\n## Think before coding\n\nUse a deque as the queue and mark nodes when they are added, not when they are taken out, so nothing is queued twice. Store each node's parent to rebuild the path backwards from the goal. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write shortest_path(graph, start, goal) for an adjacency dict. Return the list of nodes on a path with the fewest edges, or None when goal cannot be reached. Visit neighbours in listed order.",
+   "starter": "def shortest_path(graph, start, goal):\n    return [start, goal]\n",
+   "solution": "from collections import deque\n\ndef shortest_path(graph, start, goal):\n    parent = {start: None}\n    queue = deque([start])\n    while queue:\n        node = queue.popleft()\n        if node == goal:\n            path = []\n            while node is not None:\n                path.append(node)\n                node = parent[node]\n            return path[::-1]\n        for neighbour in graph.get(node, []):\n            if neighbour not in parent:\n                parent[neighbour] = node\n                queue.append(neighbour)\n    return None\n",
+   "checks": [
+    {
+     "name": "diamond",
+     "code": "g={'a':['b','c'],'b':['d'],'c':['d'],'d':[]}\nassert shortest_path(g,'a','d') == ['a','b','d']\n"
+    },
+    {
+     "name": "start is goal",
+     "code": "assert shortest_path({'a':[]}, 'a', 'a') == ['a']\n"
+    },
+    {
+     "name": "unreachable",
+     "code": "assert shortest_path({'a':['b'],'b':[],'c':[]}, 'a', 'c') is None\n"
+    },
+    {
+     "name": "cycle and shortcut",
+     "code": "g={1:[2,4],2:[3],3:[1,5],4:[5],5:[]}\nassert shortest_path(g,1,5) == [1,4,5]\n"
+    }
+   ],
+   "hints": [
+    "Queue the start and record its parent as None.",
+    "Record a parent when you first see a neighbour.",
+    "Walk parents back from the goal and reverse."
+   ],
+   "explanation": "Use a deque as the queue and mark nodes when they are added, not when they are taken out, so nothing is queued twice. Store each node's parent to rebuild the path backwards from the goal."
+  },
+  {
+   "id": "dfs-components",
+   "title": "Count connected groups with depth-first search",
+   "body": "# Count connected groups with depth-first search\n\nDepth-first search follows one path as far as it goes before backing up. Started from every unvisited node, it splits an undirected graph into connected components, such as friend circles or separate road networks.\n\n```python\nstack = [\"a\"]\nseen = {\"a\"}\nnode = stack.pop()\n# push a's unseen neighbours next\n```\n\n## Think before coding\n\nAn explicit stack avoids Python's recursion limit on long chains. Every node is pushed at most once because it is marked when pushed, so the whole count is linear in nodes plus edges. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write count_components(graph) for an undirected adjacency dict (every edge listed both ways). Return the number of connected components.",
+   "starter": "def count_components(graph):\n    return len(graph)\n",
+   "solution": "def count_components(graph):\n    seen = set()\n    count = 0\n    for start in graph:\n        if start in seen:\n            continue\n        count += 1\n        seen.add(start)\n        stack = [start]\n        while stack:\n            node = stack.pop()\n            for neighbour in graph[node]:\n                if neighbour not in seen:\n                    seen.add(neighbour)\n                    stack.append(neighbour)\n    return count\n",
+   "checks": [
+    {
+     "name": "two groups",
+     "code": "g={1:[2],2:[1,3],3:[2],4:[5],5:[4]}\nassert count_components(g) == 2\n"
+    },
+    {
+     "name": "isolated nodes",
+     "code": "assert count_components({'a':[],'b':[],'c':[]}) == 3\n"
+    },
+    {
+     "name": "empty",
+     "code": "assert count_components({}) == 0\n"
+    },
+    {
+     "name": "long chain",
+     "code": "n=50000; g={i:[] for i in range(n)}\nfor i in range(n-1): g[i].append(i+1); g[i+1].append(i)\nassert count_components(g) == 1\n"
+    }
+   ],
+   "hints": [
+    "Loop over every node as a possible start.",
+    "Each unseen start begins a new component.",
+    "Use a stack to mark everything reachable from it."
+   ],
+   "explanation": "An explicit stack avoids Python's recursion limit on long chains. Every node is pushed at most once because it is marked when pushed, so the whole count is linear in nodes plus edges."
+  },
+  {
+   "id": "dijkstra",
+   "title": "Find cheapest routes with Dijkstra's algorithm",
+   "body": "# Find cheapest routes with Dijkstra's algorithm\n\nWhen edges have costs, the fewest edges is not the cheapest route. Dijkstra's algorithm always settles the closest unsettled node next, using a heap of tentative distances.\n\n```python\nimport heapq\nfrontier = [(0, \"a\")]\ncost, node = heapq.heappop(frontier)\n```\n\n## Think before coding\n\nWith non-negative costs, the cheapest entry in the heap can never be improved later, so it is final. Skip stale heap entries whose cost is larger than the best known distance instead of deleting them. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write distances(graph, start) where graph maps a node to a list of (neighbour, cost) pairs with non-negative costs. Return a dict of the cheapest cost to every reachable node.",
+   "starter": "def distances(graph, start):\n    return {start: 0}\n",
+   "solution": "import heapq\n\ndef distances(graph, start):\n    best = {start: 0}\n    heap = [(0, start)]\n    while heap:\n        cost, node = heapq.heappop(heap)\n        if cost > best[node]:\n            continue\n        for neighbour, weight in graph.get(node, []):\n            candidate = cost + weight\n            if candidate < best.get(neighbour, float(\"inf\")):\n                best[neighbour] = candidate\n                heapq.heappush(heap, (candidate, neighbour))\n    return best\n",
+   "checks": [
+    {
+     "name": "cheaper detour",
+     "code": "g={'a':[('b',5),('c',1)],'c':[('b',1)],'b':[]}\nassert distances(g,'a') == {'a':0,'c':1,'b':2}\n"
+    },
+    {
+     "name": "unreachable left out",
+     "code": "assert distances({'a':[],'z':[('a',1)]}, 'a') == {'a':0}\n"
+    },
+    {
+     "name": "zero cost and cycle",
+     "code": "g={1:[(2,0)],2:[(1,0),(3,4)],3:[]}\nassert distances(g,1) == {1:0,2:0,3:4}\n"
+    },
+    {
+     "name": "grid",
+     "code": "g={}\nfor r in range(10):\n    for c in range(10):\n        g[(r,c)]=[((r+dr,c+dc),1) for dr,dc in ((1,0),(0,1),(-1,0),(0,-1)) if 0<=r+dr<10 and 0<=c+dc<10]\nassert distances(g,(0,0))[(9,9)] == 18\n"
+    }
+   ],
+   "hints": [
+    "Start with best = {start: 0} and a heap of (0, start).",
+    "Skip popped entries worse than best[node].",
+    "Push a neighbour whenever its cost improves."
+   ],
+   "explanation": "With non-negative costs, the cheapest entry in the heap can never be improved later, so it is final. Skip stale heap entries whose cost is larger than the best known distance instead of deleting them."
+  },
+  {
+   "id": "flood-fill-islands",
+   "title": "Count islands on a grid",
+   "body": "# Count islands on a grid\n\nA grid is a graph in disguise: each cell is a node and its up, down, left and right neighbours are edges. Counting islands of land is counting connected components of land cells.\n\n```python\ngrid = [\"LL.\",\n        \".L.\",\n        \"..L\"]\n# two islands: diagonal cells do not touch\n```\n\n## Think before coding\n\nScan every cell. When an unvisited land cell appears, count a new island and flood from it, marking every land cell you can reach. Check the bounds before indexing so the edges of the grid are safe. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write count_islands(grid), where grid is a list of equal-length strings with \"L\" for land and \".\" for water. Neighbours touch up, down, left or right.",
+   "starter": "def count_islands(grid):\n    return sum(row.count('L') for row in grid)\n",
+   "solution": "def count_islands(grid):\n    rows = len(grid)\n    cols = len(grid[0]) if grid else 0\n    seen = set()\n    islands = 0\n    for r in range(rows):\n        for c in range(cols):\n            if grid[r][c] != \"L\" or (r, c) in seen:\n                continue\n            islands += 1\n            stack = [(r, c)]\n            seen.add((r, c))\n            while stack:\n                y, x = stack.pop()\n                for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):\n                    if 0 <= ny < rows and 0 <= nx < cols and grid[ny][nx] == \"L\" and (ny, nx) not in seen:\n                        seen.add((ny, nx))\n                        stack.append((ny, nx))\n    return islands\n",
+   "checks": [
+    {
+     "name": "diagonal does not join",
+     "code": "assert count_islands(['LL.','.L.','..L']) == 2\n"
+    },
+    {
+     "name": "all water and empty",
+     "code": "assert count_islands(['...']) == 0 and count_islands([]) == 0\n"
+    },
+    {
+     "name": "one big island",
+     "code": "assert count_islands(['LLL','L.L','LLL']) == 1\n"
+    },
+    {
+     "name": "large",
+     "code": "assert count_islands(['L'*300]*300) == 1\n"
+    }
+   ],
+   "hints": [
+    "Visit every cell once in a double loop.",
+    "Each new unvisited L starts an island.",
+    "Flood with a stack over the four neighbours inside the grid."
+   ],
+   "explanation": "Scan every cell. When an unvisited land cell appears, count a new island and flood from it, marking every land cell you can reach. Check the bounds before indexing so the edges of the grid are safe."
+  },
+  {
+   "id": "bellman-ford",
+   "title": "Handle negative costs with Bellman-Ford",
+   "body": "# Handle negative costs with Bellman-Ford\n\nDijkstra's algorithm breaks when an edge can lower a cost after a node is settled. Bellman-Ford instead relaxes every edge again and again. A shortest path uses at most n - 1 edges, so n - 1 rounds are enough.\n\n```python\nedges = [(\"a\", \"b\", 4), (\"a\", \"c\", 2),\n         (\"c\", \"b\", -3)]\n# a -> c -> b costs -1, cheaper than a -> b\n```\n\n## Think before coding\n\nIf any edge still improves a distance after n - 1 rounds, a cycle with negative total cost is reachable and no cheapest path exists. Report that instead of returning wrong numbers. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write bellman_ford(nodes, edges, start) with edges as (u, v, cost). Return a dict of cheapest costs to reachable nodes, or None when a negative cycle is reachable from start.",
+   "starter": "def bellman_ford(nodes, edges, start):\n    return {start: 0}\n",
+   "solution": "def bellman_ford(nodes, edges, start):\n    best = {start: 0}\n    for _ in range(len(nodes) - 1):\n        changed = False\n        for u, v, cost in edges:\n            if u in best and best[u] + cost < best.get(v, float(\"inf\")):\n                best[v] = best[u] + cost\n                changed = True\n        if not changed:\n            break\n    for u, v, cost in edges:\n        if u in best and best[u] + cost < best.get(v, float(\"inf\")):\n            return None\n    return best\n",
+   "checks": [
+    {
+     "name": "negative edge",
+     "code": "assert bellman_ford('abc', [('a','b',4),('a','c',2),('c','b',-3)], 'a') == {'a':0,'c':2,'b':-1}\n"
+    },
+    {
+     "name": "negative cycle",
+     "code": "assert bellman_ford('abc', [('a','b',1),('b','c',-2),('c','b',1)], 'a') is None\n"
+    },
+    {
+     "name": "unreachable cycle ignored",
+     "code": "assert bellman_ford('axy', [('x','y',-1),('y','x',-1)], 'a') == {'a':0}\n"
+    },
+    {
+     "name": "chain",
+     "code": "n=list(range(6)); e=[(i,i+1,-1) for i in range(5)]\nassert bellman_ford(n,e,0)[5] == -5\n"
+    }
+   ],
+   "hints": [
+    "Repeat len(nodes) - 1 rounds of relaxing every edge.",
+    "Only relax from nodes that already have a cost.",
+    "One more improving edge afterwards means a negative cycle."
+   ],
+   "explanation": "If any edge still improves a distance after n - 1 rounds, a cycle with negative total cost is reachable and no cheapest path exists. Report that instead of returning wrong numbers."
+  },
+  {
+   "id": "memoized-stairs",
+   "title": "Remember answers with memoization",
+   "body": "# Remember answers with memoization\n\nCounting the ways to climb n stairs taking one or two steps repeats the same subproblems many times. Store each answer the first time it is computed and the exponential tree collapses to a straight line.\n\n```python\nfrom functools import cache\n\n@cache\ndef ways(n):\n    if n <= 1:\n        return 1\n    return ways(n - 1) + ways(n - 2)\n```\n\n## Think before coding\n\nThe last step was either one stair or two, so ways(n) = ways(n - 1) + ways(n - 2). A table filled from the bottom gives the same numbers without recursion and works for very large n. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write climb_ways(n) returning the number of ways to climb n stairs with steps of 1 or 2. climb_ways(0) is 1. It must handle n = 5000 quickly.",
+   "starter": "def climb_ways(n):\n    if n <= 1:\n        return 1\n    return climb_ways(n - 1) + climb_ways(n - 2)\n",
+   "solution": "def climb_ways(n):\n    previous, current = 1, 1\n    for _ in range(n - 1):\n        previous, current = current, previous + current\n    return current\n",
+   "checks": [
+    {
+     "name": "small",
+     "code": "assert [climb_ways(n) for n in range(6)] == [1,1,2,3,5,8]\n"
+    },
+    {
+     "name": "forty",
+     "code": "assert climb_ways(40) == 165580141\n"
+    },
+    {
+     "name": "large is fast",
+     "code": "assert climb_ways(5000) % 1000 == climb_ways(5000) % 1000 and len(str(climb_ways(5000))) == 1045\n"
+    }
+   ],
+   "hints": [
+    "ways(n) = ways(n - 1) + ways(n - 2).",
+    "Keep only the last two answers.",
+    "Loop upward instead of recursing."
+   ],
+   "explanation": "The last step was either one stair or two, so ways(n) = ways(n - 1) + ways(n - 2). A table filled from the bottom gives the same numbers without recursion and works for very large n."
+  },
+  {
+   "id": "coin-change",
+   "title": "Fill a table for the fewest coins",
+   "body": "# Fill a table for the fewest coins\n\nGreedy change fails for coins 1, 3 and 4 with amount 6: taking 4 first needs three coins, while 3 + 3 needs two. Dynamic programming tries every last coin for every smaller amount.\n\n```python\ncoins = [1, 3, 4]\n# fewest coins for amounts 0..4\nbest = [0, 1, 2, 1, 1]\n```\n\n## Think before coding\n\nbest[a] is one plus the smallest best[a - coin] over coins that fit. Fill amounts from zero upward so every smaller answer is ready. Amounts no combination reaches stay infinite and become -1. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write fewest_coins(coins, amount) returning the minimum number of coins summing to amount, with unlimited coins of each value, or -1 if impossible.",
+   "starter": "def fewest_coins(coins, amount):\n    count = 0\n    for coin in sorted(coins, reverse=True):\n        count += amount // coin\n        amount %= coin\n    return count\n",
+   "solution": "def fewest_coins(coins, amount):\n    inf = float(\"inf\")\n    best = [0] + [inf] * amount\n    for value in range(1, amount + 1):\n        for coin in coins:\n            if coin <= value and best[value - coin] + 1 < best[value]:\n                best[value] = best[value - coin] + 1\n    return best[amount] if best[amount] != inf else -1\n",
+   "checks": [
+    {
+     "name": "greedy trap",
+     "code": "assert fewest_coins([1,3,4], 6) == 2\n"
+    },
+    {
+     "name": "impossible",
+     "code": "assert fewest_coins([2], 3) == -1\n"
+    },
+    {
+     "name": "zero amount",
+     "code": "assert fewest_coins([5], 0) == 0\n"
+    },
+    {
+     "name": "larger",
+     "code": "assert fewest_coins([1,5,10,25], 99) == 9\n"
+    }
+   ],
+   "hints": [
+    "best[0] is 0 and everything else starts infinite.",
+    "For each amount try every coin that fits.",
+    "Return -1 if the final entry is still infinite."
+   ],
+   "explanation": "best[a] is one plus the smallest best[a - coin] over coins that fit. Fill amounts from zero upward so every smaller answer is ready. Amounts no combination reaches stay infinite and become -1."
+  },
+  {
+   "id": "longest-common-subsequence",
+   "title": "Compare two strings with a 2D table",
+   "body": "# Compare two strings with a 2D table\n\nA subsequence keeps characters in order but may skip some. The longest common subsequence of two texts measures how similar they are, and diff tools build on the same table.\n\n```python\na, b = \"abcde\", \"ace\"\n# common subsequence: \"ace\", length 3\n```\n\n## Think before coding\n\nCell (i, j) holds the answer for the first i characters of a and the first j of b. Equal last characters extend the diagonal answer by one; otherwise take the better of dropping a character from either text. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write lcs_length(a, b) returning the length of the longest common subsequence of two strings.",
+   "starter": "def lcs_length(a, b):\n    return len(set(a) & set(b))\n",
+   "solution": "def lcs_length(a, b):\n    table = [[0] * (len(b) + 1) for _ in range(len(a) + 1)]\n    for i in range(1, len(a) + 1):\n        for j in range(1, len(b) + 1):\n            if a[i - 1] == b[j - 1]:\n                table[i][j] = table[i - 1][j - 1] + 1\n            else:\n                table[i][j] = max(table[i - 1][j], table[i][j - 1])\n    return table[len(a)][len(b)]\n",
+   "checks": [
+    {
+     "name": "classic",
+     "code": "assert lcs_length('abcde','ace') == 3\n"
+    },
+    {
+     "name": "order matters",
+     "code": "assert lcs_length('abc','cba') == 1\n"
+    },
+    {
+     "name": "repeats",
+     "code": "assert lcs_length('aaaa','aa') == 2\n"
+    },
+    {
+     "name": "empty",
+     "code": "assert lcs_length('','abc') == 0 and lcs_length('', '') == 0\n"
+    }
+   ],
+   "hints": [
+    "Make a (len(a)+1) by (len(b)+1) table of zeros.",
+    "Matching characters add one to the diagonal cell.",
+    "Otherwise copy the larger of the cell above and to the left."
+   ],
+   "explanation": "Cell (i, j) holds the answer for the first i characters of a and the first j of b. Equal last characters extend the diagonal answer by one; otherwise take the better of dropping a character from either text."
+  },
+  {
+   "id": "n-queens",
+   "title": "Backtrack through N queens",
+   "body": "# Backtrack through N queens\n\nBacktracking builds a solution one choice at a time and undoes a choice as soon as it cannot lead anywhere. For N queens, place one queen per row and reject any column or diagonal already under attack.\n\n```python\ncols, diag1, diag2 = set(), set(), set()\nrow, col = 2, 1\nprint(row - col, row + col)   # 1 3\n```\n\n## Think before coding\n\nCells on one diagonal share row - col; cells on the other share row + col. Three sets make each safety check constant time. After exploring a placement, remove it from the sets so the next column starts clean. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write solve(n) returning every solution as a list of column indices, one per row, in lexicographic order.",
+   "starter": "def solve(n):\n    return [list(range(n))]\n",
+   "solution": "def solve(n):\n    solutions = []\n    placed = []\n    cols, diag1, diag2 = set(), set(), set()\n\n    def place(row):\n        if row == n:\n            solutions.append(list(placed))\n            return\n        for col in range(n):\n            if col in cols or row - col in diag1 or row + col in diag2:\n                continue\n            cols.add(col); diag1.add(row - col); diag2.add(row + col); placed.append(col)\n            place(row + 1)\n            cols.remove(col); diag1.remove(row - col); diag2.remove(row + col); placed.pop()\n\n    place(0)\n    return solutions\n",
+   "checks": [
+    {
+     "name": "four",
+     "code": "assert solve(4) == [[1,3,0,2],[2,0,3,1]]\n"
+    },
+    {
+     "name": "counts",
+     "code": "assert [len(solve(n)) for n in range(1,9)] == [1,0,0,2,10,4,40,92]\n"
+    },
+    {
+     "name": "valid",
+     "code": "for s in solve(6):\n    assert len(set(s)) == 6 and len({r-c for r,c in enumerate(s)}) == 6 and len({r+c for r,c in enumerate(s)}) == 6\n"
+    }
+   ],
+   "hints": [
+    "Place one queen per row, trying columns left to right.",
+    "Track used columns and both diagonals in sets.",
+    "Undo the placement after the recursive call."
+   ],
+   "explanation": "Cells on one diagonal share row - col; cells on the other share row + col. Three sets make each safety check constant time. After exploring a placement, remove it from the sets so the next column starts clean."
+  },
+  {
+   "id": "kmp-search",
+   "title": "Never step back with Knuth-Morris-Pratt",
+   "body": "# Never step back with Knuth-Morris-Pratt\n\nNaive matching restarts after every mismatch and can compare the same text characters many times. Knuth-Morris-Pratt first studies the pattern: for each prefix it records the longest proper prefix that is also a suffix.\n\n```python\npattern = \"abab\"\nfailure = [0, 0, 1, 2]\n# after a full \"abab\" match,\n# \"ab\" counts toward the next one\n```\n\n## Think before coding\n\nOn a mismatch, fall back through the failure table instead of moving backwards in the text. Each text character is read once, so the search is linear in text plus pattern, and overlapping matches are found naturally. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write find_all(text, pattern) returning every start index of pattern in text, overlaps included, in linear time. A non-empty pattern is guaranteed.",
+   "starter": "def find_all(text, pattern):\n    return [text.find(pattern)]\n",
+   "solution": "def find_all(text, pattern):\n    failure = [0] * len(pattern)\n    k = 0\n    for i in range(1, len(pattern)):\n        while k and pattern[i] != pattern[k]:\n            k = failure[k - 1]\n        if pattern[i] == pattern[k]:\n            k += 1\n        failure[i] = k\n    matches = []\n    k = 0\n    for i, char in enumerate(text):\n        while k and char != pattern[k]:\n            k = failure[k - 1]\n        if char == pattern[k]:\n            k += 1\n        if k == len(pattern):\n            matches.append(i - k + 1)\n            k = failure[k - 1]\n    return matches\n",
+   "checks": [
+    {
+     "name": "overlaps",
+     "code": "assert find_all('abababa', 'aba') == [0,2,4]\n"
+    },
+    {
+     "name": "none",
+     "code": "assert find_all('hello', 'xyz') == [] and find_all('', 'a') == []\n"
+    },
+    {
+     "name": "whole text",
+     "code": "assert find_all('aaaa', 'aaaa') == [0]\n"
+    },
+    {
+     "name": "long",
+     "code": "t='a'*20000+'b'; assert find_all(t, 'a'*1000+'b') == [19000]\n"
+    }
+   ],
+   "hints": [
+    "Build failure[i]: longest proper prefix of pattern[:i+1] that is also its suffix.",
+    "On mismatch set k = failure[k - 1] instead of moving back.",
+    "After a full match record it and continue from failure[k - 1]."
+   ],
+   "explanation": "On a mismatch, fall back through the failure table instead of moving backwards in the text. Each text character is read once, so the search is linear in text plus pattern, and overlapping matches are found naturally."
+  },
+  {
+   "id": "topological-order",
+   "title": "Order tasks with depth-first topological sort",
+   "body": "# Order tasks with depth-first topological sort\n\nBuild steps, course prerequisites and spreadsheet formulas form directed graphs without cycles. A topological order lists every task after everything it depends on.\n\n```python\nneeds = {\"test\": [\"build\"],\n         \"build\": [\"fetch\"], \"fetch\": []}\n# fetch, build, test\n```\n\n## Think before coding\n\nDepth-first search can emit a node after all of its dependencies have been emitted. Three states detect cycles: unvisited, in progress and done. Meeting a node that is still in progress means a cycle, so no order exists. Work through the example by hand before changing the starter. Decide what should happen for an empty input, a single value and a repeated value where those cases apply. The checks use several inputs so a hard-coded answer cannot stand in for the rule.\n",
+   "task": "Write build_order(needs) where needs maps each task to the tasks it depends on. Return a list with dependencies first, visiting tasks and dependencies in the given order, or raise ValueError on a cycle.",
+   "starter": "def build_order(needs):\n    return list(needs)\n",
+   "solution": "def build_order(needs):\n    state = {}\n    order = []\n\n    def visit(task):\n        if state.get(task) == \"done\":\n            return\n        if state.get(task) == \"active\":\n            raise ValueError(f\"cycle at {task}\")\n        state[task] = \"active\"\n        for dependency in needs.get(task, []):\n            visit(dependency)\n        state[task] = \"done\"\n        order.append(task)\n\n    for task in needs:\n        visit(task)\n    return order\n",
+   "checks": [
+    {
+     "name": "chain",
+     "code": "assert build_order({'test':['build'],'build':['fetch'],'fetch':[]}) == ['fetch','build','test']\n"
+    },
+    {
+     "name": "shared dependency once",
+     "code": "o=build_order({'a':['c'],'b':['c'],'c':[]}); assert o == ['c','a','b']\n"
+    },
+    {
+     "name": "cycle",
+     "code": "raised = False\ntry:\n    build_order({'a':['b'],'b':['a']})\nexcept ValueError:\n    raised = True\nassert raised, 'cycle not reported'\n"
+    },
+    {
+     "name": "undeclared dependency",
+     "code": "assert build_order({'app':['lib']}) == ['lib','app']\n"
+    }
+   ],
+   "hints": [
+    "Track each task as active or done.",
+    "Visit every dependency before appending the task.",
+    "Seeing an active task again means a cycle."
+   ],
+   "explanation": "Depth-first search can emit a node after all of its dependencies have been emitted. Three states detect cycles: unvisited, in progress and done. Meeting a node that is still in progress means a cycle, so no order exists."
+  }
+ ]
+}

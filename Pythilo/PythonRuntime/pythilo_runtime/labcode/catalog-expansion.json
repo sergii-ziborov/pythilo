@@ -15,7 +15,10 @@
         "scales": false
       }
     ],
-    "idea": "prefix[i] is the total before i. The extra zero handles ranges beginning at zero and empty ranges. Trace the table being built, then compare the two boundaries for each query."
+    "idea": "prefix[i] is the total before i. The extra zero handles ranges beginning at zero and empty ranges. Trace the table being built, then compare the two boundaries for each query.",
+    "lessons": [
+      "prefix-range"
+    ]
   },
   {
     "id": "monostack",
@@ -33,7 +36,10 @@
         "scales": false
       }
     ],
-    "idea": "The pending stack stores indices whose warmer day has not arrived. Each index enters and leaves once. Equal temperatures stay pending because the question asks for a strictly warmer day."
+    "idea": "The pending stack stores indices whose warmer day has not arrived. Each index enters and leaves once. Equal temperatures stay pending because the question asks for a strictly warmer day.",
+    "lessons": [
+      "next-warmer"
+    ]
   },
   {
     "id": "topological",
@@ -51,7 +57,11 @@
         "scales": false
       }
     ],
-    "idea": "Indegree counts prerequisites that remain. Removing a ready task reduces the counts of its dependants. If no task is ready but some remain, a cycle blocks the schedule."
+    "idea": "Indegree counts prerequisites that remain. Removing a ready task reduces the counts of its dependants. If no task is ready but some remain, a cycle blocks the schedule.",
+    "lessons": [
+      "dependency-order",
+      "topological-order"
+    ]
   },
   {
     "id": "knapsack",
@@ -69,7 +79,10 @@
         "scales": false
       }
     ],
-    "idea": "The table records the best value at each capacity. Iterate capacity downward so each transition reads a state that has not used the current item. Trace upward updates to see why they would solve an unbounded problem instead."
+    "idea": "The table records the best value at each capacity. Iterate capacity downward so each transition reads a state that has not used the current item. Trace upward updates to see why they would solve an unbounded problem instead.",
+    "lessons": [
+      "zero-one-knapsack"
+    ]
   },
   {
     "id": "bellmanford",
@@ -87,7 +100,10 @@
         "scales": false
       }
     ],
-    "idea": "One full pass can extend a shortest route by another edge. A simple path has at most n-1 edges. Any reachable edge that can still improve a distance after those passes proves a reachable negative cycle; an unreachable cycle must not invalidate the result."
+    "idea": "One full pass can extend a shortest route by another edge. A simple path has at most n-1 edges. Any reachable edge that can still improve a distance after those passes proves a reachable negative cycle; an unreachable cycle must not invalidate the result.",
+    "lessons": [
+      "bellman-ford"
+    ]
   },
   {
     "id": "editrows",
@@ -105,7 +121,10 @@
         "scales": false
       }
     ],
-    "idea": "Each cell compares two prefixes. Above means delete, left means insert, and the diagonal means match or substitute. Two rows are enough because older rows are never read again."
+    "idea": "Each cell compares two prefixes. Above means delete, left means insert, and the diagonal means match or substitute. Two rows are enough because older rows are never read again.",
+    "lessons": [
+      "rolling-distance"
+    ]
   },
   {
     "id": "linearfit",

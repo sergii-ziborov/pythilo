@@ -150,8 +150,8 @@ final class ContentDownloadTests: XCTestCase {
     @MainActor func testSelectionsIncludeEveryLessonLabAndSharedDependency() throws {
         let catalog = DownloadCatalog.bundled
         let courses = catalog.packs.filter { $0.kind == "course" }.map(\.id)
-        XCTAssertEqual(courses.count, 38)
-        XCTAssertEqual(catalog.courses.flatMap(\.lessons).count, 546)
+        XCTAssertEqual(courses.count, 39)
+        XCTAssertEqual(catalog.courses.flatMap(\.lessons).count, 578)
         let ml = LabCatalog.topics.filter { $0.section == .learning }.map { "labs-\($0.id)" }
         let selection = catalog.closure(ml)
         XCTAssertTrue(Set(ml).isSubset(of: Set(selection.map(\.id))))

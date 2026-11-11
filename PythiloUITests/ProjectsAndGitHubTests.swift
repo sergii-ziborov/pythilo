@@ -79,3 +79,27 @@ final class ProjectsAndGitHubTests: XCTestCase {
         add(shot)
     }
 }
+
+/// Learn lists the Algorithms and data structures course with its 32 lessons.
+@MainActor
+final class AlgorithmsCourseTests: XCTestCase {
+    func testAlgorithmsCourseIsInItsTrack() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-tab", "learn"]
+        app.launch()
+        let track = app.buttons["learn-track-projects"]
+        XCTAssertTrue(track.waitForExistence(timeout: 30))
+        for _ in 0..<4 where !track.isHittable { app.swipeUp() }
+        track.tap()
+        let course = app.descendants(matching: .any)["course-algorithms"]
+        for _ in 0..<6 where !course.exists { app.swipeUp() }
+        XCTAssertTrue(course.exists)
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = "learn-algorithms-track"; shot.lifetime = .keepAlways; add(shot)
+        course.tap()
+        XCTAssertTrue(app.staticTexts["Halve a sorted list with binary search"].waitForExistence(timeout: 10))
+        let list = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        list.name = "algorithms-course-lessons"; list.lifetime = .keepAlways; add(list)
+    }
+}

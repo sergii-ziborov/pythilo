@@ -280,7 +280,7 @@ final class FeatureGateTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(count, 546)
+        XCTAssertEqual(count, 578)
         XCTAssertEqual(failures, [], failures.joined(separator: "\n"))
     }
 

@@ -15,10 +15,11 @@ test('three advanced paths resolve real courses and distinct integration project
   assert.equal(path.projects.length,path.id==='python'?2:16);assert.ok(path.fieldwork.length>=2);assert.ok(path.review.length>=3);
  }
  assert.equal(projects.size,34);
- assert.equal(courses.filter(c=>c.order>=25).flatMap(c=>c.lessons).length,138);
+ // Courses 25 to 38 are the advanced paths; later courses are general practice.
+ assert.equal(courses.filter(c=>c.order>=25&&c.order<=38).flatMap(c=>c.lessons).length,138);
 });
 test('advanced labs link to existing lessons with runnable code and independent check cases',()=>{
- const linked=labs.filter(lab=>lab.lessons?.some(id=>lessons.get(id)?.course.order>=25));
+ const linked=labs.filter(lab=>lab.lessons?.some(id=>lessons.get(id)?.course.order>=25&&lessons.get(id)?.course.order<=38));
  assert.equal(linked.length,84);assert.equal(labs.length,114);
  for(const lab of labs.filter(lab=>lab.lessons?.length))for(const id of lab.lessons){assert.ok(lessons.has(id),`${lab.id}: ${id}`);assert.ok(lab.answer.includes('def '));assert.notEqual(lab.answer,lab.starter);}
  assert.equal(linked.filter(l=>l.section==='Machine learning').length,44);
@@ -33,7 +34,7 @@ test('twenty-four systems labs include twelve composed projects with adversarial
   assert.ok(labs.some(lab=>lab.lessons?.includes(lesson.id)),lesson.id);
   assert.ok(lesson.checks.length>=4,lesson.id);
  }
- assert.equal(labs.reduce((count,lab)=>count+(lab.lessons?.length??0),0),104);
+ assert.equal(labs.reduce((count,lab)=>count+(lab.lessons?.length??0),0),111);
 });
 test('advanced tensor lessons require native PyTorch and the other new lessons run in the browser',()=>{
  for(const course of courses.filter(c=>c.order>=25))for(const lesson of course.lessons){

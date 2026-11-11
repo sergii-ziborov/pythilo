@@ -23,7 +23,7 @@ enum LearnTrack: String, CaseIterable, Identifiable {
         case .web: "Web & data"
         case .ml: "ML"
         case .ai: "AI"
-        case .projects: "Projects"
+        case .projects: "Algorithms"
         case .more: "More"
         }
     }
@@ -55,7 +55,7 @@ enum LearnTrack: String, CaseIterable, Identifiable {
         .web: ["web", "data", "pydantic", "fastapi-httpx", "data-formats", "data-practice", "testing-practice", "reliable-python"],
         .ml: ["math", "ml", "ml-practice", "ml-evaluation", "ml-statistics", "ml-production", "ml-systems", "deep-learning-practice", "pytorch-training", "robust-ml-engineering"],
         .ai: ["llm", "ai", "ai-building-blocks", "ai-production", "ai-systems", "transformer-engineering", "finetuning-projects", "alignment-engineering"],
-        .projects: ["algorithm-patterns", "senior-projects"],
+        .projects: ["algorithms", "algorithm-patterns", "senior-projects"],
     ]
 
     static func track(of course: Course) -> LearnTrack {

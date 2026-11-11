@@ -30,6 +30,7 @@ TORCH_IMPORT_SECONDS = 20
 
 # File stem -> (course id, kind, number of lessons)
 EXPECTED_COURSES = {
+    "39-algorithms": ("algorithms", "path", 32),
     "37-robust-ml-engineering": ("robust-ml-engineering", "path", 8),
     "38-alignment-engineering": ("alignment-engineering", "path", 8),
     "36-finetuning-projects": ("finetuning-projects", "path", 6),
