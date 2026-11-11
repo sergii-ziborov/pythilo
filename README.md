@@ -46,6 +46,11 @@ open source (see [License](#license)).
   frameworks have verified downloadable Python packages and signed native backends.
 - **Git, for real.** A genuine `.git` folder: commit, branches, diff, `git merge` with
   conflict markers and `--abort`, `git rebase`, and HTTPS clone.
+- **GitHub in Clone.** Search GitHub with stars, owners, forks and languages, or save a
+  GitHub account once (a personal access token in the Keychain) to list and clone your
+  own repositories, private ones included.
+- **Organized projects.** Search projects, sort them by edit, name or kind, and group
+  them into categories that never end up inside the project folder.
 - **Notebooks** that open and save ordinary `.ipynb` files.
 - **npm and React.** `npm install` fetches packages from the npm registry and checks
   each one's integrity; `npm run build` bundles with esbuild, which runs inside the app.
@@ -59,21 +64,28 @@ Courses and Lab topics download individually. Project source is saved locally im
 opening or creating a project never starts a download. Explicitly select Download entire
 course, Download entire category, Download project packages or Download everything. Each
 selection includes its required packages and assets; then its code and checks run offline.
-Downloads shows progress, pause, resume, cancellation and removal.
+Downloads shows progress, pause, resume, cancellation and removal. In Learn and Labs,
+touch and hold a course or topic to download it, remove its download or hide it; hidden
+items come back from Show hidden at the end of the list, and each Learn track has
+Download all.
 Removing downloads preserves projects, lesson drafts and completion history. Archives are
 checked against the catalog pinned inside the signed app before installation. Native
 Python extensions remain signed inside the app; their Python APIs download separately.
 
 ### Learn
 
-- **446 lessons in 37 courses**, in Python, web and data, machine learning, AI and
-  project tracks, with search across every lesson. They include 138 advanced lessons (34 integration projects): Python foundations and Python deeper (30 each), clean
+- **478 lessons in 38 courses**, in Python, web and data, machine learning, AI and
+  algorithms tracks, with search across every lesson. They include 138 advanced lessons (34 integration projects): Python foundations and Python deeper (30 each), clean
   code, testing, the tools around Python, architecture, concurrency and async, the web,
   data, the mathematics of neural networks, machine learning with PyTorch (30), language
   models from the inside, working with AI tools, and four practical courses on
   algorithm patterns, data processing, reliability and machine learning, followed by
   ML evaluation and AI building blocks. New courses cover Pydantic 2 (20 lessons),
-  FastAPI/HTTPX (14), practical testing (10) and file/data formats (8).
+  FastAPI/HTTPX (14), practical testing (10) and file/data formats (8), and
+  **Algorithms and data structures** (32): binary search, two pointers, sliding window,
+  stacks and queues, recursion, three sorts, linked lists, hashing, BSTs, heaps, tries,
+  union-find, LRU, BFS, DFS, Dijkstra, Bellman-Ford, dynamic programming, N-Queens,
+  KMP and topological order, each linked to the Lab that traces it.
   Plus **100 interview tasks** (35 easy, 45 medium, 20 hard) with a timer, progressive
   hints, worked solutions and edge-case checks.
 - PyTorch 2.15 runs on the device ([torch-ios](https://github.com/sergii-ziborov/torch-ios)):
@@ -90,7 +102,7 @@ Python extensions remain signed inside the app; their Python APIs download separ
 available. Seventy-four also run in the browser at [pythilo.com/labs](https://pythilo.com/labs/),
 using the same tracer and correctness checks. Forty PyTorch Labs run in the app,
 including sixteen composed projects. Six train real pretrained BERT models with the UCI
-sentiment dataset, LoRA, domain transfer, exact resume and merged-artifact evaluation. Expand a topic or search by concept to find them.
+sentiment dataset, LoRA, domain transfer, exact resume and merged-artifact evaluation. Expand a topic or search by concept to find them. 127 Labs link to the lessons that teach them.
 Correctness first, then time. The catalogue now covers Basics, Data structures,
 Algorithms, Machine learning and Artificial intelligence. Search the catalog or use
 the ML (65 labs) and AI (48 labs) filters. For example:

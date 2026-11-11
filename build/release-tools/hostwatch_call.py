@@ -27,7 +27,7 @@ try:
     data = json.loads(text)
     result = data.get("result", data)
     if keys: result = {k: result.get(k) for k in keys}
-    print(json.dumps(result)[:4000])
+    print(json.dumps(result)[:int(__import__("os").environ.get("HW_LIMIT","4000"))])
 except Exception:
     print(text[:4000])
 proc.terminate()

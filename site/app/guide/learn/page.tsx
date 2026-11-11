@@ -14,12 +14,16 @@ export default function Page() {
   const lessons = path.reduce((sum, course) => sum + course.lessons.length, 0);
   return <>
     <GuideHeader slug="learn" />
-    <Toc items={[["path", "The path"], ["lesson", "A lesson"], ["checks", "Checks"], ["hints", "Hints and the solution"], ["debug", "Debug in a project"], ["progress", "Progress"], ["interview", "Interview practice"], ["labs", "Labs"], ["web", "On the website"]]} />
+    <Toc items={[["path", "The path"], ["manage", "Download, remove and hide"], ["lesson", "A lesson"], ["checks", "Checks"], ["hints", "Hints and the solution"], ["debug", "Debug in a project"], ["progress", "Progress"], ["interview", "Interview practice"], ["labs", "Labs"], ["web", "On the website"]]} />
 
     <h2 id="path">The path</h2>
-    <p>The <span className="ui">Learn</span> tab starts with a card to <span className="ui">Start lesson</span> or <span className="ui">Continue lesson</span>, then <span className="ui">Your path</span>: {path.length} courses and {lessons} lessons in order, each with a ring that fills as you finish lessons. Below them, <span className="ui">Practice</span> holds the interview tasks.</p>
+    <p>The <span className="ui">Learn</span> tab starts with a card to <span className="ui">Start lesson</span> or <span className="ui">Continue lesson</span>, then your progress, <span className="ui">Interview practice</span> and the courses: {path.length} courses and {lessons} lessons in tracks (Python, Web &amp; data, ML, AI and Algorithms), each course with a ring that fills as you finish lessons and a check once it is downloaded. Tap a track chip to see only its courses, or search every lesson by name.</p>
     <Table head={["#", "Course", "Lessons"]} rows={path.map((course, index) => [String(index + 1), <Link key="c" href={`/learn/${course.id}/`}>{course.title}</Link>, String(course.lessons.length)])} />
     <p>A course screen shows how many lessons it has, the time they take, how many you have done, and a timeline of lessons with their length, parts and number of checks. The next one is marked <em>Up next</em>.</p>
+
+    <h2 id="manage">Download, remove and hide</h2>
+    <p>Touch and hold a course for <span className="ui">Download course</span> (or <span className="ui">Remove download</span> once it is on the device) and <span className="ui">Hide course</span>. A course screen has the same actions in its <span className="ui">⋯</span> menu, and each track has <span className="ui">Download all</span> for its courses. In <span className="ui">Labs</span>, touch and hold a topic for the same actions.</p>
+    <p>A hidden course or topic leaves its list and is left out of <span className="ui">Download all</span>; its download, progress and drafts stay. <span className="ui">Show N hidden courses</span> at the end of the list brings them back, dimmed and marked <em>Hidden</em>, so you can show them again. <span className="ui">Remove download</span> asks first, deletes the content from the device and keeps your progress and lesson drafts; you can download it again at any time.</p>
 
     <h2 id="lesson">A lesson</h2>
     <p>Courses and Lab topics download separately in the app, only when you choose Download. Download entire course saves every lesson, example and check with all its required packages, data and models. Download entire category prepares every Lab in that category. Downloads also offers Download everything, progress, pause and resume. After completion, the selected course or category works entirely offline, including code execution, checks and model training. Opening a lesson or pressing Run never downloads anything. Removing downloads preserves your project code, lesson drafts and progress.</p>

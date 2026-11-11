@@ -463,3 +463,24 @@ Operation keys `pythilo-algorithms-github-{build,publish,deploy}-20261111-v1`; d
 13:24:52 UTC. All 92 site tests, TypeScript and the build pass; the public smoke suite
 passes, the course pack serves with its pinned SHA-256, and the new course, lesson and
 guide pages return 200.
+
+## Learn guide: download, remove and hide (11 November 2026)
+
+The Learn guide describes tracks and the new Download, remove and hide actions for courses
+and Lab topics (app build 34). Lessons, Labs and the course packs are unchanged from the
+previous deployment, which already carries all 478 path lessons including the algorithms
+course. Overlay: `app/guide/learn/page.tsx` and this file (14,843 bytes, SHA-256
+`c0711ea3ab50c817d450c588d8edff2fadf7ccfc7fccaa234d04521d2f7c28de`).
+
+Free disk was 8.70 GB. A reviewed retention run (`pythilo-guide34-cleanup-20261111`)
+removed superseded shared build caches and the 7 November Pythilo build, freeing 0.94 GB;
+current and two rollback versions stayed protected. With 9.64 GB free, `minFreeBytes` was
+set to 8.5 GiB for this build only and restored to 10 GiB after deployment. The disk must be
+enlarged before further releases: each build retains roughly 0.5 GB until it ages out.
+
+Image `sha256:278008c6398df2a769a76669a23d2a498e87be6dded86faa88f9648ec7181d47`, registry
+manifest `sha256:b922a7be9f56ae9d8632087e753f22b5f52aab85b8670fb3fdc9e8a3d1de7fa7`, serving
+revision `sha256:e7823ad3d686725d6c54f72337dda5fecfe704a9480e0acb73f9030b54dc7749`. Keys
+`pythilo-learn-guide-manage-{build,publish,deploy}-20261111-v1` (build v2: v1 was refused
+while the guard update timed out). Deployed 17:00:17 UTC. 92 site tests, TypeScript and the
+776-page build pass; the public smoke suite passes and the live guide shows the new section.
