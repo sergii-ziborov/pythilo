@@ -26,7 +26,15 @@ final class LabsCardLayoutTests: XCTestCase {
 
         download.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
         let status = app.staticTexts["offline-status-\(id)"]
-        XCTAssertTrue(status.waitForExistence(timeout: 30))
+        for _ in 0..<60 where !status.exists && download.exists { Thread.sleep(forTimeInterval: 0.5) }
+        if !status.exists && !download.exists {
+            // PyTorch was already on this device: only the small topic pack downloaded, at once,
+            // and a topic that is offline hides its download row.
+            XCTAssertTrue(app.buttons["lab-torchclip"].exists)
+            attach(app, "labs-card-offline-at-once")
+            return
+        }
+        XCTAssertTrue(status.exists)
         let pause = app.buttons["pause-\(id)"]
         assertApart(note, download, "the description and the busy button")
         assertApart(status, download, "the status and the busy button")

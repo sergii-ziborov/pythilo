@@ -1,0 +1,4 @@
+{
+  "en-US": "Build 32 fixes the Labs download controls on narrower iPhones: a topic's description, its Download button and the \"N of M ready\" status no longer overlap. Everything from build 31 is included: terminal tabs (keep a Django server running in one tab and run tests, migrate or git in another), python manage.py test, the new Learn and Labs layout, Next pinned after a lesson's checks pass, and Settings > About.",
+  "ru": "Сборка 32 исправляет кнопки загрузки в Labs на узких iPhone: описание темы, кнопка Download и статус «N of M ready» больше не накладываются друг на друга. Всё из сборки 31 на месте: вкладки терминала (сервер Django работает в одной вкладке, а тесты, migrate или git — в другой), python manage.py test, новый дизайн Learn и Labs, кнопка «Далее» после прохождения проверок урока и раздел «О приложении» в настройках."
+}
