@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { GuideHeader, Note, Pager, Table } from "@/components/guide/doc";
 
-export const metadata: Metadata = { title: "Settings", description: "Every setting in Pythilo for iPhone and iPad: the file drawer, status bar, code size, appearance, Git identity and tokens, room name, and the Python version." };
+export const metadata: Metadata = { title: "Settings", description: "Every setting in Pythilo for iPhone and iPad: the file drawer, status bar, code size, appearance, Git identity, GitHub account and tokens, room name, and the Python version." };
 
 export default function Page() {
   return <>
@@ -22,6 +22,7 @@ export default function Page() {
     <Table head={["Setting", "What it does"]} rows={[
       [<span key="s" className="ui">Name</span>, <>The author name on your commits. Also set by <code>git config user.name</code>.</>],
       [<span key="s" className="ui">Email</span>, <>The author email on your commits. Also set by <code>git config user.email</code>.</>],
+      [<span key="s" className="ui">GitHub account</span>, <>Save a GitHub personal access token once. Clone then shows your repositories, private ones included, and pull and push to github.com use it. See <Link href="/guide/git/#tokens">Git</Link>.</>],
       [<span key="s" className="ui">HTTPS tokens</span>, <>How many host tokens are stored in the Keychain. Add or replace one from the <Link href="/guide/git/#tokens">Git screen</Link>.</>],
     ]} />
 

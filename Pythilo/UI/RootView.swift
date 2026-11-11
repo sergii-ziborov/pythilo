@@ -117,6 +117,13 @@ struct RootView: View {
         where !store.projects.contains(where: { $0.name == name }) {
             _ = try? store.create(name: name, template: .blank)
         }
+        // -seedCategories "name=Category;other=Category" files seeded projects, for screenshots.
+        for pair in (defaults.string(forKey: "seedCategories") ?? "").split(separator: ";") {
+            let parts = pair.split(separator: "=", maxSplits: 1).map(String.init)
+            if parts.count == 2, let project = store.projects.first(where: { $0.name == parts[0] }) {
+                store.setCategory(parts[1], for: project)
+            }
+        }
         if let tab = defaults.string(forKey: "tab").flatMap(AppSection.init(rawValue:)) { section = tab }
         if let link = defaults.string(forKey: "roomLink") {
             incomingRoomLink = link

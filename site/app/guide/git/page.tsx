@@ -30,6 +30,7 @@ export default function Page() {
 
     <h2 id="tokens">HTTPS tokens</h2>
     <p>Private repositories need a username and an access token (a personal access token from GitHub, GitLab and the like; not your password). Enter them when you clone, or with the key button labelled <span className="ui">HTTPS token</span> on the Git screen. Pythilo keeps one token per host in the iOS Keychain, on this device only, readable only while the device is unlocked, and never in the project or its <code>.git</code> folder. <span className="ui">Settings</span> shows how many you have stored. A token typed into the address itself is refused.</p>
+    <p>For GitHub, save your account once in <span className="ui">Settings</span> › <span className="ui">GitHub account</span>: paste a personal access token with the <code>repo</code> scope, and Pythilo checks it with GitHub before storing it the same way. Clone then lists your repositories, private ones included, and pull and push to github.com use that account. <span className="ui">Sign out</span> removes the token from the device.</p>
 
     <h2 id="terminal">Git in the terminal</h2>
     <p>The terminal&apos;s <code>git</code> speaks the commands you know:</p>

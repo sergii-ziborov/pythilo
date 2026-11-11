@@ -4,7 +4,8 @@ export type Shot = { file: string; device: "phone" | "ipad"; alt: string; title:
 const phone = (file: string, title: string, caption: string, alt: string): Shot => ({ file, device: "phone", title, caption, alt });
 
 export const shots = {
-  projects: phone("projects", "Projects are folders", "New, Clone or Import. Every project is an ordinary folder that also shows up in the Files app.", "The Projects screen with New, Clone and Import, and a list of recent projects"),
+  projects: phone("projects", "Projects are folders", "Search them, sort them and group them into categories. Every project is an ordinary folder that also shows up in the Files app.", "The Projects screen with search, category chips and projects grouped into Learning, Machine learning and Web"),
+  github: phone("github", "Clone from GitHub", "Search GitHub with stars and owners, or open your own repositories, private ones included.", "The Clone sheet searching GitHub for org:python, with stars, forks and languages"),
   editor: phone("editor", "An editor made for touch", "Syntax colours, completion that knows your modules, and problems flagged as you type.", "A FastAPI main.py open in the editor, with line numbers and syntax colours"),
   torch: phone("torch", "PyTorch, on the phone", "The PyTorch template trains a small network on the CPU, offline, to 97% test accuracy.", "The terminal in dark mode after python main.py trained a PyTorch network to 97 percent test accuracy"),
   django: phone("django", "Django serves from the phone", "runserver starts a real server. Open site shows it; migrate and friends are one tap away.", "A Django development server running in the terminal, with a Django is running banner and an Open site button"),
@@ -12,7 +13,7 @@ export const shots = {
   terminal: phone("terminal", "A terminal without a server", "pytest, pip, git and npm, built into the app. Nothing runs anywhere else.", "The terminal after pytest -q reported 2 passed, with command keys for python, pip, npm, pytest, git and ls"),
   notebook: phone("notebook", "Notebooks", "Ordinary .ipynb files, with cells that share one namespace and NumPy built in.", "A notebook called Rainfall by month with two code cells and Add code and Add text buttons"),
   files: phone("files", "Files, folders and Git status", "A drawer with nested folders, quick search, Packages, Git and Room one tap away.", "The file drawer of a Django project with nested folders and Packages, Git, Room and Share buttons"),
-  learn: phone("learn", "A path through Python", "Courses from the first variable to PyTorch and language models, with progress on the device.", "The Learn screen with a Continue lesson card and the course path"),
+  learn: phone("learn", "A path through Python", "Courses in tracks, from the first variable to algorithms, PyTorch and language models, with progress on the device.", "The Learn screen with the Algorithms track: Algorithms and data structures, Algorithm patterns and Projects"),
   lesson: phone("lesson", "Lessons you can run", "Short parts, runnable examples, then a task checked on the device.", "A lesson about guard clauses with a runnable code example"),
   check: phone("check", "Checks that say what came back", "describe(3) returned None, expected 'int: 3'. Is a return missing?", "The check sheet listing five failed checks, each saying what came back and what was expected"),
   graphLab: phone("graph-lab", "Graph Explorer", "Your own BFS, DFS or Dijkstra, traced step by step on a grid, tree or random graph.", "Graph Explorer tracing a breadth-first search on a grid"),
@@ -29,4 +30,4 @@ export const shots = {
 } satisfies Record<string, Shot>;
 
 /** The home page gallery, in the order of a first afternoon with the app. */
-export const gallery: Shot[] = [shots.projects, shots.editor, shots.torch, shots.django, shots.preview, shots.terminal, shots.notebook, shots.learn, shots.check, shots.graphLab, shots.dpLab, shots.room];
+export const gallery: Shot[] = [shots.projects, shots.github, shots.editor, shots.torch, shots.django, shots.preview, shots.terminal, shots.notebook, shots.learn, shots.check, shots.graphLab, shots.dpLab, shots.room];

@@ -114,6 +114,7 @@ export default function Home() {
             <li>Every check runs your code on the device. When one fails it says what came back and what was expected.</li>
             <li>On a phone, reading and coding take turns on the whole screen. On an iPad they sit side by side.</li>
             <li><span className="ui">Debug in a project</span> turns a lesson into a project with tests, so you can step through it like any other code.</li>
+            <li><strong>Algorithms and data structures</strong>: 32 lessons from binary search and sorting to heaps, tries, union-find, BFS, Dijkstra, dynamic programming, N-Queens and KMP, each linked to the Lab that traces it.</li>
           </ul>
           <Link href="/guide/learn/" className="arrow-link">Courses, checks and interview practice</Link>
         </div>
@@ -142,10 +143,11 @@ export default function Home() {
             <li>Nobody runs code on your iPhone unless you allow it: once, for the room, or never.</li>
             <li>An AI client on your computer, such as Claude Code or Codex, can work on one project over your local network. Reading, editing, running, installing and committing are separate permissions.</li>
             <li>Git, for real, in an ordinary <code>.git</code> folder: commit, branches, diff, merge with conflict markers, rebase, and HTTPS clone.</li>
+            <li>Search GitHub from <span className="ui">Clone</span> with stars, owners and languages, or sign in once to see your own repositories, private ones included.</li>
           </ul>
           <Link href="/guide/rooms/" className="arrow-link">Rooms and permissions</Link>
         </div>
-        <div className="feature-media"><DeviceShot shot={shots.room} /><DeviceShot shot={shots.files} /></div>
+        <div className="feature-media"><DeviceShot shot={shots.room} /><DeviceShot shot={shots.github} /></div>
       </section>
 
       <section aria-labelledby="f-shapes" style={{ display: "flex", flexDirection: "column", gap: 32 }}>

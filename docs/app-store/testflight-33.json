@@ -1,0 +1,4 @@
+{
+ "en-US": "Build 33 adds GitHub search to Clone (stars, owners, languages), an optional GitHub account in Settings that lists your repositories including private ones, project search, sorting and categories, and a 32-lesson Algorithms and data structures course linked to its Labs (Learn > Algorithms). It also fixes the Labs download controls on narrow iPhones.",
+ "ru": "Сборка 33: поиск по GitHub в Clone (звёзды, владельцы, языки), необязательный аккаунт GitHub в настройках со списком ваших репозиториев, включая приватные, поиск, сортировка и категории проектов, а также курс «Algorithms and data structures» из 32 уроков, связанных с Labs (Learn › Algorithms). Также исправлены кнопки загрузки в Labs на узких iPhone."
+}
