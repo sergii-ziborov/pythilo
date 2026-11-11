@@ -954,3 +954,18 @@ Build 32's waiting submission was withdrawn; submission
 `3f58bfed-4824-4d65-9e65-a1b2346ccd05` with build 33 is `WAITING_FOR_REVIEW` since
 2026-11-11T13:50:27Z, release **MANUAL**. Metadata and all nine screenshots read back
 matching the repository. Receipt: `docs/app-store/release-1.0-build33.json`.
+
+## Download, remove and hide — 1.0 (34), 11 November 2026
+
+Courses and Lab topics can be downloaded, removed and hidden from their lists (touch and
+hold) and from a course page's menu; each Learn track has Download all. Hidden items leave
+the lists until Show hidden. The menus depend only on whether an item is downloaded, so a
+download in progress never rebuilds them. UI tests: `ContentVisibilityTests` on iPhone 17 Pro
+and iPad, and 25 Learn, Labs, Downloads, Projects and GitHub cases on iPhone
+(`build/hide34-regress.xcresult`, `build/hide34-pad.xcresult`).
+
+Release 1.0 (34) archives from `2aa591c`; build 34 is `VALID` and `IN_BETA_TESTING` with
+matching notes. Build 33's waiting submission was withdrawn; submission
+`8d069ee1-d982-4ee6-8e62-29b06ced7cb9` with build 34 is `WAITING_FOR_REVIEW` since
+2026-11-11T16:10:10Z, release **MANUAL**. Metadata and all nine screenshots read back
+matching. No physical-device run is claimed. Receipt: `docs/app-store/release-1.0-build34.json`.
