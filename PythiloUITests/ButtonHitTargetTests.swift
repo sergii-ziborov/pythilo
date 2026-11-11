@@ -107,6 +107,18 @@ final class ButtonHitTargetTests: XCTestCase {
     }
 }
 
+@MainActor
+extension XCTestCase {
+    /// iPadOS keeps a .searchable field behind a toolbar button until it is tapped.
+    func searchField(in app: XCUIApplication) -> XCUIElement {
+        let field = app.searchFields.firstMatch
+        if field.waitForExistence(timeout: 3) { return field }
+        let button = app.buttons["Search"].firstMatch
+        if button.waitForExistence(timeout: 3) { button.tap() }
+        return field
+    }
+}
+
 // XCUITest considers partially covered/offscreen controls hittable on this SDK.
 // Keep the exact padding point clear of the navigation and floating tab bars.
 @MainActor

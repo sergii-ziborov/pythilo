@@ -33,6 +33,8 @@ def boot(bundle, cache):
         os.environ.setdefault("SSL_CERT_FILE", certificates)
         os.environ.setdefault("REQUESTS_CA_BUNDLE", certificates)
 
+    _ipados_compat()
+
     # The app is one process, so nothing may end it from Python's side.
     os._exit = _refuse_process_exit
     signal.signal(signal.SIGINT, signal.default_int_handler)
@@ -48,6 +50,32 @@ def boot(bundle, cache):
             "platform": sys.platform,
         },
     )
+
+
+def _ipados_compat():
+    """PyTorch for iOS skips its desktop-only native loaders when platform.system() is
+    "iOS". On an iPad CPython says "iPadOS", so torch tried to dlopen a library that
+    is not shipped and failed to import. Code in the torch package is told "iOS";
+    everyone else, including your own code, still sees "iPadOS".
+    """
+    import platform
+
+    real = platform.system
+    if real() != "iPadOS":
+        return
+
+    def system():
+        value = real()
+        try:
+            caller = sys._getframe(1).f_globals.get("__name__") or ""
+        except ValueError:
+            return value
+        if caller == "torch" or caller.startswith("torch."):
+            return "iOS"
+        return value
+
+    system.__doc__ = real.__doc__
+    platform.system = system
 
 
 def _refuse_process_exit(status=0):

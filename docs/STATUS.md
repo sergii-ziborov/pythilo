@@ -871,6 +871,18 @@ at once; two failed on project files changed by earlier keyboard tests (a typed 
 (`build/redesign31-ui-phone.xcresult`, `build/redesign31-ui-rerun.xcresult`,
 `build/redesign31-ui-rerun2.xcresult`). No physical-device run is claimed.
 
+The iPad run found a real defect that predates this release: PyTorch did not import
+on an iPad. torch for iOS skips its desktop-only `libtorch_global_deps` and shared-memory
+manager when `platform.system()` is "iOS", and CPython reports "iPadOS" there, so torch
+tried to `dlopen` a library that is not shipped. The downloaded torch pack is pinned, so
+the runtime answers "iOS" to code in the `torch` package on an iPad only; every other
+caller still sees "iPadOS". The iPad UI run had 21 cases: 17 passed at once; the two
+PyTorch Labs failed on that defect, and two search steps failed because iPadOS keeps a
+`.searchable` field behind a toolbar button (the tests now open it). All four pass on
+rerun (`build/redesign31-ui-pad.xcresult`, `build/redesign31-ui-pad-rerun.xcresult`,
+`build/redesign31-ui-pad-torch.xcresult`). The torch fix belongs in torch-ios as a
+`sys.platform == "ios"` check for its next pack.
+
 Store screenshots 02, 03 and 04 are new captures of terminal tabs with Django tests
 beside the server, Learn and Labs, in the same frames as before; the other five are
 unchanged. The App Store description now says 19 topics (it said 15) and mentions tabs.

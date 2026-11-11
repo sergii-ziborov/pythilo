@@ -26,7 +26,7 @@ final class LabsNavigationTests: XCTestCase {
         XCTAssertFalse(app.buttons["lab-torchclip"].exists)
         tapVisiblePadding(app.buttons["AI · 48"], in: app)
         app.swipeDown()
-        let search = app.searchFields.firstMatch
+        let search = searchField(in: app)
         XCTAssertTrue(search.waitForExistence(timeout: 5))
         search.tap()
         search.typeText("rotary")
