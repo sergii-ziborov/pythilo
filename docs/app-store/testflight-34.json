@@ -1,0 +1,4 @@
+{
+ "en-US": "Build 34: touch and hold a course (Learn) or a Lab topic (Labs) to download it, remove its download or hide it; a course page has the same actions in its menu. Each Learn track has Download all. Hidden items come back from Show hidden at the end of the list. Also in this release: GitHub search and your repositories in Clone, project categories and search, and the 32-lesson Algorithms and data structures course.",
+ "ru": "Сборка 34: удерживайте курс (Learn) или тему Labs, чтобы скачать её, удалить загрузку или скрыть; на странице курса те же действия есть в меню. В каждом направлении Learn есть «Download all». Скрытое возвращается кнопкой «Show hidden» в конце списка. Также в этом выпуске: поиск по GitHub и ваши репозитории в Clone, категории и поиск проектов и курс «Algorithms and data structures» из 32 уроков."
+}
