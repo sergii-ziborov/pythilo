@@ -11,7 +11,8 @@ import XCTest
         XCTAssertFalse(app.buttons["lesson-check"].exists)
         download.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
         XCTAssertTrue(app.buttons["Run example"].firstMatch.waitForExistence(timeout: 60))
-        app.buttons["Code"].tap()
+        // A phone shows the lesson's code behind a tab; an iPad shows it beside the reading.
+        if app.buttons["Code"].exists { app.buttons["Code"].tap() }
         XCTAssertTrue(app.buttons["lesson-check"].waitForExistence(timeout: 60))
         let proof = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         proof.name = "downloaded-course-opens-native-lesson"; proof.lifetime = .keepAlways; add(proof)
