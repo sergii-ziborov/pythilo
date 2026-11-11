@@ -284,47 +284,66 @@ struct CompactSelectionControl: View {
                 .accessibilityLabel("Available offline. \(readyText)")
                 .accessibilityIdentifier("offline-ready-\(downloadID)")
         } else {
-            HStack(spacing: 8) {
-                Button { store.download(packIDs) } label: {
-                    HStack(spacing: 6) {
-                        if busy {
-                            ProgressView().controlSize(.small).tint(AppTheme.blue)
-                        } else {
-                            Image(systemName: "arrow.down.circle.fill")
-                        }
-                        Text(busy ? "\(completed)/\(packs.count)" : "\(title) · \(ByteCountFormatter.string(fromByteCount: Int64(store.missingBytes(packIDs)), countStyle: .file))")
-                            .lineLimit(1)
-                            .monospacedDigit()
-                    }
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(busy ? AppTheme.blue : AppTheme.onBlue)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 32)
-                    .background(busy ? AppTheme.selection : AppTheme.blue, in: Capsule())
-                    .fixedSize()
+            // The status moves under the button when a row is too narrow, instead of overlapping it.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    downloadButtons(busy: busy, pausable: pausable, completed: completed, total: packs.count)
+                    status(busy: busy, completed: completed, total: packs.count)
                 }
-                .buttonStyle(SolidButtonStyle()).disabled(busy)
-                .accessibilityIdentifier(downloadID)
-                .accessibilityLabel(busy ? "Preparing offline, \(completed) of \(packs.count) ready" : "\(title), \(ByteCountFormatter.string(fromByteCount: Int64(store.missingBytes(packIDs)), countStyle: .file))")
-                if pausable {
-                    Button { store.pause(packIDs) } label: {
-                        Image(systemName: "pause.fill").font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(AppTheme.secondary)
-                            .frame(width: 32, height: 32)
-                            .background(AppTheme.raised, in: Circle())
-                    }
-                    .buttonStyle(SolidButtonStyle())
-                    .accessibilityLabel("Pause")
-                    .accessibilityIdentifier("pause-\(downloadID)")
-                }
-                if busy || completed > 0 {
-                    Text("\(completed) of \(packs.count) ready")
-                        .font(.system(size: 12))
-                        .foregroundStyle(AppTheme.muted)
-                        .lineLimit(1)
-                        .accessibilityIdentifier("offline-status-\(downloadID)")
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) { downloadButtons(busy: busy, pausable: pausable, completed: completed, total: packs.count) }
+                    status(busy: busy, completed: completed, total: packs.count)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func status(busy: Bool, completed: Int, total: Int) -> some View {
+        if busy || completed > 0 {
+            Text("\(completed) of \(total) ready")
+                .font(.system(size: 12))
+                .foregroundStyle(AppTheme.muted)
+                .lineLimit(1)
+                .fixedSize()
+                .accessibilityIdentifier("offline-status-\(downloadID)")
+        }
+    }
+
+    @ViewBuilder
+    private func downloadButtons(busy: Bool, pausable: Bool, completed: Int, total: Int) -> some View {
+        let size = ByteCountFormatter.string(fromByteCount: Int64(store.missingBytes(packIDs)), countStyle: .file)
+        Button { store.download(packIDs) } label: {
+            HStack(spacing: 6) {
+                if busy {
+                    ProgressView().controlSize(.small).tint(AppTheme.blue)
+                } else {
+                    Image(systemName: "arrow.down.circle.fill")
+                }
+                Text(busy ? "\(completed)/\(total)" : "\(title) · \(size)")
+                    .lineLimit(1)
+                    .monospacedDigit()
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(busy ? AppTheme.blue : AppTheme.onBlue)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 32)
+            .background(busy ? AppTheme.selection : AppTheme.blue, in: Capsule())
+            .fixedSize()
+        }
+        .buttonStyle(SolidButtonStyle()).disabled(busy)
+        .accessibilityIdentifier(downloadID)
+        .accessibilityLabel(busy ? "Preparing offline, \(completed) of \(total) ready" : "\(title), \(size)")
+        if pausable {
+            Button { store.pause(packIDs) } label: {
+                Image(systemName: "pause.fill").font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(AppTheme.secondary)
+                    .frame(width: 32, height: 32)
+                    .background(AppTheme.raised, in: Circle())
+            }
+            .buttonStyle(SolidButtonStyle())
+            .accessibilityLabel("Pause")
+            .accessibilityIdentifier("pause-\(downloadID)")
         }
     }
 }

@@ -239,10 +239,12 @@ struct LabsView: View {
                 Divider().padding(.horizontal, 12)
                 VStack(alignment: .leading, spacing: 10) {
                     if !ready {
-                        HStack(spacing: 10) {
+                        // Stacked, so the button and its progress never sit on top of the text.
+                        VStack(alignment: .leading, spacing: 8) {
                             Text("Save this topic, its packages and data to use it offline.")
                                 .font(.system(size: 13))
                                 .foregroundStyle(AppTheme.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             CompactSelectionControl(packIDs: ["labs-\(topic.id)"], title: "Download", downloadID: "download-pack-labs-\(topic.id)")
                         }
