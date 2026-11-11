@@ -21,6 +21,9 @@ struct LabsView: View {
     @State private var expandedTopics: Set<String> = []
     @State private var collapsedSearchTopics: Set<String> = []
     @State private var store = ContentStore.shared
+    @State private var hidden = HiddenContent.shared
+    @State private var showHidden = false
+    @State private var removing: RemovalTarget?
 
     private static let order: [LabInfo.Section] = [.learning, .intelligence, .basics, .structures, .algorithms]
 
@@ -57,7 +60,7 @@ struct LabsView: View {
                         let labs = matching(section)
                         if !labs.isEmpty {
                             sectionHeader(section, count: labs.count)
-                            ForEach(LabCatalog.topics.filter { $0.section == section }) { topic in
+                            ForEach(LabCatalog.topics.filter { $0.section == section && (showHidden || !hidden.labTopics.contains($0.id)) }) { topic in
                                 let matches = labs.filter { LabCatalog.topic(for: $0)?.id == topic.id }
                                 if !matches.isEmpty {
                                     topicGroup(topic, labs: matches)
@@ -65,6 +68,13 @@ struct LabsView: View {
                             }
                         }
                     }
+                    let hiddenTopics = LabCatalog.topics.filter { hidden.labTopics.contains($0.id) }.count
+                    HiddenFooter(count: hiddenTopics, noun: hiddenTopics == 1 ? "topic" : "topics", showing: $showHidden,
+                                 identifier: "labs-show-hidden")
+                    Text("Touch and hold a topic to download, remove or hide it.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(AppTheme.muted)
+                        .padding(.horizontal, 4)
                     Text("Timings come from this device. They suggest a growth rate; they do not prove Big O.")
                         .font(.system(size: 13))
                         .foregroundStyle(AppTheme.muted)
@@ -81,6 +91,7 @@ struct LabsView: View {
             }
             .background(AppTheme.background)
             .navigationTitle("Labs")
+            .removalConfirmation($removing)
             .toolbar { DownloadsLink() }
             .searchable(text: $query, prompt: "Search all labs")
             .onChange(of: query) { collapsedSearchTopics = [] }
@@ -147,7 +158,7 @@ struct LabsView: View {
 
     private func sectionHeader(_ section: LabInfo.Section, count: Int) -> some View {
         let download = CompactSelectionControl(
-            packIDs: LabCatalog.topics.filter { $0.section == section }.map { "labs-\($0.id)" },
+            packIDs: LabCatalog.topics.filter { $0.section == section && !hidden.labTopics.contains($0.id) }.map { "labs-\($0.id)" },
             title: "Download all",
             downloadID: "download-category-\(section.rawValue)",
             readyText: "Every topic in \(section.rawValue) is on this device.")
@@ -181,6 +192,7 @@ struct LabsView: View {
         let expanded = query.isEmpty ? expandedTopics.contains(topic.id) : !collapsedSearchTopics.contains(topic.id)
         let tint = topic.section.tint
         let ready = store.ready("labs-\(topic.id)")
+        let isHidden = hidden.labTopics.contains(topic.id)
         return VStack(alignment: .leading, spacing: 0) {
             Button {
                 withAnimation(.snappy(duration: 0.25)) {
@@ -208,8 +220,11 @@ struct LabsView: View {
                             }
                         }
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(topic.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(AppTheme.primary)
-                            .multilineTextAlignment(.leading)
+                        HStack(spacing: 6) {
+                            Text(topic.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(AppTheme.primary)
+                                .multilineTextAlignment(.leading)
+                            if isHidden { HiddenTag() }
+                        }
                         Text(preview(of: labs))
                             .font(.system(size: 13))
                             .foregroundStyle(AppTheme.muted)
@@ -235,6 +250,9 @@ struct LabsView: View {
             .buttonStyle(.app)
             .accessibilityIdentifier("labs-topic-\(topic.id)")
             .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+            .contentActions(packID: "labs-\(topic.id)", title: topic.title, noun: "topic", isReady: ready, isHidden: isHidden, remove: $removing) {
+                withAnimation(.snappy(duration: 0.2)) { hidden.toggleTopic(topic.id) }
+            }
             if expanded {
                 Divider().padding(.horizontal, 12)
                 VStack(alignment: .leading, spacing: 10) {
@@ -259,6 +277,7 @@ struct LabsView: View {
         }
         .panelCard(cornerRadius: 16)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .opacity(isHidden ? 0.6 : 1)
     }
 
     /// A taste of what is inside a collapsed topic.

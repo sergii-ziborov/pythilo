@@ -107,6 +107,7 @@ struct RootView: View {
     private func openFromLaunchArguments() {
         let defaults = UserDefaults.standard
         if let id = defaults.string(forKey: "removeDownload") { try? ContentStore.shared.remove(id) }
+        if defaults.bool(forKey: "showAllContent") { HiddenContent.shared.showEverything() }
         // -seedProjects a,b,c makes blank projects with those names when they are missing,
         // and -resetProjectCategories YES clears every category, for UI tests.
         if defaults.bool(forKey: "resetProjectCategories") {

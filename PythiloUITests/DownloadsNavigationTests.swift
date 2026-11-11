@@ -39,11 +39,16 @@ import XCTest
             XCTAssertTrue(app.buttons["download-resume-runtime-torch"].waitForExistence(timeout: 10))
             app.buttons["download-resume-runtime-torch"].tap()
         }
-        app.buttons["downloads-close"].tap()
-        XCTAssertTrue(app.navigationBars["Project downloads"].waitForNonExistence(timeout: 10))
+        let close = app.buttons["downloads-close"]
+        close.tap()
+        // The sheet can still be animating away; a tap during that is swallowed.
+        if !close.waitForNonExistence(timeout: 5), close.exists { close.tap() }
+        XCTAssertTrue(close.waitForNonExistence(timeout: 10))
         let menu = app.buttons["project-menu"].firstMatch
         XCTAssertTrue(menu.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 1)
         menu.tap()
+        if !app.buttons["project-downloads-menu"].waitForExistence(timeout: 3) { menu.tap() }
         XCTAssertTrue(app.buttons["project-downloads-menu"].waitForExistence(timeout: 5))
         app.buttons["project-downloads-menu"].tap()
         XCTAssertTrue(app.navigationBars["Project downloads"].waitForExistence(timeout: 10))

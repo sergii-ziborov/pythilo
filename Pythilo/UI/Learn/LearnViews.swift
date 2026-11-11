@@ -76,6 +76,9 @@ struct LearnView: View {
     @State private var path = NavigationPath()
     @State private var track: LearnTrack?
     @State private var query = ""
+    @State private var hidden = HiddenContent.shared
+    @State private var showHidden = false
+    @State private var removing: RemovalTarget?
 
     private var tracks: [LearnTrack] {
         LearnTrack.allCases.filter { !$0.courses(in: library.paths).isEmpty }
@@ -91,7 +94,7 @@ struct LearnView: View {
                     if !query.isEmpty {
                         searchResults
                     } else {
-                        if let (course, lesson) = library.nextLesson {
+                        if let (course, lesson) = library.nextLesson, !hidden.courses.contains(course.id) {
                             NavigationLink(value: LessonRoute(course: course, lesson: lesson)) {
                                 ContinueCard(course: course, lesson: lesson)
                             }
@@ -99,10 +102,14 @@ struct LearnView: View {
                             .accessibilityIdentifier("learn-continue")
                         }
                         ProgressStrip()
-                        if let interview = library.interview {
+                        if let interview = library.interview, showHidden || !hidden.courses.contains(interview.id) {
                             NavigationLink(value: interview) { PracticeCard(course: interview) }
                                 .buttonStyle(.app)
+                                .opacity(hidden.courses.contains(interview.id) ? 0.55 : 1)
                                 .accessibilityIdentifier("learn-practice")
+                                .contentActions(packID: "course-\(interview.id)", title: interview.title, noun: "practice",
+                                                isReady: ContentStore.shared.ready("course-\(interview.id)"),
+                                                isHidden: hidden.courses.contains(interview.id), remove: $removing) { hidden.toggleCourse(interview.id) }
                         }
                         VStack(alignment: .leading, spacing: 12) {
                             Text("COURSES").sectionLabel()
@@ -118,6 +125,11 @@ struct LearnView: View {
                         ForEach(track.map { [$0] } ?? tracks) { item in
                             trackSection(item)
                         }
+                        HiddenFooter(count: hiddenCount, noun: hiddenCount == 1 ? "course" : "courses", showing: $showHidden,
+                                     identifier: "learn-show-hidden")
+                        Text("Touch and hold a course to download, remove or hide it.")
+                            .font(.system(size: 13)).foregroundStyle(AppTheme.muted)
+                            .padding(.horizontal, 4)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -128,6 +140,7 @@ struct LearnView: View {
             }
             .background(AppTheme.background)
             .navigationTitle("Learn")
+            .removalConfirmation($removing)
             .toolbar { DownloadsLink() }
             .searchable(text: $query, prompt: "Search lessons and courses")
             .navigationDestination(for: Course.self) { CourseView(course: $0) }
@@ -146,10 +159,19 @@ struct LearnView: View {
         }
     }
 
+    private var hiddenCount: Int {
+        (library.courses.filter { hidden.courses.contains($0.id) }).count
+    }
+
+    /// The track's courses in order, hidden ones left out unless the person asked to see them.
+    private func listed(_ item: LearnTrack) -> [Course] {
+        item.courses(in: library.paths).filter { showHidden || !hidden.courses.contains($0.id) }
+    }
+
     private func trackChip(_ item: LearnTrack?) -> some View {
         let active = track == item
         let tint = item?.tint ?? AppTheme.blue
-        let count = item.map { $0.courses(in: library.paths).count } ?? library.paths.count
+        let count = item.map { listed($0).count } ?? tracks.reduce(0) { $0 + listed($1).count }
         let title = "\(item?.shortTitle ?? "All") · \(count)"
         return Button { withAnimation(.snappy(duration: 0.2)) { track = item } } label: {
             HStack(spacing: 6) {
@@ -168,8 +190,14 @@ struct LearnView: View {
         .accessibilityIdentifier("learn-track-\(item?.rawValue ?? "all")")
     }
 
+    @ViewBuilder
     private func trackSection(_ item: LearnTrack) -> some View {
-        let courses = item.courses(in: library.paths)
+        let courses = listed(item)
+        if !courses.isEmpty { trackBody(item, courses: courses) }
+    }
+
+    private func trackBody(_ item: LearnTrack, courses: [Course]) -> some View {
+        let visible = courses.filter { !hidden.courses.contains($0.id) }
         let lessons = courses.reduce(0) { $0 + $1.lessons.count }
         let done = courses.reduce(0) { $0 + library.completedCount($1) }
         return VStack(alignment: .leading, spacing: 12) {
@@ -188,12 +216,23 @@ struct LearnView: View {
                 }
                 Spacer(minLength: 0)
             }
+            if !visible.isEmpty {
+                CompactSelectionControl(
+                    packIDs: visible.map { "course-\($0.id)" },
+                    title: "Download all",
+                    downloadID: "download-track-\(item.rawValue)",
+                    readyText: "Every course in \(item.title) is on this device.")
+            }
             VStack(spacing: 0) {
                 ForEach(Array(courses.enumerated()), id: \.element.id) { index, course in
+                    let isHidden = hidden.courses.contains(course.id)
                     NavigationLink(value: course) {
-                        PathRow(course: course, number: index + 1, isLast: index == courses.count - 1, tint: item.tint)
+                        PathRow(course: course, number: index + 1, isLast: index == courses.count - 1, tint: item.tint, isHidden: isHidden)
                     }
                     .buttonStyle(.app)
+                    .contentActions(packID: "course-\(course.id)", title: course.title, noun: "course", isReady: ContentStore.shared.ready("course-\(course.id)"), isHidden: isHidden, remove: $removing) {
+                        withAnimation(.snappy(duration: 0.2)) { hidden.toggleCourse(course.id) }
+                    }
                 }
             }
             .padding(14)
@@ -439,9 +478,12 @@ private struct PathRow: View {
     let number: Int
     let isLast: Bool
     var tint: Color = AppTheme.blue
+    var isHidden = false
     @State private var library = CourseLibrary.shared
+    @State private var store = ContentStore.shared
 
     var body: some View {
+        let offline = store.ready("course-\(course.id)")
         let done = library.completedCount(course)
         let total = course.lessons.count
         let finished = done == total && total > 0
@@ -484,6 +526,13 @@ private struct PathRow: View {
                     Text(finished ? "Done · \(total) lessons" : "\(total) lessons · \(duration(library.minutes(course)))\(done > 0 ? " · \(done) done" : "")")
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(finished ? AppTheme.mint : current ? tint : AppTheme.muted)
+                    if offline {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(AppTheme.mint)
+                            .accessibilityLabel("Downloaded")
+                    }
+                    if isHidden { HiddenTag() }
                 }
                 .padding(.top, 1)
             }
@@ -491,6 +540,7 @@ private struct PathRow: View {
             .padding(.bottom, isLast ? 0 : 18)
         }
         .contentShape(Rectangle())
+        .opacity(isHidden ? 0.55 : 1)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("course-\(course.id)")
     }
@@ -543,6 +593,8 @@ private struct PracticeCard: View {
 struct CourseView: View {
     let course: Course
     @State private var library = CourseLibrary.shared
+    @State private var hidden = HiddenContent.shared
+    @State private var removing: RemovalTarget?
 
     private var isInterview: Bool { course.kind == "interview" }
 
@@ -612,6 +664,21 @@ struct CourseView: View {
         .navigationTitle(course.title)
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    ContentActionItems(packID: "course-\(course.id)", noun: isInterview ? "practice" : "course",
+                                       isReady: ContentStore.shared.ready("course-\(course.id)"),
+                                       isHidden: hidden.courses.contains(course.id),
+                                       toggleHidden: { hidden.toggleCourse(course.id) },
+                                       requestRemoval: { removing = RemovalTarget(packID: "course-\(course.id)", title: course.title) })
+                } label: {
+                    Label("Course options", systemImage: "ellipsis.circle")
+                }
+                .accessibilityIdentifier("course-menu")
+            }
+        }
+        .removalConfirmation($removing)
     }
 
     private func stat(_ value: String, _ label: String) -> some View {
