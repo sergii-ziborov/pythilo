@@ -1,7 +1,11 @@
 # App Store and TestFlight materials
 
 The owner confirmed a one-time paid app at **US$9.99** on 5 November 2026. The beta
-remains free. Do not submit to App Review or Beta App Review without a new request.
+remains free. On 11 November 2026 the owner asked for release to the App Store, set up
+as Crabrix: version 1.0 is submitted for App Review with **manual** release, available in
+all 175 territories and in new ones. App Privacy is published as **Data Not Collected**
+(as for Crabrix, and as the privacy policy states) and the content rights declaration is
+"uses third-party content", as for Crabrix. The receipt is `release-1.0-build31.json`.
 
 `en-US.json` is the current text for the App Store draft and TestFlight: subtitle,
 promotional text, description, keywords, links, beta description, What to Test and
@@ -62,3 +66,9 @@ confirmed at 2026-11-06T23:57:45.095Z. Both note locales match `testflight-27.js
 No Beta App Review submission exists; the App Store draft remains
 PREPARE_FOR_SUBMISSION with MANUAL release. Final readback:
 `build/release-receipts/testflight-27-ready.json`.
+
+Build 31 (version 1.0) replaces the Store screenshots 02, 03 and 04 with new captures of
+terminal tabs (Django tests in a second tab while the server runs), Learn and Labs, in
+the same frames; the other five are unchanged. The description says 19 Lab topics and
+mentions terminal tabs, lesson search and the pinned Next. The reviewer notes describe
+the terminal-tab path and no longer say that no submission is requested.

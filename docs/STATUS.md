@@ -887,3 +887,16 @@ Store screenshots 02, 03 and 04 are new captures of terminal tabs with Django te
 beside the server, Learn and Labs, in the same frames as before; the other five are
 unchanged. The App Store description now says 19 topics (it said 15) and mentions tabs.
 The version is 1.0, matching the App Store draft.
+
+Release 1.0 (31) archives from `fdcbcb2` with Xcode 27.2 / SDK 27.2 and exports an
+83,994,102-byte IPA signed by Apple Distribution; it contains the lanes runtime, the
+iPadOS torch fix and the Django test adaptation. Apple processing completed: build 31 is
+`VALID` and `IN_BETA_TESTING` for the internal group (one tester), and the en-US and ru
+notes match `docs/app-store/testflight-31.json`. App Store 1.0 now selects build 31 and
+was submitted for App Review at 2026-11-11T02:45:07Z: version and submission are
+`WAITING_FOR_REVIEW`, release **MANUAL**. Availability is all 175 territories plus new
+ones, price US$9.99, App Privacy "Data Not Collected" and content rights "uses
+third-party content", as for Crabrix. Description, keywords, promotional text, URLs and
+reviewer notes match their readback; all eight screenshots are `COMPLETE` and match the
+repository by checksum. No physical-device run is claimed. Receipt:
+`docs/app-store/release-1.0-build31.json`.
