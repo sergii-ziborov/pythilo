@@ -900,3 +900,30 @@ third-party content", as for Crabrix. Description, keywords, promotional text, U
 reviewer notes match their readback; all eight screenshots are `COMPLETE` and match the
 repository by checksum. No physical-device run is claimed. Receipt:
 `docs/app-store/release-1.0-build31.json`.
+
+## Labs download controls, build 32 and site guide — 11 November 2026
+
+On narrower iPhones a Labs topic card put its description, the Download button and
+"N of M ready" in one row, so the button and the status were drawn over each other.
+The description now has its own line, and `CompactSelectionControl` moves its status
+under the button when the two do not fit side by side (`ViewThatFits`). The section
+header already stacked. `LabsCardLayoutTests` compares the frames before, during and
+after a partial download; it passes on an iPhone SE (3rd generation, 375 pt) from a
+fresh install, on the iPhone 17 Pro and on the iPad, where PyTorch is already present
+and the topic pack finishes at once. On iPhone 17 Pro the Labs, Downloads, hit-target
+and release-31 suites pass (18 cases); on iPad the Labs and Downloads suites pass
+(8 cases). The course download test now taps the lesson's Code tab only on a phone.
+Screenshots: `build/labs-fix32-shots/`.
+
+Release 1.0 (32) archives from `e174ca1` with Xcode 27.2 / SDK 27.2 and exports an
+84,002,124-byte IPA signed by Apple Distribution. Apple processing completed: build 32
+is `VALID` and `IN_BETA_TESTING` for the internal group, with the en-US and ru notes
+of `docs/app-store/testflight-32.json`. Build 31's review submission was still
+waiting, so it was withdrawn, version 1.0 now selects build 32, and a new submission
+(`9cf6f749-794b-4dcd-8389-8706d329a97e`) is `WAITING_FOR_REVIEW` since
+2026-11-11T06:43:09Z, release **MANUAL**. Metadata, all eight screenshots, 175
+territories, price, privacy and content rights read back unchanged. No physical-device
+run is claimed. Receipt: `docs/app-store/release-1.0-build32.json`.
+
+The website guide for terminal tabs, Settings › About and servers in tabs is live on
+pythilo.com (see `site/DEPLOY.md`).

@@ -1,0 +1,88 @@
+{
+ "checkedAt": "2026-11-11T06:43:32.732580+00:00",
+ "version": "1.0",
+ "buildNumber": "32",
+ "buildID": "8fcfd8ef-d3bc-426f-8262-3459e58cbff3",
+ "processingState": "VALID",
+ "usesNonExemptEncryption": false,
+ "internalBuildState": "IN_BETA_TESTING",
+ "testNotesReadbackMatches": true,
+ "appStoreVersionID": "82001a0a-ab72-4c32-b715-52b1338d5866",
+ "appStoreState": "WAITING_FOR_REVIEW",
+ "releaseType": "MANUAL",
+ "selectedBuild": "32",
+ "reviewSubmissionID": "9cf6f749-794b-4dcd-8389-8706d329a97e",
+ "reviewSubmissionState": "WAITING_FOR_REVIEW",
+ "reviewSubmittedDate": "2026-11-11T06:43:09.996Z",
+ "metadataReadbackMatches": true,
+ "screenshots": [
+  {
+   "set": "APP_IPHONE_67",
+   "file": "01-editor.jpg",
+   "md5": "f028f8c632eaae00f09a3dbdf22d1b1f",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPHONE_67",
+   "file": "02-terminal.jpg",
+   "md5": "a0814a4751e805ca883ecf1f6f2977f3",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPHONE_67",
+   "file": "03-learn.jpg",
+   "md5": "97e1d166dfd4c2684127f0a7289c37d4",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPHONE_67",
+   "file": "04-labs.jpg",
+   "md5": "630a3c8e0ff9b5c918e8e6d1aa0c42a1",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPHONE_67",
+   "file": "05-pytorch.jpg",
+   "md5": "b6c430d5acd5dd21ea957a0d7d12a654",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPHONE_67",
+   "file": "06-rooms.jpg",
+   "md5": "ee13383c3efa19c04ba152ca8abb3990",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPAD_PRO_3GEN_129",
+   "file": "01-ipad-workspace.jpg",
+   "md5": "dbe4c324c92009fd144d09ee3516ec69",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPAD_PRO_3GEN_129",
+   "file": "02-ipad-learn.jpg",
+   "md5": "ae41f6bf0c04d06d4f720401558e9803",
+   "state": "COMPLETE"
+  }
+ ],
+ "screenshotsMatchRepository": true,
+ "screenshotsComplete": true,
+ "territoriesAvailable": 175,
+ "territoriesTotal": 175,
+ "appPrivacy": "Data Not Collected (published in App Store Connect, as for Crabrix)",
+ "contentRightsDeclaration": "USES_THIRD_PARTY_CONTENT",
+ "price": [
+  {
+   "customerPrice": "9.99",
+   "proceeds": "7.0"
+  }
+ ],
+ "archiveSourceCommit": "e174ca1cfa831115d74778d0ad17501a83b2e461",
+ "ipa": {
+  "bytes": 84002124,
+  "sha256": "9a95dcd5263097c6180a9e64f79ab81835ccb392ee4f34a6c321513fa4c9323a",
+  "sdk": "iphoneos27.2",
+  "signedBy": "Apple Distribution: Serhii Ziborov (XMS5ZC28UJ)"
+ },
+ "physicalDeviceClaim": false
+}

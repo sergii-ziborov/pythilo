@@ -407,3 +407,31 @@ Catalog hash: `b29787e5e05d7aa54a965695c7c59fb5b920b121174c5bce53321d12ef0bc191`
 Prior immutable pack URLs remain available. Public receipts:
 `build/release-receipts/research28-public-integrity.json` and
 `build/logs/research28-public-audit.json`.
+
+## Terminal tabs guide (11 November 2026)
+
+The terminal, settings and web-servers guide pages describe terminal tabs, Settings ›
+About and running commands beside a server. A three-file partial overlay (6,578 bytes,
+SHA-256 `4efbefd6b3ed310044c41a8ab9410fd6768e372e426b5db4ec06cee51fcf1178`) was
+uploaded after the server's copies matched the previous revision byte for byte.
+
+The first source build was refused by the node's build guard: it requires 10 GiB free
+and the node had 10.03 GB. Retention could reclaim nothing (rollbacks and other
+services' recovery sets are protected). With the owner's approval `minFreeBytes` was
+lowered to 9 GiB for this build and restored to 10 GiB right after the deployment.
+The node's disk (40 GB, 17.7 GB of container layers) needs headroom before the next
+build: resize it or free space deliberately.
+
+Source revision:
+`sha256:ed3afcb6862df89f7baf2e2fb72284a90e1d57045e985498332349322dc32693`.
+Image: `sha256:9d762686826d9bd83ed599cf17400794504c60413e7bc3905da6c19dfe9ccae0`.
+Registry manifest:
+`sha256:f198249c90e4fe18d791a2eb89086cc82c8109ef9127f1fa64dbc04b849e7e17`.
+Serving revision:
+`sha256:751757d85866902c82fd930a507dc5ee2ffb75d607484dd142d8d70b98fb0670`.
+Operation keys: `pythilo-guide-tabs-build-20261111-v2`, `pythilo-guide-tabs-publish-20261111-v1`,
+`pythilo-guide-tabs-deploy-20261111-v1`; deployed at 06:14:15 UTC.
+Receipt: `build/release-receipts/guide-tabs-site-release.json`.
+
+All 92 site tests, TypeScript and the 743-page production build pass locally. The public
+smoke suite passes, and the three live pages return 200 with the new text.
