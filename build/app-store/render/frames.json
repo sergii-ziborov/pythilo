@@ -1,0 +1,74 @@
+[
+ {
+  "id": "01-editor",
+  "title": "Real Python.\nRight here.",
+  "subtitle": "A complete workspace on your iPhone.",
+  "source": "site/public/shots/editor.webp",
+  "device": "phone",
+  "image": "images/01-editor.webp"
+ },
+ {
+  "id": "02-terminal",
+  "title": "Run a server.\nKeep working.",
+  "subtitle": "Terminal tabs: test and migrate while Django serves.",
+  "source": "build/redesign31/shots/terminal-tabs.png",
+  "device": "phone",
+  "image": "images/02-terminal-tabs31.png"
+ },
+ {
+  "id": "03-learn",
+  "title": "Every course.\nOne clear path.",
+  "subtitle": "478 lessons, now with 32 on algorithms.",
+  "source": "build/shots33/shot-learn.png",
+  "device": "phone",
+  "image": "images/03-learn33.png"
+ },
+ {
+  "id": "04-labs",
+  "title": "136 Labs.\nTrace your code.",
+  "subtitle": "19 topics, ready offline once downloaded.",
+  "source": "build/redesign31/shots/labs.png",
+  "device": "phone",
+  "image": "images/04-labs31.png"
+ },
+ {
+  "id": "05-github",
+  "title": "Search GitHub.\nClone in a tap.",
+  "subtitle": "Stars, owners and your private repos.",
+  "source": "build/shots33/shot-github.png",
+  "device": "phone",
+  "image": "images/05-github33.png"
+ },
+ {
+  "id": "06-pytorch",
+  "title": "Train. Evaluate.\nReload offline.",
+  "subtitle": "A local DPO/LoRA experiment, with held-out checks.",
+  "source": "build/verification/research28-preference-passed.png",
+  "device": "phone",
+  "image": "images/05-pytorch-research.png"
+ },
+ {
+  "id": "07-rooms",
+  "title": "Work together.\nKeep the keys.",
+  "subtitle": "Encrypted rooms. Runs with your permission.",
+  "source": "site/public/shots/room.webp",
+  "device": "phone",
+  "image": "images/06-rooms.webp"
+ },
+ {
+  "id": "01-ipad-workspace",
+  "title": "Room for\nreal projects.",
+  "subtitle": "Files, code and your terminal. Together on iPad.",
+  "source": "site/public/shots/ipad-django.webp",
+  "device": "ipad",
+  "image": "images/01-ipad-workspace.webp"
+ },
+ {
+  "id": "02-ipad-learn",
+  "title": "Read. Write.\nTry it yourself.",
+  "subtitle": "The lesson and your code, side by side.",
+  "source": "site/public/shots/ipad-lesson.webp",
+  "device": "ipad",
+  "image": "images/02-ipad-learn.webp"
+ }
+]

@@ -927,3 +927,30 @@ run is claimed. Receipt: `docs/app-store/release-1.0-build32.json`.
 
 The website guide for terminal tabs, Settings › About and servers in tabs is live on
 pythilo.com (see `site/DEPLOY.md`).
+
+## GitHub, project categories and the algorithms course — 1.0 (33), 11 November 2026
+
+Clone searches GitHub (owner avatar, description, stars, forks, language, last push; sorted
+by stars, recent updates or best match) and lists the signed-in account's repositories,
+private ones included. Settings › GitHub account checks a personal access token with
+GitHub and keeps it in the Keychain; only api.github.com and github.com receive it.
+Projects can be searched, sorted and put into categories, which live in user defaults
+outside project folders. Learn adds Algorithms and data structures: 32 lessons linked to
+17 classic and 6 expansion Labs (127 Labs now link to lessons, 142 links). The Learn chip
+for that track reads Algorithms. Totals: 478 path lessons in 38 courses plus 100 tasks.
+
+Verification: the lesson verifier passes all 32 lessons; 92 site tests (every browser
+solution in Pyodide); native gates run all 578 downloaded lesson solutions and every Lab
+answer and starter on the simulator (`build/native33.xcresult`); UI tests cover
+categories, search, GitHub search, the sign-in prompt and the course in its track
+(`build/gh33-ui.xcresult`, `build/alg33-ui.xcresult`). GitHub sign-in and My repos were
+not exercised with a real account. No physical-device run is claimed.
+
+The website is live with the course pack, landing page, guides and new shots (see
+`site/DEPLOY.md`). Store screenshot 03 shows the Algorithms track and a new 05 shows GitHub
+search (`build/app-store/out33/`, captured by `Release33ShotTests`). Release 1.0 (33)
+archives from `68d0559`; build 33 is `VALID` and `IN_BETA_TESTING` with matching notes.
+Build 32's waiting submission was withdrawn; submission
+`3f58bfed-4824-4d65-9e65-a1b2346ccd05` with build 33 is `WAITING_FOR_REVIEW` since
+2026-11-11T13:50:27Z, release **MANUAL**. Metadata and all nine screenshots read back
+matching the repository. Receipt: `docs/app-store/release-1.0-build33.json`.

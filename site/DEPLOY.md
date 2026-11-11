@@ -435,3 +435,31 @@ Receipt: `build/release-receipts/guide-tabs-site-release.json`.
 
 All 92 site tests, TypeScript and the 743-page production build pass locally. The public
 smoke suite passes, and the three live pages return 200 with the new text.
+
+## Algorithms course, GitHub and project categories (11 November 2026)
+
+Publishes the 32-lesson Algorithms and data structures course (pack
+`course-algorithms-85ec1e9e661413c4.zip`, 19,066 bytes) for app build 33, and updates the
+landing page, Projects, Git and Settings guides for GitHub search, the GitHub account and
+project categories, with new Projects, Learn and GitHub shots. Totals: 478 path lessons in
+38 courses plus 100 interview tasks; 776 pages.
+
+The 13-file partial overlay (815,320 bytes, SHA-256
+`613d118099535c661a4ee072987c74d989918ce4568105820950d0edba31ba19`) was larger than one
+inline call, so it was sent in 256 KiB chunks through the same `source_upload` operation by
+`build/release-tools/hostwatch_upload.py`, which drives the local Hostwatch MCP server.
+Server baselines for every replaced file matched the committed sources.
+
+The node had 9.77 GB free after its scheduled cleanup, short of the 10 GiB build guard.
+As for the morning release, `minFreeBytes` was set to 9 GiB for this build and restored to
+10 GiB right after deployment. The disk keeps shrinking with each release; resize it or
+free space before the next build.
+
+Source revision `sha256:1ba4db82da5be70ed37597b5c4edf1fa103b5bc9a7f0147585f686eb3e360db9`,
+image `sha256:5986a21373a2315bd9cbfc9767daa00eca58cc91bad3256747c9a2cf52996c92`, registry
+manifest `sha256:01b256b795c3cbbc488f22753b553a1033f7bbc41984e997d051eac82c1d292c`, serving
+revision `sha256:f164ca2e730623e001f6b09095280b06f59bf01f77cf5dfddc0a0010a9d12d04`.
+Operation keys `pythilo-algorithms-github-{build,publish,deploy}-20261111-v1`; deployed at
+13:24:52 UTC. All 92 site tests, TypeScript and the build pass; the public smoke suite
+passes, the course pack serves with its pinned SHA-256, and the new course, lesson and
+guide pages return 200.

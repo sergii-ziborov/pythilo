@@ -1,0 +1,81 @@
+{
+ "checkedAt": "2026-11-11T13:50:56.674463+00:00",
+ "version": "1.0",
+ "buildNumber": "33",
+ "buildID": "4de9a598-00ef-4c66-a207-0030f571e345",
+ "processingState": "VALID",
+ "internalBuildState": "IN_BETA_TESTING",
+ "testNotesReadbackMatches": true,
+ "appStoreState": "WAITING_FOR_REVIEW",
+ "releaseType": "MANUAL",
+ "selectedBuild": "33",
+ "reviewSubmissionID": "3f58bfed-4824-4d65-9e65-a1b2346ccd05",
+ "reviewSubmittedDate": "2026-11-11T13:50:27.175Z",
+ "withdrawnSubmission": "9cf6f749-794b-4dcd-8389-8706d329a97e (build 32)",
+ "metadataReadbackMatches": true,
+ "screenshots": [
+  {
+   "set": "APP_IPHONE_67",
+   "file": "01-editor.jpg",
+   "md5": "f028f8c632eaae00f09a3dbdf22d1b1f",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPHONE_67",
+   "file": "02-terminal.jpg",
+   "md5": "a0814a4751e805ca883ecf1f6f2977f3",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPHONE_67",
+   "file": "03-learn.jpg",
+   "md5": "60ceee37e5ae42283b0a02452f0de1fe",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPHONE_67",
+   "file": "04-labs.jpg",
+   "md5": "630a3c8e0ff9b5c918e8e6d1aa0c42a1",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPHONE_67",
+   "file": "05-github.jpg",
+   "md5": "0b2f7b2bdb26344ad57473eb34bb7b34",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPHONE_67",
+   "file": "06-pytorch.jpg",
+   "md5": "b6c430d5acd5dd21ea957a0d7d12a654",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPHONE_67",
+   "file": "07-rooms.jpg",
+   "md5": "ee13383c3efa19c04ba152ca8abb3990",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPAD_PRO_3GEN_129",
+   "file": "01-ipad-workspace.jpg",
+   "md5": "dbe4c324c92009fd144d09ee3516ec69",
+   "state": "COMPLETE"
+  },
+  {
+   "set": "APP_IPAD_PRO_3GEN_129",
+   "file": "02-ipad-learn.jpg",
+   "md5": "ae41f6bf0c04d06d4f720401558e9803",
+   "state": "COMPLETE"
+  }
+ ],
+ "screenshotsMatchRepository": true,
+ "screenshotsComplete": true,
+ "archiveSourceCommit": "68d0559a3561fbff2d738d80087a13e9d99a726b",
+ "ipa": {
+  "bytes": 84309194,
+  "sha256": "af210558fe15fc2304697a95ea4047e76e9ed440d330df80fd989605f8e514ae",
+  "sdk": "iphoneos27.2"
+ },
+ "physicalDeviceClaim": false
+}
