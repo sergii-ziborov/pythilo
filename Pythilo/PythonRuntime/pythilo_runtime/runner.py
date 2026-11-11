@@ -19,7 +19,7 @@ import types
 import warnings
 from importlib.machinery import ExtensionFileLoader
 
-from . import emit_json, streams
+from . import emit_json, lanes, streams
 
 _baseline_modules = set()
 # The analysis thread can be inside these during a reset, whatever a run did.
@@ -31,8 +31,8 @@ _baseline_filters = []
 _baseline_cwd = ""
 _process_register = atexit.register
 _process_unregister = atexit.unregister
-_job_exit_callbacks = []
-_job_exit_root = None
+# lane -> (project root, callbacks registered by that job's own code)
+_job_exits = {}
 
 
 def capture_baseline():
@@ -62,9 +62,17 @@ def _sticky_packages():
     return sticky
 
 
-def _purge_modules():
+def _purge_modules(only=None):
+    """Forgets modules a run imported, so the next run reads the files again.
+
+    `only` limits it to those names: while another tab's program runs, a job removes
+    just what its own lane imported and leaves the other program's modules alone.
+    """
     sticky = _sticky_packages()
+    purged = []
     for name, module in list(sys.modules.items()):
+        if only is not None and name not in only:
+            continue
         top = name.partition(".")[0]
         if name in _baseline_modules or top in sticky or top in _editor_tools:
             continue
@@ -74,20 +82,26 @@ def _purge_modules():
         if isinstance(origin, str) and origin.startswith(_stdlib_root) and "site-packages" not in origin:
             continue
         del sys.modules[name]
+        purged.append(name)
+    lanes.forget_imports(purged)
 
 
-def _leftover_threads():
+def _leftover_threads(lane=0):
     current = threading.current_thread()
-    # A dummy thread stands for a native thread the app started, not one the
-    # program left running.
+    # A dummy thread stands for a native thread the app started, such as another
+    # lane, not one the program left running. Threads belong to the lane that started them.
     return [
         thread.name
         for thread in threading.enumerate()
-        if thread is not current and thread.is_alive() and not isinstance(thread, threading._DummyThread)
+        if thread is not current
+        and thread is not threading.main_thread()
+        and thread.is_alive()
+        and not isinstance(thread, threading._DummyThread)
+        and getattr(thread, "_pythilo_lane", 0) == lane
     ]
 
 
-def _owns_exit_registration(frame):
+def _owns_exit_registration(frame, root):
     # The immediate registration site owns the callback. In particular,
     # weakref.finalize registers its PROCESS exit hook from the stdlib; running
     # that hook after a job destroys live PyTorch operator registrations.
@@ -97,7 +111,7 @@ def _owns_exit_registration(frame):
     if not os.path.isabs(origin):
         return True  # REPL, notebook and lab source use virtual filenames.
     try:
-        return os.path.commonpath((os.path.realpath(origin), _job_exit_root)) == _job_exit_root
+        return os.path.commonpath((os.path.realpath(origin), root)) == root
     except ValueError:
         return False
 
@@ -105,48 +119,61 @@ def _owns_exit_registration(frame):
 def _register_job_exit(callback, *args, **kwargs):
     if not callable(callback):
         raise TypeError("the first argument must be callable")
-    if _job_exit_root is not None and _owns_exit_registration(sys._getframe(1)):
-        _job_exit_callbacks.append((callback, args, kwargs))
+    entry = _job_exits.get(lanes.current_lane())
+    if entry is not None and _owns_exit_registration(sys._getframe(1), entry[0]):
+        entry[1].append((callback, args, kwargs))
         return callback
     return _process_register(callback, *args, **kwargs)
 
 
 def _unregister_job_exit(callback):
-    _job_exit_callbacks[:] = [item for item in _job_exit_callbacks if item[0] != callback]
+    entry = _job_exits.get(lanes.current_lane())
+    if entry is not None:
+        entry[1][:] = [item for item in entry[1] if item[0] != callback]
     _process_unregister(callback)
 
 
-def _begin_exit_handlers(job):
-    global _job_exit_root
+def _begin_exit_handlers(job, lane=0):
     root = job.get("root") or os.path.dirname(job.get("path") or "") or os.getcwd()
-    _job_exit_root = os.path.realpath(root)
-    _job_exit_callbacks.clear()
+    _job_exits[lane] = (os.path.realpath(root), [])
     atexit.register = _register_job_exit
     atexit.unregister = _unregister_job_exit
 
 
-def _run_exit_handlers():
-    global _job_exit_root
-
+def _run_exit_handlers(lane=0):
+    entry = _job_exits.get(lane)
     try:
         # Only callbacks registered by the running project's code belong to
         # its lifetime. Imported bundled libraries retain process callbacks.
-        for callback, args, kwargs in reversed(_job_exit_callbacks[:]):
+        for callback, args, kwargs in reversed((entry[1] if entry else [])[:]):
             try:
                 callback(*args, **kwargs)
             except BaseException as error:
                 print_exception(error)
     finally:
-        _job_exit_callbacks.clear()
-        _job_exit_root = None
-        atexit.register = _process_register
-        atexit.unregister = _process_unregister
+        _job_exits.pop(lane, None)
+        if not _job_exits:
+            atexit.register = _process_register
+            atexit.unregister = _process_unregister
 
 
-def restore_interpreter():
-    """Undo what a run changed, except for files, which belong to the user."""
+def restore_interpreter(record=None):
+    """Undo what a run changed, except for files, which belong to the user.
+
+    While another lane's program is still running, the process-wide state it relies
+    on (folder, environment, sys.path, logging, signals) stays as it is; only the
+    modules this job imported are forgotten. The last job to end resets everything.
+    """
     sys.settrace(None)
     sys.setprofile(None)
+    if record is not None and lanes.others_running(record.lane):
+        if "asyncio" in sys.modules:
+            try:
+                sys.modules["asyncio"].set_event_loop(None)
+            except Exception:
+                pass
+        _purge_modules(only=lanes.owned_new_modules(record.lane, record.modules))
+        return
     threading.settrace(None)
     threading.setprofile(None)
     streams.reset()
@@ -162,8 +189,9 @@ def restore_interpreter():
     os.environ.clear()
     os.environ.update(_baseline_environment)
     os.chdir(_baseline_cwd)
-    signal.signal(signal.SIGINT, signal.default_int_handler)
-    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGINT, signal.default_int_handler)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
     if "asyncio" in sys.modules:
         try:
             sys.modules["asyncio"].set_event_loop(None)
@@ -217,13 +245,20 @@ def exit_code(error):
 def project_environment(job):
     """Puts the project's own files and packages first on the import path."""
     root = job.get("root")
+
+    def first(path):
+        # Another tab's job may have put it there already.
+        while path in sys.path:
+            sys.path.remove(path)
+        sys.path.insert(0, path)
+
     for package_path in reversed(job.get("packagePaths") or []):
         if os.path.isdir(package_path):
-            sys.path.insert(0, package_path)
+            first(package_path)
     if root:
         site = os.path.join(root, ".pythilo", "site-packages")
         if os.path.isdir(site):
-            sys.path.insert(0, site)
+            first(site)
     os.environ.update(job.get("env") or {})
     os.environ["PYTHILO_PROJECT"] = root or ""
     cwd = job.get("cwd") or root
@@ -231,19 +266,25 @@ def project_environment(job):
         os.chdir(cwd)
 
 
-def run_job(job):
+def run_job(job, lane=0):
     job_id = job.get("id", "")
     kind = job.get("kind")
     started = time.monotonic()
-    outcome = {"id": job_id, "status": "finished", "code": 0, "error": None, "cwd": None}
-    emit_json("run_start", {"id": job_id, "kind": kind})
+    outcome = {"id": job_id, "status": "finished", "code": 0, "error": None, "cwd": None, "lane": lane}
+    record = lanes.begin(lane, job_id, job.get("root"))
+    record.modules = set(sys.modules)
+    emit_json("run_start", {"id": job_id, "kind": kind, "lane": lane})
     try:
-        streams.stdin.discard_pending()
+        streams.stdin.discard_pending(lane)
         # A stop that arrived after the previous run ended must not end this one.
         time.sleep(0)
         project_environment(job)
-        _begin_exit_handlers(job)
-        outcome.update(_perform(job) or {})
+        _begin_exit_handlers(job, lane)
+        record.in_body = True
+        try:
+            outcome.update(_perform(job) or {})
+        finally:
+            record.in_body = False
     except KeyboardInterrupt:
         outcome.update(status="cancelled", code=130)
     except SystemExit as error:
@@ -253,19 +294,31 @@ def run_job(job):
         print_exception(error)
         outcome.update(status="failed", code=1, error=describe_exception(error))
     finally:
-        outcome["cwd"] = _current_directory()
+        record.in_body = False
+        lanes.shielded(_finish, record, outcome, started)
+
+
+def _finish(record, outcome, started):
+    lane = record.lane
+    if lane:
+        lanes.clear_pending()
+    outcome["cwd"] = _current_directory()
+    try:
+        _run_exit_handlers(lane)
+    except BaseException as error:
+        print_exception(error)
+    outcome["threads"] = _leftover_threads(lane)
+    # Deciding and resetting happen under the lanes lock, so of two jobs ending at once
+    # exactly the last one resets the interpreter, and no job starts halfway through.
+    with lanes.serialized():
         try:
-            _run_exit_handlers()
-        except BaseException as error:
-            print_exception(error)
-        outcome["threads"] = _leftover_threads()
-        try:
-            restore_interpreter()
+            restore_interpreter(record)
         except BaseException as error:
             print(f"Pythilo could not fully reset Python: {error}", file=sys.stderr)
             outcome["recovery"] = str(error)
-        outcome["duration"] = time.monotonic() - started
-        emit_json("run_end", outcome)
+        lanes.end(lane)
+    outcome["duration"] = time.monotonic() - started
+    emit_json("run_end", outcome)
 
 
 def _current_directory():

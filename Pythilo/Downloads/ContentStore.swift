@@ -103,7 +103,7 @@ final class ContentStore {
 
     func remove(_ id: String) throws {
         guard phases[id] != .installing else { throw ContentFailure.invalid("Wait for verification to finish before removing this download.") }
-        guard RunSession.shared.phase == .idle || RunSession.shared.phase == .starting else {
+        guard !RunSession.shared.isAnythingRunning else {
             throw ContentFailure.invalid("Stop the current Python run before removing downloaded content.")
         }
         cancel(id)

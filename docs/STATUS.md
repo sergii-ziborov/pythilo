@@ -23,6 +23,8 @@ Later dated release entries record the current catalog and replace earlier count
 | `npm install` from the npm registry: semver, hoisting, integrity, package-lock.json; no install scripts | Checked: React and Express on the Mac, React on the simulator |
 | `npm run build` / `dev` / `npx esbuild`: esbuild-wasm in a hidden web view; `dev` rebuilds on save | Checked: the React and FastAPI template installs, builds and serves on the simulator. Scripts that need Node (vite, webpack) say so |
 | Packages has its own button beside Run | Checked by screenshot |
+| Terminal tabs that run at the same time: a server in one tab, tests, migrate, pip or Git in another | Checked: Django `runserver` with `manage.py test` and `migrate` beside it; pipes, input(), Stop and fresh imports per tab |
+| `python manage.py test` and `django-admin test` | Checked: the runner gets `--no-faulthandler`, since output here has no file descriptor |
 
 All projects share one process. Resetting between runs is cleanup, not a security
 boundary, and the app says so.
@@ -816,3 +818,60 @@ internal group with one tester and all-build access, and exact en-US/ru notes.
 No Beta App Review submission exists. App Store 1.0 remains
 `PREPARE_FOR_SUBMISSION` with manual release; neither review was requested.
 Readiness proof: `build/release-receipts/testflight-30-ready.json`.
+
+## Terminal tabs, Learn and Labs redesign, release 1.0 — 11 November 2026
+
+`python manage.py test` failed in the terminal with `python: fileno`: Django's test
+runner hands `faulthandler` `sys.stderr.fileno()`, and Pythilo's output is a stream into
+the app. The terminal now adds `--no-faulthandler` to `test`, as it already adds
+`--noreload` to `runserver`. The Django template gained three tests (list, create,
+blank note). `manage.py test` and `django-admin test --settings …` both report
+`Ran 3 tests … OK`.
+
+The terminal has tabs. Each tab keeps its own folder, history, prompt and output, and
+shows whether it is idle, running or serving. Commands run at the same time: the C host
+gained three job lanes beside Python's main thread, each with its own stdin pipe and
+Stop. A tab's command runs on the main thread when it is free and on a lane otherwise.
+Typing into a busy tab runs the command in another tab instead of stopping the server.
+All lanes share one interpreter, so the runtime now keeps per-lane output (stdout@N),
+input, shell redirects and pipes (`streams.redirect`, so one tab's `| grep` never catches
+another tab's server log), exit handlers, leftover-thread reports and signal handlers
+(a lane's `signal.signal`, as unittest's `installHandler` does, is kept for that lane).
+A ledger notes which lane imported each module; while another lane still runs, a job
+that ends forgets only its own modules, so edited project files and pytest tests are
+read again while the server keeps the modules it loaded. The last job to end resets
+the interpreter as before, under one lock. Lane threads stop `sleep` and `input()` at
+once; a blocking native call or socket read ends only when it returns, and the lane
+says so after the same escalation as the main thread.
+
+On the iPhone the running server shows as a one-line strip under the tabs, so the tabs
+stay reachable; the iPad keeps the floating banner. stderr is no longer red throughout:
+progress lines from Django, unittest and logging use the normal ink, and lines that
+report an error stay red. A migrate in any tab clears the "unapplied migrations" warning.
+
+Learn groups the 37 courses into five tracks with filter chips, shows overall progress,
+moves Interview practice up, and searches every lesson and course by name. Labs has a
+compact header with three facts, icon filters, topic cards with an icon, a preview of
+their Labs and an offline badge, and compact download controls; a finished download is
+a status, not a greyed-out button. After a lesson's checks pass, the results show
+"Lesson complete" at the top and a pinned **Next** (or **Course complete**) at the bottom
+at every sheet height; the lesson bar keeps **Next lesson** after the sheet closes.
+Settings has an About section and page: version and build, contents, website, guide,
+Labs in the browser, blog, source, support, email, bug reports, rating, sharing,
+privacy policy, terms, acceptable use and licences. Every linked page answered 200.
+
+Verification on the iOS Simulator (iPhone 17 Pro and iPad, iOS 26.5, Xcode 27.2):
+all 43 RuntimeGateTests and the template, web-template and two terminal-tab gates pass
+(`build/redesign31-gates.xcresult`, `build/redesign31-gates2.xcresult`). One gate first
+failed because the new tab test left a daemon thread running into the next test; the
+test now stops it, and the rerun passes. The iPhone UI suites ran 46 cases: 44 passed
+at once; two failed on project files changed by earlier keyboard tests (a typed `:` in
+`manage.py` and `main.py`) and on Django 6.1's "Starting WSGI development server" text.
+`-freshTemplate YES` now recreates such a project, and both pass on rerun
+(`build/redesign31-ui-phone.xcresult`, `build/redesign31-ui-rerun.xcresult`,
+`build/redesign31-ui-rerun2.xcresult`). No physical-device run is claimed.
+
+Store screenshots 02, 03 and 04 are new captures of terminal tabs with Django tests
+beside the server, Learn and Labs, in the same frames as before; the other five are
+unchanged. The App Store description now says 19 topics (it said 15) and mentions tabs.
+The version is 1.0, matching the App Store draft.

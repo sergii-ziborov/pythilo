@@ -68,15 +68,30 @@ struct OutputTextView: UIViewRepresentable {
     }
 
     private func attributed(_ text: String, kind: OutputChunk.Kind) -> NSAttributedString {
-        let color: UIColor = switch kind {
-        case .stdout: UIColor(AppTheme.primary)
-        case .stderr: UIColor(AppTheme.coralInk)
-        case .input: UIColor(AppTheme.blue)
-        case .system: UIColor(AppTheme.muted)
+        let font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        guard kind == .stderr else {
+            let color: UIColor = switch kind {
+            case .input: UIColor(AppTheme.blue)
+            case .system: UIColor(AppTheme.muted)
+            default: UIColor(AppTheme.primary)
+            }
+            return NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
         }
-        return NSAttributedString(string: text, attributes: [
-            .font: UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular),
-            .foregroundColor: color,
-        ])
+        // Test runners, Django and logging write progress to stderr: "OK" is not an error.
+        // Red is kept for the lines that report one.
+        let result = NSMutableAttributedString()
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            let piece = line.offset > 0 ? "\n" + line.element : String(line.element)
+            let color = Self.isErrorLine(line.element) ? UIColor(AppTheme.coralInk) : UIColor(AppTheme.secondary)
+            result.append(NSAttributedString(string: piece, attributes: [.font: font, .foregroundColor: color]))
+        }
+        return result
+    }
+
+    static func isErrorLine(_ line: Substring) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty { return false }
+        let markers = ["Traceback", "Error", "Exception", "FAILED", "FAIL:", "ERROR", "error:", "failed", "Failed", "fatal", "CRITICAL", "Warning", "WARNING", "  File \"", "^"]
+        return markers.contains { trimmed.contains($0) || line.hasPrefix($0) }
     }
 }

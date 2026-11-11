@@ -184,32 +184,48 @@ struct OutputPanel: View {
     }
 }
 
+extension EnvironmentValues {
+    /// The terminal fills the screen, so it shows a running server under its tabs.
+    @Entry var terminalServerInline = false
+}
+
 struct TerminalPanel: View {
     @Bindable var model: WorkspaceModel
     var fontSize: CGFloat = 13
+    @Environment(\.terminalServerInline) private var serverInline
     private var keyboard: TerminalKeyboardController { model.terminalKeyboard }
 
     private var session: RunSession { model.session }
-    private var inProgram: Bool { session.isBusy && session.activeChannel == .terminal }
-    /// A running server takes commands too: the model restarts it around them.
-    private var acceptsInput: Bool { !session.isBusy || session.phase == .waitingForInput || session.listening != nil }
+    private var tab: TerminalTab { model.activeTerminal }
+    private var phase: RunPhase { tab.lane.map { session.phase(lane: $0) } ?? .idle }
+    private var waitingForInput: Bool { phase == .waitingForInput }
+    private var serving: Bool { tab.lane.map { session.listening(lane: $0) != nil } ?? false }
 
     private var placeholder: String {
-        if session.phase == .waitingForInput { return "" }
-        if session.listening != nil { return "Command (restarts the server)" }
-        return session.isBusy ? "Running. Ctrl-C stops it" : ""
+        guard tab.lane != nil else { return "" }
+        if waitingForInput { return "" }
+        if serving { return "Command (runs in another tab)" }
+        return "Running. Ctrl-C stops it; commands run in another tab"
     }
 
     var body: some View {
         VStack(spacing: 0) {
+            TerminalTabsBar(model: model)
+            if serverInline, let url = model.previewURL {
+                ServerStrip(url: url, framework: model.commands.framework?.rawValue,
+                            unappliedMigrations: model.unappliedMigrations,
+                            onOpen: { model.previewOpen = true },
+                            onMigrate: { model.migrateAndRestart() })
+            }
             ZStack {
-                if session.terminalOutput.isEmpty {
+                if tab.output.isEmpty {
                     VStack(spacing: 6) {
-                        Text("Type a command. Try help.").foregroundStyle(AppTheme.muted)
+                        Text(model.terminals.count > 1 ? "Terminal \(tab.number). Type a command." : "Type a command. Try help.").foregroundStyle(AppTheme.muted)
                     }
                     .font(.system(size: 14))
                 }
-                OutputTextView(chunks: session.terminalOutput, revision: session.terminalRevision, fontSize: fontSize)
+                OutputTextView(chunks: tab.output, revision: tab.revision, fontSize: fontSize)
+                    .id(tab.id)
             }
             .frame(maxHeight: .infinity)
             if !model.commands.featured.isEmpty || !model.commands.npm.isEmpty { ProjectCommandBar(model: model) }
@@ -218,7 +234,7 @@ struct TerminalPanel: View {
                     ForEach(["python", "pip", "npm", "pytest", "git", "ls"], id: \.self) { word in
                         key(word) { insert(word + " ") }
                     }
-                    key("Ctrl-C") { session.stop() }
+                    key("Ctrl-C") { stop() }
                     key("↑") { recall() }
                 }
                 .padding(.horizontal, 10)
@@ -226,11 +242,11 @@ struct TerminalPanel: View {
             .frame(height: 52)
             .background(AppTheme.panel, ignoresSafeAreaEdges: [])
             HStack(spacing: 8) {
-                Text(session.phase == .waitingForInput ? ">" : "$")
+                Text(waitingForInput ? ">" : "$")
                     .font(.system(size: 14, design: .monospaced))
                     .foregroundStyle(AppTheme.blue)
                 TerminalPrompt(text: $model.terminalInput, placeholder: placeholder, keyboard: keyboard,
-                    onSubmit: submit, onPrevious: recall, onNext: recallNext, onStop: { session.stop() })
+                    onSubmit: submit, onPrevious: recall, onNext: recallNext, onStop: stop)
                     .padding(.horizontal, 12)
                     .frame(height: 44)
                     .background(AppTheme.background, in: RoundedRectangle(cornerRadius: 10))
@@ -259,6 +275,10 @@ struct TerminalPanel: View {
         .buttonStyle(.app)
     }
 
+    private func stop() {
+        if let lane = tab.lane { session.stop(lane: lane) }
+    }
+
     private func insert(_ text: String) {
         keyboard.insert(text)
     }
@@ -281,23 +301,116 @@ struct TerminalPanel: View {
 
     private func submit() {
         // The field stays editable while a program runs: disabling it would drop
-        // the keyboard and bring it back each time a server restarts. A line
-        // typed meanwhile waits in the field until Enter can run it.
-        guard acceptsInput else {
-            keyboard.focus()
-            return
-        }
+        // the keyboard. A program waiting for input gets the line; otherwise the
+        // command runs here, or in another tab while this one is busy.
         let text = model.terminalInput
+        let tab = self.tab
         model.terminalInput = ""
         model.terminalHistoryIndex = nil
         keyboard.focus()
-        if session.phase == .waitingForInput, session.activeChannel == .terminal {
-            session.noteTerminal(text + "\n", kind: .input)
-            session.sendInput(text)
+        if let lane = tab.lane, session.phase(lane: lane) == .waitingForInput {
+            session.sendInput(text, lane: lane)
             return
         }
-        if !text.trimmingCharacters(in: .whitespaces).isEmpty { model.terminalHistory.append(text) }
-        model.runTerminal(text)
+        if !text.trimmingCharacters(in: .whitespaces).isEmpty { tab.history.append(text) }
+        model.runTerminal(text, in: tab)
+    }
+}
+
+/// The project's terminal tabs: which one is shown, what runs in each, and + for another.
+struct TerminalTabsBar: View {
+    @Bindable var model: WorkspaceModel
+    @State private var closing: TerminalTab?
+
+    private var session: RunSession { model.session }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(model.terminals) { tab in
+                            chip(tab).id(tab.id)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                }
+                .onChange(of: model.activeTerminalID) { _, id in
+                    withAnimation(.snappy) { proxy.scrollTo(id, anchor: .center) }
+                }
+            }
+            Button {
+                withAnimation(.snappy) { _ = model.newTerminal() }
+                model.terminalKeyboard.focus()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(AppTheme.selectionInk)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.app)
+            .accessibilityLabel("New terminal tab")
+            .accessibilityIdentifier("terminal-new-tab")
+        }
+        .frame(height: 46)
+        .background(AppTheme.rail, ignoresSafeAreaEdges: [])
+        .overlay(alignment: .bottom) { Rectangle().fill(AppTheme.border).frame(height: 1) }
+        .alert("Close \(closing.map { "Terminal \($0.number)" } ?? "this tab")?", isPresented: Binding(get: { closing != nil }, set: { if !$0 { closing = nil } })) {
+            Button("Cancel", role: .cancel) { closing = nil }
+            Button("Stop and close", role: .destructive) {
+                if let closing { withAnimation(.snappy) { model.closeTerminal(closing) } }
+                closing = nil
+            }
+        } message: {
+            Text("\(closing?.command ?? "Its program") is still running. Closing the tab stops it.")
+        }
+    }
+
+    private func chip(_ tab: TerminalTab) -> some View {
+        let active = tab.id == model.activeTerminalID
+        let serving = tab.lane.map { session.listening(lane: $0) != nil } ?? false
+        let running = tab.lane != nil
+        return HStack(spacing: 7) {
+            Button {
+                model.selectTerminal(tab)
+            } label: {
+                HStack(spacing: 7) {
+                    Circle()
+                        .fill(serving ? AppTheme.mint : running ? AppTheme.amber : AppTheme.muted.opacity(0.45))
+                        .frame(width: 8, height: 8)
+                        .accessibilityHidden(true)
+                    Text(tab.title)
+                        .font(.system(size: 13, weight: active ? .bold : .medium, design: .monospaced))
+                        .lineLimit(1)
+                        .foregroundStyle(active ? AppTheme.primary : AppTheme.secondary)
+                }
+                .padding(.leading, 11)
+                .padding(.trailing, model.terminals.count > 1 ? 2 : 11)
+                .frame(minHeight: 34)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Terminal \(tab.number)\(serving ? ", serving a site" : running ? ", running \(tab.command ?? "")" : "")")
+            .accessibilityAddTraits(active ? .isSelected : [])
+            .accessibilityIdentifier("terminal-tab-\(tab.number)")
+            if model.terminals.count > 1 {
+                Button {
+                    if tab.lane != nil { closing = tab } else { withAnimation(.snappy) { model.closeTerminal(tab) } }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(AppTheme.muted)
+                        .frame(width: 28, height: 34)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close Terminal \(tab.number)")
+                .accessibilityIdentifier("terminal-close-\(tab.number)")
+            }
+        }
+        .background(active ? AppTheme.panel : AppTheme.raised.opacity(0.55), in: Capsule())
+        .overlay { Capsule().stroke(active ? AppTheme.border : .clear, lineWidth: 1) }
     }
 }
 

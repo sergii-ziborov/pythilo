@@ -66,27 +66,48 @@ final class WorkspaceModel {
     var drawerOpen = false
     var cursorOffset = 0
     var navigation: EditorNavigationTarget?
-    private(set) var terminalDirectory: URL
+    /// Terminal tabs. There is always at least one.
+    private(set) var terminals: [TerminalTab]
+    var activeTerminalID: TerminalTab.ID {
+        didSet { session.defaultTerminalSink = activeTerminal }
+    }
+    var activeTerminal: TerminalTab { terminals.first { $0.id == activeTerminalID } ?? terminals[0] }
+    var terminalDirectory: URL { activeTerminal.directory }
     private(set) var gitSnapshot: GitSnapshot?
     private(set) var previewURL: URL?
     var previewOpen = false
     /// The framework's commands, offered as chips in the terminal.
     private(set) var commands = ProjectCommands.none
-    /// Text a chip puts into the terminal's input for the user to finish.
-    var terminalDraft: String?
-    /// Kept with the workspace so a new layout cannot discard the prompt.
-    var terminalInput = ""
-    var terminalHistory: [String] = []
-    var terminalHistoryIndex: Int?
+    /// The active tab's prompt, kept with its tab so a new layout cannot discard it.
+    var terminalDraft: String? {
+        get { activeTerminal.draft }
+        set { activeTerminal.draft = newValue }
+    }
+    var terminalInput: String {
+        get { activeTerminal.input }
+        set { activeTerminal.input = newValue }
+    }
+    var terminalHistory: [String] {
+        get { activeTerminal.history }
+        set { activeTerminal.history = newValue }
+    }
+    var terminalHistoryIndex: Int? {
+        get { activeTerminal.historyIndex }
+        set { activeTerminal.historyIndex = newValue }
+    }
     let terminalKeyboard = TerminalKeyboardController()
     private var djangoNames: [(group: String, name: String)] = []
+    /// The lane whose program the preview shows, while it listens.
+    private(set) var previewLane: Int?
+    /// The tab running the program the preview shows.
+    var serverTab: TerminalTab? {
+        guard let previewLane else { return nil }
+        return terminals.first { $0.lane == previewLane }
+    }
     /// Django said "You have N unapplied migration(s)" while starting the server.
-    private(set) var unappliedMigrations = 0
-    private var serverLine: String?
-    /// Where the current command's output begins in the terminal.
-    private(set) var commandOutputStart = 0
-    /// Commands to run one after another once the current one ends.
-    private var queuedLines: [String] = []
+    var unappliedMigrations: Int { serverTab?.unappliedMigrations ?? terminals.map(\.unappliedMigrations).max() ?? 0 }
+    /// Where the active tab's current command's output begins.
+    var commandOutputStart: Int { activeTerminal.commandOutputStart }
     private(set) var completions: [PythonCompletion] = []
     private(set) var runLabel = ""
 
@@ -98,7 +119,9 @@ final class WorkspaceModel {
     init(project: Project, session: RunSession? = nil) {
         self.project = project
         self.session = session ?? RunSession.shared
-        terminalDirectory = project.url
+        let first = TerminalTab(number: 1, directory: project.url)
+        terminals = [first]
+        activeTerminalID = first.id
         ProjectDependencies.refresh(project)
         reloadTree()
         let root = tree
@@ -113,6 +136,11 @@ final class WorkspaceModel {
         self.session.onRunEnded = { [weak self] outcome in
             self?.runEnded(outcome)
         }
+        self.session.onLaneRunEnded = { [weak self] lane, outcome in
+            self?.laneEnded(lane, outcome)
+        }
+        self.session.defaultTerminalSink = first
+        first.onOutput = { [weak self] tab in self?.noticeOutput(in: tab) }
         refreshGit()
         PlaygroundRooms.shared.workspace = self
     }
@@ -159,8 +187,8 @@ final class WorkspaceModel {
     /// command needs a name typed after it.
     func use(_ command: ProjectCommands.Command) {
         panel = .terminal
-        // A build runs beside a busy Python; anything else waits in the input.
-        if command.needsArgument || (session.isBusy && !NpmScripts.handles(command.line)) {
+        // A busy tab hands the command to another tab, so it never waits.
+        if command.needsArgument {
             terminalDraft = command.line
         } else {
             runTerminal(command.line)
@@ -372,7 +400,7 @@ final class WorkspaceModel {
         rebuild = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
             guard let self, !Task.isCancelled, let build = self.bundleWatch else { return }
-            self.session.noteTerminal("Rebuilding after a save…\n", kind: .stdout)
+            self.session.noteTerminal("Rebuilding after a save…\n", kind: .stdout, to: self.terminals.first)
             await NpmScripts.bundle(build, in: self)
         }
     }
@@ -546,13 +574,66 @@ final class WorkspaceModel {
         return Self.firstEntry(in: tree).flatMap { $0.hasSuffix(".py") ? $0 : nil }
     }
 
+    // MARK: Terminal tabs
+
+    /// Opens another terminal tab in the project folder and shows it.
+    @discardableResult
+    func newTerminal(select: Bool = true) -> TerminalTab {
+        let number = (terminals.map(\.number).max() ?? 0) + 1
+        let tab = TerminalTab(number: number, directory: activeTerminal.directory)
+        tab.onOutput = { [weak self] tab in self?.noticeOutput(in: tab) }
+        terminals.append(tab)
+        if select { activeTerminalID = tab.id }
+        return tab
+    }
+
+    /// Closes a tab, stopping what runs in it. The last tab stays.
+    func closeTerminal(_ tab: TerminalTab) {
+        guard terminals.count > 1, let index = terminals.firstIndex(where: { $0.id == tab.id }) else { return }
+        if let lane = tab.lane { session.stop(lane: lane) }
+        tab.queuedLines = []
+        terminals.remove(at: index)
+        if activeTerminalID == tab.id { activeTerminalID = terminals[min(index, terminals.count - 1)].id }
+    }
+
+    func selectTerminal(_ tab: TerminalTab) {
+        activeTerminalID = tab.id
+    }
+
+    /// Ends the lanes this project's tabs started, when the project closes. A lane's
+    /// program writes to a tab, and its tab goes away with the project.
+    func stopTerminalLanes() {
+        for tab in terminals {
+            tab.queuedLines = []
+            if let lane = tab.lane, lane > 0 { session.stop(lane: lane) }
+        }
+    }
+
+    /// A tab that can take a command now, other than `tab`.
+    private func idleTerminal(besides tab: TerminalTab) -> TerminalTab? {
+        terminals.first { $0.id != tab.id && $0.lane == nil && $0.queuedLines.isEmpty }
+    }
+
     func runTerminal(_ line: String) {
+        runTerminal(line, in: activeTerminal)
+    }
+
+    func runTerminal(_ line: String, in tab: TerminalTab) {
         let trimmed = Self.plainCommand(line).trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         saveAll()
-        session.noteTerminal("\(terminalDirectory.lastPathComponent) $ \(trimmed)\n", kind: .input)
+        // A busy tab hands a new command to another tab, so a running server
+        // keeps running instead of the terminal saying "busy".
+        if tab.lane != nil {
+            let other = idleTerminal(besides: tab) ?? newTerminal(select: false)
+            session.noteTerminal("→ \(trimmed) runs in Terminal \(other.number); this program keeps running.\n", to: tab)
+            if activeTerminalID == tab.id { activeTerminalID = other.id }
+            runTerminal(trimmed, in: other)
+            return
+        }
+        session.noteTerminal("\(tab.directory.lastPathComponent) $ \(trimmed)\n", kind: .input, to: tab)
         if trimmed == "clear" {
-            session.clearTerminal()
+            tab.clear()
             return
         }
         if trimmed == "git" || trimmed.hasPrefix("git ") {
@@ -564,26 +645,16 @@ final class WorkspaceModel {
             Task { await NpmScripts.run(trimmed, in: self) }
             return
         }
-        guard session.phase == .idle || session.phase == .starting else {
-            // Python runs one program at a time. A server started here is stopped,
-            // the command runs, and the server starts again, as after a migration.
-            if session.listening != nil, session.activeChannel == .terminal, let server = serverLine {
-                session.noteTerminal("Stopping the server to run this; it starts again afterwards.\n")
-                queuedLines = trimmed == server ? [server] : [trimmed, server]
-                session.stop()
-                return
+        let job: [String: Any] = ["kind": "shell", "line": trimmed, "root": project.url.path, "cwd": tab.directory.path]
+        guard let started = session.submitTerminal(job, label: trimmed, sink: tab) else {
+            if session.freeTerminalLane == nil {
+                session.noteTerminal("Every terminal is running a program (\(1 + PythonEngine.extraLanes) at once at most). Stop one first.\n", kind: .stderr, to: tab)
             }
-            session.noteTerminal("Python is busy. Stop the running program first.\n", kind: .stderr)
             return
         }
-        unappliedMigrations = 0
-        serverLine = trimmed
-        commandOutputStart = session.terminalOutput.count
-        session.submit(
-            ["kind": "shell", "line": trimmed, "root": project.url.path, "cwd": terminalDirectory.path],
-            label: trimmed,
-            channel: .terminal
-        )
+        tab.began(trimmed, lane: started.lane, id: started.id)
+        tab.unappliedMigrations = 0
+        tab.serverLine = trimmed
     }
 
     func openREPL() {
@@ -591,29 +662,19 @@ final class WorkspaceModel {
     }
 
     /// Stops the server, applies the migrations Django listed, then starts the
-    /// same command again.
+    /// same command again, in the server's own tab.
     func migrateAndRestart() {
-        guard let line = serverLine else { return }
-        queuedLines = ["python manage.py migrate", line]
-        session.stop()
+        guard let tab = serverTab ?? terminals.first(where: { $0.unappliedMigrations > 0 }),
+              let line = tab.serverLine, let lane = tab.lane else { return }
+        tab.queuedLines = ["python manage.py migrate", line]
+        session.stop(lane: lane)
     }
 
     private func runEnded(_ outcome: RunOutcome) {
-        if !queuedLines.isEmpty {
-            let next = queuedLines.removeFirst()
-            // The stopped server ends as cancelled; any other failure, such as a
-            // migrate that fails, stays on screen instead of going on.
-            let failed = outcome.code != 0 && outcome.status != "cancelled"
-            if failed { queuedLines = [] } else {
-                Task { @MainActor [weak self] in self?.runTerminal(next) }
-            }
-        }
-        if session.activeChannel == .terminal, let cwd = outcome.cwd {
-            let url = URL(fileURLWithPath: cwd)
-            if url.path.hasPrefix(project.url.resolvingSymlinksInPath().path) || url.path.hasPrefix(project.url.path) {
-                terminalDirectory = url
-            }
-            session.noteTerminal(outcome.code == 0 ? "" : "[exit \(outcome.code)]\n")
+        if previewLane == 0 { clearPreview() }
+        if session.activeChannel == .terminal {
+            let tab = terminals.first { $0.jobID == outcome.id } ?? (session.terminalSink as? TerminalTab)
+            if let tab { terminalEnded(tab, outcome) }
         }
         if let error = outcome.error, let file = error.file {
             let root = project.url.resolvingSymlinksInPath().path + "/"
@@ -636,6 +697,58 @@ final class WorkspaceModel {
         reloadTree()
         reloadChangedBuffers()
         refreshGit()
+    }
+
+    private func laneEnded(_ lane: Int, _ outcome: RunOutcome) {
+        if previewLane == lane { clearPreview() }
+        if let tab = terminals.first(where: { $0.jobID == outcome.id }) { terminalEnded(tab, outcome) }
+        reloadTree()
+        reloadChangedBuffers()
+        refreshGit()
+    }
+
+    private func terminalEnded(_ tab: TerminalTab, _ outcome: RunOutcome) {
+        let command = tab.command ?? ""
+        tab.ended()
+        // Migrated in another tab: the running server reads the new tables on its next request.
+        if outcome.code == 0, command.contains("manage.py migrate") || command.hasPrefix("django-admin migrate") {
+            for other in terminals {
+                other.unappliedMigrations = 0
+                other.migrationsApplied = true
+            }
+        }
+        if !tab.queuedLines.isEmpty {
+            let next = tab.queuedLines.removeFirst()
+            // The stopped server ends as cancelled; any other failure, such as a
+            // migrate that fails, stays on screen instead of going on.
+            let failed = outcome.code != 0 && outcome.status != "cancelled"
+            if failed { tab.queuedLines = [] } else {
+                Task { @MainActor [weak self, weak tab] in
+                    guard let self, let tab, self.terminals.contains(where: { $0.id == tab.id }) else { return }
+                    self.runTerminal(next, in: tab)
+                }
+            }
+        }
+        if let cwd = outcome.cwd {
+            let url = URL(fileURLWithPath: cwd)
+            if url.path.hasPrefix(project.url.resolvingSymlinksInPath().path) || url.path.hasPrefix(project.url.path) {
+                tab.directory = url
+            }
+        }
+        if outcome.code != 0 { session.noteTerminal("[exit \(outcome.code)]\n", to: tab) }
+        if let threads = outcome.threads, !threads.isEmpty, (outcome.lane ?? 0) > 0 {
+            session.noteTerminal("Still running in the background: \(threads.joined(separator: ", ")).\n", to: tab)
+        }
+        noticeCommandList(in: tab.output.suffix(12).map(\.text).joined())
+    }
+
+    /// Reads a tab's new output for the site's address and Django's warnings.
+    private func noticeOutput(in tab: TerminalTab) {
+        let chunks = tab.output
+        updatePreview(from: chunks.suffix(12).map(\.text).joined())
+        if tab.lane != nil, chunks.count > tab.commandOutputStart {
+            noticeMigrationWarning(in: chunks[tab.commandOutputStart...].suffix(40).map(\.text).joined(), tab: tab)
+        }
     }
 
     /// A program, pip or Git can change files that are open in tabs.
@@ -667,19 +780,22 @@ final class WorkspaceModel {
         previewURL = URL(string: address)
     }
 
-    func noticeMigrationWarning(in text: String) {
-        guard serverLine?.contains("runserver") == true, unappliedMigrations == 0, let match = text.firstMatch(of: /You have (\d+) unapplied migration/), let count = Int(match.1) else { return }
-        unappliedMigrations = count
+    func noticeMigrationWarning(in text: String, tab: TerminalTab) {
+        guard tab.serverLine?.contains("runserver") == true, tab.unappliedMigrations == 0, !tab.migrationsApplied,
+              let match = text.firstMatch(of: /You have (\d+) unapplied migration/), let count = Int(match.1) else { return }
+        tab.unappliedMigrations = count
     }
 
     func serverStarted(_ server: ListeningServer?) {
-        guard let url = server?.url else { return }
+        guard let server, let url = server.url else { return }
+        previewLane = server.lane ?? 0
         if previewURL?.port != url.port { previewURL = url }
     }
 
     func clearPreview() {
         previewURL = nil
         previewOpen = false
+        previewLane = nil
     }
 
     // MARK: Git

@@ -44,6 +44,39 @@ struct SettingsView: View {
                     NavigationLink("What runs here") { LimitsView() }
                     NavigationLink("Licenses") { LicensesView() }
                 }
+                Section {
+                    NavigationLink { AboutView() } label: {
+                        HStack(spacing: 12) {
+                            AppMark(size: 40)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("About Pythilo").font(.system(size: 16, weight: .semibold))
+                                Text("Version \(AppInfo.version)").font(.system(size: 13)).foregroundStyle(AppTheme.muted)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .accessibilityIdentifier("settings-about")
+                    LinkRow(title: "Website", detail: "pythilo.com", systemImage: "globe", url: AppInfo.website)
+                    LinkRow(title: "User guide", systemImage: "book.pages", url: AppInfo.guide)
+                    LinkRow(title: "Help and support", systemImage: "questionmark.circle", url: AppInfo.support)
+                    LinkRow(title: "Contact", detail: AppInfo.supportEmail, systemImage: "envelope", url: AppInfo.mail)
+                } header: {
+                    Text("About")
+                }
+                Section {
+                    LinkRow(title: "Rate Pythilo", systemImage: "star", url: AppInfo.review)
+                    ShareLink(item: AppInfo.appStore, subject: Text("Pythilo"), message: Text("Real Python on iPhone and iPad.")) {
+                        Label("Share Pythilo", systemImage: "square.and.arrow.up")
+                    }
+                    LinkRow(title: "Report a bug", detail: "GitHub", systemImage: "ladybug", url: AppInfo.issues)
+                } footer: {
+                    Text("No account, analytics or advertising. Projects stay on this device unless you share them.")
+                }
+                Section("Legal") {
+                    LinkRow(title: "Privacy policy", systemImage: "hand.raised", url: AppInfo.privacy)
+                    LinkRow(title: "Terms of use", systemImage: "doc.text", url: AppInfo.terms)
+                    LinkRow(title: "Acceptable use", systemImage: "checkmark.shield", url: AppInfo.acceptableUse)
+                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -103,5 +136,129 @@ struct LicensesView: View {
             }
         }
         .navigationTitle("Licenses")
+    }
+}
+
+/// Where Pythilo lives outside the app. Every page here is on the public website.
+enum AppInfo {
+    static let appStoreID = "6829637526"
+    static let supportEmail = "support@pythilo.com"
+    static let website = URL(string: "https://pythilo.com/")!
+    static let guide = URL(string: "https://pythilo.com/guide/")!
+    static let support = URL(string: "https://pythilo.com/support/")!
+    static let blog = URL(string: "https://pythilo.com/blog/")!
+    static let labs = URL(string: "https://pythilo.com/labs/")!
+    static let privacy = URL(string: "https://pythilo.com/legal/privacy/")!
+    static let terms = URL(string: "https://pythilo.com/legal/terms/")!
+    static let acceptableUse = URL(string: "https://pythilo.com/legal/acceptable-use/")!
+    static let licenses = URL(string: "https://pythilo.com/legal/licenses/")!
+    static let source = URL(string: "https://github.com/sergii-ziborov/pythilo")!
+    static let issues = URL(string: "https://github.com/sergii-ziborov/pythilo/issues/new")!
+    static let mail = URL(string: "mailto:\(supportEmail)?subject=Pythilo%20\(version.replacingOccurrences(of: " ", with: "%20"))")!
+    static let appStore = URL(string: "https://apps.apple.com/app/id\(appStoreID)")!
+    static let review = URL(string: "https://apps.apple.com/app/id\(appStoreID)?action=write-review")!
+
+    static var shortVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
+    static var build: String { Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "" }
+    /// "1.0 (31)"
+    static var version: String { "\(shortVersion) (\(build))" }
+    static var copyright: String { Bundle.main.infoDictionary?["NSHumanReadableCopyright"] as? String ?? "© 2026 Serhii Ziborov" }
+}
+
+/// The app icon, drawn small.
+struct AppMark: View {
+    var size: CGFloat = 40
+
+    var body: some View {
+        Image("PythiloMark")
+            .resizable()
+            .interpolation(.high)
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.225, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: size * 0.225, style: .continuous).stroke(AppTheme.border, lineWidth: 0.5) }
+            .accessibilityHidden(true)
+    }
+}
+
+/// A row that opens a page or a mail draft outside the app.
+struct LinkRow: View {
+    let title: String
+    var detail: String?
+    let systemImage: String
+    let url: URL
+
+    var body: some View {
+        Link(destination: url) {
+            HStack(spacing: 12) {
+                Label(title, systemImage: systemImage).foregroundStyle(AppTheme.primary)
+                Spacer(minLength: 8)
+                if let detail {
+                    Text(detail).font(.system(size: 14)).foregroundStyle(AppTheme.muted).lineLimit(1)
+                }
+                Image(systemName: "arrow.up.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(AppTheme.muted)
+            }
+            .contentShape(Rectangle())
+        }
+        .accessibilityHint(url.scheme == "mailto" ? "Writes an email" : "Opens \(url.host() ?? "the page")")
+    }
+}
+
+struct AboutView: View {
+    private var counts: (lessons: Int, courses: Int, tasks: Int, labs: Int) {
+        let library = CourseLibrary.shared
+        let paths = library.paths
+        return (paths.reduce(0) { $0 + $1.lessons.count }, paths.count, library.interview?.lessons.count ?? 0, LabCatalog.all.count)
+    }
+
+    var body: some View {
+        List {
+            Section {
+                VStack(spacing: 10) {
+                    AppMark(size: 88)
+                    Text("Pythilo").font(.system(size: 26, weight: .bold))
+                    Text("Real Python on iPhone and iPad").font(.system(size: 15)).foregroundStyle(AppTheme.secondary)
+                    Text("Version \(AppInfo.version)")
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundStyle(AppTheme.muted)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("about-version")
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .listRowBackground(Color.clear)
+            }
+            Section("In this app") {
+                LabeledContent("Python", value: RunSession.shared.pythonVersion.map { "CPython \($0)" } ?? "Starting")
+                LabeledContent("Lessons", value: "\(counts.lessons) in \(counts.courses) courses")
+                if counts.tasks > 0 { LabeledContent("Interview tasks", value: "\(counts.tasks)") }
+                LabeledContent("Labs", value: "\(counts.labs)")
+                LabeledContent("Runs", value: "On this device, offline after downloads")
+            }
+            Section("Pythilo online") {
+                LinkRow(title: "Website", detail: "pythilo.com", systemImage: "globe", url: AppInfo.website)
+                LinkRow(title: "User guide", systemImage: "book.pages", url: AppInfo.guide)
+                LinkRow(title: "Labs in the browser", systemImage: "testtube.2", url: AppInfo.labs)
+                LinkRow(title: "Blog", systemImage: "newspaper", url: AppInfo.blog)
+                LinkRow(title: "Source code", detail: "GitHub", systemImage: "chevron.left.forwardslash.chevron.right", url: AppInfo.source)
+            }
+            Section("Help") {
+                LinkRow(title: "Help and support", systemImage: "questionmark.circle", url: AppInfo.support)
+                LinkRow(title: "Email support", detail: AppInfo.supportEmail, systemImage: "envelope", url: AppInfo.mail)
+                LinkRow(title: "Report a bug", detail: "GitHub", systemImage: "ladybug", url: AppInfo.issues)
+                LinkRow(title: "Rate Pythilo", systemImage: "star", url: AppInfo.review)
+            }
+            Section {
+                LinkRow(title: "Privacy policy", systemImage: "hand.raised", url: AppInfo.privacy)
+                LinkRow(title: "Terms of use", systemImage: "doc.text", url: AppInfo.terms)
+                LinkRow(title: "Acceptable use", systemImage: "checkmark.shield", url: AppInfo.acceptableUse)
+                LinkRow(title: "Third-party licenses", systemImage: "list.bullet.rectangle", url: AppInfo.licenses)
+            } header: {
+                Text("Legal")
+            } footer: {
+                Text("\(AppInfo.copyright)\nPythilo collects no analytics and shows no advertising.")
+            }
+        }
+        .navigationTitle("About")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

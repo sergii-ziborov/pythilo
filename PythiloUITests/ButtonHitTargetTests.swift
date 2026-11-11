@@ -94,7 +94,7 @@ final class ButtonHitTargetTests: XCTestCase {
 
     func testEditorRunAcceptsPaddingTap() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-openTemplate", "blank", "-panel", "code"]
+        app.launchArguments = ["-openTemplate", "blank", "-freshTemplate", "YES", "-panel", "code"]
         app.launch()
         let run = app.buttons["run-button"]
         XCTAssertTrue(run.waitForExistence(timeout: 20))

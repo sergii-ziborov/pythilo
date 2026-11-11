@@ -200,6 +200,10 @@ def _adapt_manage_py(args):
     if args and args[0] == "runserver" and "--noreload" not in args:
         print("Pythilo: running without the autoreloader. Stop and run again after a change.")
         return ["runserver", "--noreload", *args[1:]]
+    if args and args[0] == "test" and "--no-faulthandler" not in args:
+        # The test runner hands faulthandler sys.stderr.fileno(), and output here
+        # is a stream into the app, not a file descriptor. Results are unchanged.
+        return ["test", "--no-faulthandler", *args[1:]]
     if args and args[0] == "dbshell":
         raise ShellError("dbshell starts an external database program, which iOS does not allow")
     return args

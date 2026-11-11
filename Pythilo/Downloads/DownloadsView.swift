@@ -37,9 +37,16 @@ struct ContentSelectionButton: View {
                 Button { store.download(packIDs) } label: {
                     Label(ready ? "Available offline" : busy ? "Preparing offline…" : "\(title) · \(ByteCountFormatter.string(fromByteCount: Int64(store.missingBytes(packIDs)), countStyle: .file))",
                           systemImage: ready ? "checkmark.circle.fill" : "arrow.down.circle")
-                        .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(ready ? AppTheme.mint : busy ? AppTheme.secondary : AppTheme.onBlue)
+                        .padding(.horizontal, 14)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(ready ? AppTheme.mint.opacity(0.13) : busy ? AppTheme.raised : AppTheme.blue,
+                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.borderedProminent).disabled(ready || busy)
+                // A finished download is a state, not a greyed-out action.
+                .buttonStyle(SolidButtonStyle()).disabled(ready || busy)
                 .accessibilityIdentifier(downloadID)
                 if pausable {
                     Button { store.pause(packIDs) } label: {
@@ -234,6 +241,90 @@ struct DownloadGate<Content: View>: View {
             ScrollView { ContentDownloadCard(packID: packID).padding().frame(maxWidth: 760) }
                 .frame(maxWidth: .infinity).background(AppTheme.background)
                 .toolbar { DownloadsLink() }
+        }
+    }
+}
+
+
+/// Presses like any button but does not fade when disabled: the label itself says why.
+struct SolidButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(.interaction, Rectangle())
+            .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
+/// The small form of ContentSelectionButton, for a list header: one capsule and a status line.
+struct CompactSelectionControl: View {
+    let packIDs: [String]
+    let title: String
+    let downloadID: String
+    var readyText = "On this device"
+    @State private var store = ContentStore.shared
+
+    var body: some View {
+        let packs = store.catalog.closure(packIDs)
+        let ready = store.ready(packIDs)
+        let busy = packs.contains { [.queued, .downloading, .installing].contains(store.phase($0.id)) }
+        let pausable = packs.contains { [.queued, .downloading].contains(store.phase($0.id)) }
+        let completed = packs.filter { store.location($0.id) != nil }.count
+        if ready {
+            // Done is a state, not a button. Tests and VoiceOver read it from this label.
+            Label("Offline", systemImage: "checkmark.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(AppTheme.mint)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 32)
+                .background(AppTheme.mint.opacity(0.13), in: Capsule())
+                .fixedSize()
+                .accessibilityElement(children: .ignore)
+                .accessibilityAddTraits(.isStaticText)
+                .accessibilityLabel("Available offline. \(readyText)")
+                .accessibilityIdentifier("offline-ready-\(downloadID)")
+        } else {
+            HStack(spacing: 8) {
+                Button { store.download(packIDs) } label: {
+                    HStack(spacing: 6) {
+                        if busy {
+                            ProgressView().controlSize(.small).tint(AppTheme.blue)
+                        } else {
+                            Image(systemName: "arrow.down.circle.fill")
+                        }
+                        Text(busy ? "\(completed)/\(packs.count)" : "\(title) · \(ByteCountFormatter.string(fromByteCount: Int64(store.missingBytes(packIDs)), countStyle: .file))")
+                            .lineLimit(1)
+                            .monospacedDigit()
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(busy ? AppTheme.blue : AppTheme.onBlue)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 32)
+                    .background(busy ? AppTheme.selection : AppTheme.blue, in: Capsule())
+                    .fixedSize()
+                }
+                .buttonStyle(SolidButtonStyle()).disabled(busy)
+                .accessibilityIdentifier(downloadID)
+                .accessibilityLabel(busy ? "Preparing offline, \(completed) of \(packs.count) ready" : "\(title), \(ByteCountFormatter.string(fromByteCount: Int64(store.missingBytes(packIDs)), countStyle: .file))")
+                if pausable {
+                    Button { store.pause(packIDs) } label: {
+                        Image(systemName: "pause.fill").font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(AppTheme.secondary)
+                            .frame(width: 32, height: 32)
+                            .background(AppTheme.raised, in: Circle())
+                    }
+                    .buttonStyle(SolidButtonStyle())
+                    .accessibilityLabel("Pause")
+                    .accessibilityIdentifier("pause-\(downloadID)")
+                }
+                if busy || completed > 0 {
+                    Text("\(completed) of \(packs.count) ready")
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppTheme.muted)
+                        .lineLimit(1)
+                        .accessibilityIdentifier("offline-status-\(downloadID)")
+                }
+            }
         }
     }
 }

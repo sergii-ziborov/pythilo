@@ -20,9 +20,12 @@ struct LabsView: View {
     @State private var query = ""
     @State private var expandedTopics: Set<String> = []
     @State private var collapsedSearchTopics: Set<String> = []
+    @State private var store = ContentStore.shared
+
+    private static let order: [LabInfo.Section] = [.learning, .intelligence, .basics, .structures, .algorithms]
 
     private var sections: [LabInfo.Section] {
-        selected.map { [$0] } ?? [.learning, .intelligence, .basics, .structures, .algorithms]
+        selected.map { [$0] } ?? Self.order
     }
 
     private func matching(_ section: LabInfo.Section) -> [LabInfo] {
@@ -34,39 +37,26 @@ struct LabsView: View {
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("\(LabCatalog.all.count) interactive labs")
-                        .font(.system(size: 24, weight: .bold))
-                        .accessibilityIdentifier("labs-total")
-                    Text("Choose a topic or search for a concept. Write the code yourself, trace what changes and check the edges. PyTorch projects train small models on this device.")
-                        .font(.system(size: 15))
-                        .foregroundStyle(AppTheme.secondary)
-                        .padding(.bottom, 4)
+                VStack(alignment: .leading, spacing: 14) {
+                    if query.isEmpty { hero }
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            filter("All · \(LabCatalog.all.count)", section: nil)
-                            ForEach([LabInfo.Section.learning, .intelligence, .basics, .structures, .algorithms], id: \.self) { section in
+                            filter("All · \(LabCatalog.all.count)", systemImage: "square.grid.2x2", section: nil)
+                            ForEach(Self.order, id: \.self) { section in
                                 let count = LabCatalog.all.filter { $0.section == section }.count
-                                let title = section == .learning ? "ML" : section == .intelligence ? "AI" : section.rawValue
-                                filter("\(title) · \(count)", section: section)
+                                filter("\(section.shortTitle) · \(count)", systemImage: section.systemImage, section: section)
                             }
-                        }.padding(.vertical, 4)
+                        }
+                        .padding(.vertical, 2)
                     }
+                    .scrollClipDisabled()
                     if sections.allSatisfy({ matching($0).isEmpty }) {
                         ContentUnavailableView.search(text: query)
                     }
                     ForEach(sections, id: \.self) { section in
                         let labs = matching(section)
                         if !labs.isEmpty {
-                            Text("\(section.rawValue.uppercased()) · \(labs.count)")
-                                .sectionLabel()
-                                .padding(.top, 10)
-                                .padding(.horizontal, 4)
-                                .accessibilityAddTraits(.isHeader)
-                            ContentSelectionButton(
-                                packIDs: LabCatalog.topics.filter { $0.section == section }.map { "labs-\($0.id)" },
-                                title: "Download entire category",
-                                downloadID: "download-category-\(section.rawValue)")
+                            sectionHeader(section, count: labs.count)
                             ForEach(LabCatalog.topics.filter { $0.section == section }) { topic in
                                 let matches = labs.filter { LabCatalog.topic(for: $0)?.id == topic.id }
                                 if !matches.isEmpty {
@@ -79,12 +69,13 @@ struct LabsView: View {
                         .font(.system(size: 13))
                         .foregroundStyle(AppTheme.muted)
                         .padding(.horizontal, 4)
-                        .padding(.top, 6)
-                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") · build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "")")
+                        .padding(.top, 8)
+                    Text("Version \(AppInfo.version)")
                         .font(.caption).foregroundStyle(AppTheme.muted)
+                        .padding(.horizontal, 4)
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 24)
+                .padding(.bottom, 28)
                 .frame(maxWidth: 980)
                 .frame(maxWidth: .infinity)
             }
@@ -108,69 +99,301 @@ struct LabsView: View {
         }
     }
 
+    /// What Labs are, in one look: the count, one sentence and three facts.
+    private var hero: some View {
+        let topics = LabCatalog.topics
+        let offline = topics.filter { store.ready("labs-\($0.id)") }.count
+        let linked = LabCatalog.all.filter { !($0.lessons ?? []).isEmpty }.count
+        return VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(LabCatalog.all.count) interactive labs")
+                    .font(.system(size: 22, weight: .bold))
+                    .accessibilityIdentifier("labs-total")
+                Text("Write the code yourself, trace every step and check the edge cases. Everything runs on this device.")
+                    .font(.system(size: 14.5))
+                    .foregroundStyle(AppTheme.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 8) {
+                heroFact("\(topics.count)", "topics", systemImage: "square.stack.3d.up", tint: AppTheme.violet)
+                heroFact("\(linked)", "with lessons", systemImage: "book", tint: AppTheme.blue)
+                heroFact("\(offline)/\(topics.count)", "offline", systemImage: "arrow.down.circle", tint: AppTheme.mint)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(LinearGradient(colors: [AppTheme.violet.opacity(0.14), AppTheme.blue.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing))
+        }
+        .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(AppTheme.violet.opacity(0.18), lineWidth: 1) }
+        .padding(.top, 4)
+    }
+
+    private func heroFact(_ value: String, _ label: String, systemImage: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage).font(.system(size: 12, weight: .semibold)).foregroundStyle(tint)
+                Text(value).font(.system(size: 17, weight: .bold, design: .rounded)).monospacedDigit()
+            }
+            Text(label).font(.system(size: 12)).foregroundStyle(AppTheme.muted).lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.panel.opacity(0.85), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func sectionHeader(_ section: LabInfo.Section, count: Int) -> some View {
+        let download = CompactSelectionControl(
+            packIDs: LabCatalog.topics.filter { $0.section == section }.map { "labs-\($0.id)" },
+            title: "Download all",
+            downloadID: "download-category-\(section.rawValue)",
+            readyText: "Every topic in \(section.rawValue) is on this device.")
+        let title = HStack(spacing: 8) {
+            Image(systemName: section.systemImage)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(section.tint)
+                .frame(width: 24, height: 24)
+                .background(section.tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .accessibilityHidden(true)
+            Text("\(section.rawValue.uppercased()) · \(count)")
+                .sectionLabel()
+                .accessibilityAddTraits(.isHeader)
+        }
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                title
+                Spacer(minLength: 8)
+                download
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                title
+                download
+            }
+        }
+        .padding(.top, 14)
+        .padding(.horizontal, 2)
+    }
+
     private func topicGroup(_ topic: LabTopic, labs: [LabInfo]) -> some View {
         let expanded = query.isEmpty ? expandedTopics.contains(topic.id) : !collapsedSearchTopics.contains(topic.id)
-        return VStack(alignment: .leading, spacing: 8) {
+        let tint = topic.section.tint
+        let ready = store.ready("labs-\(topic.id)")
+        return VStack(alignment: .leading, spacing: 0) {
             Button {
-                if !query.isEmpty {
-                    if collapsedSearchTopics.contains(topic.id) { collapsedSearchTopics.remove(topic.id) }
-                    else { collapsedSearchTopics.insert(topic.id) }
-                } else if expandedTopics.contains(topic.id) { expandedTopics.remove(topic.id) }
-                else { expandedTopics.insert(topic.id) }
-            } label: {
-                HStack(spacing: 10) {
-                    Text(topic.title).font(.system(size: 16, weight: .semibold))
-                    Spacer(minLength: 4)
-                    Text("\(labs.count)").font(.system(size: 14, weight: .medium)).monospacedDigit()
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.system(size: 12, weight: .semibold))
+                withAnimation(.snappy(duration: 0.25)) {
+                    if !query.isEmpty {
+                        if collapsedSearchTopics.contains(topic.id) { collapsedSearchTopics.remove(topic.id) }
+                        else { collapsedSearchTopics.insert(topic.id) }
+                    } else if expandedTopics.contains(topic.id) { expandedTopics.remove(topic.id) }
+                    else { expandedTopics.insert(topic.id) }
                 }
-                .foregroundStyle(AppTheme.primary)
-                .padding(.horizontal, 14)
-                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: topic.systemImage)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(tint)
+                        .frame(width: 42, height: 42)
+                        .background(tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                        .overlay(alignment: .bottomTrailing) {
+                            if ready {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(AppTheme.mint)
+                                    .background(Circle().fill(AppTheme.panel).padding(1))
+                                    .offset(x: 4, y: 4)
+                                    .accessibilityLabel("Offline")
+                            }
+                        }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(topic.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(AppTheme.primary)
+                            .multilineTextAlignment(.leading)
+                        Text(preview(of: labs))
+                            .font(.system(size: 13))
+                            .foregroundStyle(AppTheme.muted)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 4)
+                    Text("\(labs.count)")
+                        .font(.system(size: 13, weight: .bold, design: .rounded)).monospacedDigit()
+                        .foregroundStyle(AppTheme.secondary)
+                        .padding(.horizontal, 8)
+                        .frame(minWidth: 28, minHeight: 24)
+                        .background(AppTheme.raised, in: Capsule())
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AppTheme.muted)
+                        .rotationEffect(.degrees(expanded ? 180 : 0))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
                 .contentShape(Rectangle())
-                .panelCard(cornerRadius: 12)
             }
             .buttonStyle(.app)
             .accessibilityIdentifier("labs-topic-\(topic.id)")
             .accessibilityValue(expanded ? "Expanded" : "Collapsed")
             if expanded {
-                ContentDownloadCard(packID: "labs-\(topic.id)")
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 10)], spacing: 10) {
-                    ForEach(labs) { lab($0) }
+                Divider().padding(.horizontal, 12)
+                VStack(alignment: .leading, spacing: 10) {
+                    if !ready {
+                        HStack(spacing: 10) {
+                            Text("Save this topic, its packages and data to use it offline.")
+                                .font(.system(size: 13))
+                                .foregroundStyle(AppTheme.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            CompactSelectionControl(packIDs: ["labs-\(topic.id)"], title: "Download", downloadID: "download-pack-labs-\(topic.id)")
+                        }
+                    }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 10)], spacing: 10) {
+                        ForEach(labs) { lab($0) }
+                    }
                 }
+                .padding(12)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .panelCard(cornerRadius: 16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private func filter(_ title: String, section: LabInfo.Section?) -> some View {
-        Button { selected = section } label: {
-            Text(title).font(.system(size: 13, weight: .semibold))
-                .padding(.horizontal, 12).padding(.vertical, 9)
-                .background(selected == section ? AppTheme.violet.opacity(0.25) : AppTheme.secondary.opacity(0.08), in: Capsule())
-                .foregroundStyle(selected == section ? AppTheme.violet : AppTheme.secondary)
+    /// A taste of what is inside a collapsed topic.
+    private func preview(of labs: [LabInfo]) -> String {
+        let names = labs.prefix(3).map(\.title).joined(separator: " · ")
+        return labs.count > 3 ? "\(names) +\(labs.count - 3)" : names
+    }
+
+    private func filter(_ title: String, systemImage: String, section: LabInfo.Section?) -> some View {
+        let active = selected == section
+        let tint = section?.tint ?? AppTheme.blue
+        return Button { withAnimation(.snappy(duration: 0.2)) { selected = section } } label: {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage).font(.system(size: 11.5, weight: .bold))
+                Text(title).font(.system(size: 13.5, weight: .semibold)).monospacedDigit()
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 36)
+            .foregroundStyle(active ? AppTheme.onBlue : AppTheme.secondary)
+            .background(active ? tint : AppTheme.panel, in: Capsule())
+            .overlay { if !active { Capsule().stroke(AppTheme.border, lineWidth: 1) } }
         }
         .buttonStyle(.app)
-        .accessibilityAddTraits(selected == section ? .isSelected : [])
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(active ? .isSelected : [])
     }
 
     private func lab(_ info: LabInfo) -> some View {
         NavigationLink(value: info.id) {
-            HStack(spacing: 12) {
-                Image(systemName: info.symbol).font(.system(size: 19)).foregroundStyle(info.color).frame(width: 44, height: 44)
-                    .background(info.color.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(info.title).font(.system(size: 16.5, weight: .bold)).foregroundStyle(AppTheme.primary)
-                    Text(info.summary).font(.system(size: 13.5)).foregroundStyle(AppTheme.muted).multilineTextAlignment(.leading)
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: info.symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(info.color)
+                    .frame(width: 40, height: 40)
+                    .background(info.color.opacity(0.14), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(info.title).font(.system(size: 15.5, weight: .semibold)).foregroundStyle(AppTheme.primary)
+                        .multilineTextAlignment(.leading)
+                    Text(info.summary).font(.system(size: 13)).foregroundStyle(AppTheme.muted)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                    let tags = tags(for: info)
+                    if !tags.isEmpty {
+                        HStack(spacing: 6) {
+                            ForEach(tags, id: \.self) { tag in
+                                Label(tag.title, systemImage: tag.image)
+                                    .font(.system(size: 11.5, weight: .medium))
+                                    .foregroundStyle(AppTheme.secondary)
+                                    .labelStyle(.titleAndIcon)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(AppTheme.raised, in: Capsule())
+                            }
+                        }
+                        .padding(.top, 2)
+                    }
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(AppTheme.muted)
+                Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(AppTheme.muted)
+                    .padding(.top, 12)
             }
             .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-            .panelCard(cornerRadius: 16)
+            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .background(AppTheme.background.opacity(0.6), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.border.opacity(0.7), lineWidth: 1) }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.app)
         .accessibilityIdentifier("lab-\(info.id)")
+    }
+
+    private func tags(for info: LabInfo) -> [Tag] {
+        var result: [Tag] = []
+        if info.variants.count > 1 { result.append(Tag("\(info.variants.count) problems", "list.number")) }
+        if let lessons = info.lessons, !lessons.isEmpty { result.append(Tag(lessons.count == 1 ? "Lesson" : "\(lessons.count) lessons", "book")) }
+        return result
+    }
+
+    private struct Tag: Hashable {
+        let title: String
+        let image: String
+        init(_ title: String, _ image: String) { self.title = title; self.image = image }
+    }
+}
+
+extension LabInfo.Section {
+    var shortTitle: String {
+        switch self {
+        case .learning: "ML"
+        case .intelligence: "AI"
+        default: rawValue
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .basics: "magnifyingglass"
+        case .structures: "square.stack.3d.up"
+        case .algorithms: "point.3.connected.trianglepath.dotted"
+        case .learning: "brain"
+        case .intelligence: "sparkles"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .basics: AppTheme.mint
+        case .structures: AppTheme.amber
+        case .algorithms: AppTheme.coral
+        case .learning: AppTheme.violet
+        case .intelligence: AppTheme.blue
+        }
+    }
+}
+
+extension LabTopic {
+    var systemImage: String {
+        switch id {
+        case "ml-foundations": "function"
+        case "ml-evaluation": "chart.xyaxis.line"
+        case "ml-operations": "waveform.path.ecg"
+        case "ml-projects": "shippingbox"
+        case "pytorch-training": "flame"
+        case "transformer-internals": "square.stack.3d.down.right"
+        case "generation": "text.bubble"
+        case "retrieval-rag": "doc.text.magnifyingglass"
+        case "tools-evaluation": "wrench.and.screwdriver"
+        case "transformer-projects": "cpu"
+        case "basics": "magnifyingglass"
+        case "structures": "square.grid.3x3.topleft.filled"
+        case "algorithms": "point.3.filled.connected.trianglepath.dotted"
+        case "finetuning-training": "speedometer"
+        case "finetuning-adapters": "slider.horizontal.3"
+        case "robust-training": "shield.lefthalf.filled"
+        case "robustness-projects": "checkmark.shield"
+        case "alignment-mechanisms": "scope"
+        case "alignment-projects": "arrow.triangle.branch"
+        default: section.systemImage
+        }
     }
 }
 

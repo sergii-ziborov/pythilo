@@ -36,4 +36,17 @@ void pyhost_write_input(const char *utf8);
 /// Writes a debugger command, which the paused run is waiting for.
 void pyhost_write_debug_command(const char *utf8);
 
+/// Lane 0 is the main thread. Lanes 1 to PYHOST_LANES - 1 each run their own jobs on
+/// their own thread, one at a time, so a terminal tab can run a command while another
+/// tab's program keeps running. They share the interpreter.
+#define PYHOST_LANES 4
+
+void pyhost_submit_lane(int lane, const char *json);
+
+/// Stops the lane's job: a KeyboardInterrupt in its thread, which also wakes a
+/// sleep or input(). A blocking native call or socket read ends only when it returns.
+void pyhost_interrupt_lane(int lane);
+
+void pyhost_write_lane_input(int lane, const char *utf8);
+
 #endif

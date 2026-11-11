@@ -16,6 +16,17 @@ enum PythonEvent: Sendable {
     case completions(token: String, [PythonCompletion])
     case cell(CellEvent)
     case custom(kind: String, data: Data)
+    /// The same events from a terminal lane (1...), which runs beside the main thread.
+    case lane(Int, LaneEvent)
+}
+
+enum LaneEvent: Sendable {
+    case started(id: String)
+    case stream(RunStream, String)
+    case inputWait
+    case inputDone
+    case ended(RunOutcome)
+    case listening(ListeningServer)
 }
 
 enum RunStream: Sendable {
@@ -46,6 +57,8 @@ struct RunOutcome: Decodable, Sendable, Equatable {
     let threads: [String]?
     let duration: Double?
     let recovery: String?
+    /// 0, or the terminal lane it ran on.
+    var lane: Int?
 }
 
 struct DebugVariable: Decodable, Sendable, Hashable, Identifiable {
@@ -75,6 +88,8 @@ struct DebugPause: Decodable, Sendable, Equatable {
 struct ListeningServer: Decodable, Sendable, Equatable {
     let host: String
     let port: Int
+    /// 0, or the terminal lane whose program listens.
+    var lane: Int?
 
     /// The address a browser on this device opens. A server bound to every
     /// interface is reached through loopback.
@@ -162,6 +177,16 @@ final class PythonEngine: @unchecked Sendable {
     private static func decode(kind: String, data: Data) -> PythonEvent? {
         let decoder = JSONDecoder()
         let text = { String(decoding: data, as: UTF8.self) }
+        // Streams and input events from a lane say so in their name: stdout@2.
+        if let at = kind.firstIndex(of: "@"), let lane = Int(kind[kind.index(after: at)...]), lane > 0 {
+            switch kind[..<at] {
+            case "stdout": return .lane(lane, .stream(.stdout, text()))
+            case "stderr": return .lane(lane, .stream(.stderr, text()))
+            case "input_wait": return .lane(lane, .inputWait)
+            case "input_done": return .lane(lane, .inputDone)
+            default: return nil
+            }
+        }
         switch kind {
         case "stdout": return .stream(.stdout, text())
         case "stderr": return .stream(.stderr, text())
@@ -172,10 +197,19 @@ final class PythonEngine: @unchecked Sendable {
             struct Ready: Decodable { let python: String }
             return (try? decoder.decode(Ready.self, from: data)).map { .ready(version: $0.python) }
         case "run_start":
-            struct Start: Decodable { let id: String }
-            return (try? decoder.decode(Start.self, from: data)).map { .runStarted(id: $0.id) }
+            struct Start: Decodable { let id: String; let lane: Int? }
+            guard let start = try? decoder.decode(Start.self, from: data) else { return nil }
+            if let lane = start.lane, lane > 0 { return .lane(lane, .started(id: start.id)) }
+            return .runStarted(id: start.id)
         case "run_end":
-            return (try? decoder.decode(RunOutcome.self, from: data)).map { .runEnded($0) }
+            guard let outcome = try? decoder.decode(RunOutcome.self, from: data) else { return nil }
+            if let lane = outcome.lane, lane > 0 { return .lane(lane, .ended(outcome)) }
+            return .runEnded(outcome)
+        case "server_listening":
+            if let server = try? decoder.decode(ListeningServer.self, from: data), let lane = server.lane, lane > 0 {
+                return .lane(lane, .listening(server))
+            }
+            return .custom(kind: kind, data: data)
         case "debug_pause":
             return (try? decoder.decode(DebugPause.self, from: data)).map { .debugPaused($0) }
         case "debug_resume": return .debugResumed
@@ -216,6 +250,23 @@ final class PythonEngine: @unchecked Sendable {
     func interrupt() {
         pyhost_send_interrupt()
     }
+
+    func submit(_ job: [String: Any], lane: Int) {
+        guard let data = try? JSONSerialization.data(withJSONObject: job),
+              let text = String(data: data, encoding: .utf8) else { return }
+        pyhost_submit_lane(Int32(lane), text)
+    }
+
+    func interrupt(lane: Int) {
+        pyhost_interrupt_lane(Int32(lane))
+    }
+
+    func sendInput(_ line: String, lane: Int) {
+        pyhost_write_lane_input(Int32(lane), line)
+    }
+
+    /// The number of terminal lanes beside the main thread.
+    static let extraLanes = Int(PYHOST_LANES) - 1
 
     func sendInput(_ line: String) {
         pyhost_write_input(line)

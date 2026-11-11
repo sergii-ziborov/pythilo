@@ -36,6 +36,7 @@ struct WorkspaceView: View {
             ZStack {
                 AppTheme.background.ignoresSafeArea()
                 content(layout, size: size, safeArea: geometry.safeAreaInsets)
+                    .environment(\.terminalServerInline, Self.showsServerInTerminal(layout))
                     .ignoresSafeArea(.container)
                 serverBanner(layout, safeArea: geometry.safeAreaInsets)
                     .animation(.snappy, value: model.previewURL)
@@ -85,9 +86,12 @@ struct WorkspaceView: View {
         .sheet(isPresented: $model.previewOpen) { PreviewSheet(model: model) }
         // Several chunks can land between two updates, so the recent tail is read,
         // not only the last chunk.
-        .onChange(of: session.terminalRevision) { noticeOutput(session.terminalOutput, terminal: true) }
-        .onChange(of: session.outputRevision) { noticeOutput(session.output, terminal: false) }
+        // Terminal tabs read their own output (WorkspaceModel.noticeOutput).
+        .onChange(of: session.outputRevision) { noticeOutput(session.output) }
         .onChange(of: session.listening) { _, server in model.serverStarted(server) }
+        .onChange(of: session.lanes.map(\.listening)) { old, new in
+            for (before, after) in zip(old, new) where after != nil && after != before { model.serverStarted(after) }
+        }
         #if DEBUG
         // For screenshots: -openSite YES opens the preview once the server listens.
         .onChange(of: model.previewURL) { _, url in
@@ -102,7 +106,7 @@ struct WorkspaceView: View {
         }
         #endif
         .onChange(of: session.phase) { _, phase in
-            if phase == .idle { model.clearPreview() }
+            // The preview closes when its own program ends, whichever tab or lane it ran on.
             if phase == .paused { model.panel = .debug }
         }
         .onChange(of: model.selectedPath) { model.clearCompletions() }
@@ -126,12 +130,9 @@ struct WorkspaceView: View {
         }
     }
 
-    private func noticeOutput(_ chunks: [OutputChunk], terminal: Bool) {
+    private func noticeOutput(_ chunks: [OutputChunk]) {
         let tail = chunks.suffix(12).map(\.text).joined()
         model.updatePreview(from: tail)
-        if terminal, session.isBusy, chunks.count > model.commandOutputStart {
-            model.noticeMigrationWarning(in: chunks[model.commandOutputStart...].suffix(40).map(\.text).joined())
-        }
         if !session.isBusy { model.noticeCommandList(in: tail) }
     }
 
@@ -139,7 +140,9 @@ struct WorkspaceView: View {
     /// to the top, so the terminal's keys stay free.
     @ViewBuilder
     private func serverBanner(_ layout: WorkspaceLayout, safeArea: EdgeInsets) -> some View {
-        if let url = model.previewURL, !keyboard.isVisible, layout != .padLandscape {
+        // On a phone the terminal shows its server in line, under its tabs, so the tabs stay reachable.
+        if let url = model.previewURL, !keyboard.isVisible, layout != .padLandscape,
+           !(model.panel == .terminal && Self.showsServerInTerminal(layout)) {
             let atBottom = layout == .phone && model.panel == .code
             ServerBanner(
                 url: url,
@@ -153,6 +156,14 @@ struct WorkspaceView: View {
             .padding(atBottom ? .bottom : .top, atBottom ? 62 : max(60, safeArea.top + 8))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: atBottom ? .bottom : .top)
             .transition(.move(edge: atBottom ? .bottom : .top).combined(with: .opacity))
+        }
+    }
+
+    /// Where the terminal is the whole screen, its server shows in line instead of floating.
+    static func showsServerInTerminal(_ layout: WorkspaceLayout) -> Bool {
+        switch layout {
+        case .phone, .phoneLandscape, .cover: true
+        default: false
         }
     }
 
@@ -273,6 +284,7 @@ struct WorkspaceView: View {
     private var backButton: some View {
         RoundIconButton(systemImage: "chevron.left", label: "Back to projects") {
             model.saveAll()
+            model.stopTerminalLanes()
             onClose()
         }
         .accessibilityIdentifier("workspace-back")

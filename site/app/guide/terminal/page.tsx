@@ -4,12 +4,12 @@ import { GuideHeader, Note, Pager, Table, Toc } from "@/components/guide/doc";
 import { DeviceShot } from "@/components/site/phone";
 import { shots } from "@/lib/shots";
 
-export const metadata: Metadata = { title: "The terminal", description: "Pythilo's terminal on iPhone and iPad: a small bash with pipes, redirects and about 60 built-in commands, plus python, pip, pytest, sqlite3, git, npm, Django, Flask and Uvicorn." };
+export const metadata: Metadata = { title: "The terminal", description: "Pythilo's terminal on iPhone and iPad: tabs, a small bash with pipes, redirects and about 60 built-in commands, plus python, pip, pytest, sqlite3, git, npm, Django, Flask and Uvicorn." };
 
 export default function Page() {
   return <>
     <GuideHeader slug="terminal" />
-    <Toc items={[["how", "How it works"], ["keys", "Keys, history and Ctrl-C"], ["shell", "Pipes, redirects and variables"], ["files", "File commands"], ["text", "Text tools"], ["network", "curl and wget"], ["python", "python"], ["frameworks", "Django, Flask and Uvicorn"], ["chips", "Framework chips"], ["other", "pip, pytest, sqlite3, git and npm"], ["servers-busy", "While a server runs"]]} />
+    <Toc items={[["how", "How it works"], ["keys", "Keys, history and Ctrl-C"], ["shell", "Pipes, redirects and variables"], ["files", "File commands"], ["text", "Text tools"], ["network", "curl and wget"], ["python", "python"], ["frameworks", "Django, Flask and Uvicorn"], ["chips", "Framework chips"], ["other", "pip, pytest, sqlite3, git and npm"], ["servers-busy", "Tabs, and while a server runs"]]} />
 
     <h2 id="how">How it works</h2>
     <p>iOS does not let an app start other programs, so Pythilo&apos;s terminal is a small bash built into the app. It reads a line the way bash does (quotes, variables, globs, pipes and lists) and runs each command as part of Pythilo, on the real files of your project and with the same Python that runs your code. A command or option that is not built in says so, rather than being ignored. Type <code>help</code> for the list, and <code>COMMAND --help</code> for a command&apos;s options.</p>
@@ -17,7 +17,7 @@ export default function Page() {
     <figure><DeviceShot shot={shots.terminal} /><DeviceShot shot={shots.django} /><figcaption>pytest in the terminal, and a Django project with its command chips.</figcaption></figure>
 
     <h2 id="keys">Keys, history and Ctrl-C</h2>
-    <p>Above the input line is a row of keys: <code>python</code>, <code>pip</code>, <code>npm</code>, <code>pytest</code>, <code>git</code> and <code>ls</code> type the word and a space; <span className="ui">Ctrl-C</span> stops what is running; <span className="ui">↑</span> steps back through the commands you ran since you opened the panel. While something runs, the field reads <em>Running. Ctrl-C stops it</em>; you can type the next line already and it waits for Return. When a program asks for <code>input()</code>, the prompt changes to <code>&gt;</code> and the line you type goes to the program.</p>
+    <p>Above the input line is a row of keys: <code>python</code>, <code>pip</code>, <code>npm</code>, <code>pytest</code>, <code>git</code> and <code>ls</code> type the word and a space; <span className="ui">Ctrl-C</span> stops what is running in this tab; <span className="ui">↑</span> steps back through the commands this tab ran since you opened the project. While something runs, the field reads <em>Running. Ctrl-C stops it</em>; a command you type then runs in another tab. When a program asks for <code>input()</code>, the prompt changes to <code>&gt;</code> and the line you type goes to the program.</p>
 
     <h2 id="shell">Pipes, redirects and variables</h2>
     <Table head={["Write", "Means"]} rows={[
@@ -87,8 +87,10 @@ ls *.py | xargs wc -l`}</code></pre>
       <li><code>npm</code> installs from the npm registry and builds with esbuild; <code>npx esbuild</code> works too. See <Link href="/guide/packages/#npm">npm and esbuild</Link>.</li>
     </ul>
 
-    <h2 id="servers-busy">While a server runs</h2>
-    <p>A server keeps Python busy. If you type a command while a server you started from the terminal is running, Pythilo stops the server, runs the command and starts the server again; the field says <em>Command (restarts the server)</em>. If some other program is running, the terminal asks you to stop it first.</p>
+    <h2 id="servers-busy">Tabs, and while a server runs</h2>
+    <p>The terminal has tabs. Tap <span className="ui">+</span> above the output for another one; each tab keeps its own folder, history, input and output, and a dot shows what it is doing: grey when idle, amber while a command runs, green while it serves a site. A tab&apos;s name says what runs in it, such as <code>1 · runserver</code>. Closing a tab that is still running something asks first, then stops it.</p>
+    <p>Tabs run at the same time. Start <code>python manage.py runserver</code> in one tab, and in another run <code>python manage.py test</code>, <code>migrate</code>, <code>git commit</code> or <code>pip install</code> while the site keeps answering. Typing a command into a busy tab runs it in another tab and says so, so the terminal is never blocked. Up to four programs run at once.</p>
+    <p>All tabs share one Python, the one inside the app: modules a running server has imported, such as your Django models, stay as they were until you stop and start it, as without the autoreloader. A command in another tab reads your files again each time. Ctrl-C and Stop act on the tab you are in.</p>
     <Pager slug="terminal" />
   </>;
 }

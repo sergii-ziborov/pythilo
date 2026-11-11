@@ -23,6 +23,8 @@ import tarfile
 import time
 import zipfile
 
+from . import lanes, streams
+
 
 class ShellError(Exception):
     pass
@@ -283,29 +285,34 @@ def run_command(words, command, commands, text_in, capture):
         # The utilities are small built-ins, not the programs they are named after.
         handler = lambda _: print(f"usage: {USAGE[name]}" if args == ["--help"] else f"{name}: built into Pythilo")
     saved = sys.stdin, sys.stdout, sys.stderr
+    lane = lanes.current_lane()
+    # Redirects belong to this lane only: another tab's server keeps printing to its own tab.
+    previous = streams.redirected(lane)
+    targets = list(previous or (None, None, None))
     opened = []
     captured = io.StringIO() if capture else None
     try:
         if command.stdin is not None:
             handle = open(expand(command.stdin)[0], encoding="utf-8", errors="replace")
             opened.append(handle)
-            sys.stdin = handle
+            targets[0] = handle
         elif text_in is not None:
-            sys.stdin = _PipeInput(text_in)
+            targets[0] = _PipeInput(text_in)
         if command.stdout is not None:
             mode, path = command.stdout
             handle = open(expand(path)[0], mode, encoding="utf-8")
             opened.append(handle)
-            sys.stdout = handle
+            targets[1] = handle
         elif captured is not None:
-            sys.stdout = captured
+            targets[1] = captured
         if command.stderr == "stdout":
-            sys.stderr = sys.stdout
+            targets[2] = targets[1] if targets[1] is not None else streams.stdout
         elif command.stderr is not None:
             mode, path = command.stderr
             handle = open(expand(path)[0], mode, encoding="utf-8")
             opened.append(handle)
-            sys.stderr = handle
+            targets[2] = handle
+        streams.redirect(lane, targets)
         try:
             code = handler(args)
         except SystemExit as exit:
@@ -327,6 +334,7 @@ def run_command(words, command, commands, text_in, capture):
             sys.stdout.flush()
         except Exception:
             pass
+        streams.redirect(lane, previous)
         sys.stdin, sys.stdout, sys.stderr = saved
         for handle in opened:
             handle.close()
@@ -1445,12 +1453,15 @@ def xargs(args, commands=None):
         handler = (commands or {}).get(words[0])
         if handler is None:
             raise ShellError(f"command not found: {words[0]}")
-        saved = sys.stdin
-        sys.stdin = _PipeInput("")
+        lane = lanes.current_lane()
+        previous = streams.redirected(lane)
+        targets = list(previous or (None, None, None))
+        targets[0] = _PipeInput("")
+        streams.redirect(lane, targets)
         try:
             status = max(status, int(handler(words[1:]) or 0))
         finally:
-            sys.stdin = saved
+            streams.redirect(lane, previous)
     return status
 
 

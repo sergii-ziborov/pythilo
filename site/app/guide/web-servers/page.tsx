@@ -23,10 +23,10 @@ export default function Page() {
     <p>The preview is a normal web view. Pages that load scripts from the internet, such as FastAPI&apos;s <code>/docs</code>, which loads Swagger UI from a CDN, need a network connection for those parts.</p>
 
     <h2 id="migrations">Django migrations</h2>
-    <p>When <code>runserver</code> reports unapplied migrations, the banner adds <em>N migrations are not applied. Pages that use the database will fail.</em> and a <span className="ui">Migrate &amp; restart</span> button, which runs <code>python manage.py migrate</code> and starts the server again. The <code>migrate</code> and <code>makemigrations</code> chips are always there too.</p>
+    <p>When <code>runserver</code> reports unapplied migrations, the banner adds <em>N migrations are not applied. Pages that use the database will fail.</em> and a <span className="ui">Migrate &amp; restart</span> button, which runs <code>python manage.py migrate</code> and starts the server again. The <code>migrate</code> and <code>makemigrations</code> chips are always there too; a <code>migrate</code> run in another tab also clears the warning, without a restart.</p>
 
     <h2 id="after-changes">After a change</h2>
-    <p>Autoreloaders start a second process, which iOS does not allow, so servers do not restart on their own when you save. Stop and run again. If you type a terminal command while your server runs, Pythilo stops the server, runs the command, and starts the server again.</p>
+    <p>Autoreloaders start a second process, which iOS does not allow, so servers do not restart on their own when you save. Stop and run again. While your server runs, other terminal tabs keep working: tap <span className="ui">+</span> and run <code>migrate</code>, <code>test</code> or <code>git</code> there, and the site keeps answering. A command typed into the server&apos;s own tab runs in another tab. See <Link href="/guide/terminal/#servers-busy">Tabs</Link>.</p>
 
     <h2 id="frameworks">Framework notes</h2>
     <ul>

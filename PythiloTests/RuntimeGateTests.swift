@@ -449,7 +449,7 @@ final class RuntimeGateTests: XCTestCase {
         await NpmScripts.run("npm run build", in: model)
         let bundle = root.appending(path: "static/assets/main.js")
         let size = (try? FileManager.default.attributesOfItem(atPath: bundle.path)[.size] as? Int) ?? 0
-        XCTAssertGreaterThan(size, 100_000, "React and the app, minified: \(session.terminalOutput.map(\.text).joined())")
+        XCTAssertGreaterThan(size, 100_000, "React and the app, minified: \(model.activeTerminal.output.map(\.text).joined())")
         XCTAssertTrue(FileManager.default.fileExists(atPath: root.appending(path: "static/assets/main.css").path))
 
         var page = "", script = "", api = ""

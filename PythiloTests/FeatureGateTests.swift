@@ -19,6 +19,11 @@ final class FeatureGateTests: XCTestCase {
     }
 
     override func tearDown() async throws {
+        // A failed test must not leave a server running into the next one.
+        for lane in 0...session.lanes.count where session.phase(lane: lane) != .idle && session.phase(lane: lane) != .starting {
+            session.stop(lane: lane)
+        }
+        try? await waitUntil(timeout: 20) { !self.session.isAnythingRunning }
         if offlineAudit { try await OfflineTestSupport.stop() }
         MCPHost.shared.stop()
         session.onCustom = nil
@@ -26,11 +31,18 @@ final class FeatureGateTests: XCTestCase {
         try? FileManager.default.removeItem(at: root)
     }
 
+    /// Terminal tabs of the workspace under test, printed when a wait times out.
+    private var tabsUnderTest: WorkspaceModel?
+
     private func waitUntil(timeout: TimeInterval, _ condition: @escaping @MainActor () -> Bool) async throws {
         let deadline = Date().addingTimeInterval(timeout)
         while !condition() {
             if Date() > deadline {
-                XCTFail("Timed out. Output: \(session.output.map(\.text).joined())")
+                let tabs = (tabsUnderTest?.terminals ?? []).map { tab in
+                    let text = tab.output.map(\.text).joined()
+                    return "[tab \(tab.number) lane \(String(describing: tab.lane)) listening \(String(describing: session.listening)) preview \(String(describing: tabsUnderTest?.previewURL))]\n\(text.prefix(1500))\n…\n\(text.suffix(600))"
+                }
+                XCTFail("Timed out. Phase \(session.phase), lanes \(session.lanes.map(\.phase)). Output: \(session.output.map(\.text).joined())\n\(tabs.joined(separator: "\n"))")
                 throw CancellationError()
             }
             try await Task.sleep(for: .milliseconds(20))
@@ -85,6 +97,18 @@ final class FeatureGateTests: XCTestCase {
         try await waitUntil(timeout: 60) { self.session.lastOutcome?.id == migrate && self.session.phase == .idle }
         XCTAssertEqual(session.lastOutcome?.status, "finished", session.output.map(\.text).joined())
         XCTAssertTrue(FileManager.default.fileExists(atPath: notes.url.appending(path: "db.sqlite3").path))
+
+        // Django's test runner asks for sys.stderr.fileno(); the terminal adapts the command.
+        for line in ["python manage.py test", "django-admin test --settings site_config.settings"] {
+            session.clearOutput()
+            let test = session.submit(["kind": "shell", "line": line, "root": notes.url.path, "cwd": notes.url.path], label: "t")
+            try await waitUntil(timeout: 120) { self.session.lastOutcome?.id == test && self.session.phase == .idle }
+            let printed = session.output.map(\.text).joined()
+            XCTAssertEqual(session.lastOutcome?.code, 0, printed)
+            XCTAssertTrue(printed.contains("Ran 3 tests"), printed)
+            XCTAssertTrue(printed.contains("OK"), printed)
+            XCTAssertFalse(printed.contains("fileno"), printed)
+        }
     }
 
     // MARK: Git
@@ -418,25 +442,126 @@ final class FeatureGateTests: XCTestCase {
         XCTAssertEqual(trace?.writes.count, 57)
     }
 
-    func testATerminalCommandWhileAServerRunsRestartsTheServerAroundIt() async throws {
+    func testATerminalCommandWhileAServerRunsUsesAnotherTabAndTheServerKeepsServing() async throws {
         let project = try project("serve")
         try """
-        import http.server
-        server = http.server.HTTPServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler)
+        import http.server, sys, threading, time
+        class Quiet(http.server.SimpleHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Quiet)
         print("serving", flush=True)
-        server.serve_forever()
+        stopped = threading.Event()
+        def tick():
+            while not stopped.wait(0.02):
+                print("tick", flush=True)
+        threading.Thread(target=tick, daemon=True).start()
+        try:
+            server.serve_forever()
+        finally:
+            stopped.set()
         """.write(to: project.url.appending(path: "serve.py"), atomically: true, encoding: .utf8)
         try "note\n".write(to: project.url.appending(path: "note.txt"), atomically: true, encoding: .utf8)
+        try "VALUE = 1\n".write(to: project.url.appending(path: "mod.py"), atomically: true, encoding: .utf8)
         let model = WorkspaceModel(project: project)
+        tabsUnderTest = model
+        defer { tabsUnderTest = nil }
+        let server = model.activeTerminal
         model.runTerminal("python serve.py")
         try await waitUntil(timeout: 30) { self.session.listening != nil }
-        model.runTerminal("cat note.txt")
-        let text = { self.session.terminalOutput.map(\.text).joined() }
-        try await waitUntil(timeout: 30) { text().contains("Stopping the server") && text().contains("note\n") }
-        try await waitUntil(timeout: 30) { self.session.listening != nil && text().components(separatedBy: "serving").count == 3 }
-        XCTAssertFalse(text().contains("Python is busy"), text())
+        let port = try XCTUnwrap(session.listening?.port)
+
+        // Typed into the busy tab, it runs in a new one, beside the server.
+        model.runTerminal("cat note.txt", in: server)
+        XCTAssertEqual(model.terminals.count, 2)
+        let second = model.activeTerminal
+        XCTAssertNotEqual(second.id, server.id)
+        let text = { second.output.map(\.text).joined() }
+        try await waitUntil(timeout: 30) { second.lane == nil && text().contains("note\n") }
+        XCTAssertTrue(server.output.map(\.text).joined().contains("runs in Terminal 2"))
+        XCTAssertEqual(server.output.map(\.text).joined().components(separatedBy: "serving").count, 2, "the server was never restarted")
+        XCTAssertNotNil(session.listening, "the server keeps listening")
+
+        // A pipe in one tab never catches the other tab's prints.
+        second.clear()
+        model.runTerminal("python -c \"for _ in range(3): print('x')\" | wc -l", in: second)
+        try await waitUntil(timeout: 30) { second.lane == nil && text().contains("3") }
+        XCTAssertEqual(text().components(separatedBy: "\n").filter { $0.trimmingCharacters(in: .whitespaces) == "3" }.count, 1, text())
+        XCTAssertFalse(text().contains("tick"), text())
+
+        // A module edited between runs is read again, while the server keeps its own.
+        second.clear()
+        model.runTerminal("python -c \"import mod; print('value', mod.VALUE)\"", in: second)
+        try await waitUntil(timeout: 30) { second.lane == nil && text().contains("value 1") }
+        // A different size, so CPython's cached bytecode (checked by size and second) is stale.
+        try "VALUE = 2  # edited\n".write(to: project.url.appending(path: "mod.py"), atomically: true, encoding: .utf8)
+        model.runTerminal("python -c \"import mod; print('value', mod.VALUE)\"", in: second)
+        try await waitUntil(timeout: 30) { second.lane == nil && text().contains("value 2") }
+
+        // pytest imports through its own hook; an edited test still runs fresh.
+        try "def test_value():\n    assert 1 == 1\n".write(to: project.url.appending(path: "test_value.py"), atomically: true, encoding: .utf8)
+        second.clear()
+        model.runTerminal("pytest -q", in: second)
+        try await waitUntil(timeout: 60) { second.lane == nil && text().contains("1 passed") }
+        try "def test_value():\n    assert 1 == 2  # edited\n".write(to: project.url.appending(path: "test_value.py"), atomically: true, encoding: .utf8)
+        second.clear()
+        model.runTerminal("pytest -q", in: second)
+        try await waitUntil(timeout: 60) { second.lane == nil && text().contains("1 failed") }
+
+        // input() reads this tab's own keyboard.
+        second.clear()
+        model.runTerminal("python -c \"print('hello', input('name? '))\"", in: second)
+        try await waitUntil(timeout: 30) { second.lane.map { self.session.phase(lane: $0) } == .waitingForInput }
+        session.sendInput("Ada", lane: try XCTUnwrap(second.lane))
+        try await waitUntil(timeout: 30) { second.lane == nil && text().contains("hello Ada") }
+
+        // Stop ends a sleeping command on a lane quickly.
+        second.clear()
+        model.runTerminal("sleep 30", in: second)
+        try await waitUntil(timeout: 10) { second.lane != nil && second.lane != 0 }
+        let lane = try XCTUnwrap(second.lane)
+        try await Task.sleep(for: .milliseconds(300))
+        let stopped = Date()
+        session.stop(lane: lane)
+        try await waitUntil(timeout: 10) { second.lane == nil }
+        XCTAssertLessThan(Date().timeIntervalSince(stopped), 3)
+        XCTAssertEqual(session.lane(lane)?.lastOutcome?.status, "cancelled")
+
+        // After all of that, the server still answers.
+        let (data, response) = try await URLSession.shared.data(from: URL(string: "http://127.0.0.1:\(port)/note.txt")!)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        XCTAssertEqual(String(decoding: data, as: UTF8.self), "note\n")
+        XCTAssertFalse(server.output.map(\.text).joined().contains("Traceback"), server.output.map(\.text).joined())
+
         session.stop()
-        try await waitUntil(timeout: 30) { !self.session.isBusy }
+        try await waitUntil(timeout: 30) { !self.session.isBusy && server.lane == nil }
+        XCTAssertNil(model.previewURL)
+    }
+
+    func testTabsShareOneFolderButKeepTheirOwnDirectoryAndHistory() async throws {
+        let project = try project("tabs")
+        try FileManager.default.createDirectory(at: project.url.appending(path: "sub"), withIntermediateDirectories: true)
+        let model = WorkspaceModel(project: project)
+        tabsUnderTest = model
+        defer { tabsUnderTest = nil }
+        let first = model.activeTerminal
+        model.runTerminal("cd sub")
+        try await waitUntil(timeout: 30) { first.lane == nil && first.directory.lastPathComponent == "sub" }
+        let second = model.newTerminal()
+        XCTAssertEqual(model.activeTerminal.id, second.id)
+        XCTAssertEqual(second.directory.lastPathComponent, "sub", "a new tab opens where the current one is")
+        model.runTerminal("cd ..", in: second)
+        try await waitUntil(timeout: 30) { second.lane == nil && second.directory.lastPathComponent == "tabs" }
+        XCTAssertEqual(first.directory.lastPathComponent, "sub")
+        model.terminalInput = "draft"
+        model.selectTerminal(first)
+        XCTAssertEqual(model.terminalInput, "")
+        model.selectTerminal(second)
+        XCTAssertEqual(model.terminalInput, "draft")
+        model.closeTerminal(second)
+        XCTAssertEqual(model.terminals.count, 1)
+        model.closeTerminal(first)
+        XCTAssertEqual(model.terminals.count, 1, "the last tab stays")
     }
 
     func testEachWebTemplateOffersItsFrameworksCommands() throws {

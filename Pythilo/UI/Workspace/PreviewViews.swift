@@ -121,7 +121,8 @@ struct PreviewSheet: View {
                     VStack(spacing: 0) {
                         PreviewColumn(url: url)
                         Rectangle().fill(AppTheme.border).frame(height: 1)
-                        OutputTextView(chunks: model.session.terminalOutput, revision: model.session.terminalRevision, fontSize: 12.5)
+                        let log = model.serverTab ?? model.activeTerminal
+                        OutputTextView(chunks: log.output, revision: log.revision, fontSize: 12.5)
                             .frame(height: 128)
                             .background(AppTheme.panel, ignoresSafeAreaEdges: [])
                     }

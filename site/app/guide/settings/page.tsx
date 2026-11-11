@@ -36,6 +36,7 @@ export default function Page() {
       [<span key="s" className="ui">Version</span>, "The exact CPython version inside the app."],
       [<span key="s" className="ui">What runs here</span>, <>What runs on the device, what iOS does not allow, and what is worth knowing. The same as <Link href="/guide/limits/">What runs on iOS</Link>.</>],
       [<span key="s" className="ui">Licenses</span>, <>The runtime&apos;s licences and every bundled Python package. See also <Link href="/legal/licenses/">Open-source licences</Link>.</>],
+      [<span key="s" className="ui">About Pythilo</span>, <>The version and build, what is in the app, and links to this website, the guide, the blog, the source, support and the legal pages. The <span className="ui">About</span> section also has <span className="ui">Rate Pythilo</span>, <span className="ui">Share Pythilo</span> and <span className="ui">Report a bug</span>.</>],
     ]} />
     <Note>Lesson progress, lab code and these settings live in the app&apos;s own storage on the device. Deleting Pythilo deletes them, together with your projects, unless the device is backed up.</Note>
     <Pager slug="settings" />

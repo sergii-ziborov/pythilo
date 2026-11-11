@@ -5,19 +5,19 @@ algorithm and machine learning labs in one app. CPython 3.14 runs on the device 
 tests, your Django site and your debugger session never leave the phone. Execution
 works offline after the required packages and data have been downloaded.
 
-Pythilo is a paid app, in TestFlight now. This repository is public to read; it is not
+Pythilo is a paid app, submitted to the App Store as 1.0. This repository is public to read; it is not
 open source (see [License](#license)).
 
 <p align="center">
   <img src="docs/screenshots/django-running.png" width="200" alt="A Django project running, with Open site">
   <img src="docs/screenshots/site-preview.png" width="200" alt="The site in the built-in preview">
-  <img src="docs/screenshots/lesson.png" width="200" alt="A lesson, reading mode">
+  <img src="docs/screenshots/learn.png" width="200" alt="Learn: continue, progress, practice and course tracks">
   <img src="docs/screenshots/checks.png" width="200" alt="Checks that say what came back">
 </p>
 <p align="center">
-  <img src="docs/screenshots/labs.png" width="200" alt="An earlier overview of the algorithm labs">
+  <img src="docs/screenshots/terminal-tabs.png" width="200" alt="Django tests in a second terminal tab while the server runs">
+  <img src="docs/screenshots/labs.png" width="200" alt="The Labs catalog: 136 labs in 19 topics">
   <img src="docs/screenshots/graph-lab.png" width="200" alt="Graph Explorer tracing a BFS">
-  <img src="docs/screenshots/dp-lab.png" width="200" alt="Dynamic Programming counting repeated calls">
   <img src="docs/screenshots/room.png" width="200" alt="A shared room">
 </p>
 
@@ -29,8 +29,11 @@ open source (see [License](#license)).
   ships in the app, with `input()`, real files, tracebacks that point at your line,
   and a Stop that works on endless loops, `sleep`, blocking sockets and asyncio.
 - **Projects with many files**, a file drawer with nested folders, an editor built
-  for touch, a terminal and a problems list fed by pyflakes, with Jedi
+  for touch, a terminal with tabs and a problems list fed by pyflakes, with Jedi
   completion that knows your own modules.
+- **Terminal tabs that run at the same time.** Keep `runserver` going in one tab and
+  run `manage.py test`, `migrate`, `pip` or `git` in another while the site keeps
+  answering. Up to four programs run at once, on threads that share the interpreter.
 - **Run web servers on the phone.** Django with SQLite and migrations, Flask, FastAPI
   with Pydantic, Starlette on Uvicorn. When a server starts, Pythilo says so and opens
   the site in a preview where you can go to any path, such as `/admin/`. The
@@ -63,7 +66,8 @@ Python extensions remain signed inside the app; their Python APIs download separ
 
 ### Learn
 
-- **446 lessons in 37 courses**, including 138 advanced lessons (34 integration projects): Python foundations and Python deeper (30 each), clean
+- **446 lessons in 37 courses**, in Python, web and data, machine learning, AI and
+  project tracks, with search across every lesson. They include 138 advanced lessons (34 integration projects): Python foundations and Python deeper (30 each), clean
   code, testing, the tools around Python, architecture, concurrency and async, the web,
   data, the mathematics of neural networks, machine learning with PyTorch (30), language
   models from the inside, working with AI tools, and four practical courses on
@@ -76,6 +80,7 @@ Python extensions remain signed inside the app; their Python APIs download separ
   the machine learning lessons train real networks offline.
 - Every exercise is checked by running your code on the device. When a check fails it
   says what happened: `describe(3) returned None, expected 'int: 3'. Is a return missing?`
+  When every check passes, the next lesson is pinned at the bottom of the results.
 - Reading and coding take turns on the whole screen on a phone, and sit side by side on
   an iPad.
 

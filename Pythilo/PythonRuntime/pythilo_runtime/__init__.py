@@ -22,8 +22,9 @@ def boot(bundle, cache):
     bundle_root = bundle
     cache_root = cache
     streams.install()
-    from . import servers
+    from . import lanes, servers
 
+    lanes.install()
     servers.install()
 
     packages = os.path.join(bundle, "app_packages")
@@ -57,3 +58,18 @@ def dispatch(text):
     from . import runner
 
     runner.run_job(json.loads(text))
+
+
+# Terminal tabs only: Run, the debugger, notebooks, lessons and labs use the main thread.
+_LANE_KINDS = {"shell"}
+
+
+def dispatch_lane(lane, text):
+    from . import runner
+
+    job = json.loads(text)
+    kind = job.get("kind")
+    if kind not in _LANE_KINDS:
+        print(f"pythilo: {kind} jobs run on the main thread only", file=sys.stderr)
+        job = {**job, "kind": "shell", "line": "false"}
+    runner.run_job(job, lane=lane)

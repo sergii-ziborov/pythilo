@@ -188,3 +188,63 @@ struct ServerBanner: View {
         .accessibilityLabel("Site is running at \(url.absoluteString)")
     }
 }
+
+/// The terminal's one-line form of ServerBanner, under its tabs.
+struct ServerStrip: View {
+    let url: URL
+    let framework: String?
+    var unappliedMigrations = 0
+    let onOpen: () -> Void
+    var onMigrate: () -> Void = {}
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle().fill(AppTheme.mint).frame(width: 8, height: 8)
+                .background(Circle().fill(AppTheme.mint.opacity(0.25)).frame(width: 15, height: 15))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(framework.map { "\($0) is running" } ?? "Site is running")
+                    .font(.system(size: 13.5, weight: .bold))
+                    .lineLimit(1)
+                Text(url.host().map { "\($0):\(url.port ?? 80)" } ?? url.absoluteString)
+                    .font(.system(size: 11.5, design: .monospaced))
+                    .foregroundStyle(AppTheme.mint)
+                    .lineLimit(1)
+            }
+            .layoutPriority(1)
+            Spacer(minLength: 4)
+            if unappliedMigrations > 0 {
+                Button(action: onMigrate) {
+                    Label("Migrate", systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(AppTheme.onRun)
+                        .padding(.horizontal, 10)
+                        .frame(height: 34)
+                        .background(AppTheme.run, in: Capsule())
+                        .fixedSize()
+                }
+                .buttonStyle(.app)
+                .accessibilityLabel("\(unappliedMigrations) migrations are not applied. Migrate and restart")
+                .accessibilityIdentifier("migrate-restart")
+            }
+            Button(action: onOpen) {
+                Label("Open site", systemImage: "globe")
+                    .font(.system(size: 13.5, weight: .bold))
+                    .foregroundStyle(AppTheme.onBlue)
+                    .padding(.horizontal, 12)
+                    .frame(height: 34)
+                    .background(AppTheme.blue, in: Capsule())
+                    .fixedSize()
+            }
+            .buttonStyle(.app)
+            .accessibilityIdentifier("open-site")
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 6)
+        .frame(minHeight: 48)
+        .background(AppTheme.mint.opacity(0.09), ignoresSafeAreaEdges: [])
+        .overlay(alignment: .bottom) { Rectangle().fill(AppTheme.border).frame(height: 1) }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Site is running at \(url.absoluteString)")
+    }
+}

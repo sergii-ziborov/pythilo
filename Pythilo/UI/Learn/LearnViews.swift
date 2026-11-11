@@ -1,40 +1,122 @@
 import SwiftUI
 
+/// Courses grouped the way people choose them. Order inside a track is the order to take them.
+enum LearnTrack: String, CaseIterable, Identifiable {
+    case python, web, ml, ai, projects, more
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .python: "Python"
+        case .web: "Web, data & APIs"
+        case .ml: "Machine learning"
+        case .ai: "AI & transformers"
+        case .projects: "Algorithms & projects"
+        case .more: "More"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .python: "Python"
+        case .web: "Web & data"
+        case .ml: "ML"
+        case .ai: "AI"
+        case .projects: "Projects"
+        case .more: "More"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .python: "chevron.left.forwardslash.chevron.right"
+        case .web: "globe"
+        case .ml: "brain"
+        case .ai: "sparkles"
+        case .projects: "puzzlepiece.extension"
+        case .more: "ellipsis.circle"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .python: AppTheme.blue
+        case .web: AppTheme.mint
+        case .ml: AppTheme.violet
+        case .ai: AppTheme.coral
+        case .projects: AppTheme.amber
+        case .more: AppTheme.secondary
+        }
+    }
+
+    private static let courses: [LearnTrack: [String]] = [
+        .python: ["foundations", "deeper", "clean-code", "testing", "tools", "architecture", "async", "python-runtime", "python-systems"],
+        .web: ["web", "data", "pydantic", "fastapi-httpx", "data-formats", "data-practice", "testing-practice", "reliable-python"],
+        .ml: ["math", "ml", "ml-practice", "ml-evaluation", "ml-statistics", "ml-production", "ml-systems", "deep-learning-practice", "pytorch-training", "robust-ml-engineering"],
+        .ai: ["llm", "ai", "ai-building-blocks", "ai-production", "ai-systems", "transformer-engineering", "finetuning-projects", "alignment-engineering"],
+        .projects: ["algorithm-patterns", "senior-projects"],
+    ]
+
+    static func track(of course: Course) -> LearnTrack {
+        courses.first { $0.value.contains(course.id) }?.key ?? .more
+    }
+
+    func courses(in paths: [Course]) -> [Course] {
+        guard let ids = Self.courses[self] else {
+            return paths.filter { Self.track(of: $0) == .more }
+        }
+        return ids.compactMap { id in paths.first { $0.id == id } }
+    }
+}
+
 struct LearnView: View {
     let onOpenProject: (Project) -> Void
     @State private var library = CourseLibrary.shared
     @State private var path = NavigationPath()
+    @State private var track: LearnTrack?
+    @State private var query = ""
+
+    private var tracks: [LearnTrack] {
+        LearnTrack.allCases.filter { !$0.courses(in: library.paths).isEmpty }
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 20) {
                     if library.courses.isEmpty {
                         ContentUnavailableView("Courses are missing from this build", systemImage: "book.closed")
                     }
-                    if let (course, lesson) = library.nextLesson {
-                        NavigationLink(value: LessonRoute(course: course, lesson: lesson)) {
-                            ContinueCard(course: course, lesson: lesson)
-                        }
-                        .buttonStyle(.app)
-                        .accessibilityIdentifier("learn-continue")
-                    }
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("YOUR PATH").sectionLabel()
-                        VStack(spacing: 0) {
-                            ForEach(Array(library.paths.enumerated()), id: \.element.id) { index, course in
-                                NavigationLink(value: course) {
-                                    PathRow(course: course, number: index + 1, isLast: index == library.paths.count - 1)
-                                }
-                                .buttonStyle(.app)
+                    if !query.isEmpty {
+                        searchResults
+                    } else {
+                        if let (course, lesson) = library.nextLesson {
+                            NavigationLink(value: LessonRoute(course: course, lesson: lesson)) {
+                                ContinueCard(course: course, lesson: lesson)
                             }
+                            .buttonStyle(.app)
+                            .accessibilityIdentifier("learn-continue")
                         }
-                    }
-                    if let interview = library.interview {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("PRACTICE").sectionLabel()
+                        ProgressStrip()
+                        if let interview = library.interview {
                             NavigationLink(value: interview) { PracticeCard(course: interview) }
                                 .buttonStyle(.app)
+                                .accessibilityIdentifier("learn-practice")
+                        }
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("COURSES").sectionLabel()
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    trackChip(nil)
+                                    ForEach(tracks) { trackChip($0) }
+                                }
+                                .padding(.vertical, 2)
+                            }
+                            .scrollClipDisabled()
+                        }
+                        ForEach(track.map { [$0] } ?? tracks) { item in
+                            trackSection(item)
                         }
                     }
                 }
@@ -47,6 +129,7 @@ struct LearnView: View {
             .background(AppTheme.background)
             .navigationTitle("Learn")
             .toolbar { DownloadsLink() }
+            .searchable(text: $query, prompt: "Search lessons and courses")
             .navigationDestination(for: Course.self) { CourseView(course: $0) }
             .navigationDestination(for: String.self) { id in
                 LabDestination(id: id)
@@ -60,6 +143,105 @@ struct LearnView: View {
             #if DEBUG
             .task(openFromLaunchArguments)
             #endif
+        }
+    }
+
+    private func trackChip(_ item: LearnTrack?) -> some View {
+        let active = track == item
+        let tint = item?.tint ?? AppTheme.blue
+        let count = item.map { $0.courses(in: library.paths).count } ?? library.paths.count
+        let title = "\(item?.shortTitle ?? "All") · \(count)"
+        return Button { withAnimation(.snappy(duration: 0.2)) { track = item } } label: {
+            HStack(spacing: 6) {
+                Image(systemName: item?.systemImage ?? "square.grid.2x2").font(.system(size: 11.5, weight: .bold))
+                Text(title).font(.system(size: 13.5, weight: .semibold)).monospacedDigit()
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 36)
+            .foregroundStyle(active ? AppTheme.onBlue : AppTheme.secondary)
+            .background(active ? tint : AppTheme.panel, in: Capsule())
+            .overlay { if !active { Capsule().stroke(AppTheme.border, lineWidth: 1) } }
+        }
+        .buttonStyle(.app)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(active ? .isSelected : [])
+        .accessibilityIdentifier("learn-track-\(item?.rawValue ?? "all")")
+    }
+
+    private func trackSection(_ item: LearnTrack) -> some View {
+        let courses = item.courses(in: library.paths)
+        let lessons = courses.reduce(0) { $0 + $1.lessons.count }
+        let done = courses.reduce(0) { $0 + library.completedCount($1) }
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: item.systemImage)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(item.tint)
+                    .frame(width: 30, height: 30)
+                    .background(item.tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.title).font(.system(size: 19, weight: .bold))
+                        .accessibilityAddTraits(.isHeader)
+                    Text("\(courses.count) courses · \(lessons) lessons\(done > 0 ? " · \(done) done" : "")")
+                        .font(.system(size: 13)).foregroundStyle(AppTheme.muted)
+                }
+                Spacer(minLength: 0)
+            }
+            VStack(spacing: 0) {
+                ForEach(Array(courses.enumerated()), id: \.element.id) { index, course in
+                    NavigationLink(value: course) {
+                        PathRow(course: course, number: index + 1, isLast: index == courses.count - 1, tint: item.tint)
+                    }
+                    .buttonStyle(.app)
+                }
+            }
+            .padding(14)
+            .panelCard(cornerRadius: 18)
+        }
+        .padding(.top, 4)
+    }
+
+    /// Lessons and courses whose titles match, across the whole library.
+    @ViewBuilder
+    private var searchResults: some View {
+        let courses = library.courses.filter { "\($0.title) \($0.summary)".localizedCaseInsensitiveContains(query) }
+        let lessons = library.courses.flatMap { course in
+            course.lessons.filter { $0.title.localizedCaseInsensitiveContains(query) }.map { (course, $0) }
+        }
+        if courses.isEmpty && lessons.isEmpty {
+            ContentUnavailableView.search(text: query)
+        }
+        if !courses.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("COURSES · \(courses.count)").sectionLabel()
+                ForEach(courses) { course in
+                    NavigationLink(value: course) {
+                        SearchRow(title: course.title, detail: "\(course.lessons.count) \(course.kind == "interview" ? "tasks" : "lessons")",
+                                  systemImage: course.kind == "interview" ? "stopwatch" : LearnTrack.track(of: course).systemImage,
+                                  tint: course.kind == "interview" ? AppTheme.violet : LearnTrack.track(of: course).tint)
+                    }
+                    .buttonStyle(.app)
+                }
+            }
+        }
+        if !lessons.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("LESSONS · \(lessons.count)").sectionLabel()
+                ForEach(lessons.prefix(60), id: \.1.id) { course, lesson in
+                    NavigationLink(value: LessonRoute(course: course, lesson: lesson)) {
+                        SearchRow(title: lesson.title, detail: course.title,
+                                  systemImage: library.completed.contains(lesson.id) ? "checkmark.circle.fill" : "book",
+                                  tint: library.completed.contains(lesson.id) ? AppTheme.mint : AppTheme.blue)
+                    }
+                    .buttonStyle(.app)
+                    .accessibilityIdentifier("search-lesson-\(lesson.id)")
+                }
+                if lessons.count > 60 {
+                    Text("Showing 60 of \(lessons.count). Type more to narrow it down.")
+                        .font(.system(size: 13)).foregroundStyle(AppTheme.muted)
+                }
+            }
         }
     }
 
@@ -77,6 +259,68 @@ struct LearnView: View {
         }
     }
     #endif
+}
+
+private struct SearchRow: View {
+    let title: String
+    let detail: String
+    let systemImage: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 36, height: 36)
+                .background(tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 15.5, weight: .semibold)).foregroundStyle(AppTheme.primary)
+                    .multilineTextAlignment(.leading)
+                Text(detail).font(.system(size: 13)).foregroundStyle(AppTheme.muted).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(AppTheme.muted)
+        }
+        .padding(12)
+        .panelCard(cornerRadius: 14)
+        .contentShape(Rectangle())
+    }
+}
+
+/// How far along you are, across every course.
+private struct ProgressStrip: View {
+    @State private var library = CourseLibrary.shared
+
+    var body: some View {
+        let paths = library.paths
+        let lessons = paths.reduce(0) { $0 + $1.lessons.count }
+        let done = paths.reduce(0) { $0 + library.completedCount($1) }
+        let finished = paths.filter { !$0.lessons.isEmpty && library.completedCount($0) == $0.lessons.count }.count
+        let solved = library.interview.map { library.completedCount($0) } ?? 0
+        let tasks = library.interview?.lessons.count ?? 0
+        HStack(spacing: 8) {
+            fact("\(done)", "of \(lessons) lessons", systemImage: "book.fill", tint: AppTheme.blue)
+            fact("\(finished)", "of \(paths.count) courses", systemImage: "flag.checkered", tint: AppTheme.mint)
+            if tasks > 0 { fact("\(solved)", "of \(tasks) tasks", systemImage: "stopwatch.fill", tint: AppTheme.violet) }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("learn-progress")
+    }
+
+    private func fact(_ value: String, _ label: String, systemImage: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage).font(.system(size: 11.5, weight: .semibold)).foregroundStyle(tint)
+                Text(value).font(.system(size: 18, weight: .bold, design: .rounded)).monospacedDigit()
+            }
+            Text(label).font(.system(size: 12)).foregroundStyle(AppTheme.muted).lineLimit(1).minimumScaleFactor(0.85)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .panelCard(cornerRadius: 14)
+    }
 }
 
 struct LessonRoute: Hashable {
@@ -131,13 +375,14 @@ private struct ProgressBar: View {
 private struct ProgressRing: View {
     let value: Double
     var size: CGFloat = 36
+    var tint: Color = AppTheme.blue
 
     var body: some View {
         ZStack {
             Circle().stroke(AppTheme.raised, lineWidth: 4)
             Circle()
                 .trim(from: 0, to: min(1, value))
-                .stroke(value >= 1 ? AppTheme.mint : AppTheme.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .stroke(value >= 1 ? AppTheme.mint : tint, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                 .rotationEffect(.degrees(-90))
         }
         .frame(width: size, height: size)
@@ -193,6 +438,7 @@ private struct PathRow: View {
     let course: Course
     let number: Int
     let isLast: Bool
+    var tint: Color = AppTheme.blue
     @State private var library = CourseLibrary.shared
 
     var body: some View {
@@ -203,12 +449,12 @@ private struct PathRow: View {
         HStack(alignment: .top, spacing: 14) {
             VStack(spacing: 0) {
                 ZStack {
-                    ProgressRing(value: Double(done) / Double(max(1, total)), size: 40)
+                    ProgressRing(value: Double(done) / Double(max(1, total)), size: 38, tint: tint)
                     if finished {
-                        Image(systemName: "checkmark").font(.system(size: 15, weight: .heavy)).foregroundStyle(AppTheme.mint)
+                        Image(systemName: "checkmark").font(.system(size: 14, weight: .heavy)).foregroundStyle(AppTheme.mint)
                     } else {
-                        Text("\(number)").font(.system(size: 15, weight: .heavy, design: .rounded))
-                            .foregroundStyle(current ? AppTheme.selectionInk : AppTheme.secondary)
+                        Text("\(number)").font(.system(size: 14, weight: .heavy, design: .rounded))
+                            .foregroundStyle(current ? tint : AppTheme.secondary)
                     }
                 }
                 if !isLast {
@@ -217,21 +463,32 @@ private struct PathRow: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(course.title).font(.system(size: 17, weight: .semibold)).multilineTextAlignment(.leading)
+                    Text(course.title).font(.system(size: 16.5, weight: .semibold)).multilineTextAlignment(.leading)
                     Spacer(minLength: 8)
-                    Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(AppTheme.muted)
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(AppTheme.muted)
                 }
                 Text(course.summary)
-                    .font(.system(size: 14))
+                    .font(.system(size: 13.5))
                     .foregroundStyle(AppTheme.secondary)
                     .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(finished ? "Done · \(total) lessons" : "\(total) lessons · \(duration(library.minutes(course)))\(done > 0 ? " · \(done) done" : "")")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(finished ? AppTheme.mint : current ? AppTheme.selectionInk : AppTheme.muted)
+                    .lineLimit(2)
+                HStack(spacing: 6) {
+                    if current, !finished {
+                        Text(done > 0 ? "In progress" : "Up next")
+                            .font(.system(size: 11.5, weight: .bold))
+                            .foregroundStyle(AppTheme.onBlue)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(tint, in: Capsule())
+                    }
+                    Text(finished ? "Done · \(total) lessons" : "\(total) lessons · \(duration(library.minutes(course)))\(done > 0 ? " · \(done) done" : "")")
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(finished ? AppTheme.mint : current ? tint : AppTheme.muted)
+                }
+                .padding(.top, 1)
             }
-            .padding(.top, 2)
-            .padding(.bottom, isLast ? 4 : 22)
+            .padding(.top, 1)
+            .padding(.bottom, isLast ? 0 : 18)
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
@@ -245,22 +502,39 @@ private struct PracticeCard: View {
 
     var body: some View {
         let done = library.completedCount(course)
+        let levels = ["Easy", "Medium", "Hard"].map { level in (level, course.lessons.filter { $0.level == level }.count) }.filter { $0.1 > 0 }
         HStack(spacing: 14) {
             Image(systemName: "stopwatch")
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(AppTheme.violet)
-                .frame(width: 44, height: 44)
-                .background(AppTheme.violet.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            VStack(alignment: .leading, spacing: 3) {
+                .frame(width: 46, height: 46)
+                .background(AppTheme.violet.opacity(0.14), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
                 Text(course.title).font(.system(size: 16.5, weight: .semibold))
                 Text("\(done) of \(course.lessons.count) solved · timed, with real tests")
-                    .font(.system(size: 13.5)).foregroundStyle(AppTheme.muted)
+                    .font(.system(size: 13)).foregroundStyle(AppTheme.muted)
+                if !levels.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(levels, id: \.0) { level, count in
+                            Text("\(count) \(level.lowercased())")
+                                .font(.system(size: 11.5, weight: .semibold))
+                                .foregroundStyle(level == "Easy" ? AppTheme.mint : level == "Medium" ? AppTheme.amber : AppTheme.coralInk)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background((level == "Easy" ? AppTheme.mint : level == "Medium" ? AppTheme.amber : AppTheme.coral).opacity(0.12), in: Capsule())
+                        }
+                    }
+                }
             }
             Spacer(minLength: 8)
             Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(AppTheme.muted)
         }
         .padding(14)
-        .panelCard(cornerRadius: 16)
+        .background {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(LinearGradient(colors: [AppTheme.violet.opacity(0.10), AppTheme.panel], startPoint: .topLeading, endPoint: .bottomTrailing))
+        }
+        .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(AppTheme.violet.opacity(0.2), lineWidth: 1) }
     }
 }
 
@@ -519,9 +793,13 @@ private struct InstalledLessonView: View {
     @State private var started = Date()
     @State private var bridge = EditorKeyboardBridge()
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dismiss) private var dismiss
 
     private let session = RunSession.shared
     private var isInterview: Bool { course.kind == "interview" }
+    private var isDone: Bool { library.completed.contains(lesson.id) }
+    private var nextLesson: Lesson? { onNext == nil ? nil : library.next(after: lesson, in: course) }
+    private var isLastLesson: Bool { library.next(after: lesson, in: course) == nil }
     private var sections: [LessonOutline.Section] { LessonOutline.sections(of: lesson) }
     private var passed: Int { results.filter(\.ok).count }
     private var allPassed: Bool { !results.isEmpty && passed == results.count }
@@ -853,29 +1131,36 @@ private struct InstalledLessonView: View {
                     .buttonStyle(.app)
                     .accessibilityLabel("Run")
                     .accessibilityIdentifier("lesson-run")
-                    Button(action: check) {
-                        Label(isInterview ? "Test" : "Check", systemImage: "checkmark")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(AppTheme.onRun)
-                            .lineLimit(1)
-                            .fixedSize()
-                            .padding(.horizontal, 18)
-                            .frame(minHeight: 46)
-                            .background(AppTheme.run, in: Capsule())
+                    if isDone, nextLesson != nil || isLastLesson {
+                        // Done: checking again stays one tap away, but moving on leads.
+                        Button(action: check) {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(AppTheme.mint)
+                                .frame(width: 46, height: 46)
+                                .background(AppTheme.mint.opacity(0.14), in: Circle())
+                        }
+                        .buttonStyle(.app)
+                        .accessibilityLabel(isInterview ? "Test again" : "Check again")
+                        .accessibilityIdentifier("lesson-check")
+                        advanceButton(compact: true)
+                    } else {
+                        Button(action: check) {
+                            Label(isInterview ? "Test" : "Check", systemImage: "checkmark")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(AppTheme.onRun)
+                                .lineLimit(1)
+                                .fixedSize()
+                                .padding(.horizontal, 18)
+                                .frame(minHeight: 46)
+                                .background(AppTheme.run, in: Capsule())
+                        }
+                        .buttonStyle(.app)
+                        .accessibilityIdentifier("lesson-check")
                     }
-                    .buttonStyle(.app)
-                    .accessibilityIdentifier("lesson-check")
                 }
-            } else if let next = library.next(after: lesson, in: course), library.completed.contains(lesson.id), let onNext {
-                Button { onNext(next) } label: {
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(AppTheme.onBlue)
-                        .frame(width: 46, height: 46)
-                        .background(AppTheme.blue, in: Circle())
-                }
-                .buttonStyle(.app)
-                .accessibilityLabel("Next lesson")
+            } else if isDone, nextLesson != nil || isLastLesson {
+                advanceButton(compact: true)
             }
         }
         .padding(.horizontal, 14)
@@ -883,6 +1168,48 @@ private struct InstalledLessonView: View {
         .padding(.bottom, 8)
         .background(AppTheme.panel)
         .overlay(alignment: .top) { Rectangle().fill(AppTheme.border).frame(height: 1) }
+    }
+
+    /// Moves on once the lesson is done: the next lesson, or back to the course after the last.
+    @ViewBuilder
+    private func advanceButton(compact: Bool) -> some View {
+        if let next = nextLesson, let onNext {
+            Button {
+                reportKind = nil
+                onNext(next)
+            } label: {
+                HStack(spacing: 6) {
+                    Text(compact ? (isInterview ? "Next task" : "Next lesson") : "Next: \(next.title)").lineLimit(1)
+                    Image(systemName: "arrow.right")
+                }
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(AppTheme.onBlue)
+                .padding(.horizontal, 18)
+                .frame(maxWidth: compact ? nil : .infinity, minHeight: compact ? 46 : 52)
+                .background(AppTheme.blue, in: compact ? AnyShape(Capsule()) : AnyShape(RoundedRectangle(cornerRadius: 14, style: .continuous)))
+                .fixedSize(horizontal: compact, vertical: false)
+            }
+            .buttonStyle(.app)
+            .accessibilityIdentifier(compact ? "lesson-next-bar" : "lesson-next")
+        } else if isLastLesson {
+            Button {
+                reportKind = nil
+                dismiss()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "flag.checkered")
+                    Text(compact ? "Finish" : "Course complete · back to the course").lineLimit(1)
+                }
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(AppTheme.onBlue)
+                .padding(.horizontal, 18)
+                .frame(maxWidth: compact ? nil : .infinity, minHeight: compact ? 46 : 52)
+                .background(AppTheme.mint, in: compact ? AnyShape(Capsule()) : AnyShape(RoundedRectangle(cornerRadius: 14, style: .continuous)))
+                .fixedSize(horizontal: compact, vertical: false)
+            }
+            .buttonStyle(.app)
+            .accessibilityIdentifier(compact ? "lesson-finish-bar" : "lesson-finish")
+        }
     }
 
     @ViewBuilder
@@ -926,6 +1253,17 @@ private struct InstalledLessonView: View {
                 .padding(16)
             }
             .background(AppTheme.background)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                // Pinned, so it is on screen at every sheet height and never under the explanation.
+                if kind == .check, allPassed, !session.isBusy, nextLesson != nil || isLastLesson {
+                    advanceButton(compact: false)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
+                        .padding(.bottom, 8)
+                        .background(AppTheme.panel)
+                        .overlay(alignment: .top) { Rectangle().fill(AppTheme.border).frame(height: 1) }
+                }
+            }
             .navigationTitle(reportTitle(kind: kind))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -946,6 +1284,26 @@ private struct InstalledLessonView: View {
     private var checkSummary: some View {
         if let reportError {
             Text(reportError).font(.system(size: 13.5, design: .monospaced)).foregroundStyle(AppTheme.coralInk)
+        }
+        if allPassed {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(AppTheme.mint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isInterview ? "Task solved" : "Lesson complete").font(.system(size: 18, weight: .bold))
+                    Text(nextLesson.map { "Up next: \($0.title)" } ?? (isLastLesson ? "That was the last one in \(course.title)." : "Saved to your progress."))
+                        .font(.system(size: 14))
+                        .foregroundStyle(AppTheme.secondary)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppTheme.mint.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("lesson-complete")
         }
         VStack(spacing: 0) {
             ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
@@ -976,25 +1334,8 @@ private struct InstalledLessonView: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(AppTheme.mint.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            if let next = library.next(after: lesson, in: course), let onNext {
-                Button {
-                    reportKind = nil
-                    onNext(next)
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("Next: \(next.title)").lineLimit(1)
-                        Image(systemName: "arrow.right")
-                    }
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(AppTheme.onBlue)
-                    .padding(.horizontal, 16)
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                    .background(AppTheme.blue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                .buttonStyle(.app)
-                .accessibilityIdentifier("lesson-next")
-            }
+            .background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.border, lineWidth: 1) }
         }
         if !results.isEmpty {
             Button(action: keepAsProject) {

@@ -16,7 +16,9 @@ def _announce(self, *args):
     try:
         if self.type == socket.SOCK_STREAM and self.family in (socket.AF_INET, socket.AF_INET6):
             host, port = self.getsockname()[:2]
-            emit_json("server_listening", {"host": host, "port": port})
+            from . import lanes
+
+            emit_json("server_listening", {"host": host, "port": port, "lane": lanes.current_lane()})
     except OSError:
         pass
     return result

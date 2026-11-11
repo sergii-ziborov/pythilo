@@ -175,6 +175,29 @@ struct ProjectTemplate: Identifiable, Sendable {
                 return redirect("notes")
 
             """,
+            "notes/tests.py": """
+            from django.test import TestCase
+            from django.urls import reverse
+
+            from .models import Note
+
+
+            class NoteTests(TestCase):
+                def test_list_shows_saved_notes(self):
+                    Note.objects.create(text="Buy milk")
+                    response = self.client.get(reverse("notes"))
+                    self.assertContains(response, "Buy milk")
+
+                def test_new_note_is_saved_and_redirects(self):
+                    response = self.client.post(reverse("note_new"), {"text": "  Call Ada  "})
+                    self.assertRedirects(response, reverse("notes"))
+                    self.assertEqual(Note.objects.get().text, "Call Ada")
+
+                def test_blank_note_is_ignored(self):
+                    self.client.post(reverse("note_new"), {"text": "   "})
+                    self.assertEqual(Note.objects.count(), 0)
+
+            """,
             "notes/migrations/__init__.py": "",
             "notes/migrations/0001_initial.py": """
             from django.db import migrations, models

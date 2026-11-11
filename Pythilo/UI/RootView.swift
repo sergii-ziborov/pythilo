@@ -118,6 +118,10 @@ struct RootView: View {
         }
         guard let id = defaults.string(forKey: "openTemplate"),
               let template = ProjectTemplate.all.first(where: { $0.id == id }) else { return }
+        // -freshTemplate YES starts from the template again, whatever earlier runs typed into it.
+        if defaults.bool(forKey: "freshTemplate"), let stale = store.projects.first(where: { $0.name == "shot-\(id)" }) {
+            try? store.delete(stale)
+        }
         let existing = store.projects.first { $0.name == "shot-\(id)" }
         guard let project = existing ?? (try? store.create(name: "shot-\(id)", template: template)) else { return }
         let model = WorkspaceModel(project: project)
@@ -126,6 +130,13 @@ struct RootView: View {
         if let file = defaults.string(forKey: "openFile") { model.open(file); model.panel = defaults.string(forKey: "panel").flatMap(WorkspacePanel.init(rawValue:)) ?? .code }
         model.drawerOpen = defaults.bool(forKey: "drawer")
         if let line = defaults.string(forKey: "terminal") { model.panel = .terminal; model.runTerminal(line) }
+        // -terminalThen "<line>" types a second command while the first still runs.
+        if let line = defaults.string(forKey: "terminalThen") {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(defaults.double(forKey: "terminalDelay") > 0 ? defaults.double(forKey: "terminalDelay") : 8))
+                model.runTerminal(line)
+            }
+        }
         workspace = model
         if defaults.bool(forKey: "startMCP") {
             let host = MCPHost.shared

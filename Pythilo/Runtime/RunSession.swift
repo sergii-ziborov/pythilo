@@ -27,6 +27,36 @@ struct OutputChunk: Identifiable, Equatable, Sendable {
     var text: String
 }
 
+/// Where a terminal command's output goes: one terminal tab.
+@MainActor
+protocol TerminalOutputSink: AnyObject {
+    func appendOutput(_ kind: OutputChunk.Kind, _ text: String)
+}
+
+/// A bounded run of output chunks, as a terminal tab keeps it.
+@MainActor
+struct OutputBuffer {
+    private(set) var chunks: [OutputChunk] = []
+    private(set) var revision = 0
+    private var count = 0
+    private static var nextID = 1_000_000_000
+
+    mutating func append(_ kind: OutputChunk.Kind, _ text: String) {
+        guard !text.isEmpty else { return }
+        var next = Self.nextID
+        var dropped = 0
+        RunSession.add(kind, text, to: &chunks, count: &count, dropped: &dropped, next: &next)
+        Self.nextID = next
+        revision += 1
+    }
+
+    mutating func clear() {
+        chunks = []
+        count = 0
+        revision += 1
+    }
+}
+
 /// Owns the single run the interpreter can do at a time. One per app.
 @MainActor
 @Observable
@@ -34,7 +64,7 @@ final class RunSession {
     static let shared = RunSession(engine: .shared)
 
     /// Output kept for display. A program printing forever must not fill memory.
-    private static let maximumOutput = 400_000
+    nonisolated private static let maximumOutput = 400_000
 
     private(set) var phase: RunPhase = .starting
     private(set) var pythonVersion: String?
@@ -62,6 +92,14 @@ final class RunSession {
     var onCell: ((CellEvent) -> Void)?
     var onCustom: ((String, Data) -> Void)?
 
+    /// Terminal tabs run here when the main thread is busy: lanes 1, 2 and 3.
+    let lanes: [RunLane]
+    /// The terminal tab a note or an unaddressed terminal job writes to: the one on screen.
+    weak var defaultTerminalSink: (any TerminalOutputSink)?
+    /// The tab whose command runs on the main thread now.
+    private(set) weak var terminalSink: (any TerminalOutputSink)?
+    var onLaneRunEnded: ((Int, RunOutcome) -> Void)?
+
     private let engine: PythonEngine
     private var nextChunk = 0
     private var outputCount = 0
@@ -71,19 +109,95 @@ final class RunSession {
 
     init(engine: PythonEngine) {
         self.engine = engine
+        lanes = (1...PythonEngine.extraLanes).map { RunLane(index: $0, engine: engine) }
         let pending = pendingLock
         engine.addListener { [weak self] event in
+            // Output can arrive far faster than the screen can draw it, so it
+            // is batched here rather than hopping to the main actor per print.
             if case let .stream(stream, text) = event {
-                // Output can arrive far faster than the screen can draw it, so it
-                // is batched here rather than hopping to the main actor per print.
-                if pending.append(stream, text) {
+                if pending.append(0, stream, text) {
+                    Task { @MainActor [weak self] in self?.flushOutput() }
+                }
+                return
+            }
+            if case let .lane(lane, .stream(stream, text)) = event {
+                if pending.append(lane, stream, text) {
                     Task { @MainActor [weak self] in self?.flushOutput() }
                 }
                 return
             }
             Task { @MainActor [weak self] in self?.handle(event) }
         }
+        for lane in lanes {
+            lane.onEnded = { [weak self] lane, outcome in self?.onLaneRunEnded?(lane, outcome) }
+        }
         engine.start()
+    }
+
+    /// The main thread, then any free lane: where a terminal command can start now.
+    var freeTerminalLane: Int? {
+        if phase == .idle || phase == .starting { return 0 }
+        return lanes.first { !$0.isBusy }?.index
+    }
+
+    /// Anything running anywhere, terminal lanes included.
+    var isAnythingRunning: Bool { isBusy || lanes.contains { $0.isBusy } }
+
+    func lane(_ index: Int) -> RunLane? {
+        index > 0 && index <= lanes.count ? lanes[index - 1] : nil
+    }
+
+    /// Runs a terminal command for one tab: on the main thread when it is free, so
+    /// signals and Stop behave as on a desktop, otherwise beside it on a free lane.
+    /// Returns the lane and the run's id, or nil when every lane is busy.
+    func submitTerminal(_ job: [String: Any], label: String, sink: any TerminalOutputSink) -> (lane: Int, id: String)? {
+        if phase == .idle || phase == .starting {
+            terminalSink = sink
+            guard let id = submit(job, label: label, channel: .terminal) else { terminalSink = nil; return nil }
+            return (0, id)
+        }
+        guard let lane = lanes.first(where: { !$0.isBusy }) else { return nil }
+        guard missingPackagesNote(for: job, sink: sink) == nil else { return nil }
+        var job = job
+        job["packagePaths"] = ContentStore.shared.packagePaths
+        var environment = ContentStore.shared.assetEnvironment
+        environment.merge(job["env"] as? [String: String] ?? [:]) { _, explicit in explicit }
+        job["env"] = environment
+        return lane.submit(job, label: label, sink: sink).map { (lane.index, $0) }
+    }
+
+    /// Stops whatever runs on a lane: the main thread's run for 0.
+    func stop(lane: Int) {
+        if lane == 0 { stop() } else { self.lane(lane)?.stop() }
+    }
+
+    func sendInput(_ line: String, lane: Int) {
+        if lane == 0 { sendInput(line) } else { self.lane(lane)?.sendInput(line) }
+    }
+
+    func sendEndOfInput(lane: Int) {
+        if lane == 0 { sendEndOfInput() } else { self.lane(lane)?.sendEndOfInput() }
+    }
+
+    func phase(lane: Int) -> RunPhase {
+        lane == 0 ? phase : self.lane(lane)?.phase ?? .idle
+    }
+
+    func listening(lane: Int) -> ListeningServer? {
+        lane == 0 ? listening : self.lane(lane)?.listening
+    }
+
+    /// The offline packages a job needs and does not have. Says so in the sink.
+    private func missingPackagesNote(for job: [String: Any], sink: (any TerminalOutputSink)?) -> String? {
+        guard let root = job["root"] as? String else { return nil }
+        let project = Project(url: URL(filePath: root))
+        let projectsRoot = ProjectStore.shared.root.standardizedFileURL.path + "/"
+        let requirements = project.url.standardizedFileURL.path.hasPrefix(projectsRoot)
+            ? ProjectDependencies.refresh(project) : project.requiredPacks
+        guard requirements.contains(where: { !ContentStore.shared.ready($0) }) else { return nil }
+        let note = "This project's offline packages are not downloaded. Open Project downloads and tap Download project packages. Nothing is downloaded by Run. Once the download finishes, this project can run offline.\n"
+        sink?.appendOutput(.system, note)
+        return note
     }
 
     var isBusy: Bool {
@@ -94,8 +208,13 @@ final class RunSession {
     }
 
     private func flushOutput() {
-        for (stream, text) in pendingLock.drain() {
-            append(stream == .stdout ? .stdout : .stderr, Self.withoutTerminalColors(text))
+        for (lane, stream, text) in pendingLock.drain() {
+            let kind: OutputChunk.Kind = stream == .stdout ? .stdout : .stderr
+            if lane == 0 {
+                append(kind, Self.withoutTerminalColors(text))
+            } else {
+                self.lane(lane)?.sink?.appendOutput(kind, Self.withoutTerminalColors(text))
+            }
         }
     }
 
@@ -152,6 +271,8 @@ final class RunSession {
                 return
             }
             onCustom?(kind, data)
+        case let .lane(index, event):
+            lane(index)?.handle(event)
         }
     }
 
@@ -161,13 +282,17 @@ final class RunSession {
             Self.add(kind, text, to: &output, count: &outputCount, dropped: &droppedCharacters, next: &nextChunk)
             outputRevision += 1
         case .terminal:
+            if let sink = terminalSink ?? defaultTerminalSink {
+                sink.appendOutput(kind, text)
+                return
+            }
             var dropped = 0
             Self.add(kind, text, to: &terminalOutput, count: &terminalCount, dropped: &dropped, next: &nextChunk)
             terminalRevision += 1
         }
     }
 
-    private static func add(
+    nonisolated static func add(
         _ kind: OutputChunk.Kind,
         _ text: String,
         to chunks: inout [OutputChunk],
@@ -202,8 +327,15 @@ final class RunSession {
         terminalRevision += 1
     }
 
-    func noteTerminal(_ text: String, kind: OutputChunk.Kind = .system) {
-        append(kind, text, channel: .terminal)
+    /// App-side lines in a terminal tab: the one given, or the one on screen.
+    func noteTerminal(_ text: String, kind: OutputChunk.Kind = .system, to sink: (any TerminalOutputSink)? = nil) {
+        if let sink = sink ?? defaultTerminalSink {
+            sink.appendOutput(kind, text)
+            return
+        }
+        var dropped = 0
+        Self.add(kind, text, to: &terminalOutput, count: &terminalCount, dropped: &dropped, next: &nextChunk)
+        terminalRevision += 1
     }
 
     func note(_ text: String) {
@@ -218,6 +350,8 @@ final class RunSession {
     func submit(_ job: [String: Any], label: String, channel: OutputChannel = .output) -> String? {
         // A job sent while Python starts waits in the host's queue.
         guard phase == .idle || phase == .starting else { return nil }
+        if channel == .output { terminalSink = nil }
+        if channel == .terminal, terminalSink == nil { terminalSink = defaultTerminalSink }
         if let root = job["root"] as? String {
             let project = Project(url: URL(filePath: root))
             let projectsRoot = ProjectStore.shared.root.standardizedFileURL.path + "/"
@@ -225,7 +359,9 @@ final class RunSession {
                 ? ProjectDependencies.refresh(project) : project.requiredPacks
             let missing = requirements.filter { !ContentStore.shared.ready($0) }
             if !missing.isEmpty {
-                note("This project's offline packages are not downloaded. Open Project downloads and tap Download project packages. Nothing is downloaded by Run. Once the download finishes, this project can run offline.\n")
+                let text = "This project's offline packages are not downloaded. Open Project downloads and tap Download project packages. Nothing is downloaded by Run. Once the download finishes, this project can run offline.\n"
+                if channel == .terminal { noteTerminal(text, to: terminalSink) } else { note(text) }
+                terminalSink = nil
                 return nil
             }
         }
@@ -294,42 +430,131 @@ final class RunSession {
     }
 }
 
-/// Collects output from the Python thread between main-actor flushes.
+/// Collects output from the Python threads between main-actor flushes.
 final class PendingOutput: @unchecked Sendable {
     private let lock = NSLock()
-    private var items: [(RunStream, String)] = []
+    private var items: [(Int, RunStream, String)] = []
     private var size = 0
-    private var dropped = 0
+    private var dropped: [Int: Int] = [:]
     private static let cap = 1_000_000
 
     /// Returns true when the main actor needs to be told there is output.
-    func append(_ stream: RunStream, _ text: String) -> Bool {
+    func append(_ lane: Int, _ stream: RunStream, _ text: String) -> Bool {
         lock.withLock {
             let wasEmpty = items.isEmpty
             if size + text.utf8.count > Self.cap {
-                dropped += text.utf8.count
+                dropped[lane, default: 0] += text.utf8.count
                 return wasEmpty
             }
-            if let last = items.indices.last, items[last].0 == stream {
-                items[last].1 += text
+            if let last = items.indices.last, items[last].0 == lane, items[last].1 == stream {
+                items[last].2 += text
             } else {
-                items.append((stream, text))
+                items.append((lane, stream, text))
             }
             size += text.utf8.count
             return wasEmpty
         }
     }
 
-    func drain() -> [(RunStream, String)] {
+    func drain() -> [(Int, RunStream, String)] {
         lock.withLock {
             var result = items
-            if dropped > 0 {
-                result.append((.stderr, "\n[Pythilo skipped \(dropped) characters of output the screen could not keep up with]\n"))
+            for (lane, count) in dropped where count > 0 {
+                result.append((lane, .stderr, "\n[Pythilo skipped \(count) characters of output the screen could not keep up with]\n"))
             }
             items = []
             size = 0
-            dropped = 0
+            dropped = [:]
             return result
         }
+    }
+}
+
+/// One terminal lane beside the main thread: its phase, its server and its Stop.
+@MainActor
+@Observable
+final class RunLane: Identifiable {
+    let index: Int
+    private(set) var phase: RunPhase = .idle
+    private(set) var listening: ListeningServer?
+    private(set) var lastOutcome: RunOutcome?
+    private(set) var activeRunID: String?
+    private(set) var label: String?
+    private(set) weak var sink: (any TerminalOutputSink)?
+    var onEnded: ((Int, RunOutcome) -> Void)?
+
+    private let engine: PythonEngine
+    private var escalation: Task<Void, Never>?
+
+    nonisolated var id: Int { index }
+
+    init(index: Int, engine: PythonEngine) {
+        self.index = index
+        self.engine = engine
+    }
+
+    var isBusy: Bool { phase != .idle && phase != .starting }
+
+    func submit(_ job: [String: Any], label: String, sink: any TerminalOutputSink) -> String? {
+        guard !isBusy else { return nil }
+        let id = UUID().uuidString
+        var job = job
+        job["id"] = id
+        self.sink = sink
+        self.label = label
+        activeRunID = id
+        phase = .running
+        engine.submit(job, lane: index)
+        return id
+    }
+
+    func handle(_ event: LaneEvent) {
+        switch event {
+        case let .started(id):
+            activeRunID = id
+            if phase != .cancelling { phase = .running }
+        case .stream:
+            break
+        case .inputWait:
+            if phase == .running { phase = .waitingForInput }
+        case .inputDone:
+            if phase == .waitingForInput { phase = .running }
+        case let .listening(server):
+            listening = server
+        case let .ended(outcome):
+            escalation?.cancel()
+            escalation = nil
+            activeRunID = nil
+            listening = nil
+            lastOutcome = outcome
+            phase = .idle
+            onEnded?(index, outcome)
+        }
+    }
+
+    /// The same escalation as the main thread: repeat, then say honestly that it did not stop.
+    func stop() {
+        guard isBusy, phase != .cancelling, phase != .unresponsive else { return }
+        phase = .cancelling
+        engine.interrupt(lane: index)
+        escalation = Task { [weak self, engine, index] in
+            for delay in [1.0, 2.0, 3.0, 4.0] {
+                try? await Task.sleep(for: .seconds(delay))
+                if Task.isCancelled { return }
+                engine.interrupt(lane: index)
+            }
+            try? await Task.sleep(for: .seconds(2))
+            if Task.isCancelled { return }
+            if self?.phase == .cancelling { self?.phase = .unresponsive }
+        }
+    }
+
+    func sendInput(_ line: String) {
+        sink?.appendOutput(.input, line + "\n")
+        engine.sendInput(line + "\n", lane: index)
+    }
+
+    func sendEndOfInput() {
+        engine.sendInput("\u{04}", lane: index)
     }
 }

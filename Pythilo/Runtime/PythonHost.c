@@ -32,6 +32,22 @@ static int debug_pipe[2] = {-1, -1};
 static char *bundle_root = NULL;
 static char *cache_root = NULL;
 
+// Lanes 1...PYHOST_LANES-1 are extra job threads for terminal tabs, so a command can run
+// while another tab's program, such as a web server, keeps the main thread. Lane 0 is
+// the main thread. Each lane has its own stdin pipe; they share one interpreter.
+static JobQueue lane_queues[PYHOST_LANES] = {
+    {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, NULL, NULL},
+    {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, NULL, NULL},
+    {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, NULL, NULL},
+    {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, NULL, NULL},
+};
+static bool lane_started[PYHOST_LANES] = {false};
+static int lane_pipes[PYHOST_LANES][2] = {{-1, -1}, {-1, -1}, {-1, -1}, {-1, -1}};
+static pthread_mutex_t lane_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t ready_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t ready_cond = PTHREAD_COND_INITIALIZER;
+static bool python_ready = false;
+
 static void queue_push(JobQueue *queue, const char *json) {
     Job *job = malloc(sizeof(Job));
     job->json = strdup(json);
@@ -128,11 +144,23 @@ static PyObject *host_debug_fd(PyObject *self, PyObject *args) {
     return PyLong_FromLong(debug_pipe[0]);
 }
 
+static PyObject *host_lane_input_fd(PyObject *self, PyObject *args) {
+    int lane;
+    if (!PyArg_ParseTuple(args, "i", &lane)) {
+        return NULL;
+    }
+    if (lane <= 0 || lane >= PYHOST_LANES) {
+        return PyLong_FromLong(input_pipe[0]);
+    }
+    return PyLong_FromLong(lane_pipes[lane][0]);
+}
+
 static PyMethodDef host_methods[] = {
     {"emit", host_emit, METH_VARARGS, "Send an event to the app."},
     {"call", host_call, METH_VARARGS, "Ask the app something and wait for the answer."},
     {"input_fd", host_input_fd, METH_NOARGS, "Read end of the stdin pipe."},
     {"debug_fd", host_debug_fd, METH_NOARGS, "Read end of the debugger command pipe."},
+    {"lane_input_fd", host_lane_input_fd, METH_VARARGS, "Read end of a lane's stdin pipe."},
     {NULL, NULL, 0, NULL},
 };
 
@@ -251,6 +279,10 @@ static void *python_main(void *unused) {
     Py_DECREF(booted);
 
     PyThreadState *saved = PyEval_SaveThread();
+    pthread_mutex_lock(&ready_lock);
+    python_ready = true;
+    pthread_cond_broadcast(&ready_cond);
+    pthread_mutex_unlock(&ready_lock);
     pthread_t analysis_thread;
     if (pthread_create(&analysis_thread, NULL, analysis_main, NULL) == 0) {
         pthread_detach(analysis_thread);
@@ -267,6 +299,55 @@ static void *python_main(void *unused) {
         saved = PyEval_SaveThread();
         free(json);
     }
+    return NULL;
+}
+
+static void wait_for_python(void) {
+    pthread_mutex_lock(&ready_lock);
+    while (!python_ready) {
+        pthread_cond_wait(&ready_cond, &ready_lock);
+    }
+    pthread_mutex_unlock(&ready_lock);
+}
+
+// A lane keeps one thread state for its whole life, as the main thread does, so
+// Python sees one stable thread per lane.
+static void *lane_main(void *argument) {
+    int lane = (int)(intptr_t)argument;
+    wait_for_python();
+    PyGILState_STATE gil = PyGILState_Ensure();
+    PyObject *runtime = PyImport_ImportModule("pythilo_runtime");
+    if (!runtime) {
+        report_python_error("lane");
+    }
+    PyThreadState *saved = PyEval_SaveThread();
+    for (;;) {
+        char *json = queue_pop(&lane_queues[lane]);
+        PyEval_RestoreThread(saved);
+        PyObject *result = runtime ? PyObject_CallMethod(runtime, "dispatch_lane", "is", lane, json) : NULL;
+        if (!result) {
+            report_python_error("dispatch");
+        }
+        Py_XDECREF(result);
+        saved = PyEval_SaveThread();
+        free(json);
+    }
+    (void)gil;
+    return NULL;
+}
+
+static void *lane_interrupt_main(void *argument) {
+    int lane = (int)(intptr_t)argument;
+    wait_for_python();
+    PyGILState_STATE gil = PyGILState_Ensure();
+    PyObject *module = PyImport_ImportModule("pythilo_runtime.lanes");
+    PyObject *result = module ? PyObject_CallMethod(module, "interrupt", "i", lane) : NULL;
+    if (!result) {
+        report_python_error("interrupt");
+    }
+    Py_XDECREF(result);
+    Py_XDECREF(module);
+    PyGILState_Release(gil);
     return NULL;
 }
 
@@ -300,6 +381,42 @@ void pyhost_analyze(const char *json) {
     queue_push(&analysis_queue, json);
 }
 
+void pyhost_submit_lane(int lane, const char *json) {
+    if (lane <= 0 || lane >= PYHOST_LANES) {
+        pyhost_submit(json);
+        return;
+    }
+    pthread_mutex_lock(&lane_lock);
+    if (!lane_started[lane]) {
+        lane_started[lane] = true;
+        pipe(lane_pipes[lane]);
+        pthread_attr_t attributes;
+        pthread_attr_init(&attributes);
+        pthread_attr_setstacksize(&attributes, 16 * 1024 * 1024);
+        pthread_t thread;
+        if (pthread_create(&thread, &attributes, lane_main, (void *)(intptr_t)lane) == 0) {
+            pthread_detach(thread);
+        }
+        pthread_attr_destroy(&attributes);
+    }
+    pthread_mutex_unlock(&lane_lock);
+    queue_push(&lane_queues[lane], json);
+}
+
+void pyhost_interrupt_lane(int lane) {
+    if (lane <= 0 || lane >= PYHOST_LANES) {
+        pyhost_send_interrupt();
+        return;
+    }
+    // Never from the app's main thread: taking the GIL there could stall the UI.
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, lane_interrupt_main, (void *)(intptr_t)lane) == 0) {
+        pthread_detach(thread);
+    }
+}
+
+void pyhost_write_lane_input(int lane, const char *utf8);
+
 void pyhost_send_interrupt(void) {
     if (started) {
         pthread_kill(python_thread, SIGINT);
@@ -320,6 +437,17 @@ static void write_all(int fd, const char *text) {
 
 void pyhost_write_input(const char *utf8) {
     write_all(input_pipe[1], utf8);
+}
+
+void pyhost_write_lane_input(int lane, const char *utf8) {
+    if (lane <= 0 || lane >= PYHOST_LANES) {
+        write_all(input_pipe[1], utf8);
+        return;
+    }
+    pthread_mutex_lock(&lane_lock);
+    int fd = lane_pipes[lane][1];
+    pthread_mutex_unlock(&lane_lock);
+    write_all(fd, utf8);
 }
 
 void pyhost_write_debug_command(const char *utf8) {
