@@ -1,0 +1,51 @@
+{
+ "pages": [
+  {
+   "name": "Learn Python",
+   "promotionalText": "Learn Python by writing it: 478 lessons with checks that explain, 100 interview tasks and 136 Labs that trace your code and explain each algorithm. Works offline.",
+   "keywords": [
+    "learn",
+    "coding",
+    "algorithms",
+    "pytorch",
+    "ai"
+   ],
+   "iphone": [
+    "03-learn.jpg",
+    "04-labs.jpg",
+    "06-pytorch.jpg",
+    "01-editor.jpg",
+    "02-terminal.jpg"
+   ],
+   "ipad": [
+    "02-ipad-learn.jpg",
+    "01-ipad-workspace.jpg"
+   ]
+  },
+  {
+   "name": "Python IDE",
+   "promotionalText": "A real Python workspace on iPhone and iPad: editor, terminal with tabs, debugger, pytest, Git and GitHub, Django and FastAPI servers, notebooks. CPython 3.14.",
+   "keywords": [
+    "ide",
+    "code",
+    "editor",
+    "compiler",
+    "debugger",
+    "notebook",
+    "django",
+    "github"
+   ],
+   "iphone": [
+    "02-terminal.jpg",
+    "01-editor.jpg",
+    "05-github.jpg",
+    "06-pytorch.jpg",
+    "07-rooms.jpg"
+   ],
+   "ipad": [
+    "01-ipad-workspace.jpg",
+    "02-ipad-learn.jpg"
+   ]
+  }
+ ]
+}

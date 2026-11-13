@@ -984,3 +984,37 @@ technical claim in the second article was checked against the runtime sources
 (`PythonHost.h`, `lanes.py`, `streams.py`, `servers.py`, `packages.py`, `bash.py`). The
 README's first paragraph links the store page.
 
+## Lab guides, version 1.1 (35) and App Store search pages — 13 November 2026
+
+Every Lab now explains its algorithm. `Resources/LabGuides/lab-guides.json` holds one guide for
+each of the 136 Labs (52,000 words): the idea, four to six steps, what it costs, three real
+uses, three common mistakes and what to look at in the Lab. Each guide was written against
+the Lab's worked answer and checked by `build/labguides/validate.py`; the facts quoted under
+"Where it is used" were reviewed by hand. Each Lab and each of the 19 topics has an
+illustration (HEIC, 960 px, 4.6 MB in all), generated with Grok's image tool. `LabGuideSheet`
+opens from an info button beside a Lab's row, so it reads before the topic is downloaded, and
+from About in the Lab's navigation bar; on iPad it is a page-sized sheet. Settings › About
+links the App Store page.
+
+Verification on the iOS Simulator: `LabGuideCoverageTests` (every Lab has a complete guide and
+an illustration) and `LabGuideTests` (list and in-Lab entry, all six sections) pass on iPhone
+and iPad (`build/guide35-b.xcresult`, `build/guide35-pad2.xcresult`). On iPhone the hit-target,
+Labs card, Labs navigation, content visibility and Downloads suites pass; the Labs navigation
+and one Downloads case need their content downloaded first and fail when run straight after
+tests that remove downloads, as before this change (`build/guide35-regress2.xcresult`,
+`build/guide35-regress3.xcresult`, `build/guide35-regress4.xcresult`). No physical-device run.
+
+Release 1.1 (35) archives from `9fd93f8`; the IPA is 88,794,895 bytes. Build 35 is `VALID`
+and `IN_BETA_TESTING` for the internal group with en-US and ru notes. App Store version 1.1
+selects build 35 and was submitted at 2026-11-13T11:05:23Z: `WAITING_FOR_REVIEW`, release
+**MANUAL**; 1.0 (34) stays on sale. The keyword field is now
+`python,ide,code,editor,learn,coding,compiler,algorithms,debugger,notebook,django,pytorch,github,ai`.
+
+Two custom product pages were created and submitted in the same review: **Learn Python**
+(Learn, Labs and PyTorch screenshots first; keywords learn, algorithms, pytorch) and
+**Python IDE** (terminal, editor and GitHub first; keywords ide, code, editor, debugger,
+notebook, django, github). A page can only claim keywords of the version on sale, so
+`coding`, `ai` and `compiler` are to be mapped once 1.1 is live
+(`python3 build/release-tools/release35.py keywords`). Definitions:
+`docs/app-store/custom-product-pages.json`. Receipt: `docs/app-store/release-1.1-build35.json`.
+

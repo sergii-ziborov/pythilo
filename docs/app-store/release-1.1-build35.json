@@ -1,0 +1,85 @@
+{
+ "observedAt": "2026-11-13T11:06:00Z",
+ "app": "6829637526",
+ "version": "1.1",
+ "build": "35",
+ "archiveSourceCommit": "9fd93f8b56362b068987d826292ac50d5cf7df4a",
+ "ipa": {
+  "bytes": 88794895,
+  "sha256": "4ccfec1f0a89b6b17bac7f464afab74a22c5970472a121ed7db402b3805b1d7d"
+ },
+ "testFlight": {
+  "buildId": "65947d3a-8a5b-4013-a2ce-50593bf043df",
+  "processingState": "VALID",
+  "internalBuildState": "IN_BETA_TESTING",
+  "group": "Pythilo Internal",
+  "testers": 1,
+  "notes": "docs/app-store/testflight-35.json (en-US, ru)"
+ },
+ "appStoreVersion": {
+  "id": "349322f3-e85c-47ef-901c-c723882be6e6",
+  "state": "WAITING_FOR_REVIEW",
+  "releaseType": "MANUAL",
+  "selectedBuild": "35",
+  "metadata": "description, keywords, promotional text, what's new, URLs and review notes match docs/app-store/en-US.json",
+  "keywords": "python,ide,code,editor,learn,coding,compiler,algorithms,debugger,notebook,django,pytorch,github,ai",
+  "screenshots": {
+   "APP_IPHONE_67": 7,
+   "APP_IPAD_PRO_3GEN_129": 2,
+   "note": "carried over from 1.0, read back by file name"
+  }
+ },
+ "reviewSubmission": {
+  "id": "19eedaca-23a4-42cc-ad37-e93b069d26a4",
+  "state": "WAITING_FOR_REVIEW",
+  "submittedDate": "2026-11-13T11:05:23.151Z",
+  "items": [
+   "appStoreVersion 1.1",
+   "customProductPage Learn Python",
+   "customProductPage Python IDE"
+  ]
+ },
+ "customProductPages": [
+  {
+   "name": "Learn Python",
+   "id": "d5cd7ad6-99a8-484d-bda5-ee803693e995",
+   "url": "https://apps.apple.com/us/app/pythilo/id6829637526?ppid=d5cd7ad6-99a8-484d-bda5-ee803693e995",
+   "visible": true,
+   "state": "WAITING_FOR_REVIEW",
+   "searchKeywords": [
+    "learn",
+    "algorithms",
+    "pytorch"
+   ],
+   "keywordsAfter11IsLive": [
+    "coding",
+    "ai"
+   ]
+  },
+  {
+   "name": "Python IDE",
+   "id": "4e48b319-d55f-4834-8a70-b31f74acbe53",
+   "url": "https://apps.apple.com/us/app/pythilo/id6829637526?ppid=4e48b319-d55f-4834-8a70-b31f74acbe53",
+   "visible": true,
+   "state": "WAITING_FOR_REVIEW",
+   "searchKeywords": [
+    "ide",
+    "code",
+    "editor",
+    "debugger",
+    "notebook",
+    "django",
+    "github"
+   ],
+   "keywordsAfter11IsLive": [
+    "compiler"
+   ]
+  }
+ ],
+ "liveVersion": {
+  "version": "1.0",
+  "build": "34",
+  "state": "READY_FOR_SALE"
+ },
+ "tests": "LabGuideCoverageTests (2) and LabGuideTests on iPhone and iPad simulators; Labs, Downloads and hit-target UI suites on iPhone. No physical-device run."
+}
