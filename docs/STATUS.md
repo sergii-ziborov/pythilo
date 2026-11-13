@@ -1006,8 +1006,9 @@ tests that remove downloads, as before this change (`build/guide35-regress2.xcre
 
 Release 1.1 (35) archives from `9fd93f8`; the IPA is 88,794,895 bytes. Build 35 is `VALID`
 and `IN_BETA_TESTING` for the internal group with en-US and ru notes. App Store version 1.1
-selects build 35 and was submitted at 2026-11-13T11:05:23Z: `WAITING_FOR_REVIEW`, release
-**MANUAL**; 1.0 (34) stays on sale. The keyword field is now
+selects build 35 and was submitted at 2026-11-13T11:05:23Z: `WAITING_FOR_REVIEW`. Release was
+**MANUAL** at submission and is now **AFTER_APPROVAL** at the owner's request, so 1.1 goes on
+sale as soon as it is approved; 1.0 (34) stays on sale until then. The keyword field is now
 `python,ide,code,editor,learn,coding,compiler,algorithms,debugger,notebook,django,pytorch,github,ai`.
 
 Two custom product pages were created and submitted in the same review: **Learn Python**

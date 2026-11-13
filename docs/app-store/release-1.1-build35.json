@@ -19,7 +19,7 @@
  "appStoreVersion": {
   "id": "349322f3-e85c-47ef-901c-c723882be6e6",
   "state": "WAITING_FOR_REVIEW",
-  "releaseType": "MANUAL",
+  "releaseType": "AFTER_APPROVAL",
   "selectedBuild": "35",
   "metadata": "description, keywords, promotional text, what's new, URLs and review notes match docs/app-store/en-US.json",
   "keywords": "python,ide,code,editor,learn,coding,compiler,algorithms,debugger,notebook,django,pytorch,github,ai",
@@ -27,7 +27,8 @@
    "APP_IPHONE_67": 7,
    "APP_IPAD_PRO_3GEN_129": 2,
    "note": "carried over from 1.0, read back by file name"
-  }
+  },
+  "releaseTypeNote": "Changed from MANUAL on 13 November 2026 at the owner's request to publish everything: 1.1 goes on sale as soon as App Review approves it."
  },
  "reviewSubmission": {
   "id": "19eedaca-23a4-42cc-ad37-e93b069d26a4",
