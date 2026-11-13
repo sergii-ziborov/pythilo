@@ -248,6 +248,7 @@ struct AboutView: View {
                 LinkRow(title: "User guide", systemImage: "book.pages", url: AppInfo.guide)
                 LinkRow(title: "Labs in the browser", systemImage: "testtube.2", url: AppInfo.labs)
                 LinkRow(title: "Blog", systemImage: "newspaper", url: AppInfo.blog)
+                LinkRow(title: "Pythilo on the App Store", systemImage: "bag", url: AppInfo.appStore)
                 LinkRow(title: "Source code", detail: "GitHub", systemImage: "chevron.left.forwardslash.chevron.right", url: AppInfo.source)
             }
             Section("Help") {
