@@ -63,8 +63,8 @@ The smoke test creates a room, streams it, posts an update and presence, ends th
 and loads the home, guide, pricing, support, legal, blog, lessons, playground,
 Connect AI and Pyodide files.
 
-Optional: set `NEXT_PUBLIC_APP_STORE_URL` at build time to point "Get the
-app" at the App Store page. Without it, the button opens the beta section of the pricing page.
+"Get the app" opens the App Store page, `APP_STORE_URL` in `lib/site-info.ts`.
+`NEXT_PUBLIC_APP_STORE_URL` at build time overrides it, for example with a campaign link.
 
 ## Clients
 
@@ -93,9 +93,9 @@ Forward Email aliases for support, privacy and security at pythilo.com, to the
 owner-approved Gmail destination. SPF includes spf.forwardemail.net. Website routing
 records are unchanged. Forwarding is inbound only; replies are sent from Gmail.
 
-The website price is US$9.99 for the planned one-time App Store purchase; the
-TestFlight beta remains free and invitation-only. Do not link to an App Store listing
-or public TestFlight signup before one is available.
+Pythilo 1.0 has been on the App Store since 12 November 2026 for US$9.99, paid once
+(`PRICE`, `RELEASED` and `APP_STORE_URL` in `lib/site-info.ts`). The site links to the
+App Store page; TestFlight builds stay free and by invitation, with no public signup link.
 
 ## Page cache across releases
 
@@ -484,3 +484,37 @@ revision `sha256:e7823ad3d686725d6c54f72337dda5fecfe704a9480e0acb73f9030b54dc774
 `pythilo-learn-guide-manage-{build,publish,deploy}-20261111-v1` (build v2: v1 was refused
 while the guard update timed out). Deployed 17:00:17 UTC. 92 site tests, TypeScript and the
 776-page build pass; the public smoke suite passes and the live guide shows the new section.
+
+## App Store release, pricing and two articles (13 November 2026)
+
+Pythilo 1.0 (34) went on sale on 12 November 2026 (App Store Connect: `READY_FOR_SALE`,
+175 territories, US$9.99). The site now says so: Pricing is "One price, paid once", the
+home page, Support, the Terms (sections 3 and 4, dated 12 November) and the Labs pages
+drop the beta wording, and "Get the app" opens `https://apps.apple.com/app/id6829637526`.
+The blog adds "Pythilo 1.0 is on the App Store" (12 November, 2,434 words) and "How real
+Python runs on an iPhone" (13 November, 2,381 words), each with a JPEG cover and one
+WebP figure, generated as images and stored in `public/blog/<slug>/`.
+
+`lib/site-route-cache.ts` now keeps only the newest archived build in
+`.pythilo-previous-builds/` and deletes the older ones at start-up. Every release used
+to leave about 90 MB there for good; the folder had reached 555 MB.
+
+Overlay: 19 files, 703,929 bytes, SHA-256
+`63d153701a6451fe5ff17686c62d2f660907799d577e1a4867de1d880c85b318`, sent in three chunks by
+`build/release-tools/hostwatch_upload.py`. Server baselines of all replaced files matched
+`HEAD` (`build/release-tools/hostwatch_tree.py`). This file is not part of the overlay.
+
+Free disk was 8.58 GB and retention had nothing eligible, so with the owner's go-ahead
+`minFreeBytes` was 7.5 GiB for this build only and is 10 GiB again (read back). The node
+hosts Pythilo, Crabrix, Tellwick, Sharprune and Gopherforge on 40 GB; it needs a larger
+disk, or the guard needs a lower permanent value, before releases can run unattended.
+
+Source revision `sha256:26038660f5d12a763d85f0427b0a499520fa458d8caba2229a4e544e890a7f56`,
+image `sha256:7553bf7f338c5400ce09603e9213dc29db28798f8eabefa534d00658265fe638`, registry
+manifest `sha256:30aa4fad86fca54ec0d7412603c8b815e758ad707d9e8d6a7d421c2db8867083`, serving
+revision `sha256:bab078ea48fef275031d9dc69a792d659d5f2b82e3f1b72217100cd9d29c318c`. Keys
+`pythilo-appstore-launch-{build,publish,deploy}-20261113-v1`; deployed 05:41:23 UTC.
+All 94 site tests, TypeScript and the production build pass; the smoke suite (65 checks,
+now including Pricing, the App Store link and both articles) passes locally and against
+https://pythilo.com.
+

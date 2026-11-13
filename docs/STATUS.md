@@ -969,3 +969,18 @@ matching notes. Build 33's waiting submission was withdrawn; submission
 `8d069ee1-d982-4ee6-8e62-29b06ced7cb9` with build 34 is `WAITING_FOR_REVIEW` since
 2026-11-11T16:10:10Z, release **MANUAL**. Metadata and all nine screenshots read back
 matching. No physical-device run is claimed. Receipt: `docs/app-store/release-1.0-build34.json`.
+
+## On the App Store — 12 November 2026
+
+Pythilo 1.0 (34) was approved and released on 12 November 2026. App Store Connect reads
+`READY_FOR_SALE` for version 1.0 with build 34, available in 175 territories from that
+date at US$9.99, and all four review submissions are `COMPLETE`. The store page is
+https://apps.apple.com/app/id6829637526.
+
+The website followed on 13 November (see `site/DEPLOY.md`): pricing and every page that
+said "beta" now describe a one-time App Store purchase, and the blog has a release post and
+"How real Python runs on an iPhone", both over 2,000 words with generated images. Every
+technical claim in the second article was checked against the runtime sources
+(`PythonHost.h`, `lanes.py`, `streams.py`, `servers.py`, `packages.py`, `bash.py`). The
+README's first paragraph links the store page.
+
