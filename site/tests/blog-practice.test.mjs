@@ -24,3 +24,22 @@ test('practice articles have real covers, runnable examples and valid lesson/lab
     }
   }
 });
+
+test('every post has its cover and figures on disk, and the long articles stay long', () => {
+  const posts = allPosts();
+  for (const post of posts) {
+    if (post.cover) assert.ok(existsSync(`public${post.cover}`), `${post.slug}: ${post.cover}`);
+    for (const block of post.blocks) if (block.kind === 'figure') {
+      assert.ok(existsSync(`public${block.src}`), `${post.slug}: ${block.src}`);
+      assert.ok(block.alt.length > 20, `${post.slug}: ${block.src} needs real alt text`);
+    }
+  }
+  for (const name of ['pythilo-1-0-on-the-app-store', 'how-python-runs-on-an-iphone']) {
+    const post = posts.find(p => p.slug === name);
+    assert.ok(post, name);
+    assert.ok(post.words >= 2000, `${name}: ${post.words} words`);
+    assert.ok(/\.(png|jpg|jpeg)$/i.test(post.cover), `${name}: cover must work in link previews`);
+    assert.ok(post.coverAlt.length > 20, name);
+    for (const [, url] of post.body.matchAll(/\]\((\/guide\/[a-z-]+)\/\)/g)) assert.ok(existsSync(`app${url}/page.tsx`), `${name}: ${url}`);
+  }
+});

@@ -186,10 +186,10 @@ test("all browser labs trace actual edited code, accept worked answers and rejec
   }
 });
 
-test("every Python example in the six practical blog articles runs in Pyodide", async () => {
+test("every Python example in the practical and Pythilo blog articles runs in Pyodide", async () => {
   const { allPosts } = await import('../app/blog/_lib/posts.ts');
   const posts = allPosts().filter(post => !post.slug.includes('news-november'));
-  assert.equal(posts.length, 6);
+  assert.equal(posts.length, 8);
   let count = 0;
   for (const post of posts) for (const block of post.blocks) {
     if (block.kind !== 'code' || block.language !== 'python') continue;
