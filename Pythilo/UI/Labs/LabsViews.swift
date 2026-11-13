@@ -24,6 +24,7 @@ struct LabsView: View {
     @State private var hidden = HiddenContent.shared
     @State private var showHidden = false
     @State private var removing: RemovalTarget?
+    @State private var guideLab: LabInfo?
 
     private static let order: [LabInfo.Section] = [.learning, .intelligence, .basics, .structures, .algorithms]
 
@@ -98,6 +99,7 @@ struct LabsView: View {
             .navigationDestination(for: String.self) { id in
                 LabDestination(id: id)
             }
+            .sheet(item: $guideLab) { LabGuideSheet(lab: $0) }
             .navigationDestination(for: LessonRoute.self) { route in
                 LessonView(course: route.course, lesson: route.lesson, onOpenProject: onOpenProject)
             }
@@ -306,6 +308,7 @@ struct LabsView: View {
     }
 
     private func lab(_ info: LabInfo) -> some View {
+        HStack(alignment: .top, spacing: 0) {
         NavigationLink(value: info.id) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: info.symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(info.color)
@@ -337,15 +340,35 @@ struct LabsView: View {
                 Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(AppTheme.muted)
                     .padding(.top, 12)
             }
-            .padding(12)
+            .padding(.leading, 12)
+            .padding(.vertical, 12)
+            .padding(.trailing, hasGuide(info) ? 4 : 12)
             .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-            .background(AppTheme.background.opacity(0.6), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.border.opacity(0.7), lineWidth: 1) }
             .contentShape(Rectangle())
         }
         .buttonStyle(.app)
         .accessibilityIdentifier("lab-\(info.id)")
+        if hasGuide(info) {
+            // Beside the row, not inside it: the guide opens without the Lab's download.
+            Button { guideLab = info } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(AppTheme.blue)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.app)
+            .padding(.top, 10)
+            .padding(.trailing, 4)
+            .accessibilityLabel("About \(info.title)")
+            .accessibilityIdentifier("lab-about-\(info.id)")
+        }
+        }
+        .background(AppTheme.background.opacity(0.6), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AppTheme.border.opacity(0.7), lineWidth: 1) }
     }
+
+    private func hasGuide(_ info: LabInfo) -> Bool { LabGuides.guide(for: info.id) != nil }
 
     private func tags(for info: LabInfo) -> [Tag] {
         var result: [Tag] = []
@@ -430,7 +453,9 @@ struct LabDestination: View {
                 case "sorting": SortingBenchView()
                 default: TraceLabView(lab: lab)
                 }
-            }.navigationTitle(lab.title)
+            }
+            .navigationTitle(lab.title)
+            .labGuide(lab)
         }
     }
 }

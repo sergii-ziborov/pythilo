@@ -14,7 +14,7 @@ settings:
     TARGETED_DEVICE_FAMILY: "1,2"
     SUPPORTS_MACCATALYST: NO
     ENABLE_USER_SCRIPT_SANDBOXING: NO
-    MARKETING_VERSION: "1.0"
+    MARKETING_VERSION: "1.1"
     CURRENT_PROJECT_VERSION: "1"
     # The Python support package ships one simulator stdlib per architecture
     # and the embed script copies exactly one.
@@ -45,6 +45,11 @@ targets:
           - Resources/Courses
           - Resources/Bundler
           - Resources/Models
+          - Resources/LabGuides
+      # One guide and one illustration per Lab, read from the bundle's LabGuides folder.
+      - path: Pythilo/Resources/LabGuides
+        type: folder
+        buildPhase: resources
       - path: build/ContentCatalog
         type: folder
         buildPhase: resources
