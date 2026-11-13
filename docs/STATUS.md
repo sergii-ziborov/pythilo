@@ -1020,8 +1020,9 @@ notebook, django, github). A page can only claim keywords of the version on sale
 
 ## Website: Learn redesign, search metadata and five articles — 13 November 2026
 
-The website work is committed (`b868050`, `c5e373e`) and staged on the server, but not yet
-live: the build guard needs the owner's confirmation (see `site/DEPLOY.md`). It contains the
+The website work (`b868050`, `c5e373e`) is live on pythilo.com since 11:52 UTC, after a disk
+cleanup over SSH that removed 24 unreferenced old Pythilo images (see `site/DEPLOY.md`). The
+smoke suite and the audit of all 776 sitemap pages pass on the live site. It contains the
 redesigned Learn pages (tracks with icons, filters, search, progress), a design pass over the
 other pages, search and sharing metadata on every page with icons, manifest, structured data
 and a dated sitemap, five articles of 3,400 to 3,850 words with four images each, and the

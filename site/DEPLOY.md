@@ -518,7 +518,7 @@ All 94 site tests, TypeScript and the production build pass; the smoke suite (65
 now including Pricing, the App Store link and both articles) passes locally and against
 https://pythilo.com.
 
-## Learn redesign, search metadata, five articles and Lab guides (13 November 2026) — staged, not yet built
+## Learn redesign, search metadata, five articles and Lab guides (13 November 2026)
 
 What is in it: the redesigned Learn index and course page, the design pass, per-page canonical
 and Open Graph URLs, the default share image, favicon and app icons, the web manifest, the App
@@ -548,11 +548,24 @@ matched commit `d336bcb`. `source_preview` (partial): base source revision
 `sha256:7553bf7f338c5400ce09603e9213dc29db28798f8eabefa534d00658265fe638`, revision
 `sha256:16246d1f0600ad4fe6565d53f35ee23570794cedabfe6bb5206440a1c86b24b1`, 199 changed files.
 
-Not built: free disk is 8.12 GB against the 10 GiB build guard, and lowering the guard needs
-the owner's yes each time; three questions sent to the phone went unanswered. To finish:
-`retention_set_policy` with `minFreeBytes` 7 GiB, `source_build` with the digest and revision
-above (key `pythilo-learn-seo-articles-build-20261113-v1`), `image_update`, `deployment_update`,
-restore `minFreeBytes` to 10 GiB, then the two checks above. An upload expires after 24 hours
-(`uploadMaxAgeHours`); after that, send the same archive again from
-`build/release-tools/site36/overlay.tgz`.
+The build first waited on disk space: 8.12 GB free against the 10 GiB guard. The owner asked
+for a cleanup over SSH instead of lowering the guard. `podman` held 38 untagged images from 5
+and 6 November that no container and no tag referenced. Each was mounted read-only and
+identified by its files: 24 were old Pythilo builds and builder stages (one more was the
+11 November intermediate) and were removed with `podman rmi`; the 13 that belong to
+Sharprune, Gopherforge and Crabrix were left. That freed 6.9 GB. `journalctl --vacuum-size=150M`
+freed 337 MB and `apt-get clean` the package cache. Free space went from 8.78 GB to 15.7 GB,
+the guard stayed at 10 GiB, and all four running services stayed up.
 
+Source revision `sha256:77d9e8a02dce1023d81599bc6cdcdaf9703e988d718e0a2820de49d62335f9f7`,
+image `sha256:28ba7f4094df83183c00c7c0e40401e04be0fe96c94306d7c45e349ea48ef635`, registry
+manifest `sha256:1a20a1419083ac7386b11c9ff45a6b582129daa2fd557becdad2486043cd779c`, serving
+revision `sha256:170f8a557888dda4c8eaa73bc03b01e7d45333a33965c652e10952efc28cbac6`. Keys
+`pythilo-learn-seo-articles-{build,publish,deploy}-20261113-v1`; deployed 11:52:40 UTC.
+On https://pythilo.com the smoke suite passes (72 checks) and `seo-audit.mjs` reads all 776
+sitemap pages with no problems; favicon, manifest, share image, icons and the new images
+return 200 with the right types. Free disk after the release: 14.4 GB.
+
+Leftovers that are not Pythilo's and were not touched: 13 untagged images of other sites, two
+stopped Crabrix containers, `/srv/hostwatch-sources/source-contexts-20261105.tar.gz` (699 MB)
+and eight `/opt/tellwick-whatsapp-*` folders.
