@@ -518,3 +518,41 @@ All 94 site tests, TypeScript and the production build pass; the smoke suite (65
 now including Pricing, the App Store link and both articles) passes locally and against
 https://pythilo.com.
 
+## Learn redesign, search metadata, five articles and Lab guides (13 November 2026) — staged, not yet built
+
+What is in it: the redesigned Learn index and course page, the design pass, per-page canonical
+and Open Graph URLs, the default share image, favicon and app icons, the web manifest, the App
+Store banner tag, structured data, the dated sitemap, `scripts/seo-audit.mjs`, five articles
+dated 7 to 11 November with their images, and the app's algorithm guide with its illustration
+on each of the 114 Lab pages (`content/lab-guides.json`, prepared from
+`Pythilo/Resources/LabGuides/lab-guides.json`; it is part of the overlay because the server
+build does not see the app's sources).
+
+Local verification: 101 site tests, TypeScript and the 790-page production build pass. The
+audit read all 776 sitemap pages of that build: one `h1`, a unique title, a description of 50
+to 170 characters, a canonical equal to the page, Open Graph and Twitter tags and valid JSON-LD
+on each; its one finding (two courses sharing a description) is fixed in the sources. The smoke
+suite passed except for one new check whose text was split by markup, also fixed. Run both
+against https://pythilo.com after deployment:
+
+```sh
+node scripts/smoke.mjs https://pythilo.com
+node scripts/seo-audit.mjs https://pythilo.com
+```
+
+Overlay: 199 files, 3,406,538 bytes, SHA-256
+`50c5495610b65f14612842d5e1f8c779291cb183a50ce996afeffd319949bee3`, upload
+`pythilo-learn-seo-articles-20261113-v1`, sealed. Server baselines of the 27 replaced files
+matched commit `d336bcb`. `source_preview` (partial): base source revision
+`sha256:26038660f5d12a763d85f0427b0a499520fa458d8caba2229a4e544e890a7f56`, source digest
+`sha256:7553bf7f338c5400ce09603e9213dc29db28798f8eabefa534d00658265fe638`, revision
+`sha256:16246d1f0600ad4fe6565d53f35ee23570794cedabfe6bb5206440a1c86b24b1`, 199 changed files.
+
+Not built: free disk is 8.12 GB against the 10 GiB build guard, and lowering the guard needs
+the owner's yes each time; three questions sent to the phone went unanswered. To finish:
+`retention_set_policy` with `minFreeBytes` 7 GiB, `source_build` with the digest and revision
+above (key `pythilo-learn-seo-articles-build-20261113-v1`), `image_update`, `deployment_update`,
+restore `minFreeBytes` to 10 GiB, then the two checks above. An upload expires after 24 hours
+(`uploadMaxAgeHours`); after that, send the same archive again from
+`build/release-tools/site36/overlay.tgz`.
+

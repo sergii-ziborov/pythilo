@@ -1018,3 +1018,13 @@ notebook, django, github). A page can only claim keywords of the version on sale
 (`python3 build/release-tools/release35.py keywords`). Definitions:
 `docs/app-store/custom-product-pages.json`. Receipt: `docs/app-store/release-1.1-build35.json`.
 
+## Website: Learn redesign, search metadata and five articles — 13 November 2026
+
+The website work is committed (`b868050`, `c5e373e`) and staged on the server, but not yet
+live: the build guard needs the owner's confirmation (see `site/DEPLOY.md`). It contains the
+redesigned Learn pages (tracks with icons, filters, search, progress), a design pass over the
+other pages, search and sharing metadata on every page with icons, manifest, structured data
+and a dated sitemap, five articles of 3,400 to 3,850 words with four images each, and the
+algorithm guides on the Lab pages. Checked locally: 101 tests, TypeScript, a 790-page build,
+and an audit of all 776 sitemap pages.
+
