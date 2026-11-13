@@ -38,14 +38,14 @@ export default function Home() {
     <SiteHeader />
     <main className="page" style={{ gap: 88 }}>
       <section className="home-hero" aria-labelledby="hero-title">
-        <span className="eyebrow"><span className="dot" aria-hidden="true" />In beta on TestFlight · iPhone and iPad</span>
+        <span className="eyebrow"><span className="dot" aria-hidden="true" />On the App Store · iPhone and iPad</span>
         <h1 id="hero-title">Real Python, <span className="accent">on your iPhone and iPad</span></h1>
         <p className="lead">Pythilo is a Python IDE, a course and a set of algorithm labs in one app. CPython 3.14 runs on the device itself: your code, your tests, your Django site and your debugger session never leave the phone, and downloaded courses and Labs work entirely offline.</p>
         <div className="button-row center">
           <a href={APP_URL} className="big-button primary">Get the app<Arrow /></a>
           <Link href="/guide/" className="big-button">Read the guide</Link>
         </div>
-        <p className="hero-note">No account, no analytics, no ads. Free while in beta.</p>
+        <p className="hero-note">{PRICE}, paid once. No subscription, no account, no analytics, no ads.</p>
       </section>
 
       <Gallery slides={gallery} label="Screenshots of Pythilo on iPhone" />
@@ -196,10 +196,10 @@ export default function Home() {
 
       <section id="app" className="band" aria-labelledby="f-get">
         <div>
-          <h2 id="f-get">Free while in beta</h2>
-          <p>Pythilo is in beta on TestFlight. There is nothing to pay while it is in beta, and no account to make. The planned App Store price is {PRICE}, paid once.</p>
+          <h2 id="f-get">One price, paid once</h2>
+          <p>Pythilo is on the App Store for {PRICE}. You pay once for the whole app: there is no subscription, no in-app purchase and no account to make. Everything on this website stays free.</p>
         </div>
-        <div className="button-row"><Link href="/pricing/" className="big-button primary">Pricing and beta</Link><Link href="/support/" className="big-button">Support</Link></div>
+        <div className="button-row"><a href={APP_URL} className="big-button primary">Get it on the App Store</a><Link href="/pricing/" className="big-button">Pricing</Link></div>
       </section>
     </main>
     <SiteFooter />

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { OWNER } from "@/lib/site-info";
+import { APP_STORE_URL, OWNER } from "@/lib/site-info";
 
-export const APP_URL = process.env.NEXT_PUBLIC_APP_STORE_URL || "/pricing/#beta";
+export const APP_URL = process.env.NEXT_PUBLIC_APP_STORE_URL || APP_STORE_URL;
 
 export function BrandMark({ size = 30 }: { size?: number }) {
   return <span aria-hidden="true" className="brand-mark" style={size !== 30 ? { width: size, height: size, fontSize: Math.round(size * .43) } : undefined}>py</span>;

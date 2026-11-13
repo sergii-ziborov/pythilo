@@ -5,7 +5,8 @@ algorithm and machine learning labs in one app. CPython 3.14 runs on the device 
 tests, your Django site and your debugger session never leave the phone. Execution
 works offline after the required packages and data have been downloaded.
 
-Pythilo is a paid app, submitted to the App Store as 1.0. This repository is public to read; it is not
+Pythilo 1.0 is [on the App Store](https://apps.apple.com/app/id6829637526) for iPhone and iPad, for US$9.99 paid
+once, with no subscription and no account. This repository is public to read; it is not
 open source (see [License](#license)).
 
 <p align="center">
