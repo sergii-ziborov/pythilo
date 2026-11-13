@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { guidePages } from "@/lib/guide";
 
-export const metadata: Metadata = { title: "Guide", description: "A complete guide to Pythilo for iPhone and iPad: projects, the editor, the terminal, packages, web servers, Git, notebooks, courses, rooms, AI clients, settings and layouts." };
+export const metadata: Metadata = { title: "Guide to the Pythilo app", description: "A complete guide to Pythilo for iPhone and iPad: projects, the editor, the terminal, packages, web servers, Git, notebooks, courses, rooms and AI clients." };
 
 export default function GuideIndex() {
   const groups = [...new Set(guidePages.map(page => page.group))];

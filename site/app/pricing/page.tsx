@@ -4,7 +4,7 @@ import { SiteFooter, SiteHeader, APP_URL } from "@/components/site-header";
 import { PRICE, RELEASED, formatDay } from "@/lib/site-info";
 import "../site.css";
 
-export const metadata: Metadata = { title: "Pricing", description: `Pythilo for iPhone and iPad costs ${PRICE} on the App Store, paid once: no subscription, no in-app purchases, no account. The website's lessons, labs and playground are free.` };
+export const metadata: Metadata = { title: "Pricing: one price, paid once", description: `Pythilo for iPhone and iPad costs ${PRICE} on the App Store, paid once, with no subscription or account. The website's lessons, Labs and playground are free.` };
 
 export default function PricingPage() {
   return <>

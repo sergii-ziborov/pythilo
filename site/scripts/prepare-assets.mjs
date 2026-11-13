@@ -161,6 +161,9 @@ writeFileSync(join(content, 'labs.json'), JSON.stringify({
   sources: Object.fromEntries(['labs_engine.py', 'labs_extended.py', 'labs_intelligence.py', 'labs_senior.py', 'labs_projects.py'].map(file => [file, readFileSync(join(labRoot, file), 'utf8')])),
 }) + '\n');
 
+// What each Lab's algorithm is, how it works and where it is used: the same guides the app shows.
+writeFileSync(join(content, 'lab-guides.json'), JSON.stringify(JSON.parse(readFileSync(join(repository, 'Pythilo', 'Resources', 'LabGuides', 'lab-guides.json'), 'utf8'))) + '\n');
+
 // Pyodide runs only in a module worker, and the app's bundler starts workers as
 // classic scripts. The worker is therefore bundled here, beside Pyodide.
 const workerFile = join(content, 'worker.json');

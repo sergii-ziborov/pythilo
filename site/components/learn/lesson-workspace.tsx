@@ -86,12 +86,13 @@ export function LessonWorkspace({ course, lesson, breadcrumb, position, sections
             <button type="button" aria-current={section === taskIndex ? "step" : undefined} onClick={() => setSection(taskIndex)}>Your task</button>
           </nav>
           {sections.map((item, index) => <section key={index} hidden={section !== index} aria-labelledby={`part-${index}`}>
-            <h1 id={`part-${index}`}>{item.title}</h1>
+            {/* One h1 per page: the first part carries the lesson's title. */}
+            {index === 0 ? <h1 id="part-0">{item.title}</h1> : <h2 id={`part-${index}`} className="lesson-part-title">{item.title}</h2>}
             <div className="lesson-prose">{item.content}</div>
             <div className="lesson-continue"><button type="button" className="pill-button" onClick={() => setSection(index + 1)}>{index + 1 < sections.length ? `Next: ${sections[index + 1].chip}` : "Next: Your task"}</button></div>
           </section>)}
           <section hidden={section !== taskIndex} aria-labelledby="part-task">
-            <h1 id="part-task">Your task</h1>
+            <h2 id="part-task" className="lesson-part-title">Your task</h2>
             <div className="lesson-prose"><p>{task}</p>
               {hintsShown ? <><h2>Hints</h2><ol>{hints.slice(0, hintsShown).map((hint, index) => <li key={index}>{hint}</li>)}</ol></> : null}
               {passed ? <><h2>Why it works</h2>{explanation}</> : <p className="storage-note">The explanation opens here once every check passes.</p>}

@@ -4,7 +4,7 @@ import { GuideHeader, Note, Pager, Table, Toc } from "@/components/guide/doc";
 import { DeviceShot } from "@/components/site/phone";
 import { shots } from "@/lib/shots";
 
-export const metadata: Metadata = { title: "The terminal", description: "Pythilo's terminal on iPhone and iPad: tabs, a small bash with pipes, redirects and about 60 built-in commands, plus python, pip, pytest, sqlite3, git, npm, Django, Flask and Uvicorn." };
+export const metadata: Metadata = { title: "The terminal", description: "Pythilo's terminal on iPhone and iPad: tabs, a small bash with pipes and about 60 built-in commands, plus python, pip, pytest, sqlite3, git, npm and Django." };
 
 export default function Page() {
   return <>

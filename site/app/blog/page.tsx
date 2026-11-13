@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: "Blog",
   description,
   alternates: { canonical: absolute("/blog/"), types: { "application/rss+xml": [{ url: absolute("/blog/rss.xml"), title: "Pythilo blog" }] } },
-  openGraph: { siteName: "Pythilo", locale: "en_US", title: "Pythilo blog", description, url: absolute("/blog/"), type: "website" },
+  openGraph: { siteName: "Pythilo", locale: "en_US", title: "Pythilo blog", description, url: absolute("/blog/"), type: "website", images: [{ url: absolute("/opengraph-image.png"), width: 1200, height: 630, alt: "Pythilo: real Python on your iPhone and iPad" }] },
   twitter: { card: "summary", title: "Pythilo blog", description },
 };
 

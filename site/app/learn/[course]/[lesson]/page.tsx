@@ -1,3 +1,4 @@
+import { describe } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { allLabs } from "@/lib/browser-labs";
@@ -14,7 +15,7 @@ export function generateStaticParams() { return courses.flatMap(course => course
 type Params = { params: Promise<{ course: string; lesson: string }> };
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { course: courseId, lesson: lessonId } = await params, course = courseById(courseId), lesson = course && lessonById(course, lessonId);
-  return lesson ? { title: `${lesson.title} — ${course.title}`, description: lesson.task.replace(/`/g, "").slice(0, 160) } : {};
+  return lesson ? { title: `${lesson.title}: ${course.title}`, description: describe(lesson.task) } : {};
 }
 
 export default async function LessonPage({ params }: Params) {

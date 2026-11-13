@@ -3,8 +3,10 @@ import Link from "next/link";
 import { SiteFooter, SiteHeader, APP_URL } from "@/components/site-header";
 import { PythonCode } from "@/components/python-code";
 import { Gallery } from "@/components/site/gallery";
+import { HomeJsonLd } from "@/components/site/home-json-ld";
 import { DeviceShot } from "@/components/site/phone";
 import { courses } from "@/lib/courses";
+import { browserLabs } from "@/lib/browser-labs";
 import { labCount, labGroups } from "@/lib/labs";
 import { PRICE } from "@/lib/site-info";
 import { PYODIDE_VERSION } from "@/lib/python-runtime";
@@ -12,8 +14,8 @@ import { gallery, shots } from "@/lib/shots";
 import "./site.css";
 
 export const metadata: Metadata = {
-  title: { absolute: "Pythilo — Real Python on your iPhone and iPad" },
-  description: "Pythilo is a Python IDE, a course and algorithm labs in one app. CPython 3.14 runs on the device: projects, a terminal, a debugger, pytest, Django, FastAPI, PyTorch and Git, offline.",
+  title: { absolute: "Pythilo: Python IDE for iPhone and iPad, with courses and Labs" },
+  description: "Pythilo is a Python IDE, courses and algorithm Labs in one app for iPhone and iPad. CPython 3.14 runs on the device: terminal, debugger, Django, PyTorch and Git.",
 };
 
 const sample = `def running_total():
@@ -36,6 +38,7 @@ export default function Home() {
   const first = courses[0], lesson = first?.lessons[0];
   return <>
     <SiteHeader />
+    <HomeJsonLd />
     <main className="page" style={{ gap: 88 }}>
       <section className="home-hero" aria-labelledby="hero-title">
         <span className="eyebrow"><span className="dot" aria-hidden="true" />On the App Store · iPhone and iPad</span>
@@ -125,11 +128,12 @@ export default function Home() {
         <div className="feature-text">
           <span className="label">Labs</span>
           <h2 id="f-labs">Watch your algorithm work, then time it</h2>
-          <p>{labCount} labs in the next app build cover basics, data structures, algorithms and machine learning. Trace your own code, replay each step, then see how it scales on the device.</p>
+          <p>{labCount} Labs in the app cover basics, data structures, algorithms, machine learning and AI. Trace your own code, replay each step, see how it scales on the device, and read how each algorithm works.</p>
           <ul className="ticks">
-            {labGroups.map(group => <li key={group.title}><strong>{group.title}</strong>: {group.labs.map(lab => lab.title).join(", ")}.</li>)}
+            {/* A few names per section; the Labs page lists every one. */}
+            {labGroups.map(group => <li key={group.title}><strong>{group.title}</strong>: {group.labs.slice(0, 8).map(lab => lab.title).join(", ")}{group.labs.length > 8 ? ` and ${group.labs.length - 8} more` : ""}.</li>)}
           </ul>
-          <Link href="/labs/" className="arrow-link">Try 30 labs in your browser</Link>
+          <Link href="/labs/" className="arrow-link">Try {browserLabs.length} labs in your browser</Link>
         </div>
         <div className="feature-media"><DeviceShot shot={shots.graphLab} /><DeviceShot shot={shots.dpLab} /></div>
       </section>

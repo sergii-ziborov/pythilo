@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { aiClients, setupCommand, MCP_DOWNLOAD, type AIClient } from "@/lib/playground-handoff";
 
-export const metadata: Metadata = { title: "Connect an AI client", description: "Let Claude Code, Claude Desktop or Codex join a Pythilo room through the Pythilo MCP bridge." };
+export const metadata: Metadata = { title: "Connect Claude or Codex to a room (MCP)", description: "Let Claude Code, Claude Desktop or Codex join a Pythilo room through the Pythilo MCP bridge, with one command and no account." };
 
 export default function ConnectAIPage() {
   return <>

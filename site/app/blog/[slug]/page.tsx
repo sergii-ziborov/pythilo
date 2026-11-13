@@ -1,3 +1,4 @@
+import { breadcrumbList, describe } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -16,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const images = post.cover ? [{ url: absolute(post.cover), alt: post.coverAlt, ...size }] : undefined;
   return {
     title: post.title,
-    description: post.description,
+    description: describe(post.description, 165),
     authors: [{ name: post.author }],
     keywords: post.tags,
     alternates: { canonical: url, types: { "application/rss+xml": [{ url: absolute("/blog/rss.xml"), title: "Pythilo blog" }] } },
@@ -53,6 +54,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     <SiteHeader />
     <main className="blog-article-page">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbList([["Blog", "/blog/"], [post.title, `/blog/${post.slug}/`]])).replace(/</g, "\\u003c") }} />
       <article className="blog-article">
         <header className="blog-article-header">
           <nav aria-label="Breadcrumb" className="blog-breadcrumb"><Link href="/blog/">Blog</Link></nav>

@@ -104,6 +104,10 @@ available. Seventy-four also run in the browser at [pythilo.com/labs](https://py
 using the same tracer and correctness checks. Forty PyTorch Labs run in the app,
 including sixteen composed projects. Six train real pretrained BERT models with the UCI
 sentiment dataset, LoRA, domain transfer, exact resume and merged-artifact evaluation. Expand a topic or search by concept to find them. 127 Labs link to the lessons that teach them.
+Every Lab has an About page that explains its algorithm: the idea, the steps, what it costs, where
+it is used and what to watch out for, with an illustration. It opens from the info button on a
+Lab's row, before any download, or from About inside the Lab. The same guides are on each Lab's page
+on the website.
 Correctness first, then time. The catalogue now covers Basics, Data structures,
 Algorithms, Machine learning and Artificial intelligence. Search the catalog or use
 the ML (65 labs) and AI (48 labs) filters. For example:

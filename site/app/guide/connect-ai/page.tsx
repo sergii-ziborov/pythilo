@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { GuideHeader, Note, Pager, Table, Toc } from "@/components/guide/doc";
 
-export const metadata: Metadata = { title: "Connect an AI client", description: "Let Claude Code, Codex or any MCP client work on one Pythilo project over your local network, with separate permissions for reading, editing, running, installing and committing." };
+export const metadata: Metadata = { title: "Connect an AI client", description: "Let Claude Code, Codex or any MCP client work on one Pythilo project over your local network, with separate permissions to read, edit, run, install and commit." };
 
 export default function Page() {
   return <>

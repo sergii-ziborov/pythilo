@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { GuideHeader, Note, Pager, Table } from "@/components/guide/doc";
 
-export const metadata: Metadata = { title: "Settings", description: "Every setting in Pythilo for iPhone and iPad: the file drawer, status bar, code size, appearance, Git identity, GitHub account and tokens, room name, and the Python version." };
+export const metadata: Metadata = { title: "Settings", description: "Every setting in Pythilo for iPhone and iPad: file drawer, status bar, code size, appearance, Git identity, GitHub account and tokens, room name and Python version." };
 
 export default function Page() {
   return <>
